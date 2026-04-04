@@ -1,4 +1,4 @@
-# 數學防線 Math Defense — 期末專題企劃書（v2）
+# 數學防線 Math Defense — 期末專題企劃書（v3）
 
 ## 一、專題概述
 
@@ -9,7 +9,7 @@
 | 團隊 | 三人（大一、大二、大三），本科：教育與科技 |
 | 目標玩家 | 高中生 |
 | 遊戲類型 | 策略型塔防 × 數學學習 |
-| 技術棧 | HTML5 Canvas + JavaScript（主程式）+ C（數學引擎模組） |
+| 技術棧 | HTML5 Canvas + JavaScript（主程式）+ C → WebAssembly（數學運算核心） |
 | 開發時程 | 6 週以上 |
 | 關卡數量 | 4 關精緻版 |
 
@@ -372,13 +372,32 @@ Build Phase（準備階段）              Wave Phase（戰鬥階段）
 
 ## 十一、技術架構
 
-### 主程式：HTML5 Canvas + JavaScript
+### 架構總覽：雙層分離
+
+```
+┌─────────────────────────────────────────────┐
+│  瀏覽器                                      │
+│                                              │
+│  JS 層：UI、Canvas 渲染、遊戲流程控制          │
+│    ↕ ccall / cwrap                           │
+│  WASM 層（C 編譯）：所有數學運算核心            │
+│    • matrix_multiply      矩陣連結塔          │
+│    • calculate_trajectory  函數砲軌跡         │
+│    • sector_coverage       雷達掃描塔         │
+│    • numerical_integrate   積分砲             │
+│    • fourier_composite     傅立葉破盾         │
+└─────────────────────────────────────────────┘
+```
+
+C 負責**計算層**，JS 負責**表現層**，透過 WebAssembly（Emscripten）整合。遊戲中每一次砲彈軌跡計算、面積運算、波形合成，都實際經過 C 編譯的 WASM 模組執行。
+
+### JS 層：HTML5 Canvas + JavaScript
 
 | 模組 | 功能 |
 |------|------|
 | Game Engine | 遊戲迴圈、Canvas 渲染、輸入處理 |
-| Math Module (JS) | 軌跡計算、矩陣運算、三角函數、積分近似、傅立葉合成 |
-| Tower System | 6 種塔的邏輯、升級系統 |
+| WASM Bridge | 載入 WASM 模組、封裝 `ccall`/`cwrap` 呼叫介面 |
+| Tower System | 6 種塔的邏輯、升級系統（數學運算委託 WASM） |
 | Wave & Enemy System | 路徑函數生成、敵人生成、HP 管理、分裂/隱身邏輯 |
 | Random Path Generator | 依關卡等級從隨機池生成合理的函數路徑 |
 | UI Layer | Build Phase 浮動面板、HUD、選單、Buff 卡介面、傅立葉破盾介面 |
@@ -386,9 +405,9 @@ Build Phase（準備階段）              Wave Phase（戰鬥階段）
 | Leaderboard | localStorage 讀寫 |
 | Asset Manager | 像素風 sprites、chiptune 音效、自訂頭像上傳處理 |
 
-### C 模組：math_engine.c
+### WASM 層：math_engine.c → WebAssembly
 
-教授要求「至少一小部分是 C」，C 模組包含以下函式：
+C 模組是遊戲的**數學運算核心**，透過 Emscripten 編譯為 `.wasm`，在瀏覽器中直接執行。遊戲運行時，JS 層透過 `ccall`/`cwrap` 呼叫以下 C 函式：
 
 ```c
 // 矩陣乘法：兩塔連結的線性變換
@@ -409,12 +428,55 @@ float numerical_integrate(float (*f)(float), float a, float b, int n);
 float fourier_composite(float t, float freqs[3], float amps[3]);
 ```
 
-### C 模組的呈現方式
+### JS 呼叫 WASM 範例
 
-1. 編譯為獨立的命令列工具（CLI），接受參數輸入並輸出計算結果
-2. Demo 時現場展示 C 模組的運算結果
-3. 遊戲本身用 JS 實作相同演算法
-4. Report 中對照 C 和 JS 的實作方式與效能差異
+```js
+// 載入 WASM 模組
+const MathEngine = await createMathEngine();
+
+// 函數砲：計算砲彈軌跡（一次函數 y = mx + b）
+const trajectory = MathEngine.ccall('calculate_trajectory', null,
+  ['number', 'number', 'number', 'number', 'number', 'number'],
+  [a, b, c, xStart, xEnd, step]
+);
+
+// 積分砲：梯形法計算攻擊面積
+const area = MathEngine.ccall('numerical_integrate', 'number',
+  ['number', 'number', 'number'],
+  [a, b, n]
+);
+
+// 傅立葉破盾：合成波形
+const value = MathEngine.ccall('fourier_composite', 'number',
+  ['number', 'array', 'array'],
+  [t, freqs, amps]
+);
+```
+
+### 編譯流程
+
+```bash
+# 安裝 Emscripten SDK（一次性）
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk && ./emsdk install latest && ./emsdk activate latest
+
+# 編譯 C → WASM
+emcc math_engine.c -o math_engine.js \
+  -s EXPORTED_FUNCTIONS='["_matrix_multiply","_calculate_trajectory","_sector_coverage","_numerical_integrate","_fourier_composite"]' \
+  -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -s MODULARIZE=1 \
+  -s EXPORT_NAME='createMathEngine' \
+  -O2
+```
+
+產出 `math_engine.js`（膠水碼）+ `math_engine.wasm`（編譯後的二進位），放入專案即可在瀏覽器中載入。
+
+### C → WASM 的呈現價值
+
+1. **C 是遊戲的真正運算核心**——每一發砲彈、每一次積分、每一次傅立葉合成都經過 C 編譯的 WASM 執行
+2. **Demo 零安裝**——教授打開瀏覽器即可遊玩，WASM 隨網頁自動載入
+3. **效能對比有實際意義**——可在遊戲內加入開關，切換 JS 純運算 / WASM 運算，即時顯示效能差異（Report 亮點）
+4. **架構清晰**——計算層（C）與表現層（JS）分離，展示良好的軟體工程實踐
 
 ---
 
@@ -432,23 +494,110 @@ float fourier_composite(float t, float freqs[3], float amps[3]);
 
 | 週次 | 工作內容 | 產出 |
 |------|----------|------|
-| Week 1 | 環境建置 + 核心引擎：Canvas boilerplate、座標系格線（符文風格）、遊戲迴圈、敵人沿隨機函數路徑移動 | 座標平面上可看到敵人走動 |
-| Week 2 | 函數砲 + Build Phase UI：手動輸入 m/b、曲線預覽、交點命中判定、浮動面板 UI（羊皮紙風格） | 第一座塔可玩 |
-| Week 3 | 雷達掃描塔 + 機率神殿：三角函數塔的角度/弧度/半徑輸入、Buff 卡 UI（3 張卡 + 詛咒 + 跳過）、波次系統 | Level 1-2 可玩 |
-| Week 4 | 矩陣連結 + 積分砲 + C 模組：2×2 矩陣輸入 UI、塔連結動畫、積分砲（輸入函數 + 區間 + 面積預覽）、math_engine.c 撰寫 | Level 1-3 可玩 |
-| Week 5 | Level 4 + Boss 戰 + 傅立葉：Boss 龍、傅立葉破盾迷你遊戲（波形對比 UI）、隱身史萊姆、排行榜 | 全 4 關可玩 |
-| Week 6 | 打磨 + 音效 + 自訂頭像：chiptune BGM、像素美術精修、自訂頭像上傳功能、平衡性調整、Bug 修復 | 完整遊戲 |
-| Week 7 | Report + 簡報：撰寫報告（教育理論分析、C vs JS 對比）、準備 Demo、最終測試 | 完整交付 |
+| Week 1 | 環境建置 + 核心引擎 + WASM 基礎：Emscripten SDK 安裝、Canvas boilerplate、座標系格線（符文風格）、遊戲迴圈、`math_engine.c` 基礎函式（`calculate_trajectory`）撰寫並編譯為 WASM、驗證 JS ↔ WASM 呼叫通路、敵人沿隨機函數路徑移動 | 座標平面上可看到敵人走動，軌跡由 WASM 計算 |
+| Week 2 | 函數砲 + Build Phase UI：手動輸入 m/b、曲線預覽（WASM 計算軌跡點）、交點命中判定、浮動面板 UI（羊皮紙風格） | 第一座塔可玩，砲彈軌跡經由 C/WASM 運算 |
+| Week 3 | 雷達掃描塔 + 機率神殿：三角函數塔的角度/弧度/半徑輸入、WASM `sector_coverage` 實作、Buff 卡 UI（3 張卡 + 詛咒 + 跳過）、波次系統 | Level 1-2 可玩 |
+| Week 4 | 矩陣連結 + 積分砲：2×2 矩陣輸入 UI、WASM `matrix_multiply` 實作、塔連結動畫、積分砲（輸入函數 + 區間 + WASM `numerical_integrate` 面積計算與預覽） | Level 1-3 可玩 |
+| Week 5 | Level 4 + Boss 戰 + 傅立葉：Boss 龍、WASM `fourier_composite` 實作、傅立葉破盾迷你遊戲（波形對比 UI）、隱身史萊姆、排行榜 | 全 4 關可玩 |
+| Week 6 | 打磨 + 音效 + 自訂頭像 + 效能對比：chiptune BGM、像素美術精修、自訂頭像上傳功能、JS/WASM 運算切換開關與效能計時器、平衡性調整、Bug 修復 | 完整遊戲 |
+| Week 7 | Report + 簡報：撰寫報告（教育理論分析、C/WASM vs JS 效能對比數據）、準備 Demo、最終測試 | 完整交付 |
 
 ---
 
-## 十四、分工建議
+## 十四、分工設計
 
-| 成員 | 負責範圍 |
-|------|----------|
-| 大三（架構 + C） | Canvas 遊戲引擎、隨機路徑生成器、敵人系統（分裂/隱身邏輯）、math_engine.c、傅立葉破盾迷你遊戲 |
-| 大二（遊戲邏輯） | 六種塔的實作、Build Phase 浮動面板 UI、Buff 卡系統、積分砲的面積計算與預覽、關卡 JSON 配置 |
-| 大一（設計 + Report） | 像素風美術素材、UI/UX 設計（羊皮紙風格面板、HUD）、自訂頭像功能、chiptune 音效蒐集、排行榜頁面、Report 撰寫、簡報製作 |
+### 總覽
+
+```
+大三（架構 + C/WASM）          大二（雷達掃描塔）          大一（前端 UI）
+──────────────────────    ──────────────────────    ──────────────────────
+遊戲引擎 Game Loop            雷達掃描塔完整實作          HUD 資訊列
+Canvas 座標系渲染              ├ Build Phase 面板         Build Phase 浮動面板框架
+math_engine.c + WASM          ├ 扇形即時預覽             Buff 卡翻牌介面
+WASM Bridge 封裝              ├ 命中判定邏輯             主選單 / 關卡選擇畫面
+敵人系統（路徑/分裂/隱身）       └ 傷害邏輯（DPS）         排行榜頁面
+函數砲                                                   自訂頭像上傳（像素化）
+矩陣連結塔                                               關卡結算畫面
+積分砲                                                   整體視覺風格 CSS
+傅立葉破盾迷你遊戲                                        像素風美術素材
+機率神殿（Buff 邏輯）          ←── Buff 卡 UI 由大一做     chiptune 音效蒐集
+波次系統 / 關卡 JSON 配置                                 Report 撰寫（含效能分析）
+隨機路徑生成器                                            簡報製作
+JS/WASM 效能對比機制
+```
+
+### 介面約定（大三定義，供大二與大一對接）
+
+| 介面 | 大三提供 | 使用方 | 說明 |
+|------|---------|--------|------|
+| Tower base class | `Tower`（含 `onBuild`、`onWave`、`render` 方法） | 大二 | 大二繼承此 class 實作雷達掃描塔 |
+| WASM Bridge | `MathEngine.sectorCoverage(r, θ, Δθ)` 等封裝函式 | 大二 | 大二不需要碰 Emscripten，只呼叫封裝好的 JS 函式 |
+| 遊戲事件 hook | `game.on('buildPhaseStart', cb)`、`game.on('waveEnd', cb)` 等 | 大一 | 大一掛 UI 顯示/隱藏邏輯 |
+| 遊戲狀態 | `game.state`（金幣、HP、波次、分數） | 大一 | 大一讀取後顯示在 HUD |
+| Buff 邏輯結果 | `buffSystem.applyCard(card)` → 回傳成功/失敗 | 大一 | 大一依結果播放對應動畫 |
+
+### 大二：雷達掃描塔（獨立負責）
+
+**選擇理由**：數學邊界清楚（3 個參數、1 個扇形）、與其他塔耦合度低、視覺回饋明確、複雜度適中。
+
+**交付項目**：
+
+| 項目 | 內容 |
+|------|------|
+| Build Phase UI | 點擊塔後彈出面板，三個輸入欄：起始角度 θ、掃描弧度寬 Δθ、半徑 r |
+| 即時預覽 | Canvas 上畫出扇形覆蓋範圍（半透明綠色） |
+| 命中判定 | Wave Phase 中判斷敵人座標是否落在扇形內（距離 ≤ r 且角度在 [θ, θ+Δθ] 內） |
+| WASM 呼叫 | 透過 WASM Bridge 呼叫 `MathEngine.sectorCoverage()` |
+| 傷害邏輯 | 扇形內的敵人持續扣血（DPS 模式） |
+
+**需要學習的技術**：
+
+| 主題 | 原因 | 建議資源 |
+|------|------|---------|
+| Canvas 2D 基礎 | 畫扇形（`arc`）、填色（`fill`）、座標轉換 | MDN Canvas Tutorial |
+| 三角函數基礎 | `sin`/`cos` 極座標 → 直角座標轉換、點在扇形內判定 | GeoGebra 視覺化 |
+| 角度 vs 弧度 | Canvas `arc()` 用弧度，玩家輸入用角度，`rad = deg × π / 180` | 一個公式 |
+| ES Module | `import`/`export`，與專案架構接軌 | 半小時入門 |
+| Git 基礎協作 | `clone`/`pull`/`add`/`commit`/`push`、處理 conflict | GitHub 官方教學 |
+
+### 大一：前端 UI 層（獨立負責）
+
+**選擇理由**：不需要理解遊戲數學邏輯，但對最終成品的觀感與 Demo 體驗影響巨大。
+
+**交付項目**：
+
+| 項目 | 內容 |
+|------|------|
+| HUD 資訊列 | 波次狀態（Build Phase / Wave X）、金幣、HP、累積分數，深色 + 金色主題 |
+| Build Phase 浮動面板框架 | 羊皮紙風格的彈出面板容器（內部輸入欄由大三與大二各自填入） |
+| Buff 卡介面 | 3 張卡的翻牌動畫、成功/失敗視覺反饋、跳過按鈕 |
+| 主選單 / 關卡選擇畫面 | 開始遊戲、選關卡（4 關）、排行榜入口 |
+| 排行榜頁面 | 從 localStorage 讀取並顯示排名列表 |
+| 自訂頭像上傳 | `<input type="file">` + Canvas 縮放為 16×16 像素（`imageSmoothingEnabled = false`） |
+| 關卡結算畫面 | 總分、擊殺數、排行榜排名變化 |
+| 整體視覺風格 | 配色方案實作（深色石板底、金色邊框、monospace 字體）、像素風美術素材 |
+| 音效 | 蒐集免費 chiptune BGM 與音效素材 |
+| Report + 簡報 | 撰寫報告（教育理論分析、C/WASM vs JS 效能分析）、製作簡報 |
+
+**需要學習的技術**：
+
+| 主題 | 原因 | 建議資源 |
+|------|------|---------|
+| HTML + CSS 基礎 | 面板佈局、`position: absolute` 浮動面板、flex 排版 | MDN 入門教學 |
+| CSS 變數 + 主題配色 | 統一管理暗色主題顏色（`--color-gold`、`--color-stone` 等） | 一篇文章即可 |
+| JavaScript DOM 操作 | 動態建立/顯示/隱藏面板、事件綁定 | `querySelector`、`addEventListener`、`classList` |
+| Canvas drawImage | 自訂頭像的圖片縮放 + 像素化效果 | MDN drawImage 文件 |
+| localStorage | 排行榜存取：`setItem`/`getItem` + JSON 序列化 | 15 分鐘入門 |
+| CSS 動畫 / transition | Buff 卡翻牌效果、面板淡入淡出 | `@keyframes` 或 `transition` |
+| Git 基礎協作 | 同大二 | GitHub 官方教學 |
+
+### 啟動順序（避免互相卡住）
+
+| 時間 | 大三 | 大二 | 大一 |
+|------|------|------|------|
+| Week 1 前半 | 遊戲引擎骨架 + 座標系渲染 + WASM 通路 | Canvas + 三角函數學習，用獨立 HTML 練習畫扇形 | HTML/CSS 學習，做主選單靜態頁面 |
+| Week 1 後半 | Tower base class + WASM Bridge 封裝 → 推上 Git | 用獨立 HTML 練習：畫扇形 + 判斷滑鼠是否在扇形內 | HUD 靜態版本（先 hardcode 數值） |
+| Week 2 起 | 開發函數砲 | 把雷達塔接進遊戲引擎 | 把 HUD 接上 `game.state`，開始做 Buff 卡 UI |
 
 ---
 
@@ -496,7 +645,8 @@ float fourier_composite(float t, float freqs[3], float amps[3]);
 - 隨機函數路徑生成器（含參數邊界約束）
 - 數值積分演算法（梯形法）
 - 傅立葉波形合成與匹配度計算
-- C 模組（矩陣乘法、軌跡計算、積分、傅立葉）+ JS 雙實作 + 效能對比
+- C → WebAssembly（Emscripten）：數學運算核心在瀏覽器中以 WASM 執行，JS 透過 `ccall`/`cwrap` 呼叫
+- 遊戲內 JS/WASM 運算切換開關 + 即時效能對比
 
 ### Art and Design
 
@@ -513,7 +663,7 @@ float fourier_composite(float t, float freqs[3], float amps[3]);
 - 現場讓教授手動輸入 y = mx + b 體驗函數砲
 - 讓教授上傳自己的照片體驗自訂頭像
 - Report 包含教育理論分析
-- C vs JS 效能對比數據
+- 現場切換 JS/WASM 運算模式，展示 C → WebAssembly 效能對比
 - 競品分析表格
 
 ---

@@ -1,0 +1,29 @@
+/* CSS 變數 — 主題色（中世紀奇幻 × 像素風） */
+:root {
+  --stone-dark:    #1a1520;
+  --stone-light:   #252030;
+  --grid-line:     #3a3028;
+  --axis:          #8b7342;
+  --gold:          #d4a840;
+  --gold-bright:   #ffd700;
+  --gold-dim:      #8b7342;
+
+  --tower-cannon:  #4a82c8;
+  --tower-radar:   #4aab6e;
+  --tower-matrix:  #9068c8;
+  --tower-shrine:  #c89848;
+  --tower-integral:#4a82c8;
+  --tower-fourier: #c89848;
+
+  --enemy-red:     #b84040;
+  --hp-green:      #4aab6e;
+  --hp-yellow:     #c89848;
+  --hp-red:        #cc4444;
+
+  --panel-bg:      rgba(26, 21, 32, 0.95);
+  --panel-border:  #8b7342;
+  --panel-shadow:  0 0 20px rgba(0, 0, 0, 0.8);
+
+  --font-mono:     'Courier New', Courier, monospace;
+  --font-main:     var(--font-mono);
+}

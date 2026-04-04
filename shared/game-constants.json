@@ -1,0 +1,28 @@
+{
+  "_comment": "遊戲常數 — 前後端共用，確保數值一致性",
+  "canvas": {
+    "width": 1280,
+    "height": 720,
+    "originX": 160,
+    "originY": 600,
+    "unitPx": 40
+  },
+  "grid": {
+    "minX": -3, "maxX": 25,
+    "minY": -2, "maxY": 14
+  },
+  "player": {
+    "initialHp": 20,
+    "initialGold": 200
+  },
+  "loop": {
+    "targetFps": 60,
+    "fixedDt": 0.016667
+  },
+  "collision": {
+    "hitRadius": 0.5
+  },
+  "waveSystem": {
+    "pathValidationMinCoverage": 0.8
+  }
+}

@@ -1,0 +1,237 @@
+/**
+ * math_engine.c — 數學運算核心
+ * 透過 Emscripten 編譯為 WebAssembly，在瀏覽器中執行。
+ * 所有遊戲中的數學運算（砲彈軌跡、扇形面積、矩陣、積分、傅立葉）
+ * 都經由此模組計算。
+ *
+ * 編譯指令：
+ * emcc math_engine.c -o math_engine.js \
+ *   -s EXPORTED_FUNCTIONS='["_matrix_multiply","_calculate_trajectory","_sector_coverage","_point_in_sector","_numerical_integrate","_fourier_composite","_fourier_match","_line_circle_intersect"]' \
+ *   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+ *   -s MODULARIZE=1 \
+ *   -s EXPORT_NAME='createMathEngine' \
+ *   -O2
+ */
+
+#include <math.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+/* ══════════════════════════════════════════
+ *  矩陣乘法：矩陣連結塔的線性變換
+ * ══════════════════════════════════════════ */
+
+/**
+ * 2x2 矩陣乘法 result = a × b
+ * 矩陣以 row-major 一維陣列傳入：[a00, a01, a10, a11]
+ */
+void matrix_multiply(const float *a, const float *b, float *result) {
+    result[0] = a[0] * b[0] + a[1] * b[2];
+    result[1] = a[0] * b[1] + a[1] * b[3];
+    result[2] = a[2] * b[0] + a[3] * b[2];
+    result[3] = a[2] * b[1] + a[3] * b[3];
+}
+
+/* ══════════════════════════════════════════
+ *  軌跡計算：函數砲的砲彈路徑
+ * ══════════════════════════════════════════ */
+
+/**
+ * 計算多項式 y = a*x^2 + b*x + c 在指定區間的座標點
+ *
+ * @param a, b, c   多項式係數（一次函數時 a=0）
+ * @param x_start   起始 x
+ * @param x_end     結束 x
+ * @param step      步長
+ * @param out_x     輸出 x 座標陣列（呼叫方需預先分配）
+ * @param out_y     輸出 y 座標陣列
+ * @param count     輸出：實際點數
+ */
+void calculate_trajectory(float a, float b, float c,
+                          float x_start, float x_end, float step,
+                          float *out_x, float *out_y, int *count) {
+    int i = 0;
+    float x;
+    float dir = (x_end >= x_start) ? 1.0f : -1.0f;
+
+    for (x = x_start; (dir > 0 ? x <= x_end : x >= x_end); x += step * dir) {
+        out_x[i] = x;
+        out_y[i] = a * x * x + b * x + c;
+        i++;
+        if (i >= 1000) break;  /* 安全上限 */
+    }
+
+    *count = i;
+}
+
+/* ══════════════════════════════════════════
+ *  扇形覆蓋面積：雷達掃描塔
+ * ══════════════════════════════════════════ */
+
+/**
+ * 計算扇形面積
+ * @param radius       半徑
+ * @param angle_width  弧寬（弧度）
+ * @return 扇形面積
+ */
+float sector_coverage(float radius, float angle_width) {
+    return 0.5f * radius * radius * angle_width;
+}
+
+/**
+ * 判斷點是否在扇形內
+ * @param px, py        點座標
+ * @param cx, cy        圓心座標
+ * @param radius        半徑
+ * @param angle_start   起始角（弧度）
+ * @param angle_width   弧寬（弧度）
+ * @return 1 if inside, 0 if outside
+ */
+int point_in_sector(float px, float py, float cx, float cy,
+                    float radius, float angle_start, float angle_width) {
+    float dx = px - cx;
+    float dy = py - cy;
+    float dist = sqrtf(dx * dx + dy * dy);
+
+    if (dist > radius) return 0;
+
+    float angle = atan2f(dy, dx);
+    if (angle < 0) angle += 2.0f * (float)M_PI;
+
+    float start = fmodf(angle_start, 2.0f * (float)M_PI);
+    if (start < 0) start += 2.0f * (float)M_PI;
+
+    float end = start + angle_width;
+
+    if (end > 2.0f * (float)M_PI) {
+        return (angle >= start || angle <= end - 2.0f * (float)M_PI) ? 1 : 0;
+    }
+
+    return (angle >= start && angle <= end) ? 1 : 0;
+}
+
+/* ══════════════════════════════════════════
+ *  定積分近似（梯形法）：積分砲
+ * ══════════════════════════════════════════ */
+
+/**
+ * 用梯形法計算多項式 f(x) = ax^2 + bx + c 在 [lo, hi] 的定積分
+ *
+ * @param coeff_a, coeff_b, coeff_c  多項式係數
+ * @param lo     積分下界
+ * @param hi     積分上界
+ * @param n      分割數
+ * @return 近似積分值
+ */
+float numerical_integrate(float coeff_a, float coeff_b, float coeff_c,
+                          float lo, float hi, int n) {
+    if (n <= 0) n = 100;
+    float h = (hi - lo) / (float)n;
+    float sum = 0.0f;
+
+    for (int i = 0; i <= n; i++) {
+        float x = lo + i * h;
+        float y = coeff_a * x * x + coeff_b * x + coeff_c;
+        if (y < 0) y = 0;  /* 面積取正值 */
+
+        if (i == 0 || i == n) {
+            sum += y;
+        } else {
+            sum += 2.0f * y;
+        }
+    }
+
+    return fabsf(sum * h / 2.0f);
+}
+
+/* ══════════════════════════════════════════
+ *  傅立葉合成：傅立葉破盾
+ * ══════════════════════════════════════════ */
+
+/**
+ * 計算三個 sin 波的疊加值
+ * f(t) = A1*sin(ω1*t) + A2*sin(ω2*t) + A3*sin(ω3*t)
+ *
+ * @param t      時間參數
+ * @param freqs  頻率陣列 [ω1, ω2, ω3]
+ * @param amps   振幅陣列 [A1, A2, A3]
+ * @return 合成值
+ */
+float fourier_composite(float t, const float *freqs, const float *amps) {
+    return amps[0] * sinf(freqs[0] * t)
+         + amps[1] * sinf(freqs[1] * t)
+         + amps[2] * sinf(freqs[2] * t);
+}
+
+/**
+ * 計算兩個傅立葉波形的匹配度（0~1）
+ * 在 [0, 2π] 區間取樣比較
+ *
+ * @param freqs1, amps1  Boss 的波形參數
+ * @param freqs2, amps2  玩家的波形參數
+ * @param samples        取樣數
+ * @return 匹配度 0.0 ~ 1.0
+ */
+float fourier_match(const float *freqs1, const float *amps1,
+                    const float *freqs2, const float *amps2,
+                    int samples) {
+    if (samples <= 0) samples = 200;
+
+    float totalError = 0.0f;
+    float totalEnergy = 0.0f;
+    float dt = 2.0f * (float)M_PI / (float)samples;
+
+    for (int i = 0; i < samples; i++) {
+        float t = i * dt;
+        float v1 = fourier_composite(t, freqs1, amps1);
+        float v2 = fourier_composite(t, freqs2, amps2);
+        float diff = v1 - v2;
+        totalError += diff * diff;
+        totalEnergy += v1 * v1;
+    }
+
+    if (totalEnergy < 0.001f) return 1.0f;  /* 都是零波形 */
+
+    float ratio = totalError / totalEnergy;
+    float match = 1.0f - sqrtf(ratio);
+    if (match < 0.0f) match = 0.0f;
+    if (match > 1.0f) match = 1.0f;
+
+    return match;
+}
+
+/* ══════════════════════════════════════════
+ *  輔助：直線與圓的交點（函數砲命中判定）
+ * ══════════════════════════════════════════ */
+
+/**
+ * 直線 y = mx + b 與圓心 (cx, cy) 半徑 r 的交點數
+ * 交點座標寫入 out_x[], out_y[]
+ * @return 交點數 (0, 1, 或 2)
+ */
+int line_circle_intersect(float m, float b, float cx, float cy, float r,
+                          float *out_x, float *out_y) {
+    /* 代入：m*x + b = y → (x - cx)^2 + (mx + b - cy)^2 = r^2
+       展開為 (1+m^2)x^2 + 2(m(b-cy) - cx)x + (cx^2 + (b-cy)^2 - r^2) = 0 */
+    float A = 1.0f + m * m;
+    float B = 2.0f * (m * (b - cy) - cx);
+    float C = cx * cx + (b - cy) * (b - cy) - r * r;
+    float disc = B * B - 4.0f * A * C;
+
+    if (disc < 0) return 0;
+
+    if (disc < 1e-6f) {
+        out_x[0] = -B / (2.0f * A);
+        out_y[0] = m * out_x[0] + b;
+        return 1;
+    }
+
+    float sqrtDisc = sqrtf(disc);
+    out_x[0] = (-B + sqrtDisc) / (2.0f * A);
+    out_y[0] = m * out_x[0] + b;
+    out_x[1] = (-B - sqrtDisc) / (2.0f * A);
+    out_y[1] = m * out_x[1] + b;
+    return 2;
+}
