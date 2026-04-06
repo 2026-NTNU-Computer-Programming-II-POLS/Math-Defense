@@ -13,14 +13,11 @@ let _useWasm = true
 
 export async function initWasm(): Promise<boolean> {
   try {
-    // Emscripten 生成的全域建構函式
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const globalAny = globalThis as any
-    if (typeof globalAny.createMathEngine === 'function') {
-      _module = await globalAny.createMathEngine()
-      console.log('[WasmBridge] WASM 載入成功')
-      return true
-    }
+    // MODULARIZE=1 產生的 ES module，從 public/wasm/ 載入
+    const { default: createMathEngine } = await import('/wasm/math_engine.js')
+    _module = await createMathEngine()
+    console.log('[WasmBridge] WASM 載入成功')
+    return true
   } catch (e) {
     console.warn('[WasmBridge] WASM 載入失敗，使用 JS fallback:', e)
   }

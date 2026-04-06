@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "sqlite:///./math_defense.db"
-    secret_key: str = "CHANGE_THIS_IN_PRODUCTION_PLEASE"
+    secret_key: str  # Required — must be set via SECRET_KEY env var or .env file
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]

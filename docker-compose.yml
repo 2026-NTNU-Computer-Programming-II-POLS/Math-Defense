@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=sqlite:///./math_defense.db
-      - SECRET_KEY=dev_secret_key_change_in_prod
+      - SECRET_KEY=${SECRET_KEY}
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
