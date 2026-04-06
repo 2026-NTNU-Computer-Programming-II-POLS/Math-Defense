@@ -1,12 +1,17 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, DateTime, ForeignKey
+from sqlalchemy import String, Integer, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
 
 class LeaderboardEntry(Base):
     __tablename__ = "leaderboard_entries"
+    __table_args__ = (
+        UniqueConstraint("session_id", name="uq_leaderboard_session_id"),
+        Index("ix_leaderboard_user_id", "user_id"),
+        Index("ix_leaderboard_level_score", "level", "score"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)

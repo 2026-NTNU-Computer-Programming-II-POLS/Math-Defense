@@ -1,3 +1,4 @@
+import re
 from pydantic import BaseModel, field_validator
 
 
@@ -10,6 +11,8 @@ class RegisterRequest(BaseModel):
     def username_valid(cls, v: str) -> str:
         if len(v) < 3 or len(v) > 50:
             raise ValueError("用戶名長度需在 3~50 字之間")
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError("用戶名只能包含英文字母、數字、底線和連字號")
         return v
 
     @field_validator("password")
@@ -17,6 +20,8 @@ class RegisterRequest(BaseModel):
     def password_valid(cls, v: str) -> str:
         if len(v) < 6:
             raise ValueError("密碼至少需要 6 個字元")
+        if len(v) > 128:
+            raise ValueError("密碼過長")
         return v
 
 

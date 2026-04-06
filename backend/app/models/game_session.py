@@ -1,12 +1,15 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, DateTime, ForeignKey
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
 
 class GameSession(Base):
     __tablename__ = "game_sessions"
+    __table_args__ = (
+        Index("ix_game_session_user_id", "user_id"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)

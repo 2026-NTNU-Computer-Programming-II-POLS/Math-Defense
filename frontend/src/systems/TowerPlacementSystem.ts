@@ -86,6 +86,10 @@ export class TowerPlacementSystem {
     const p = tower.params as Record<string, number>
     switch (tower.type) {
       case TowerType.FUNCTION_CANNON: {
+        if (tower.level >= 2) {
+          const a = p.a ?? 0, bCoeff = p.b_coeff ?? 1, c = p.c ?? 0
+          return { type: 'line', fn: (x) => a * x * x + bCoeff * x + c, xMin: -3, xMax: 25 }
+        }
         const m = p.m ?? 1, b = p.b ?? 0
         return { type: 'line', fn: (x) => m * x + b, xMin: -3, xMax: 25 }
       }

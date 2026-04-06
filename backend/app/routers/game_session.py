@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -7,6 +8,8 @@ from app.models.leaderboard import LeaderboardEntry
 from app.schemas.game_session import SessionCreate, SessionUpdate, SessionEnd, SessionOut
 from app.middleware.auth import get_current_user
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
@@ -61,18 +64,27 @@ def end_session(
     session.score = req.score
     session.ended_at = datetime.now(UTC)
 
-    # 自動提交排行榜
-    entry = LeaderboardEntry(
-        user_id=current_user.id,
-        level=session.level,
-        score=req.score,
-        kills=req.kills,
-        waves_survived=req.waves_survived,
-        session_id=session.id,
-    )
-    db.add(entry)
+    # Commit session changes first
+    db.flush()
+
+    # 自動提交排行榜（若已存在則跳過）
+    existing = db.query(LeaderboardEntry).filter(
+        LeaderboardEntry.session_id == session.id
+    ).first()
+    if not existing:
+        entry = LeaderboardEntry(
+            user_id=current_user.id,
+            level=session.level,
+            score=req.score,
+            kills=req.kills,
+            waves_survived=req.waves_survived,
+            session_id=session.id,
+        )
+        db.add(entry)
+
     db.commit()
     db.refresh(session)
+    logger.info("Session ended: session=%s user=%s score=%d", session.id, current_user.id, req.score)
     return session
 
 

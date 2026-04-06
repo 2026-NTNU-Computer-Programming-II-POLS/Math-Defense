@@ -17,30 +17,43 @@ interface ActiveBuff extends BuffDef {
 
 type EffectFn = (game: Game, buff: ActiveBuff) => void
 
+/** Recalculate effective damage from base + bonus to avoid float drift */
+function recalcDamage(g: Game): void {
+  g.towers.forEach((t) => { t.effectiveDamage = t.baseDamage * t.damageBonus })
+}
+
 const effectStrategies: Record<string, EffectFn> = {
   ALL_TOWERS_DAMAGE_MULTIPLY_1_5: (g) => {
-    g.towers.forEach((t) => (t.effectiveDamage *= 1.5))
+    g.towers.forEach((t) => { t.damageBonus *= 1.5 })
+    recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_1_5: (g) => {
-    g.towers.forEach((t) => (t.effectiveDamage /= 1.5))
+    g.towers.forEach((t) => { t.damageBonus /= 1.5 })
+    recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_MULTIPLY_0_8: (g) => {
-    g.towers.forEach((t) => (t.effectiveDamage *= 0.8))
+    g.towers.forEach((t) => { t.damageBonus *= 0.8 })
+    recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_0_8: (g) => {
-    g.towers.forEach((t) => (t.effectiveDamage /= 0.8))
+    g.towers.forEach((t) => { t.damageBonus /= 0.8 })
+    recalcDamage(g)
   },
   RANDOM_TOWER_RANGE_MULTIPLY_1_3: (g, buff) => {
     if (g.towers.length > 0) {
       const t = g.towers[Math.floor(Math.random() * g.towers.length)]
-      t.effectiveRange *= 1.3
+      t.rangeBonus *= 1.3
+      t.effectiveRange = t.baseRange * t.rangeBonus
       buff._targetTowerId = t.id
     }
   },
   RANDOM_TOWER_RANGE_DIVIDE_1_3: (g, buff) => {
     if (buff._targetTowerId) {
       const t = g.towers.find((t) => t.id === buff._targetTowerId)
-      if (t) t.effectiveRange /= 1.3
+      if (t) {
+        t.rangeBonus /= 1.3
+        t.effectiveRange = t.baseRange * t.rangeBonus
+      }
       buff._targetTowerId = undefined
     }
   },

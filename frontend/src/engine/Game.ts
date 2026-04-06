@@ -120,7 +120,7 @@ export class Game {
   // ── 狀態操作 ──
 
   changeGold(amount: number): void {
-    this.state.gold += amount
+    this.state.gold = Math.max(0, this.state.gold + amount)
     this.eventBus.emit(Events.GOLD_CHANGED, this.state.gold)
   }
 
@@ -148,13 +148,13 @@ export class Game {
     const oldPhase = this.state.phase
     this.state = createInitialState()
     this.state.level = levelIndex
-    this.state.phase = GamePhase.BUILD
     this.towers = []
     this.enemies = []
     this.projectiles = []
     this.pathFunction = null
-    this.phase.forceTransition(GamePhase.BUILD)
-    this.eventBus.emit(Events.PHASE_CHANGED, { from: oldPhase, to: GamePhase.BUILD })
+    // Sync state machine to the old phase, then transition properly to BUILD
+    this.phase.forceTransition(oldPhase)
+    this.setPhase(GamePhase.BUILD)
     this.eventBus.emit(Events.LEVEL_START, levelIndex)
   }
 
@@ -162,9 +162,9 @@ export class Game {
     const ok = this.phase.canTransition(GamePhase.WAVE)
     if (!ok) return
     this.state.wave++
-    // WAVE_START 必須在 setPhase 之前，讓 WaveSystem 先建立生成佇列
-    this.eventBus.emit(Events.WAVE_START, this.state.wave)
+    // Transition phase first so listeners see correct phase on WAVE_START
     this.setPhase(GamePhase.WAVE)
+    this.eventBus.emit(Events.WAVE_START, this.state.wave)
   }
 
   // ── 遊戲迴圈 ──

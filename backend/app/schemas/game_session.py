@@ -22,7 +22,7 @@ class SessionUpdate(BaseModel):
 
 class SessionEnd(BaseModel):
     score: int = Field(ge=0, le=9999999)
-    kills: int = Field(ge=0)
+    kills: int = Field(ge=0, le=9999)
     waves_survived: int = Field(ge=0, le=100)
 
 

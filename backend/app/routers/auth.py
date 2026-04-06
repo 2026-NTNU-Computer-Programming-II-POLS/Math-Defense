@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -7,6 +8,8 @@ from app.utils.security import hash_password, verify_password, create_access_tok
 from app.middleware.auth import get_current_user
 from app.limiter import limiter
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
@@ -14,6 +17,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @limiter.limit("5/minute")
 def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == req.username).first():
+        logger.warning("Registration failed: username '%s' already taken", req.username)
         raise HTTPException(status_code=409, detail="用戶名已被使用")
 
     user = User(username=req.username, password_hash=hash_password(req.password))
@@ -21,6 +25,7 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
     db.commit()
     db.refresh(user)
 
+    logger.info("User registered: id=%s username=%s", user.id, user.username)
     token = create_access_token({"sub": user.id})
     return TokenResponse(access_token=token, user_id=user.id, username=user.username)
 
@@ -30,8 +35,10 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
 def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == req.username).first()
     if not user or not verify_password(req.password, user.password_hash):
+        logger.warning("Login failed: username='%s'", req.username)
         raise HTTPException(status_code=401, detail="用戶名或密碼錯誤")
 
+    logger.info("User logged in: id=%s username=%s", user.id, user.username)
     token = create_access_token({"sub": user.id})
     return TokenResponse(access_token=token, user_id=user.id, username=user.username)
 

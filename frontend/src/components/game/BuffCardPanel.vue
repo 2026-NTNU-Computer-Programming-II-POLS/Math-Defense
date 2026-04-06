@@ -2,16 +2,10 @@
 import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
-import type { BuffDef } from '@/data/buff-defs'
 
 const gameStore = useGameStore()
 
-const buffSystem = computed(() => {
-  const game = gameStore.getEngine()
-  return game?.getSystem('buff') as { currentCards: (BuffDef & { isCurse: boolean })[] } | undefined
-})
-
-const cards = computed(() => buffSystem.value?.currentCards ?? [])
+const cards = computed(() => gameStore.buffCards)
 
 function selectCard(cardId: string): void {
   const game = gameStore.getEngine()

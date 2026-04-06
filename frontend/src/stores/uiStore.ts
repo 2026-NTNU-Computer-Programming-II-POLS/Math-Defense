@@ -38,9 +38,10 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function closeModal(): void {
-    modalVisible.value = false
-    modalCallback.value?.()
+    const cb = modalCallback.value
     modalCallback.value = null
+    modalVisible.value = false
+    cb?.()
   }
 
   function selectTower(type: TowerType | null): void {

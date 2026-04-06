@@ -38,8 +38,8 @@ export function createTower(type: TowerType, x: number, y: number): Tower {
     cooldown: def.cooldown,
     cooldownTimer: 0,
 
-    damageBonus: 0,
-    rangeBonus: 0,
+    damageBonus: 1,
+    rangeBonus: 1,
     color: def.color,
   }
 }

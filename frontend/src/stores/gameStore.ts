@@ -3,10 +3,11 @@
  * 橋接引擎 EventBus → Vue reactivity，讓 Vue 元件讀取遊戲狀態。
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, shallowRef, computed } from 'vue'
 import { GamePhase } from '@/data/constants'
 import type { Game } from '@/engine/Game'
 import { Events } from '@/data/constants'
+import type { BuffDef } from '@/data/buff-defs'
 
 export const useGameStore = defineStore('game', () => {
   // ── 狀態（mirror 自 Game.state） ──
@@ -20,6 +21,7 @@ export const useGameStore = defineStore('game', () => {
   const score = ref(0)
   const kills = ref(0)
   const pathExpression = ref('')
+  const buffCards = shallowRef<(BuffDef & { isCurse: boolean })[]>([])
 
   // ── Computed ──
   const isBuilding = computed(() => phase.value === GamePhase.BUILD)
@@ -42,7 +44,10 @@ export const useGameStore = defineStore('game', () => {
 
     // 監聽事件更新 reactive state，保留 unsubscribe handles
     _unsubscribes = [
-      game.eventBus.on(Events.PHASE_CHANGED, ({ to }) => { phase.value = to }),
+      game.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
+        phase.value = to
+        if (to !== GamePhase.BUFF_SELECT) buffCards.value = []
+      }),
       game.eventBus.on(Events.GOLD_CHANGED, (v) => { gold.value = v }),
       game.eventBus.on(Events.HP_CHANGED, (v) => { hp.value = v }),
       game.eventBus.on(Events.SCORE_CHANGED, (v) => { score.value = v }),
@@ -57,6 +62,10 @@ export const useGameStore = defineStore('game', () => {
         score.value = 0
         kills.value = 0
         pathExpression.value = game.state.pathExpression
+      }),
+      game.eventBus.on(Events.BUFF_PHASE_START, () => {
+        const buffSys = game.getSystem('buff') as { currentCards: (BuffDef & { isCurse: boolean })[] } | undefined
+        if (buffSys) buffCards.value = [...buffSys.currentCards]
       }),
     ]
   }
@@ -86,7 +95,7 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     phase, level, wave, totalWaves,
-    gold, hp, maxHp, score, kills, pathExpression,
+    gold, hp, maxHp, score, kills, pathExpression, buffCards,
     isBuilding, isWave, isBuff, hpPercent,
     bindEngine, unbindEngine, syncFromEngine, getEngine,
   }

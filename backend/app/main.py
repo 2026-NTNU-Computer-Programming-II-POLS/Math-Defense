@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,10 +9,18 @@ from app.db.database import create_tables
 from app.routers import auth, leaderboard, game_session
 from app.limiter import limiter
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # create_all() for dev convenience; use Alembic migrations for production schema changes
     create_tables()
+    logger.info("Database tables ensured (dev mode: create_all)")
     yield
 
 

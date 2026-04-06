@@ -2,10 +2,9 @@
 import { ref, computed, watch } from 'vue'
 import { useUiStore } from '@/stores/uiStore'
 import { useGameStore } from '@/stores/gameStore'
-import { TOWER_PARAM_FIELDS } from '@/data/ui-defs'
+import { TOWER_PARAM_FIELDS, FUNCTION_CANNON_UPGRADED_FIELDS } from '@/data/ui-defs'
 import { TOWER_DEFS } from '@/data/tower-defs'
-import type { TowerType } from '@/data/constants'
-import { Events } from '@/data/constants'
+import { TowerType, Events } from '@/data/constants'
 
 const uiStore = useUiStore()
 const gameStore = useGameStore()
@@ -20,9 +19,14 @@ const towerDef = computed(() =>
   tower.value ? TOWER_DEFS[tower.value.type as TowerType] : null,
 )
 
-const fields = computed(() =>
-  tower.value ? (TOWER_PARAM_FIELDS[tower.value.type as TowerType] ?? []) : [],
-)
+const fields = computed(() => {
+  const t = tower.value
+  if (!t) return []
+  if (t.type === TowerType.FUNCTION_CANNON && t.level >= 2) {
+    return FUNCTION_CANNON_UPGRADED_FIELDS
+  }
+  return TOWER_PARAM_FIELDS[t.type as TowerType] ?? []
+})
 
 const localParams = ref<Record<string, number>>({})
 
