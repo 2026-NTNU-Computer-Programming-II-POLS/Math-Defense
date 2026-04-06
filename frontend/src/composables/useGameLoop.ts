@@ -76,7 +76,12 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   })
 
   onUnmounted(() => {
-    game.value?.stop()
+    gameStore.unbindEngine()
+    if (game.value) {
+      game.value.stop()
+      game.value.input.destroy()
+      game.value.eventBus.clear()
+    }
   })
 
   return { game, ready }

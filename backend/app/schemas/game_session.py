@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class SessionCreate(BaseModel):
@@ -14,16 +14,16 @@ class SessionCreate(BaseModel):
 
 
 class SessionUpdate(BaseModel):
-    current_wave: int | None = None
-    gold: int | None = None
-    hp: int | None = None
-    score: int | None = None
+    current_wave: int | None = Field(default=None, ge=0, le=100)
+    gold: int | None = Field(default=None, ge=0, le=99999)
+    hp: int | None = Field(default=None, ge=0, le=100)
+    score: int | None = Field(default=None, ge=0, le=9999999)
 
 
 class SessionEnd(BaseModel):
-    score: int
-    kills: int
-    waves_survived: int
+    score: int = Field(ge=0, le=9999999)
+    kills: int = Field(ge=0)
+    waves_survived: int = Field(ge=0, le=100)
 
 
 class SessionOut(BaseModel):
