@@ -3,7 +3,7 @@
  * 合併舊版 TowerSystem 的攻擊邏輯 + CollisionSystem。
  * Entity 無 update/render 方法；這個 System 全權負責戰鬥邏輯。
  */
-import { Events, GamePhase, TowerType, EnemyType } from '@/data/constants'
+import { Events, GamePhase, TowerType, EnemyType, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
 import { distance, findIntersections, degToRad } from '@/math/MathUtils'
 import { pointInSector as wasmPointInSector } from '@/math/WasmBridge'
 import { createEnemy } from '@/entities/EnemyFactory'
@@ -94,7 +94,7 @@ export class CombatSystem {
       proj.y += proj.vy * dt
 
       // 離開格線範圍後失效
-      if (proj.x < -5 || proj.x > 30 || proj.y < -5 || proj.y > 20) {
+      if (proj.x < GRID_MIN_X - 2 || proj.x > GRID_MAX_X + 5 || proj.y < GRID_MIN_Y - 3 || proj.y > GRID_MAX_Y + 2) {
         proj.active = false
       }
 
@@ -186,7 +186,9 @@ export class CombatSystem {
       if (!enemy.alive || enemy.isStealthed) continue
       if (enemy.x >= intA && enemy.x <= intB) {
         const curveY = fn(enemy.x)
-        if (enemy.y >= 0 && enemy.y <= curveY) {
+        const minY = Math.min(0, curveY)
+        const maxY = Math.max(0, curveY)
+        if (enemy.y >= minY && enemy.y <= maxY) {
           this._dealDamage(enemy, tower.effectiveDamage, game)
         }
       }

@@ -163,19 +163,22 @@ export class Renderer {
     const step = 0.05
     ctx.fillStyle = color
     ctx.globalAlpha = 0.3
-    ctx.beginPath()
-    ctx.moveTo(gameToCanvasX(a), gameToCanvasY(0))
-    for (let gx = a; gx <= b; gx += step) {
-      const gy = fn(gx)
-      if (!isFinite(gy)) continue
-      ctx.lineTo(gameToCanvasX(gx), gameToCanvasY(gy))
+    try {
+      ctx.beginPath()
+      ctx.moveTo(gameToCanvasX(a), gameToCanvasY(0))
+      for (let gx = a; gx <= b; gx += step) {
+        const gy = fn(gx)
+        if (!isFinite(gy)) continue
+        ctx.lineTo(gameToCanvasX(gx), gameToCanvasY(gy))
+      }
+      const gyB = fn(b)
+      if (isFinite(gyB)) ctx.lineTo(gameToCanvasX(b), gameToCanvasY(gyB))
+      ctx.lineTo(gameToCanvasX(b), gameToCanvasY(0))
+      ctx.closePath()
+      ctx.fill()
+    } finally {
+      ctx.globalAlpha = 1.0
     }
-    const gyB = fn(b)
-    if (isFinite(gyB)) ctx.lineTo(gameToCanvasX(b), gameToCanvasY(gyB))
-    ctx.lineTo(gameToCanvasX(b), gameToCanvasY(0))
-    ctx.closePath()
-    ctx.fill()
-    ctx.globalAlpha = 1.0
   }
 
   drawSector(
@@ -193,23 +196,26 @@ export class Renderer {
     const cStart = -startAngle - sweepAngle
     const cEnd = -startAngle
 
-    ctx.fillStyle = color
-    ctx.globalAlpha = 0.25
-    ctx.beginPath()
-    ctx.moveTo(pcx, pcy)
-    ctx.arc(pcx, pcy, pr, cStart, cEnd)
-    ctx.closePath()
-    ctx.fill()
+    try {
+      ctx.fillStyle = color
+      ctx.globalAlpha = 0.25
+      ctx.beginPath()
+      ctx.moveTo(pcx, pcy)
+      ctx.arc(pcx, pcy, pr, cStart, cEnd)
+      ctx.closePath()
+      ctx.fill()
 
-    ctx.strokeStyle = color
-    ctx.lineWidth = 1.5
-    ctx.globalAlpha = 0.6
-    ctx.beginPath()
-    ctx.moveTo(pcx, pcy)
-    ctx.arc(pcx, pcy, pr, cStart, cEnd)
-    ctx.closePath()
-    ctx.stroke()
-    ctx.globalAlpha = 1.0
+      ctx.strokeStyle = color
+      ctx.lineWidth = 1.5
+      ctx.globalAlpha = 0.6
+      ctx.beginPath()
+      ctx.moveTo(pcx, pcy)
+      ctx.arc(pcx, pcy, pr, cStart, cEnd)
+      ctx.closePath()
+      ctx.stroke()
+    } finally {
+      ctx.globalAlpha = 1.0
+    }
   }
 
   drawCircle(gx: number, gy: number, radius: number, color: string): void {

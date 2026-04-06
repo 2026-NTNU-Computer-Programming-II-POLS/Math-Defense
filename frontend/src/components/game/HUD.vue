@@ -101,6 +101,5 @@ const hpStr   = computed(() => `${g.hp} / ${g.maxHp}`)
 .score    { color: var(--gold); }
 .path     { font-size: 11px; color: #4a82c8; }
 
-.path-item { margin-left: auto; }
 .score-item { margin-left: auto; }
 </style>

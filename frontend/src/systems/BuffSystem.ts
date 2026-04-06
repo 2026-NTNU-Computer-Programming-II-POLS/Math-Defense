@@ -49,7 +49,7 @@ const effectStrategies: Record<string, EffectFn> = {
   },
   RANDOM_TOWER_RANGE_DIVIDE_1_3: (g, buff) => {
     if (buff._targetTowerId) {
-      const t = g.towers.find((t) => t.id === buff._targetTowerId)
+      const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
       if (t) {
         t.rangeBonus /= 1.3
         t.effectiveRange = t.baseRange * t.rangeBonus
@@ -100,7 +100,7 @@ const effectStrategies: Record<string, EffectFn> = {
   },
   ENABLE_DISABLED_TOWER: (g, buff) => {
     if (buff._targetTowerId) {
-      const t = g.towers.find((t) => t.id === buff._targetTowerId)
+      const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
       if (t) (t as { disabled?: boolean }).disabled = false
       g.state.disabledTowerType = null
       buff._targetTowerId = undefined

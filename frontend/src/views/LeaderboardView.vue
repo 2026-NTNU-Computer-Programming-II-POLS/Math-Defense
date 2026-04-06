@@ -1,15 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLeaderboard } from '@/composables/useLeaderboard'
 
 const router = useRouter()
-const { entries, loading, error, fetch: fetchLb } = useLeaderboard()
+const { entries, total, loading, error, fetch: fetchLb } = useLeaderboard()
 const selectedLevel = ref<number | undefined>(undefined)
+const currentPage = ref(1)
+const perPage = 20
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 
 function selectLevel(lv: number | undefined): void {
   selectedLevel.value = lv
-  fetchLb(lv)
+  currentPage.value = 1
+  fetchLb(lv, 1)
+}
+
+function goToPage(page: number): void {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  fetchLb(selectedLevel.value, page)
 }
 
 onMounted(() => fetchLb())
@@ -48,7 +59,7 @@ onMounted(() => fetchLb())
         </tr>
       </thead>
       <tbody>
-        <tr v-for="e in entries" :key="e.rank">
+        <tr v-for="(e, idx) in entries" :key="`${e.rank}-${idx}`">
           <td class="rank">{{ e.rank }}</td>
           <td class="username">{{ e.username }}</td>
           <td>Lv.{{ e.level }}</td>
@@ -61,6 +72,12 @@ onMounted(() => fetchLb())
         </tr>
       </tbody>
     </table>
+
+    <div v-if="totalPages > 1" class="lb-pagination">
+      <button class="btn page-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">←</button>
+      <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+      <button class="btn page-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">→</button>
+    </div>
   </div>
 </template>
 
@@ -110,4 +127,13 @@ th { color: var(--axis); font-size: 10px; letter-spacing: 2px; text-transform: u
 .score    { color: var(--gold-bright); font-weight: bold; }
 .lb-loading, .lb-error, .empty { text-align: center; color: var(--axis); padding: 32px; }
 .lb-error { color: var(--enemy-red); }
+
+.lb-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.page-info { font-size: 12px; color: var(--axis); }
+.page-btn:disabled { opacity: 0.3; cursor: default; }
 </style>

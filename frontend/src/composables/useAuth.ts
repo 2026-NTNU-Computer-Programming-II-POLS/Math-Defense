@@ -13,7 +13,13 @@ export function useAuth() {
     try {
       const res = await authService.login(username, password)
       authStore.setToken(res.access_token)
-      authStore.setUser({ id: res.user_id, username: res.username })
+      try {
+        const me = await authService.me()
+        authStore.setUser({ id: me.id, username: me.username })
+      } catch {
+        // /me failed but login succeeded — use username from token response
+        authStore.setUser({ id: '', username: res.username })
+      }
       return true
     } catch (e) {
       error.value = e instanceof Error ? e.message : '登入失敗'
@@ -29,7 +35,13 @@ export function useAuth() {
     try {
       const res = await authService.register(username, password)
       authStore.setToken(res.access_token)
-      authStore.setUser({ id: res.user_id, username: res.username })
+      try {
+        const me = await authService.me()
+        authStore.setUser({ id: me.id, username: me.username })
+      } catch {
+        // /me failed but register succeeded — use username from token response
+        authStore.setUser({ id: '', username: res.username })
+      }
       return true
     } catch (e) {
       error.value = e instanceof Error ? e.message : '註冊失敗'

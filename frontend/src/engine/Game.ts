@@ -89,6 +89,7 @@ export class Game {
   private _rafId: number | null = null
   private _lastTime = 0
   private _accumulator = 0
+  private readonly _boundLoop: () => void
 
   constructor(canvas: HTMLCanvasElement) {
     this.eventBus = new EventBus<GameEvents>()
@@ -96,6 +97,7 @@ export class Game {
     this.input = new InputManager(canvas, this.eventBus)
     this.phase = new PhaseStateMachine()
     this.state = createInitialState()
+    this._boundLoop = this._loop.bind(this)
 
     this._setupEventHandlers()
   }
@@ -199,7 +201,7 @@ export class Game {
     }
 
     this._render()
-    this._rafId = requestAnimationFrame(() => this._loop())
+    this._rafId = requestAnimationFrame(this._boundLoop)
   }
 
   private _update(dt: number): void {

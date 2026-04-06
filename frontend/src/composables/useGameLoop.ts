@@ -24,6 +24,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   const ready = ref(false)
   const gameStore = useGameStore()
   const uiStore = useUiStore()
+  const unsubs: (() => void)[] = []
 
   onMounted(async () => {
     await initWasm()
@@ -44,15 +45,15 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     g.addSystem('projectileRenderer', new ProjectileRenderer())
 
     // 每次關卡開始時生成隨機路徑，並同步到 store
-    g.eventBus.on(Events.LEVEL_START, (levelNum) => {
+    unsubs.push(g.eventBus.on(Events.LEVEL_START, (levelNum) => {
       const path = generatePath(levelNum as number)
       g.pathFunction = path.fn
       g.state.pathExpression = path.expr
       gameStore.pathExpression = path.expr
-    })
+    }))
 
     // 塔被點選 → 開啟 BuildPanel（引擎 → Vue UI 橋接）
-    g.eventBus.on(Events.TOWER_SELECTED, (tower) => {
+    unsubs.push(g.eventBus.on(Events.TOWER_SELECTED, (tower) => {
       if (tower && typeof tower === 'object' && 'id' in tower) {
         uiStore.buildPanelTowerId = (tower as Tower).id
         uiStore.buildPanelVisible = true
@@ -60,14 +61,14 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
         uiStore.buildPanelVisible = false
         uiStore.buildPanelTowerId = null
       }
-    })
+    }))
 
     // 塔放置成功 → 選中它，開啟面板設定參數
-    g.eventBus.on(Events.TOWER_PLACED, (tower) => {
+    unsubs.push(g.eventBus.on(Events.TOWER_PLACED, (tower) => {
       uiStore.buildPanelTowerId = tower.id
       uiStore.buildPanelVisible = true
       uiStore.buildHintStep = 2
-    })
+    }))
 
     gameStore.bindEngine(g)
     game.value = g
@@ -76,6 +77,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   })
 
   onUnmounted(() => {
+    unsubs.forEach((fn) => fn())
     gameStore.unbindEngine()
     if (game.value) {
       game.value.stop()

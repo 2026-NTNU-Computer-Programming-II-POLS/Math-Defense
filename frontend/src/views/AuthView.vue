@@ -12,6 +12,11 @@ const password = ref('')
 
 const title = computed(() => isLogin.value ? '登入' : '註冊')
 
+function toggleMode(): void {
+  isLogin.value = !isLogin.value
+  error.value = ''
+}
+
 async function submit(): Promise<void> {
   const ok = isLogin.value
     ? await login(username.value, password.value)
@@ -48,7 +53,7 @@ async function submit(): Promise<void> {
         </button>
       </form>
 
-      <button class="btn toggle-btn" @click="isLogin = !isLogin">
+      <button class="btn toggle-btn" @click="toggleMode">
         {{ isLogin ? '沒有帳號？前往註冊' : '已有帳號？前往登入' }}
       </button>
 

@@ -30,7 +30,7 @@ export class WaveSystem {
     game.state.totalWaves = levelDef.waves.length
     this._spawnQueue = [...waveDef.enemies]
     this._spawnInterval = waveDef.spawnInterval
-    this._spawnTimer = 0
+    this._spawnTimer = this._spawnInterval
     this._allSpawned = false
   }
 

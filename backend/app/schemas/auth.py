@@ -18,10 +18,14 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def password_valid(cls, v: str) -> str:
-        if len(v) < 6:
-            raise ValueError("密碼至少需要 6 個字元")
+        if len(v) < 8:
+            raise ValueError("密碼至少需要 8 個字元")
         if len(v) > 128:
             raise ValueError("密碼過長")
+        if not re.search(r'[a-zA-Z]', v):
+            raise ValueError("密碼需包含至少一個英文字母")
+        if not re.search(r'[0-9]', v):
+            raise ValueError("密碼需包含至少一個數字")
         return v
 
 
@@ -33,5 +37,4 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user_id: str
     username: str

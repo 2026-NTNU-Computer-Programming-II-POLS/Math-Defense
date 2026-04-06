@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -20,6 +20,23 @@ def create_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Mark stale sessions (active for >2 hours) as abandoned
+    stale_cutoff = datetime.now(UTC) - timedelta(hours=2)
+    db.query(GameSession).filter(
+        GameSession.user_id == current_user.id,
+        GameSession.status == "active",
+        GameSession.started_at < stale_cutoff,
+    ).update({"status": "abandoned", "ended_at": datetime.now(UTC)})
+
+    # Limit to one active session per user — abandon any existing active session
+    existing_active = db.query(GameSession).filter(
+        GameSession.user_id == current_user.id,
+        GameSession.status == "active",
+    ).first()
+    if existing_active:
+        existing_active.status = "abandoned"
+        existing_active.ended_at = datetime.now(UTC)
+
     session = GameSession(user_id=current_user.id, level=req.level)
     db.add(session)
     db.commit()

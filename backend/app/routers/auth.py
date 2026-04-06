@@ -27,7 +27,7 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
 
     logger.info("User registered: id=%s username=%s", user.id, user.username)
     token = create_access_token({"sub": user.id})
-    return TokenResponse(access_token=token, user_id=user.id, username=user.username)
+    return TokenResponse(access_token=token, username=user.username)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -40,7 +40,7 @@ def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
 
     logger.info("User logged in: id=%s username=%s", user.id, user.username)
     token = create_access_token({"sub": user.id})
-    return TokenResponse(access_token=token, user_id=user.id, username=user.username)
+    return TokenResponse(access_token=token, username=user.username)
 
 
 @router.get("/me")

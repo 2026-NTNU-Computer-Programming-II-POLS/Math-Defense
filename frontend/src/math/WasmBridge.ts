@@ -98,8 +98,9 @@ export function pointInSector(
   let start = angleStart % (Math.PI * 2)
   if (start < 0) start += Math.PI * 2
   const end = start + angleWidth
-  if (end > Math.PI * 2) return angle >= start || angle <= end - Math.PI * 2
-  return angle >= start && angle <= end
+  const eps = 1e-6
+  if (end > Math.PI * 2) return angle >= start - eps || angle <= end - Math.PI * 2 + eps
+  return angle >= start - eps && angle <= end + eps
 }
 
 export function numericalIntegrate(
@@ -116,7 +117,7 @@ export function numericalIntegrate(
   let sum = 0
   for (let i = 0; i <= n; i++) {
     const x = lo + i * h
-    const y = Math.max(0, a * x * x + b * x + c)
+    const y = Math.abs(a * x * x + b * x + c)
     sum += i === 0 || i === n ? y : 2 * y
   }
   return Math.abs((sum * h) / 2)

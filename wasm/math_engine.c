@@ -105,11 +105,13 @@ int point_in_sector(float px, float py, float cx, float cy,
 
     float end = start + angle_width;
 
+    float eps = 1e-6f;
+
     if (end > 2.0f * (float)M_PI) {
-        return (angle >= start || angle <= end - 2.0f * (float)M_PI) ? 1 : 0;
+        return (angle >= start - eps || angle <= end - 2.0f * (float)M_PI + eps) ? 1 : 0;
     }
 
-    return (angle >= start && angle <= end) ? 1 : 0;
+    return (angle >= start - eps && angle <= end + eps) ? 1 : 0;
 }
 
 /* ══════════════════════════════════════════
@@ -134,7 +136,7 @@ float numerical_integrate(float coeff_a, float coeff_b, float coeff_c,
     for (int i = 0; i <= n; i++) {
         float x = lo + i * h;
         float y = coeff_a * x * x + coeff_b * x + coeff_c;
-        if (y < 0) y = 0;  /* 面積取正值 */
+        y = fabsf(y);  /* 面積取絕對值 */
 
         if (i == 0 || i == n) {
             sum += y;
