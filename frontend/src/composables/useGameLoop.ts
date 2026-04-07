@@ -16,6 +16,7 @@ import { generatePath } from '@/math/PathEvaluator'
 import { initWasm } from '@/math/WasmBridge'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
+import { useSessionSync } from '@/composables/useSessionSync'
 import { Events } from '@/data/constants'
 import type { Tower } from '@/entities/types'
 
@@ -24,6 +25,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   const ready = ref(false)
   const gameStore = useGameStore()
   const uiStore = useUiStore()
+  const { bind: bindSession } = useSessionSync()
   const unsubs: (() => void)[] = []
 
   onMounted(async () => {
@@ -69,6 +71,9 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
       uiStore.buildPanelVisible = true
       uiStore.buildHintStep = 2
     }))
+
+    // Session lifecycle sync (only active when logged in)
+    unsubs.push(...bindSession(g))
 
     gameStore.bindEngine(g)
     game.value = g

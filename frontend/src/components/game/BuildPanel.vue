@@ -5,6 +5,9 @@ import { useGameStore } from '@/stores/gameStore'
 import { TOWER_PARAM_FIELDS, FUNCTION_CANNON_UPGRADED_FIELDS } from '@/data/ui-defs'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { TowerType, Events } from '@/data/constants'
+import MatrixInputPanel from './MatrixInputPanel.vue'
+import IntegralPanel from './IntegralPanel.vue'
+import FourierPanel from './FourierPanel.vue'
 
 const uiStore = useUiStore()
 const gameStore = useGameStore()
@@ -19,9 +22,19 @@ const towerDef = computed(() =>
   tower.value ? TOWER_DEFS[tower.value.type as TowerType] : null,
 )
 
+/** Whether this tower type has a specialized panel */
+const hasSpecialPanel = computed(() => {
+  const type = tower.value?.type
+  return type === TowerType.MATRIX_LINK
+    || type === TowerType.INTEGRAL_CANNON
+    || type === TowerType.FOURIER_SHIELD
+})
+
 const fields = computed(() => {
   const t = tower.value
   if (!t) return []
+  // Specialized panels handle their own fields
+  if (hasSpecialPanel.value) return []
   if (t.type === TowerType.FUNCTION_CANNON && t.level >= 2) {
     return FUNCTION_CANNON_UPGRADED_FIELDS
   }
@@ -32,12 +45,20 @@ const localParams = ref<Record<string, number>>({})
 
 watch(tower, (t) => {
   if (!t) return
+  // For specialized panels, load ALL param fields from ui-defs
+  const paramDefs = hasSpecialPanel.value
+    ? (TOWER_PARAM_FIELDS[t.type as TowerType] ?? [])
+    : fields.value
   const result: Record<string, number> = {}
-  for (const field of fields.value) {
+  for (const field of paramDefs) {
     result[field.key] = (t.params[field.key] as number) ?? field.default
   }
   localParams.value = result
 }, { immediate: true })
+
+function updateParam(key: string, value: number): void {
+  localParams.value[key] = value
+}
 
 function castSpell(): void {
   const game = gameStore.getEngine()
@@ -67,7 +88,25 @@ function close(): void {
 
     <p class="math-concept">{{ towerDef.mathConcept }}</p>
 
-    <div v-if="fields.length > 0" class="param-list">
+    <!-- Specialized panels for advanced towers -->
+    <MatrixInputPanel
+      v-if="tower.type === TowerType.MATRIX_LINK"
+      :params="localParams"
+      @update="updateParam"
+    />
+    <IntegralPanel
+      v-else-if="tower.type === TowerType.INTEGRAL_CANNON"
+      :params="localParams"
+      @update="updateParam"
+    />
+    <FourierPanel
+      v-else-if="tower.type === TowerType.FOURIER_SHIELD"
+      :params="localParams"
+      @update="updateParam"
+    />
+
+    <!-- Generic param fields for simpler towers -->
+    <div v-else-if="fields.length > 0" class="param-list">
       <label v-for="field in fields" :key="field.key" class="param-row">
         <span class="param-label">{{ field.label }}</span>
         <input
