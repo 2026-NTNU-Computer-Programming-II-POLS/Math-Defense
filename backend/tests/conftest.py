@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db.database import Base, get_db
+from app.limiter import limiter
 
 
 @pytest.fixture
@@ -25,6 +26,8 @@ def client():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    limiter.enabled = False
     yield TestClient(app)
+    limiter.enabled = True
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)

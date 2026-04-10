@@ -17,6 +17,11 @@ interface ActiveBuff extends BuffDef {
 
 type EffectFn = (game: Game, buff: ActiveBuff) => void
 
+/** Snap bonus to avoid floating-point drift from multiply/divide cycles */
+function snap(v: number): number {
+  return Math.round(v * 1e8) / 1e8
+}
+
 /** Recalculate effective damage from base + bonus to avoid float drift */
 function recalcDamage(g: Game): void {
   g.towers.forEach((t) => { t.effectiveDamage = t.baseDamage * t.damageBonus })
@@ -28,7 +33,7 @@ const effectStrategies: Record<string, EffectFn> = {
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_1_5: (g) => {
-    g.towers.forEach((t) => { t.damageBonus /= 1.5 })
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 1.5) })
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_MULTIPLY_0_8: (g) => {
@@ -36,7 +41,7 @@ const effectStrategies: Record<string, EffectFn> = {
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_0_8: (g) => {
-    g.towers.forEach((t) => { t.damageBonus /= 0.8 })
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 0.8) })
     recalcDamage(g)
   },
   RANDOM_TOWER_RANGE_MULTIPLY_1_3: (g, buff) => {
@@ -51,7 +56,7 @@ const effectStrategies: Record<string, EffectFn> = {
     if (buff._targetTowerId) {
       const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
       if (t) {
-        t.rangeBonus /= 1.3
+        t.rangeBonus = snap(t.rangeBonus / 1.3)
         t.effectiveRange = t.baseRange * t.rangeBonus
       }
       buff._targetTowerId = undefined
@@ -93,7 +98,7 @@ const effectStrategies: Record<string, EffectFn> = {
   DISABLE_RANDOM_TOWER: (g, buff) => {
     if (g.towers.length > 0) {
       const t = g.towers[Math.floor(Math.random() * g.towers.length)]
-      ;(t as { disabled?: boolean }).disabled = true
+      t.disabled = true
       g.state.disabledTowerType = t.type
       buff._targetTowerId = t.id
     }
@@ -101,7 +106,7 @@ const effectStrategies: Record<string, EffectFn> = {
   ENABLE_DISABLED_TOWER: (g, buff) => {
     if (buff._targetTowerId) {
       const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
-      if (t) (t as { disabled?: boolean }).disabled = false
+      if (t) t.disabled = false
       g.state.disabledTowerType = null
       buff._targetTowerId = undefined
     }
@@ -164,25 +169,37 @@ export class BuffSystem {
     if (card.isCurse) {
       game.changeGold(card.goldReward ?? 0)
       const entry: ActiveBuff = { ...card, remainingWaves: card.duration }
-      if (card.duration > 0) this.activeBuffs.push(entry)
       applyEffect(card.effectId, game, entry)
+      this._trackOrRevertImmediate(card, entry, game)
       game.eventBus.emit(Events.BUFF_RESULT, { success: true, cardId: card.id, skipped: false })
     } else {
       if (game.state.gold < card.cost) {
-        game.eventBus.emit(Events.BUFF_RESULT, { success: false, cardId: card.id, skipped: false })
-        return
+        game.eventBus.emit(Events.BUFF_RESULT, { success: false, cardId: card.id, skipped: false, insufficientGold: true })
+        return  // Stay in BUFF_SELECT — UI should show "insufficient gold" and let player pick another card
       }
       game.changeGold(-card.cost)
       const success = Math.random() < card.probability
       if (success) {
         const entry: ActiveBuff = { ...card, remainingWaves: card.duration }
-        if (isFinite(card.duration) && card.duration > 0) this.activeBuffs.push(entry)
         applyEffect(card.effectId, game, entry)
+        this._trackOrRevertImmediate(card, entry, game)
       }
       game.eventBus.emit(Events.BUFF_RESULT, { success, cardId: card.id, skipped: false })
     }
 
     game.setPhase(GamePhase.BUILD)
+  }
+
+  /**
+   * duration > 0（含 Infinity）→ 加入 activeBuffs 追蹤（LEVEL_START 或 _tickBuffs 會還原）
+   * duration === 0 且有 revertId → 即時效果，執行完立刻還原
+   */
+  private _trackOrRevertImmediate(card: BuffDef & { isCurse: boolean }, entry: ActiveBuff, game: Game): void {
+    if (card.duration > 0) {
+      this.activeBuffs.push(entry)
+    } else if (card.duration === 0 && card.revertId) {
+      applyEffect(card.revertId, game, entry)
+    }
   }
 
   private _tickBuffs(game: Game): void {

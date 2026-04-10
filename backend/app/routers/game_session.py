@@ -27,12 +27,13 @@ def create_session(
         GameSession.status == "active",
         GameSession.started_at < stale_cutoff,
     ).update({"status": "abandoned", "ended_at": datetime.now(UTC)})
+    db.flush()
 
     # Limit to one active session per user — abandon any existing active session
     existing_active = db.query(GameSession).filter(
         GameSession.user_id == current_user.id,
         GameSession.status == "active",
-    ).first()
+    ).with_for_update().first()
     if existing_active:
         existing_active.status = "abandoned"
         existing_active.ended_at = datetime.now(UTC)
@@ -53,7 +54,7 @@ def update_session(
 ):
     session = _get_session(session_id, current_user.id, db)
     if session.status != "active":
-        raise HTTPException(status_code=400, detail="Session 已結束")
+        raise HTTPException(status_code=409, detail="Session 已結束")
     if req.current_wave is not None:
         session.current_wave = req.current_wave
     if req.gold is not None:
@@ -76,30 +77,35 @@ def end_session(
 ):
     session = _get_session(session_id, current_user.id, db)
     if session.status != "active":
-        raise HTTPException(status_code=400, detail="Session 已結束，無法重複提交")
-    session.status = "completed"
-    session.score = req.score
-    session.ended_at = datetime.now(UTC)
+        raise HTTPException(status_code=409, detail="Session 已結束，無法重複提交")
 
-    # Commit session changes first
-    db.flush()
+    try:
+        session.status = "completed"
+        session.score = req.score
+        session.ended_at = datetime.now(UTC)
+        db.flush()
 
-    # 自動提交排行榜（若已存在則跳過）
-    existing = db.query(LeaderboardEntry).filter(
-        LeaderboardEntry.session_id == session.id
-    ).first()
-    if not existing:
-        entry = LeaderboardEntry(
-            user_id=current_user.id,
-            level=session.level,
-            score=req.score,
-            kills=req.kills,
-            waves_survived=req.waves_survived,
-            session_id=session.id,
-        )
-        db.add(entry)
+        # 自動提交排行榜（若已存在則跳過）
+        existing = db.query(LeaderboardEntry).filter(
+            LeaderboardEntry.session_id == session.id
+        ).first()
+        if not existing:
+            entry = LeaderboardEntry(
+                user_id=current_user.id,
+                level=session.level,
+                score=req.score,
+                kills=req.kills,
+                waves_survived=req.waves_survived,
+                session_id=session.id,
+            )
+            db.add(entry)
 
-    db.commit()
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to end session: session=%s user=%s", session_id, current_user.id)
+        raise HTTPException(status_code=500, detail="結束 Session 失敗，請重試")
+
     db.refresh(session)
     logger.info("Session ended: session=%s user=%s score=%d", session.id, current_user.id, req.score)
     return session
