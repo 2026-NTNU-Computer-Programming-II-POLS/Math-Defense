@@ -4,6 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from app.domain.constraints import (
+    LEVEL_MAX,
+    LEVEL_MIN,
+    SCORE_MAX,
+    SCORE_MIN,
+)
+
 
 class SessionStatus(str, Enum):
     """Session status — replaces scattered "active" / "completed" / "abandoned" string literals"""
@@ -13,21 +20,21 @@ class SessionStatus(str, Enum):
 
 
 class Level(int):
-    """Level — constrained to values 1 through 4"""
+    """Level — constrained per domain.constraints.LEVEL_RANGE"""
     def __new__(cls, value: int) -> Level:
-        if not 1 <= value <= 4:
-            raise ValueError(f"Level must be between 1 and 4, got {value}")
+        if not LEVEL_MIN <= value <= LEVEL_MAX:
+            raise ValueError(f"Level must be between {LEVEL_MIN} and {LEVEL_MAX}, got {value}")
         return super().__new__(cls, value)
 
 
 @dataclass(frozen=True)
 class Score:
-    """Score — must be non-negative and within the allowed upper bound"""
+    """Score — constrained per domain.constraints.SCORE_RANGE"""
     value: int
 
     def __post_init__(self) -> None:
-        if not 0 <= self.value <= 9_999_999:
-            raise ValueError(f"Score must be between 0 and 9999999, got {self.value}")
+        if not SCORE_MIN <= self.value <= SCORE_MAX:
+            raise ValueError(f"Score must be between {SCORE_MIN} and {SCORE_MAX}, got {self.value}")
 
 
 @dataclass(frozen=True)

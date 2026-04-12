@@ -9,9 +9,11 @@
 | 團隊 | 三人（大一、大二、大三），本科：教育與科技 |
 | 目標玩家 | 高中生 |
 | 遊戲類型 | 策略型塔防 × 數學學習 |
-| 技術棧 | HTML5 Canvas + JavaScript（主程式）+ C → WebAssembly（數學運算核心） |
+| 技術棧 | Vue 3 + TypeScript（前端）、FastAPI（後端，DDD 分層）、HTML5 Canvas、C → WebAssembly（數學運算核心） |
 | 開發時程 | 6 週以上 |
 | 關卡數量 | 4 關精緻版 |
+
+> **實作細節**：前端詳見 [`frontend/README.md`](frontend/README.md)、後端詳見 [`backend/README.md`](backend/README.md)。本文件描述遊戲設計與機制；工程架構以 README 為準（本文件 §11 為歷史脈絡，已於 DDD 重構後更新）。
 
 ### 核心理念
 
@@ -372,38 +374,49 @@ Build Phase（準備階段）              Wave Phase（戰鬥階段）
 
 ## 十一、技術架構
 
-### 架構總覽：雙層分離
+### 架構總覽：三層分離（前端 / 後端 / 運算核心）
 
 ```
-┌─────────────────────────────────────────────┐
-│  瀏覽器                                      │
-│                                              │
-│  JS 層：UI、Canvas 渲染、遊戲流程控制          │
-│    ↕ ccall / cwrap                           │
-│  WASM 層（C 編譯）：所有數學運算核心            │
-│    • matrix_multiply      矩陣連結塔          │
-│    • calculate_trajectory  函數砲軌跡         │
-│    • sector_coverage       雷達掃描塔         │
-│    • numerical_integrate   積分砲             │
-│    • fourier_composite     傅立葉破盾         │
-└─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────┐        ┌─────────────────────────────┐
+│  瀏覽器（前端）                                │        │  伺服器（後端 FastAPI）       │
+│                                                │        │                             │
+│  Vue 3 + TypeScript：UI、路由、Pinia 狀態       │  HTTPS │  DDD 分層（Domain /         │
+│  遊戲引擎（pure TS）：Canvas 渲染、遊戲流程      │ ─────► │   Application /             │
+│  ↕ ccall / cwrap                               │  /api  │   Infrastructure）          │
+│  WASM 層（C 編譯）：數學運算核心                  │        │  Auth / Session / 排行榜     │
+│    • matrix_multiply      矩陣連結塔            │        │  JWT + bcrypt, SQLAlchemy   │
+│    • calculate_trajectory 函數砲軌跡            │        └─────────────────────────────┘
+│    • sector_coverage      雷達掃描塔            │
+│    • numerical_integrate  積分砲                │
+│    • fourier_composite    傅立葉破盾            │
+└───────────────────────────────────────────────┘
 ```
 
-C 負責**計算層**，JS 負責**表現層**，透過 WebAssembly（Emscripten）整合。遊戲中每一次砲彈軌跡計算、面積運算、波形合成，都實際經過 C 編譯的 WASM 模組執行。
+C 負責**計算層**，TypeScript 負責**表現層**，FastAPI 負責**持久化與使用者身份**。遊戲中每一次砲彈軌跡計算、面積運算、波形合成，都實際經過 C 編譯的 WASM 模組執行；分數與排行榜則透過後端 REST API 儲存。
 
-### JS 層：HTML5 Canvas + JavaScript
+> 詳細目錄與 API 規格請見：
+> - 前端：[`frontend/README.md`](frontend/README.md)
+> - 後端：[`backend/README.md`](backend/README.md)
+
+### 前端：Vue 3 + TypeScript + HTML5 Canvas
 
 | 模組 | 功能 |
 |------|------|
-| Game Engine | 遊戲迴圈、Canvas 渲染、輸入處理 |
-| WASM Bridge | 載入 WASM 模組、封裝 `ccall`/`cwrap` 呼叫介面 |
-| Tower System | 6 種塔的邏輯、升級系統（數學運算委託 WASM） |
-| Wave & Enemy System | 路徑函數生成、敵人生成、HP 管理、分裂/隱身邏輯 |
-| Random Path Generator | 依關卡等級從隨機池生成合理的函數路徑 |
-| UI Layer | Build Phase 浮動面板、HUD、選單、Buff 卡介面、傅立葉破盾介面 |
-| Level Data | JSON 設定檔（關卡配置、隨機池定義、波次資料、Buff 卡池） |
-| Leaderboard | localStorage 讀寫 |
+| Vue 3 UI 層（`<script setup>` + Pinia） | 選單、登入、Build Phase 面板、HUD、Buff 卡、傅立葉破盾介面 |
+| Game Engine（`src/engine/`，純 TS） | 固定步長遊戲迴圈、PhaseStateMachine、EventBus、Canvas 渲染 |
+| WASM Bridge | 載入 WASM 模組，封裝 `ccall`/`cwrap`；型別由 `wasm-exports.d.ts` 自動生成 |
+| Tower / Wave / Enemy Systems | 6 種塔邏輯、路徑函數生成、分裂/隱身邏輯；數學運算委託 WASM |
+| Services（`src/services/`） | `fetch` 封裝，自動附帶 Bearer token；負責 Auth / Session / Leaderboard API |
 | Asset Manager | 像素風 sprites、chiptune 音效、自訂頭像上傳處理 |
+
+### 後端：FastAPI（DDD）
+
+| 層 | 功能 |
+|------|------|
+| Domain | `GameSession` / `LeaderboardEntry` / `User` aggregates、value objects、repository protocols |
+| Application | `SessionApplicationService`、`LeaderboardApplicationService`、`AuthApplicationService` |
+| Infrastructure | SQLAlchemy 實作的 repositories、Unit of Work、JWT/bcrypt 工具 |
+| API | `/api/auth`、`/api/sessions`、`/api/leaderboard`（見 `backend/README.md`） |
 
 ### WASM 層：math_engine.c → WebAssembly
 

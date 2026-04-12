@@ -35,6 +35,14 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     const canvas = canvasRef.value
     if (!canvas) return
 
+    // HMR defensive: if a prior Game survived without an unmount (e.g. Vite
+    // re-fired onMounted), tear it down before creating a new one. InputManager
+    // listeners would otherwise accumulate on the canvas/window.
+    if (game.value) {
+      game.value.destroy()
+      game.value = null
+    }
+
     const g = new Game(canvas)
 
     // Inject all systems (order: placement → combat → movement → wave → buff → economy → renderers)
@@ -51,12 +59,21 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     g.addSystem('towerRenderer', new TowerRenderer())
     g.addSystem('projectileRenderer', new ProjectileRenderer())
 
-    // Generate a random path on each level start and sync it to the store
+    // Generate a random path on each level start and sync it to the store.
+    // The expression string is presentation-only and lives on gameStore, not GameState.
     unsubs.push(g.eventBus.on(Events.LEVEL_START, (levelNum) => {
       const path = generatePath(levelNum as number)
       g.pathFunction = path.fn
-      g.state.pathExpression = path.expr
       gameStore.pathExpression = path.expr
+    }))
+
+    // Fourier target is a visual cue owned by the UI store — mirror it here
+    // rather than keeping a copy on GameState.
+    unsubs.push(g.eventBus.on(Events.BOSS_SHIELD_START, ({ target }) => {
+      uiStore.bossShieldTarget = target
+    }))
+    unsubs.push(g.eventBus.on(Events.BOSS_SHIELD_END, () => {
+      uiStore.bossShieldTarget = null
     }))
 
     // Tower selected → open BuildPanel (engine → Vue UI bridge)

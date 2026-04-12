@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
+from app.domain.errors import SessionNotFoundError, SessionStaleError
 from app.domain.value_objects import Level, Score, GameResult, SessionStatus
 from app.domain.session.aggregate import GameSession
 from app.domain.session.events import SessionCompleted
@@ -205,15 +206,6 @@ class SessionApplicationService:
             self._uow.commit()
             raise SessionStaleError("Session timed out (over 2 hours) and was automatically abandoned")
         return session
-
-
-class SessionNotFoundError(Exception):
-    pass
-
-
-class SessionStaleError(Exception):
-    """Session has timed out"""
-    pass
 
 
 def _is_active_session_conflict(err: IntegrityError) -> bool:

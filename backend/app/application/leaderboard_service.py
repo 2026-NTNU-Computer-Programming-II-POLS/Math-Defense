@@ -7,6 +7,11 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
+from app.domain.errors import (
+    DuplicateSubmissionError,
+    PermissionDeniedError,
+    SessionValidationError,
+)
 from app.domain.value_objects import Level, Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 
@@ -91,15 +96,3 @@ class LeaderboardApplicationService:
                 user_id, level, score,
             )
             return {"id": entry.id, "score": entry.score.value}
-
-
-class SessionValidationError(Exception):
-    pass
-
-
-class PermissionDeniedError(Exception):
-    pass
-
-
-class DuplicateSubmissionError(Exception):
-    pass

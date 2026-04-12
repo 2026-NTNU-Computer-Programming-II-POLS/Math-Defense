@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { EventBus } from './EventBus'
 
 interface TestEvents {
-  [key: string]: unknown
   ping: string
   count: number
   empty: void

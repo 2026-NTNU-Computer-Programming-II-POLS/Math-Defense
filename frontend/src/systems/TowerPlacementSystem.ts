@@ -8,6 +8,15 @@ import type { Game } from '@/engine/Game'
 import { getParam } from '@/entities/types'
 import type { Tower, TowerPreview } from '@/entities/types'
 
+/**
+ * Handles tower placement (Build phase) and the hover-preview overlay.
+ *
+ * **Setup contract:** after `new TowerPlacementSystem()` the caller MUST wire
+ * `getSelectedTowerType` and `clearSelectedTowerType` BEFORE the first
+ * CANVAS_CLICK fires (typically inside `useGameLoop` immediately after
+ * construction). The defaults are no-ops: forgetting this wiring silently
+ * disables tower placement rather than throwing.
+ */
 export class TowerPlacementSystem {
   /** Tower-type reader injected from outside (set by useGameLoop) */
   getSelectedTowerType: () => TowerType | null = () => null

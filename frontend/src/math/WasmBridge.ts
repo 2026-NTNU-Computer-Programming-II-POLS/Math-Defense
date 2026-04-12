@@ -5,12 +5,16 @@
 
 // Minimal Emscripten surface we actually use. Typed so a typo in an exported name
 // or a wrong return-type asserts at compile time instead of shipping NaN/undefined.
+// `WasmExport` is generated from wasm/Makefile EXPORTED_FUNCTIONS, so a C-side
+// rename is caught by vue-tsc here instead of at runtime.
+import type { WasmExport } from './wasm-exports'
+
 type WasmCType = 'number' | 'string' | 'array' | null
 type WasmValueType = 'i8' | 'i16' | 'i32' | 'i64' | 'float' | 'double' | '*'
 
 interface WasmModule {
-  ccall(name: string, returnType: WasmCType, argTypes: WasmCType[], args: unknown[]): number
-  cwrap(name: string, returnType: WasmCType, argTypes: WasmCType[]): (...args: unknown[]) => number
+  ccall(name: WasmExport, returnType: WasmCType, argTypes: WasmCType[], args: unknown[]): number
+  cwrap(name: WasmExport, returnType: WasmCType, argTypes: WasmCType[]): (...args: unknown[]) => number
   _malloc(n: number): number
   _free(ptr: number): void
   getValue(ptr: number, type: WasmValueType): number

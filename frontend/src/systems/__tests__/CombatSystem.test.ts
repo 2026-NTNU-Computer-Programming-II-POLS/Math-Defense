@@ -35,11 +35,17 @@ describe('CombatSystem', () => {
     return { game, system }
   }
 
-  it('marks tower configured on CAST_SPELL', () => {
+  it('applies params and marks tower configured on TOWER_PARAMS_SET', () => {
     const { game } = setup()
     const tower = createMockTower({ configured: false })
-    game.eventBus.emit(Events.CAST_SPELL, tower)
+    game.towers.push(tower)
+    game.eventBus.emit(Events.TOWER_PARAMS_SET, {
+      towerId: tower.id,
+      params: { m: 2, b: 3 },
+    })
     expect(tower.configured).toBe(true)
+    expect(tower.params.m).toBe(2)
+    expect(tower.params.b).toBe(3)
   })
 
   it('resets cooldownTimers on WAVE_START', () => {

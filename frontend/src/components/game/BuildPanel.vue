@@ -20,7 +20,7 @@ const tower = computed(() => {
   return engine.towers.find((t) => t.id === id) ?? null
 })
 
-const bossTarget = computed(() => gameStore.bossShieldTarget)
+const bossTarget = computed(() => uiStore.bossShieldTarget)
 
 const towerDef = computed(() =>
   tower.value ? TOWER_DEFS[tower.value.type as TowerType] : null,
@@ -39,7 +39,10 @@ const fields = computed(() => {
   if (!t) return []
   // Specialized panels handle their own fields
   if (hasSpecialPanel.value) return []
-  if (t.type === TowerType.FUNCTION_CANNON && t.level >= 2) {
+  // Defensive: TowerFactory always sets level=1, but a hand-crafted or legacy
+  // tower could still land here without it — fall back to level 1 rather than
+  // blowing up on `undefined >= 2`.
+  if (t.type === TowerType.FUNCTION_CANNON && (t.level ?? 1) >= 2) {
     return FUNCTION_CANNON_UPGRADED_FIELDS
   }
   return TOWER_PARAM_FIELDS[t.type as TowerType] ?? []
@@ -88,10 +91,12 @@ function castSpell(): void {
   const game = gameStore.getEngine()
   const t = tower.value
   if (!game || !t) return
-  for (const [k, v] of Object.entries(localParams.value)) {
-    t.params[k] = v
-  }
-  game.eventBus.emit(Events.CAST_SPELL, t)
+  // Dispatch intent only; CombatSystem owns the param apply + configured flip
+  // so simulation state stays the single responsibility of the Systems layer.
+  game.eventBus.emit(Events.TOWER_PARAMS_SET, {
+    towerId: t.id,
+    params: { ...localParams.value },
+  })
   uiStore.buildPanelVisible = false
 }
 

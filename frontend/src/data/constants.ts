@@ -81,6 +81,7 @@ export const Events = Object.freeze({
   TOWER_ATTACK:         'towerAttack',
 
   BUFF_PHASE_START:     'buffPhaseStart',
+  BUFF_CARDS_UPDATED:   'buffCardsUpdated',
   BUFF_CARD_SELECTED:   'buffCardSelected',
   BUFF_RESULT:          'buffResult',
   BUFF_PHASE_END:       'buffPhaseEnd',

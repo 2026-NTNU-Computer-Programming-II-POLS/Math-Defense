@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: pytest
+        env:
+          # Minimal env so pydantic-settings is satisfied during test collection;
+          # the test suite's conftest swaps in an in-memory SQLite anyway.
+          SECRET_KEY: ci-placeholder-secret-key-not-used
+          DATABASE_URL: sqlite:///./data/ci.db
+          CORS_ORIGINS: http://localhost:5173
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      # Skip the `prebuild` WASM compile — emsdk isn't available on the runner
+      # and the build step is only used here to drive vue-tsc type-checking.
+      - name: Type-check
+        run: npx vue-tsc -b
+      - name: Unit tests
+        run: npm test

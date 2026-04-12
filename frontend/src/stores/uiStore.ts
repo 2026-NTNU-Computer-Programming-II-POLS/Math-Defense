@@ -3,8 +3,17 @@
  * Manages panel visibility, selected tower, and other UI-only state.
  */
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import type { TowerType } from '@/data/constants'
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'then' in value
+    && typeof (value as { then: unknown }).then === 'function'
+  )
+}
 
 export const useUiStore = defineStore('ui', () => {
   // currently selected tower type (tower bar selection)
@@ -17,11 +26,16 @@ export const useUiStore = defineStore('ui', () => {
   // Buff Card Panel
   const buffPanelVisible = ref(false)
 
+  // Boss Shield Fourier target — visual cue only, driven by BOSS_SHIELD_START.
+  // shallowRef: replaced whole rather than mutated, so deep reactivity is waste.
+  const bossShieldTarget = shallowRef<{ freqs: number[]; amps: number[] } | null>(null)
+
   // Modal (replaces alert)
   const modalVisible = ref(false)
   const modalTitle = ref('')
   const modalMessage = ref('')
-  const modalCallback = ref<(() => void) | null>(null)
+  // Callback may return a Promise; we await it for rejection-reporting below.
+  const modalCallback = ref<(() => unknown) | null>(null)
 
   // Tutorial
   const tutorialVisible = ref(false)
@@ -30,7 +44,7 @@ export const useUiStore = defineStore('ui', () => {
   // HUD hint
   const buildHintStep = ref(0)   // 0=select tower  1=click cell  2=set params  3=Cast Spell
 
-  function showModal(title: string, message: string, onClose?: () => void): void {
+  function showModal(title: string, message: string, onClose?: () => unknown): void {
     modalTitle.value = title
     modalMessage.value = message
     modalCallback.value = onClose ?? null
@@ -52,12 +66,12 @@ export const useUiStore = defineStore('ui', () => {
     modalVisible.value = false
     if (!cb) return
     try {
-      const result = cb() as unknown
+      const result = cb()
       // Catch async rejections too (e.g. router.push returning a rejected
       // Promise) — otherwise the user sees the modal disappear but never
       // finds out the action actually failed.
-      if (result && typeof (result as { then?: unknown }).then === 'function') {
-        (result as Promise<unknown>).catch((e) => {
+      if (isPromiseLike(result)) {
+        result.then(undefined, (e) => {
           console.error('[Modal] Async callback error:', e)
           _showErrorFallback()
         })
@@ -77,6 +91,7 @@ export const useUiStore = defineStore('ui', () => {
     selectedTowerType,
     buildPanelVisible, buildPanelTowerId,
     buffPanelVisible,
+    bossShieldTarget,
     modalVisible, modalTitle, modalMessage, modalCallback,
     tutorialVisible, tutorialStep,
     buildHintStep,

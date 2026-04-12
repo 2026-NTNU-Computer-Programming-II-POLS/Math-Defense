@@ -13,6 +13,7 @@ import {
   GRID_MIN_X, GRID_MAX_X,
 } from '@/data/constants'
 import type { Tower, Enemy, Projectile } from '@/entities/types'
+import type { BuffDef } from '@/data/buff-defs'
 
 // ── Type-safe event map ──
 
@@ -21,8 +22,20 @@ export interface CoordPayload {
   game: { x: number; y: number }
 }
 
+/**
+ * Immutable snapshot published alongside WAVE_END.
+ * Consumers must read from the payload, not from `game.state`, so that a
+ * listener running earlier in the dispatch chain cannot bias a later
+ * listener's view of resources at wave-end.
+ */
+export interface WaveEndSnapshot {
+  readonly wave: number
+  readonly gold: number
+  readonly hp: number
+  readonly score: number
+}
+
 export interface GameEvents {
-  [key: string]: unknown
   [Events.PHASE_CHANGED]:        { from: GamePhase; to: GamePhase }
   [Events.LEVEL_START]:          number
   [Events.LEVEL_END]:            void
@@ -31,19 +44,20 @@ export interface GameEvents {
   [Events.BUILD_PHASE_END]:      void
   [Events.TOWER_PLACED]:         Tower
   [Events.TOWER_SELECTED]:       Tower | null
-  [Events.TOWER_PARAMS_SET]:     { tower: Tower; params: Tower['params'] }
+  [Events.TOWER_PARAMS_SET]:     { towerId: string; params: Tower['params'] }
   [Events.CAST_SPELL]:           Tower
   [Events.WAVE_START]:           number
-  [Events.WAVE_END]:             number
+  [Events.WAVE_END]:             WaveEndSnapshot
   [Events.ENEMY_SPAWNED]:        Enemy
   [Events.ENEMY_KILLED]:         Enemy
   [Events.ENEMY_REACHED_ORIGIN]: Enemy
   [Events.TOWER_ATTACK]:         { tower: Tower; target: Enemy }
   [Events.BUFF_PHASE_START]:     void
+  [Events.BUFF_CARDS_UPDATED]:   ReadonlyArray<BuffDef & { isCurse: boolean }>
   [Events.BUFF_CARD_SELECTED]:   string
   [Events.BUFF_RESULT]:          { success: boolean; cardId: string; skipped: boolean; insufficientGold?: boolean }
   [Events.BUFF_PHASE_END]:       void
-  [Events.BOSS_SHIELD_START]:    void
+  [Events.BOSS_SHIELD_START]:    { target: { freqs: number[]; amps: number[] } }
   [Events.BOSS_SHIELD_ATTEMPT]:  { match: number }
   [Events.BOSS_SHIELD_END]:      void
   [Events.GOLD_CHANGED]:         number

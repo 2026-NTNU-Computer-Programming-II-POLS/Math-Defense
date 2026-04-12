@@ -4,6 +4,7 @@
  */
 import { Events } from '@/data/constants'
 import type { Game, GameSystem } from '@/engine/Game'
+import { isShielded } from '@/engine/GameState'
 import type { Renderer } from '@/engine/Renderer'
 
 export class EconomySystem implements GameSystem {
@@ -14,7 +15,7 @@ export class EconomySystem implements GameSystem {
     this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
-        if (game.state.shieldActive) return
+        if (isShielded(game.state)) return
         // Per-enemy damage so a boss reaching origin actually ends the game; basic slimes still cost 1.
         game.changeHp(-(enemy.damage ?? 1))
       }),

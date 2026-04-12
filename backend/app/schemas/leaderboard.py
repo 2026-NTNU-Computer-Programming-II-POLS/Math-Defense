@@ -1,42 +1,25 @@
 from datetime import datetime
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field
+
+from app.domain.constraints import (
+    KILLS_MAX,
+    KILLS_MIN,
+    LEVEL_MAX,
+    LEVEL_MIN,
+    SCORE_MAX,
+    SCORE_MIN,
+    WAVES_MAX,
+    WAVES_MIN,
+)
 
 
 class ScoreSubmission(BaseModel):
-    level: int  # validated: 1-4
-    score: int  # validated: 0-9999999
-    kills: int  # validated: 0-9999
-    waves_survived: int  # validated: 0-999
-    session_id: str  # a valid session_id must be provided to prevent score forgery
-
-    @field_validator("level")
-    @classmethod
-    def check_level(cls, v: int) -> int:
-        if v < 1 or v > 4:
-            raise ValueError("Level must be between 1 and 4")
-        return v
-
-    @field_validator("score")
-    @classmethod
-    def check_score(cls, v: int) -> int:
-        if v < 0 or v > 9999999:
-            raise ValueError("Score must be between 0 and 9999999")
-        return v
-
-    @field_validator("kills")
-    @classmethod
-    def check_kills(cls, v: int) -> int:
-        # Upper bound stops clients from parking 9_999_999_999 on the leaderboard.
-        if v < 0 or v > 9999:
-            raise ValueError("kills must be between 0 and 9999")
-        return v
-
-    @field_validator("waves_survived")
-    @classmethod
-    def check_waves_survived(cls, v: int) -> int:
-        if v < 0 or v > 999:
-            raise ValueError("waves_survived must be between 0 and 999")
-        return v
+    level: int = Field(ge=LEVEL_MIN, le=LEVEL_MAX)
+    score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
+    kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
+    waves_survived: int = Field(ge=WAVES_MIN, le=WAVES_MAX)
+    # A valid session_id must be provided to prevent score forgery.
+    session_id: str
 
 
 class LeaderboardEntryOut(BaseModel):

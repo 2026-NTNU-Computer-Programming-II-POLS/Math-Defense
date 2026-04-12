@@ -9,6 +9,8 @@ export class InputManager {
   private canvas: HTMLCanvasElement
   private bus: GameEventBus
   private _keysDown = new Set<string>()
+  // Guards against double-destroy during HMR or repeated onUnmounted invocations.
+  private _destroyed = false
 
   // Retain listener references for removal during destroy
   private _onClick: (e: MouseEvent) => void
@@ -62,6 +64,8 @@ export class InputManager {
   }
 
   destroy(): void {
+    if (this._destroyed) return
+    this._destroyed = true
     this.canvas.removeEventListener('click', this._onClick)
     this.canvas.removeEventListener('mousemove', this._onMove)
     window.removeEventListener('keydown', this._onKeyDown)

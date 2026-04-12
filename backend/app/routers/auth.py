@@ -1,13 +1,17 @@
 import hashlib
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
+
+from app.application.auth_service import AuthApplicationService
 from app.db.database import get_db
-from app.models.user import User
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, AuthMeResponse
-from app.utils.security import hash_password, verify_password, create_access_token
-from app.middleware.auth import get_current_user
+from app.domain.user.aggregate import User
+from app.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
+from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 from app.limiter import limiter
+from app.middleware.auth import get_current_user
+from app.schemas.auth import AuthMeResponse, LoginRequest, RegisterRequest, TokenResponse
 
 logger = logging.getLogger(__name__)
 
@@ -19,33 +23,28 @@ def _anon(username: str) -> str:
     return hashlib.sha256(username.encode("utf-8")).hexdigest()[:10]
 
 
+def _get_service(db: Session) -> AuthApplicationService:
+    return AuthApplicationService(
+        user_repo=SqlAlchemyUserRepository(db),
+        uow=SqlAlchemyUnitOfWork(db),
+    )
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == req.username).first():
-        logger.warning("Registration failed: username_hash=%s", _anon(req.username))
-        raise HTTPException(status_code=409, detail="Username already taken")
-
-    user = User(username=req.username, password_hash=hash_password(req.password))
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
+    # UsernameTakenError → 409 via the global DomainError handler.
+    user, token = _get_service(db).register(req.username, req.password)
     logger.info("User registered: id=%s", user.id)
-    token = create_access_token({"sub": user.id})
     return TokenResponse(access_token=token, username=user.username)
 
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == req.username).first()
-    if not user or not verify_password(req.password, user.password_hash):
-        logger.warning("Login failed: username_hash=%s", _anon(req.username))
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-
+    # InvalidCredentialsError → 401 via the global DomainError handler.
+    user, token = _get_service(db).login(req.username, req.password)
     logger.info("User logged in: id=%s", user.id)
-    token = create_access_token({"sub": user.id})
     return TokenResponse(access_token=token, username=user.username)
 
 

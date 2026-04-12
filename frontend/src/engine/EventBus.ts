@@ -1,17 +1,17 @@
 /**
- * EventBus — generic type-safe event bus
- * Uses a string literal union for event names; payload types are inferred from generics.
+ * EventBus — generic type-safe event bus.
+ * TEvents is an event-map interface with specific keys; there is deliberately
+ * no `[key: string]: unknown` index signature so a typo at the call site is a
+ * compile error instead of a valid string emit.
  */
-
-export type EventMap = { [key: string]: unknown }
 
 type ListenerFn<T> = (payload: T) => void
 
-export class EventBus<TEvents extends EventMap> {
-  private _listeners = new Map<string, Set<ListenerFn<unknown>>>()
+export class EventBus<TEvents> {
+  private _listeners = new Map<PropertyKey, Set<ListenerFn<unknown>>>()
 
   on<K extends keyof TEvents>(event: K, cb: ListenerFn<TEvents[K]>): () => void {
-    const key = event as string
+    const key = event as PropertyKey
     if (!this._listeners.has(key)) {
       this._listeners.set(key, new Set())
     }
@@ -28,7 +28,7 @@ export class EventBus<TEvents extends EventMap> {
   }
 
   off<K extends keyof TEvents>(event: K, cb: ListenerFn<TEvents[K]>): void {
-    const key = event as string
+    const key = event as PropertyKey
     const set = this._listeners.get(key)
     if (set) {
       set.delete(cb as ListenerFn<unknown>)
@@ -37,7 +37,7 @@ export class EventBus<TEvents extends EventMap> {
   }
 
   emit<K extends keyof TEvents>(event: K, payload: TEvents[K]): void {
-    const set = this._listeners.get(event as string)
+    const set = this._listeners.get(event as PropertyKey)
     if (!set) return
     // Snapshot before iterating so once()/off() invoked during dispatch can't skip later listeners
     const snapshot = Array.from(set)

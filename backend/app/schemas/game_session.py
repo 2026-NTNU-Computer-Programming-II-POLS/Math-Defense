@@ -1,23 +1,31 @@
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+from app.domain.constraints import (
+    GOLD_MAX,
+    GOLD_MIN,
+    HP_MAX,
+    HP_MIN,
+    KILLS_MAX,
+    KILLS_MIN,
+    LEVEL_MAX,
+    LEVEL_MIN,
+    SCORE_MAX,
+    SCORE_MIN,
+    WAVES_MAX,
+    WAVES_MIN,
+)
 
 
 class SessionCreate(BaseModel):
-    level: int
-
-    @field_validator("level")
-    @classmethod
-    def check_level(cls, v: int) -> int:
-        if v < 1 or v > 4:
-            raise ValueError("Level must be between 1 and 4")
-        return v
+    level: int = Field(ge=LEVEL_MIN, le=LEVEL_MAX)
 
 
 class SessionUpdate(BaseModel):
-    current_wave: int | None = Field(default=None, ge=0, le=999)
-    gold: int | None = Field(default=None, ge=0, le=99999)
-    hp: int | None = Field(default=None, ge=0, le=100)
-    score: int | None = Field(default=None, ge=0, le=9999999)
+    current_wave: int | None = Field(default=None, ge=WAVES_MIN, le=WAVES_MAX)
+    gold: int | None = Field(default=None, ge=GOLD_MIN, le=GOLD_MAX)
+    hp: int | None = Field(default=None, ge=HP_MIN, le=HP_MAX)
+    score: int | None = Field(default=None, ge=SCORE_MIN, le=SCORE_MAX)
 
     @model_validator(mode="after")
     def at_least_one_field(self) -> "SessionUpdate":
@@ -30,9 +38,9 @@ class SessionUpdate(BaseModel):
 
 
 class SessionEnd(BaseModel):
-    score: int = Field(ge=0, le=9999999)
-    kills: int = Field(ge=0, le=9999)
-    waves_survived: int = Field(ge=0, le=999)
+    score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
+    kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
+    waves_survived: int = Field(ge=WAVES_MIN, le=WAVES_MAX)
 
 
 class SessionOut(BaseModel):

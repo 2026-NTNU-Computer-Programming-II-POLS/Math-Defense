@@ -3,7 +3,7 @@
  * Bridges the engine EventBus → Vue reactivity so Vue components can read game state.
  */
 import { defineStore } from 'pinia'
-import { ref, shallowRef, computed } from 'vue'
+import { ref, computed } from 'vue'
 // buffCards intentionally uses `ref` (not shallowRef) so future in-place
 // mutations (e.g. `buffCards.value[0].probability = 0.7`) still trigger UI
 // updates. The performance cost is negligible for a 3-element array.
@@ -23,9 +23,10 @@ export const useGameStore = defineStore('game', () => {
   const maxHp = ref(20)
   const score = ref(0)
   const kills = ref(0)
+  // pathExpression is a presentation string the HUD displays — useGameLoop
+  // writes it on LEVEL_START, and it does not round-trip through GameState.
   const pathExpression = ref('')
   const buffCards = ref<(BuffDef & { isCurse: boolean })[]>([])
-  const bossShieldTarget = shallowRef<{ freqs: number[]; amps: number[] } | null>(null)
 
   // ── Computed ──
   const isBuilding = computed(() => phase.value === GamePhase.BUILD)
@@ -65,17 +66,15 @@ export const useGameStore = defineStore('game', () => {
         wave.value = 0
         score.value = 0
         kills.value = 0
-        pathExpression.value = game.state.pathExpression
+        // pathExpression is set by useGameLoop's own LEVEL_START handler after
+        // generatePath runs; don't overwrite with stale/empty engine state here.
       }),
-      game.eventBus.on(Events.BUFF_PHASE_START, () => {
-        const buffSys = game.getSystem('buff') as { currentCards: (BuffDef & { isCurse: boolean })[] } | undefined
-        if (buffSys) buffCards.value = [...buffSys.currentCards]
-      }),
-      game.eventBus.on(Events.BOSS_SHIELD_START, () => {
-        bossShieldTarget.value = game.state.bossShieldTarget
-      }),
-      game.eventBus.on(Events.BOSS_SHIELD_END, () => {
-        bossShieldTarget.value = null
+      // BuffSystem emits BUFF_CARDS_UPDATED with a freshly built array each
+      // draw. Taking the payload directly (rather than reaching into
+      // buffSystem.currentCards) means future mutations inside the system
+      // can never leak into the store's snapshot.
+      game.eventBus.on(Events.BUFF_CARDS_UPDATED, (cards) => {
+        buffCards.value = cards.map((c) => ({ ...c }))
       }),
     ]
   }
@@ -96,7 +95,8 @@ export const useGameStore = defineStore('game', () => {
     maxHp.value = s.maxHp
     score.value = s.score
     kills.value = s.kills
-    pathExpression.value = s.pathExpression
+    // pathExpression is presentation state; it is owned by the store and set
+    // via useGameLoop's LEVEL_START handler, not mirrored from GameState.
   }
 
   function getEngine(): Game | null {
@@ -105,7 +105,7 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     phase, level, wave, totalWaves,
-    gold, hp, maxHp, score, kills, pathExpression, buffCards, bossShieldTarget,
+    gold, hp, maxHp, score, kills, pathExpression, buffCards,
     isBuilding, isWave, isBuff, hpPercent,
     bindEngine, unbindEngine, syncFromEngine, getEngine,
   }

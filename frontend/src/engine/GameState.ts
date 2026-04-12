@@ -26,15 +26,20 @@ export interface GameState {
   freeTowerNext: boolean
   enemySpeedMultiplier: number     // Curse: enemy speed multiplier (default 1.0)
 
-  // Boss Shield state (centrally managed; not scattered in CombatSystem)
+  // Boss Shield state (centrally managed; not scattered in CombatSystem).
+  // The Fourier target waveform is delivered via the BOSS_SHIELD_START event
+  // payload and mirrored into uiStore — it is presentation, not simulation.
   bossShieldTriggered: boolean
   bossShieldTimer: number
-  // Target waveform the player must match with the Fourier Shield slider UI.
-  // Populated when BOSS_SHIELD_START fires so the FourierPanel can compare against it.
-  bossShieldTarget: { freqs: number[]; amps: number[] } | null
+}
 
-  // Path
-  pathExpression: string
+/**
+ * Whether the Shield buff is currently absorbing damage.
+ * Declared as a selector so EconomySystem (and any future damage sources)
+ * can read shield state without coupling to BuffSystem's internal flag name.
+ */
+export function isShielded(state: GameState): boolean {
+  return state.shieldActive
 }
 
 export function createInitialState(): GameState {
@@ -54,7 +59,5 @@ export function createInitialState(): GameState {
     enemySpeedMultiplier: 1,
     bossShieldTriggered: false,
     bossShieldTimer: 0,
-    bossShieldTarget: null,
-    pathExpression: '',
   }
 }

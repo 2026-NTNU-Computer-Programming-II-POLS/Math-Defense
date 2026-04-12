@@ -64,7 +64,12 @@ export class WaveSystem {
   }
 
   private _spawn(config: EnemySpawnEntry, game: Game): void {
-    if (!game.pathFunction) return
+    if (!game.pathFunction) {
+      // Path cleared mid-wave — skip this spawn but log so it's visible in dev.
+      // Silent skip would manifest as a wave that "ends" without all enemies appearing.
+      console.warn('[WaveSystem] spawn skipped: pathFunction is null', { type: config.type })
+      return
+    }
     const enemy = createEnemy(config.type, game.pathFunction, config.overrides)
     // curse: enemy speed-up is read by MovementSystem from game.state.enemySpeedMultiplier — no injection needed here
     game.enemies.push(enemy)
@@ -72,7 +77,13 @@ export class WaveSystem {
   }
 
   private _endWave(game: Game): void {
-    game.eventBus.emit(Events.WAVE_END, game.state.wave)
+    const s = game.state
+    game.eventBus.emit(Events.WAVE_END, Object.freeze({
+      wave: s.wave,
+      gold: s.gold,
+      hp: s.hp,
+      score: s.score,
+    }))
 
     if (game.state.wave >= game.state.totalWaves) {
       game.eventBus.emit(Events.LEVEL_END, undefined)

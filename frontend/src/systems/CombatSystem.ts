@@ -4,7 +4,7 @@
  * Entities have no update/render methods; this System owns all combat logic.
  */
 import { Events, GamePhase, TowerType, EnemyType, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
-import { distance, findIntersections, degToRad } from '@/math/MathUtils'
+import { distance, findIntersections, degToRad, mulberry32, stringHash } from '@/math/MathUtils'
 import { pointInSector as wasmPointInSector } from '@/math/WasmBridge'
 import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
 import type { Game } from '@/engine/Game'
@@ -33,8 +33,14 @@ export class CombatSystem {
     this.destroy()
 
     this._unsubs.push(
-      game.eventBus.on(Events.CAST_SPELL, (tower) => {
+      game.eventBus.on(Events.TOWER_PARAMS_SET, ({ towerId, params }) => {
+        const tower = game.towers.find((t) => t.id === towerId)
+        if (!tower) return
+        for (const [k, v] of Object.entries(params)) {
+          tower.params[k] = v
+        }
         tower.configured = true
+        game.eventBus.emit(Events.CAST_SPELL, tower)
       }),
 
       game.eventBus.on(Events.WAVE_START, () => {
@@ -46,7 +52,6 @@ export class CombatSystem {
       game.eventBus.on(Events.LEVEL_START, () => {
         game.state.bossShieldTriggered = false
         game.state.bossShieldTimer = 0
-        game.state.bossShieldTarget = null
       }),
 
       // Allow external shield-breaking (for BOSS_SHIELD UI)
@@ -80,10 +85,12 @@ export class CombatSystem {
       if (boss) {
         game.state.bossShieldTriggered = true
         game.state.bossShieldTimer = CombatSystem.BOSS_SHIELD_DURATION
-        // Pseudo-random target waveform seeded by boss id so it stays stable across re-renders
-        game.state.bossShieldTarget = CombatSystem._makeBossTarget(boss.id)
+        // Target waveform is derived deterministically from the boss id, so the
+        // Fourier panel sees the same target across re-renders. It travels with
+        // the event rather than living on GameState because it's presentation.
+        const target = CombatSystem._makeBossTarget(boss.id)
         boss.isStealthed = true
-        game.eventBus.emit(Events.BOSS_SHIELD_START, undefined)
+        game.eventBus.emit(Events.BOSS_SHIELD_START, { target })
 
         // Process queued shield attempt from before shield was active
         if (this._pendingShieldAttempt) {
@@ -251,20 +258,21 @@ export class CombatSystem {
     // can re-arm its shield. Without this, the shield only ever fires once per level.
     game.state.bossShieldTimer = 0
     game.state.bossShieldTriggered = false
-    game.state.bossShieldTarget = null
     const boss = game.enemies.find((e) => e.type === EnemyType.BOSS_DRAGON && e.alive)
     if (boss) boss.isStealthed = false
     game.eventBus.emit(Events.BOSS_SHIELD_END, undefined)
   }
 
-  /** Cheap deterministic target waveform derived from the boss id. */
-  private static _makeBossTarget(seed: string): { freqs: number[]; amps: number[] } {
-    let h = 0
-    for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
-    const r = (n: number) => ((Math.abs((h * (n + 1)) ^ 0x9e3779b9)) % 1000) / 1000
+  /**
+   * Deterministic Fourier target waveform derived from a boss entity id.
+   * The id is hashed (FNV-1a) and used as the seed for mulberry32, so renaming
+   * boss ids will reshuffle targets — that is the contract.
+   */
+  private static _makeBossTarget(bossId: string): { freqs: number[]; amps: number[] } {
+    const rand = mulberry32(stringHash(bossId))
     return {
-      freqs: [1 + r(0) * 4, 2 + r(1) * 4, 3 + r(2) * 4],
-      amps: [0.5 + r(3) * 1.5, 0.3 + r(4), 0.2 + r(5)],
+      freqs: [1 + rand() * 4, 2 + rand() * 4, 3 + rand() * 4],
+      amps: [0.5 + rand() * 1.5, 0.3 + rand(), 0.2 + rand()],
     }
   }
 

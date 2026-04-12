@@ -88,9 +88,14 @@ export function useSessionSync() {
       sessionId.value = id
     }))
 
-    // WAVE_END → update session with current state (queued to avoid dropping rapid events)
+    // WAVE_END → update session with the frozen snapshot carried by the event.
+    // Reading from the payload (rather than game.state) ensures the values
+    // sent to the server reflect wave-end exactly, even if another listener
+    // mutates resources before this handler runs.
     let pendingSync = false
-    unsubs.push(game.eventBus.on(Events.WAVE_END, async () => {
+    let latestSnapshot: { wave: number; gold: number; hp: number; score: number } | null = null
+    unsubs.push(game.eventBus.on(Events.WAVE_END, async (snapshot) => {
+      latestSnapshot = snapshot
       if (!sessionId.value) return
       if (syncing.value) {
         pendingSync = true
@@ -100,12 +105,12 @@ export function useSessionSync() {
       try {
         do {
           pendingSync = false
-          if (!sessionId.value) break
+          if (!sessionId.value || !latestSnapshot) break
           await sessionService.update(sessionId.value, {
-            current_wave: game.state.wave,
-            gold: game.state.gold,
-            hp: game.state.hp,
-            score: game.state.score,
+            current_wave: latestSnapshot.wave,
+            gold: latestSnapshot.gold,
+            hp: latestSnapshot.hp,
+            score: latestSnapshot.score,
           })
           // success → reset the failure counter and alert latch
           consecutiveUpdateFailures = 0

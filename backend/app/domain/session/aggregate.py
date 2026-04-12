@@ -5,6 +5,8 @@ import uuid
 from datetime import datetime, timedelta, UTC
 
 from app.config import settings
+from app.domain.constraints import GOLD_MAX, HP_MAX, MAX_SCORE_DELTA, MAX_WAVE
+from app.domain.errors import InvalidStatusTransitionError, SessionNotActiveError
 from app.domain.value_objects import SessionStatus, Level, GameResult
 from app.domain.session.events import (
     SessionCreated,
@@ -12,6 +14,7 @@ from app.domain.session.events import (
     SessionAbandoned,
     SessionUpdated,
 )
+from app.shared_constants import INITIAL_GOLD, INITIAL_HP
 
 
 def _stale_cutoff() -> timedelta:
@@ -22,15 +25,8 @@ def _stale_cutoff() -> timedelta:
 # Kept for backwards compatibility with callers that imported the constant.
 STALE_CUTOFF = _stale_cutoff()
 
-# Defense-in-depth bounds for client-supplied progress updates.
-# Pydantic checks shape; the aggregate enforces game rules (hp can't exceed maxHp,
-# score can't decrease, wave can't jump past the max).
-_MAX_HP = 100
-_MAX_GOLD = 99_999
-_MAX_WAVE = 30
-# Single-update score deltas above this are almost certainly cheating; the spec
-# tops out around ~1500/wave even with all multipliers, so 50k is a generous ceiling.
-_MAX_SCORE_DELTA = 50_000
+# Bounds live in domain.constraints; the aggregate enforces game rules
+# (hp can't exceed maxHp, score can't decrease, wave can't jump past the max).
 
 # Valid state transition table
 _ALLOWED_TRANSITIONS: dict[SessionStatus, set[SessionStatus]] = {
@@ -58,8 +54,8 @@ class GameSession:
         level: Level,
         status: SessionStatus = SessionStatus.ACTIVE,
         current_wave: int = 0,
-        gold: int = 200,
-        hp: int = 20,
+        gold: int = INITIAL_GOLD,
+        hp: int = INITIAL_HP,
         score: int = 0,
         started_at: datetime | None = None,
         ended_at: datetime | None = None,
@@ -125,15 +121,15 @@ class GameSession:
         if current_wave is not None:
             if current_wave < self.current_wave:
                 raise ValueError("current_wave must not decrease")
-            self.current_wave = max(0, min(current_wave, _MAX_WAVE))
+            self.current_wave = max(0, min(current_wave, MAX_WAVE))
         if gold is not None:
-            self.gold = max(0, min(gold, _MAX_GOLD))
+            self.gold = max(0, min(gold, GOLD_MAX))
         if hp is not None:
-            self.hp = max(0, min(hp, _MAX_HP))
+            self.hp = max(0, min(hp, HP_MAX))
         if score is not None:
             if score < self.score:
                 raise ValueError("score must not decrease")
-            if score - self.score > _MAX_SCORE_DELTA:
+            if score - self.score > MAX_SCORE_DELTA:
                 raise ValueError("score delta exceeds plausibility cap")
             self.score = score
         self._events.append(SessionUpdated(session_id=self.id))
@@ -144,7 +140,7 @@ class GameSession:
         # Reject end-payload scores that wildly exceed the most recent in-flight score
         if result.score.value < self.score:
             raise ValueError("final score must not be less than last reported score")
-        if result.score.value - self.score > _MAX_SCORE_DELTA:
+        if result.score.value - self.score > MAX_SCORE_DELTA:
             raise ValueError("final score delta exceeds plausibility cap")
         self._transition_to(SessionStatus.COMPLETED)
         self.score = result.score.value
@@ -193,9 +189,9 @@ class GameSession:
         self.status = new_status
 
 
-class SessionNotActiveError(Exception):
-    """Session is not in ACTIVE status"""
-
-
-class InvalidStatusTransitionError(Exception):
-    """Invalid status transition"""
+# Re-export for backward compatibility with callers that import from aggregate.
+__all__ = [
+    "GameSession",
+    "SessionNotActiveError",
+    "InvalidStatusTransitionError",
+]

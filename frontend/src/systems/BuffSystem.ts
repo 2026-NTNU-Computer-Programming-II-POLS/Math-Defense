@@ -167,21 +167,27 @@ export class BuffSystem {
   }
 
   private _drawCards(game?: Game): void {
-    this.currentCards = []
     // Each Probability Shrine adds one extra card and tilts the curse-vs-buff
     // coin against the player less often. With no shrines, behave as before.
     const shrines = game ? game.towers.filter((t) => t.type === TowerType.PROBABILITY_SHRINE).length : 0
     const cardCount = 3 + shrines
     const curseChance = Math.max(0.05, 0.3 - shrines * 0.08)
+    // Build a fresh array each draw so downstream consumers (e.g. the Pinia
+    // store) can treat the payload as an immutable snapshot. Reassigning
+    // `currentCards` — rather than splicing/pushing into the existing one —
+    // is what guarantees the store's previous reference stays untouched.
+    const fresh: (BuffDef & { isCurse: boolean })[] = []
     for (let i = 0; i < cardCount; i++) {
       if (Math.random() < curseChance && CURSE_POOL.length > 0) {
         const curse = CURSE_POOL[Math.floor(Math.random() * CURSE_POOL.length)]
-        this.currentCards.push({ ...curse, isCurse: true })
+        fresh.push({ ...curse, isCurse: true })
       } else {
         const buff = BUFF_POOL[Math.floor(Math.random() * BUFF_POOL.length)]
-        this.currentCards.push({ ...buff, isCurse: false })
+        fresh.push({ ...buff, isCurse: false })
       }
     }
+    this.currentCards = fresh
+    if (game) game.eventBus.emit(Events.BUFF_CARDS_UPDATED, fresh)
   }
 
   private _applyCard(cardIndex: number, game: Game): void {
