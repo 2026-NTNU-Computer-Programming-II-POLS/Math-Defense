@@ -10,6 +10,8 @@ export class EconomySystem implements GameSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
+    // Clear any prior subscriptions so HMR / re-init doesn't double-subscribe.
+    this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
         if (game.state.shieldActive) return

@@ -23,4 +23,4 @@ class LeaderboardEntry(Base):
     kills: Mapped[int] = mapped_column(Integer, nullable=False)
     waves_survived: Mapped[int] = mapped_column(Integer, nullable=False)
     session_id: Mapped[str | None] = mapped_column(String, ForeignKey("game_sessions.id", ondelete="SET NULL"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

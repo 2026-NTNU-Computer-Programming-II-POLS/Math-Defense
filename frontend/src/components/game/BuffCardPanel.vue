@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
 
@@ -7,14 +7,59 @@ const gameStore = useGameStore()
 
 const cards = computed(() => gameStore.buffCards)
 
-function selectCard(cardId: string): void {
+// Guard against rapid double-click: once a card is selected, block further
+// selections until BUFF_RESULT fires (normal path) or a 2s failsafe timeout
+// elapses (in case the engine drops the result event). Without this, two
+// fast clicks dispatch two BUFF_CARD_SELECTED events and the player is
+// charged twice.
+const selectingCardId = ref<string | null>(null)
+let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+let unsubBuffResult: (() => void) | null = null
+
+function clearGuard(): void {
+  selectingCardId.value = null
+  if (timeoutHandle !== null) {
+    clearTimeout(timeoutHandle)
+    timeoutHandle = null
+  }
+}
+
+onMounted(() => {
   const game = gameStore.getEngine()
-  game?.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
+  if (!game) return
+  unsubBuffResult = game.eventBus.on(Events.BUFF_RESULT, () => {
+    clearGuard()
+  })
+})
+
+onUnmounted(() => {
+  unsubBuffResult?.()
+  unsubBuffResult = null
+  clearGuard()
+})
+
+// If the panel closes (e.g. buff phase ends) before BUFF_RESULT fires, reset
+// the guard so the next round starts clean.
+watch(cards, (v) => {
+  if (v.length === 0) clearGuard()
+})
+
+function selectCard(cardId: string): void {
+  if (selectingCardId.value !== null) return
+  const game = gameStore.getEngine()
+  if (!game) return
+  selectingCardId.value = cardId
+  timeoutHandle = setTimeout(() => { clearGuard() }, 2000)
+  game.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
 }
 
 function skipBuff(): void {
+  if (selectingCardId.value !== null) return
   const game = gameStore.getEngine()
-  game?.eventBus.emit(Events.BUFF_CARD_SELECTED, '')
+  if (!game) return
+  selectingCardId.value = ''
+  timeoutHandle = setTimeout(() => { clearGuard() }, 2000)
+  game.eventBus.emit(Events.BUFF_CARD_SELECTED, '')
 }
 </script>
 
@@ -28,6 +73,7 @@ function skipBuff(): void {
           v-for="card in cards"
           :key="card.id"
           :class="['buff-card', { curse: card.isCurse }]"
+          :disabled="selectingCardId !== null"
           @click="selectCard(card.id)"
         >
           <div class="card-name" :class="{ 'curse-name': card.isCurse }">
@@ -48,7 +94,11 @@ function skipBuff(): void {
         </button>
       </div>
 
-      <button class="btn skip-btn" @click="skipBuff">跳過 (Skip)</button>
+      <button
+        class="btn skip-btn"
+        :disabled="selectingCardId !== null"
+        @click="skipBuff"
+      >跳過 (Skip)</button>
     </div>
   </div>
 </template>

@@ -119,22 +119,30 @@ def test_end_session(client):
     assert data["ended_at"] is not None
 
 
-def test_end_session_twice_returns_409(client):
+def test_end_session_twice_is_idempotent(client):
+    """A retry after a successful end returns 200 with the stored completion state,
+    so clients retrying on timeout don't have to special-case 409."""
     token = _register_and_token(client, "sess_end_twice")
     session_id = _create_session(client, token).json()["id"]
 
-    client.post(
+    first = client.post(
         f"/api/sessions/{session_id}/end",
         json={"score": 100, "kills": 5, "waves_survived": 2},
         headers=_auth_headers(token),
     )
+    assert first.status_code == 200
+    assert first.json()["score"] == 100
 
-    res = client.post(
+    retry = client.post(
         f"/api/sessions/{session_id}/end",
         json={"score": 200, "kills": 10, "waves_survived": 4},
         headers=_auth_headers(token),
     )
-    assert res.status_code == 409
+    assert retry.status_code == 200
+    # The retry must surface the stored completion, not the retry payload —
+    # otherwise a stale second client could rewrite a posted score.
+    assert retry.json()["score"] == 100
+    assert retry.json()["status"] == "completed"
 
 
 def test_end_session_creates_leaderboard_entry(client):

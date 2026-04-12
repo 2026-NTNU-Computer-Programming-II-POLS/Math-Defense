@@ -82,6 +82,24 @@ export interface Projectile {
   ownerId: string
 }
 
+// ── Param accessor ──
+
+/**
+ * Safely read a numeric param from a Tower with a fallback.
+ *
+ * TowerParams stores `number | string | boolean`; call sites in CombatSystem /
+ * BuildPanel / TowerPlacementSystem routinely cast the bag to
+ * `Record<string, number>` and rely on `?? fallback`. That works when the key
+ * is absent but silently propagates `NaN` / strings if the value exists with
+ * a non-number type. This helper validates at runtime: only a finite number
+ * is returned; anything else (undefined, string, NaN, Infinity) yields the
+ * fallback.
+ */
+export function getParam(tower: Tower, key: string, fallback: number): number {
+  const v = tower.params[key]
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback
+}
+
 // ── Preview ──
 
 export type TowerPreview =

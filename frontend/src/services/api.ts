@@ -42,10 +42,14 @@ async function request<T>(
     // auth state and (if on a protected route) navigate to /auth so the user
     // isn't stranded on a blank panel with repeating errors. Dynamic import
     // avoids a static cycle (api → authStore → authService → api).
+    //
+    // Await logout() so the modal-close + navigation finish before the
+    // ApiError bubbles up. If a modal is already visible (e.g. "Sync Failed"),
+    // logout() force-closes it first so we don't stack overlays (F-9).
     if (res.status === 401) {
       try {
         const { useAuthStore } = await import('@/stores/authStore')
-        useAuthStore().logout()
+        await useAuthStore().logout()
       } catch {
         // Pinia not installed yet (very early bootstrap) — best-effort cleanup
         localStorage.removeItem('auth_token')

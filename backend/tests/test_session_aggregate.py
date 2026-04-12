@@ -202,6 +202,42 @@ class TestIsStale:
         assert not session.is_stale
 
 
+# ── started_at invariant ──
+
+class TestStartedAtInvariant:
+    """started_at is set at creation and must never change across lifecycle transitions."""
+
+    def test_started_at_preserved_across_update(self):
+        session = GameSession.create("user-1", Level(1))
+        original = session.started_at
+
+        session.update_progress(score=50, current_wave=1)
+        assert session.started_at == original
+
+    def test_started_at_preserved_across_complete(self):
+        session = GameSession.create("user-1", Level(1))
+        original = session.started_at
+
+        session.complete(GameResult(Score(100), kills=5, waves_survived=2))
+        assert session.started_at == original
+
+    def test_started_at_preserved_across_abandon(self):
+        session = GameSession.create("user-1", Level(1))
+        original = session.started_at
+
+        session.abandon()
+        assert session.started_at == original
+
+    def test_no_public_setter_mutates_started_at(self):
+        """Sanity check: the aggregate exposes no API that rewrites started_at."""
+        session = GameSession.create("user-1", Level(1))
+        original = session.started_at
+
+        session.update_progress(gold=500)
+        session.complete(GameResult(Score(100), kills=1, waves_survived=1))
+        assert session.started_at == original
+
+
 # ── Status transition guards ──
 
 class TestStatusTransitions:

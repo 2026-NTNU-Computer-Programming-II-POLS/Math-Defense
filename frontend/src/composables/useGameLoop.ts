@@ -61,7 +61,12 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
 
     // Tower selected → open BuildPanel (engine → Vue UI bridge)
     unsubs.push(g.eventBus.on(Events.TOWER_SELECTED, (tower) => {
-      if (tower && typeof tower === 'object' && 'id' in tower) {
+      if (
+        tower
+        && typeof tower === 'object'
+        && 'id' in tower
+        && typeof (tower as { id: unknown }).id === 'string'
+      ) {
         uiStore.buildPanelTowerId = (tower as Tower).id
         uiStore.buildPanelVisible = true
       } else {

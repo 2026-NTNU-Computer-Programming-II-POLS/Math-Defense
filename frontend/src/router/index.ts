@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useUiStore } from '@/stores/uiStore'
 
 const PROTECTED_ROUTES = new Set(['game', 'leaderboard'])
 
@@ -27,6 +28,19 @@ const router = createRouter({
       component: () => import('@/views/AuthView.vue'),
     },
   ],
+})
+
+// Close any open modal on route change so an overlay from the previous view
+// (e.g. "Game Over" triggering navigation) never bleeds into the next view.
+// The callback fires on close, but here the navigation is already in progress,
+// so we suppress it to avoid a navigation-during-navigation loop.
+router.beforeEach(() => {
+  const ui = useUiStore()
+  if (ui.modalVisible) {
+    ui.modalCallback = null
+    ui.modalVisible = false
+  }
+  return true
 })
 
 router.beforeEach((to) => {

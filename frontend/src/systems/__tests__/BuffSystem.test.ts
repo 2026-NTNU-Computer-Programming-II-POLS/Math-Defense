@@ -114,6 +114,47 @@ describe('BuffSystem', () => {
     }
   })
 
+  it('curse branch: awards goldReward, applies effect, and emits success=true', () => {
+    // Drain the pool until we get a curse card (curse probability is 1.0 but the
+    // pool also contains a buff, so a couple of retries may be needed for a curse).
+    let curseCard: { id: string; isCurse: boolean } | undefined
+    for (let attempt = 0; attempt < 50 && !curseCard; attempt++) {
+      game.eventBus.emit(Events.BUFF_PHASE_START, undefined)
+      curseCard = system.currentCards.find((c) => c.isCurse && c.id === 'test_curse')
+    }
+    expect(curseCard).toBeDefined()
+
+    const captured: { result: { success: boolean; skipped: boolean; cardId: string } | null } = { result: null }
+    game.eventBus.on(Events.BUFF_RESULT, (r) => {
+      captured.result = r as { success: boolean; skipped: boolean; cardId: string }
+    })
+
+    const goldBefore = game.state.gold
+    game.eventBus.emit(Events.BUFF_CARD_SELECTED, curseCard!.id)
+
+    // Curse pays out goldReward=30 and applies the speed effect.
+    expect(game.state.gold).toBe(goldBefore + 30)
+    expect(game.state.enemySpeedMultiplier).toBeCloseTo(1.5)
+    expect(captured.result).toEqual({ success: true, cardId: 'test_curse', skipped: false })
+    expect(game.state.phase).toBe(GamePhase.BUILD)
+  })
+
+  it('curse branch: reverts effect after duration expires (tick at WAVE_END)', () => {
+    let curseCard: { id: string; isCurse: boolean } | undefined
+    for (let attempt = 0; attempt < 50 && !curseCard; attempt++) {
+      game.eventBus.emit(Events.BUFF_PHASE_START, undefined)
+      curseCard = system.currentCards.find((c) => c.isCurse && c.id === 'test_curse')
+    }
+    expect(curseCard).toBeDefined()
+
+    game.eventBus.emit(Events.BUFF_CARD_SELECTED, curseCard!.id)
+    expect(game.state.enemySpeedMultiplier).toBeCloseTo(1.5)
+
+    // duration=1 → first WAVE_END should revert.
+    game.eventBus.emit(Events.WAVE_END, 1 as never)
+    expect(game.state.enemySpeedMultiplier).toBeCloseTo(1.0)
+  })
+
   it('clears active buffs on LEVEL_START', () => {
     game.eventBus.emit(Events.BUFF_PHASE_START, undefined)
     const buffCard = system.currentCards.find((c) => c.id === 'test_buff')

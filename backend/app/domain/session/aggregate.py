@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, UTC
 
+from app.config import settings
 from app.domain.value_objects import SessionStatus, Level, GameResult
 from app.domain.session.events import (
     SessionCreated,
@@ -12,7 +13,14 @@ from app.domain.session.events import (
     SessionUpdated,
 )
 
-STALE_CUTOFF = timedelta(hours=2)
+
+def _stale_cutoff() -> timedelta:
+    # Read at call time so tests / runtime overrides of the setting take effect.
+    return timedelta(hours=settings.session_stale_cutoff_hours)
+
+
+# Kept for backwards compatibility with callers that imported the constant.
+STALE_CUTOFF = _stale_cutoff()
 
 # Defense-in-depth bounds for client-supplied progress updates.
 # Pydantic checks shape; the aggregate enforces game rules (hp can't exceed maxHp,
@@ -97,7 +105,7 @@ class GameSession:
         # SQLite returns naive datetime; normalize to aware before comparing
         if started.tzinfo is None:
             started = started.replace(tzinfo=UTC)
-        return now - started > STALE_CUTOFF
+        return now - started > _stale_cutoff()
 
     # ── Commands (state-mutating methods) ──
 

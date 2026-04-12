@@ -68,8 +68,8 @@ def get_active_session(
 ):
     # Lets the frontend adopt/clean an orphaned active session after a reload
     # or a rapid LEVEL_START race where the session id was lost client-side.
-    repo = SqlAlchemySessionRepository(db)
-    session = repo.find_active_by_user(current_user.id)
+    service = _get_service(db)
+    session = service.get_active_for_user(current_user.id)
     if not session:
         return None
     return _to_response(session)

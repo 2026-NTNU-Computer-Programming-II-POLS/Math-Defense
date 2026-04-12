@@ -47,16 +47,34 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('auth_token')
   }
 
-  function logout(): void {
+  async function logout(): Promise<void> {
     clearAuth()
-    // If the user is on a protected route (e.g. /game), navigate away so the
-    // view unmounts. That releases the engine, useSessionSync/useGameLoop
-    // listeners, and any cached per-user state — otherwise a subsequent login
-    // as a different account would reuse stale in-game state.
+    // Serialize close-modal → navigate → toast so a 401 triggered mid-modal
+    // doesn't leave the user trapped behind stacked overlays (cf. F-7/F-8/F-9).
+    // Dynamic import avoids a static cycle (authStore → uiStore → …).
+    try {
+      const { useUiStore } = await import('@/stores/uiStore')
+      const uiStore = useUiStore()
+      if (uiStore.modalVisible) {
+        // Force-close any existing modal before we navigate. We intentionally
+        // bypass the callback (modalCallback.value = null first) because the
+        // modal's original caller is now mid-logout and any router.push it
+        // wanted to run would race with ours.
+        uiStore.modalCallback = null
+        uiStore.modalVisible = false
+      }
+    } catch {
+      // Pinia not installed yet (very early bootstrap) — skip modal cleanup.
+    }
+
     const PROTECTED = new Set(['game', 'leaderboard'])
     const currentName = router.currentRoute.value.name as string | undefined
     if (currentName && PROTECTED.has(currentName)) {
-      router.push({ name: 'auth' }).catch(() => { /* navigation failures are non-fatal */ })
+      try {
+        await router.push({ name: 'auth' })
+      } catch {
+        // navigation failures are non-fatal
+      }
     }
   }
 

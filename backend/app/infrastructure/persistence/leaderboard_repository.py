@@ -1,8 +1,8 @@
 """SQLAlchemy implementation of LeaderboardRepository"""
 from __future__ import annotations
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session as DbSession
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session as DbSession, aliased
 
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.value_objects import Level, Score
@@ -41,40 +41,45 @@ class SqlAlchemyLeaderboardRepository:
         page: int,
         per_page: int,
     ) -> tuple[list[dict], int]:
-        """Returns (entries_with_rank, total_count)"""
-        base_q = self._db.query(LeaderboardEntryModel).join(
-            User, LeaderboardEntryModel.user_id == User.id
+        """Returns (entries_with_rank, total_count).
+
+        Rank semantics: DENSE_RANK by score — ties share a rank, next distinct
+        score advances by 1. Implementation avoids a window function so the DB
+        doesn't materialise every row before LIMIT. Instead, each returned row's
+        rank is derived from a correlated subquery (``1 + COUNT DISTINCT higher
+        scores``), which uses the score index and costs O(per_page * log N)
+        rather than O(N).
+        """
+        # Count query: no User join (B-8) — COUNT doesn't need usernames.
+        count_q = self._db.query(func.count(LeaderboardEntryModel.id))
+        if level is not None:
+            count_q = count_q.filter(LeaderboardEntryModel.level == level)
+        total = count_q.scalar() or 0
+        if total == 0:
+            return [], 0
+
+        L2 = aliased(LeaderboardEntryModel)
+        higher_distinct = select(func.count(func.distinct(L2.score))).where(
+            L2.score > LeaderboardEntryModel.score
         )
         if level is not None:
-            base_q = base_q.filter(LeaderboardEntryModel.level == level)
+            higher_distinct = higher_distinct.where(L2.level == level)
+        rank_col = (higher_distinct.correlate(LeaderboardEntryModel).scalar_subquery() + 1).label("rank")
 
-        total = base_q.count()
-
-        # DENSE_RANK for tie handling.
-        # Partition by level when filtering so rank reflects the per-level ladder
-        # (without partition_by, GET ?level=2 would still report global rank).
-        # id is the final tie-breaker so pagination stays stable across pages.
-        rank_kwargs = {
-            "order_by": [
-                LeaderboardEntryModel.score.desc(),
-                LeaderboardEntryModel.created_at.asc(),
-                LeaderboardEntryModel.id.asc(),
-            ],
-        }
-        if level is not None:
-            rank_kwargs["partition_by"] = LeaderboardEntryModel.level
-        rank_col = func.dense_rank().over(**rank_kwargs).label("rank")
-
-        ranked_q = self._db.query(
-            LeaderboardEntryModel, User.username, rank_col
+        q = self._db.query(
+            LeaderboardEntryModel.level.label("level"),
+            LeaderboardEntryModel.score.label("score"),
+            LeaderboardEntryModel.kills.label("kills"),
+            LeaderboardEntryModel.waves_survived.label("waves_survived"),
+            LeaderboardEntryModel.created_at.label("created_at"),
+            User.username.label("username"),
+            rank_col,
         ).join(User, LeaderboardEntryModel.user_id == User.id)
-
         if level is not None:
-            ranked_q = ranked_q.filter(LeaderboardEntryModel.level == level)
+            q = q.filter(LeaderboardEntryModel.level == level)
 
         rows = (
-            ranked_q
-            .order_by(
+            q.order_by(
                 LeaderboardEntryModel.score.desc(),
                 LeaderboardEntryModel.created_at.asc(),
                 LeaderboardEntryModel.id.asc(),
@@ -86,15 +91,15 @@ class SqlAlchemyLeaderboardRepository:
 
         entries = [
             {
-                "rank": rank,
-                "username": username,
-                "level": entry.level,
-                "score": entry.score,
-                "kills": entry.kills,
-                "waves_survived": entry.waves_survived,
-                "created_at": entry.created_at,
+                "rank": row.rank,
+                "username": row.username,
+                "level": row.level,
+                "score": row.score,
+                "kills": row.kills,
+                "waves_survived": row.waves_survived,
+                "created_at": row.created_at,
             }
-            for entry, username, rank in rows
+            for row in rows
         ]
 
         return entries, total

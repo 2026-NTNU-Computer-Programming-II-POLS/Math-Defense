@@ -179,11 +179,16 @@ export class Game {
   }
 
   stop(): void {
-    this._running = false
+    // Cancel the pending RAF *before* flipping _running. If we flipped first, a
+    // frame that fires between the two statements would still enter _loop() with
+    // _running=false and early-return — fine — but requestAnimationFrame
+    // might have already been scheduled inside that frame for the *next* one.
+    // Cancelling up front guarantees no further frames enter _loop after stop().
     if (this._rafId !== null) {
       cancelAnimationFrame(this._rafId)
       this._rafId = null
     }
+    this._running = false
   }
 
   destroy(): void {
@@ -210,6 +215,9 @@ export class Game {
     }
 
     this._render()
+    // Re-check _running after update/render: a system (e.g. session sync error)
+    // or WAVE_END listener could have stopped the game mid-frame.
+    if (!this._running) return
     this._rafId = requestAnimationFrame(this._boundLoop)
   }
 

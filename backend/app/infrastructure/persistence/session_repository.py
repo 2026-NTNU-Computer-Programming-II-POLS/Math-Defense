@@ -5,7 +5,7 @@ from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session as DbSession
 
-from app.domain.session.aggregate import GameSession, STALE_CUTOFF
+from app.domain.session.aggregate import GameSession, _stale_cutoff
 from app.domain.value_objects import SessionStatus, Level
 from app.models.game_session import GameSession as GameSessionModel
 
@@ -22,6 +22,17 @@ class SqlAlchemySessionRepository:
         ).first()
         return self._to_domain(row) if row else None
 
+    def find_by_id_for_update(self, session_id: str, user_id: str) -> GameSession | None:
+        # Row-level lock prevents the TOCTOU race between the duplicate-submission
+        # check and the leaderboard insert. On SQLite with_for_update is a no-op,
+        # but the DB-level unique constraint on leaderboard.session_id is the
+        # fallback safety net (callers should also catch IntegrityError).
+        row = self._db.query(GameSessionModel).filter(
+            GameSessionModel.id == session_id,
+            GameSessionModel.user_id == user_id,
+        ).with_for_update().first()
+        return self._to_domain(row) if row else None
+
     def find_active_by_user(self, user_id: str) -> GameSession | None:
         row = self._db.query(GameSessionModel).filter(
             GameSessionModel.user_id == user_id,
@@ -30,7 +41,7 @@ class SqlAlchemySessionRepository:
         return self._to_domain(row) if row else None
 
     def find_stale_sessions(self, user_id: str) -> list[GameSession]:
-        cutoff = datetime.now(UTC) - STALE_CUTOFF
+        cutoff = datetime.now(UTC) - _stale_cutoff()
         rows = self._db.query(GameSessionModel).filter(
             GameSessionModel.user_id == user_id,
             GameSessionModel.status == SessionStatus.ACTIVE.value,
@@ -43,6 +54,13 @@ class SqlAlchemySessionRepository:
             GameSessionModel.id == session.id
         ).first()
         if row:
+            # started_at is an aggregate invariant: it is set once at creation
+            # and must never change. Surface future setters that break this
+            # instead of silently dropping the mutation on update.
+            if _ensure_utc(row.started_at) != _ensure_utc(session.started_at):
+                raise StartedAtMutationError(
+                    f"started_at is immutable on GameSession (session={session.id})"
+                )
             row.status = session.status.value
             row.current_wave = session.current_wave
             row.gold = session.gold
@@ -80,6 +98,20 @@ class SqlAlchemySessionRepository:
             gold=row.gold,
             hp=row.hp,
             score=row.score,
-            started_at=row.started_at,
-            ended_at=row.ended_at,
+            started_at=_ensure_utc(row.started_at),
+            ended_at=_ensure_utc(row.ended_at),
         )
+
+
+class StartedAtMutationError(RuntimeError):
+    """Raised when a caller attempts to persist a changed started_at."""
+
+
+def _ensure_utc(value: datetime | None) -> datetime | None:
+    # SQLite (and any DateTime column without timezone=True) returns naive datetimes;
+    # treat them as UTC so downstream comparisons against datetime.now(UTC) are well-defined.
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

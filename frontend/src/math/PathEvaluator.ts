@@ -124,9 +124,14 @@ function validatePath(path: PathDef): boolean {
   let validPoints = 0
   let totalPoints = 0
   for (let x = 0; x <= path.startX; x += step) {
-    const y = path.fn(x)
     totalPoints++
-    if (isFinite(y) && y > -1 && y < 15) validPoints++
+    try {
+      const y = path.fn(x)
+      if (isFinite(y) && y > -1 && y < 15) validPoints++
+    } catch {
+      // A future user-supplied expression (e.g. 1/x at x=0) can throw;
+      // treat that sample as invalid and continue scoring the rest of the path.
+    }
   }
   return totalPoints > 0 && validPoints / totalPoints > 0.8
 }

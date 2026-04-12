@@ -5,6 +5,8 @@ import logging
 import uuid
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import IntegrityError
+
 from app.domain.value_objects import Level, Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 
@@ -46,8 +48,12 @@ class LeaderboardApplicationService:
         session_id: str,
     ) -> dict:
         with self._uow:
-            # Validate session ownership and status (session_id must be provided)
-            session = self._session_repo.find_by_id(session_id, user_id)
+            # Lock the session row up front so the duplicate-submission check and
+            # the insert below are serialised against concurrent submissions for
+            # the same session_id. Without this, two concurrent POSTs can both
+            # pass find_by_session_id and only the DB unique constraint would
+            # catch the loser (raising 500 instead of a clean 409).
+            session = self._session_repo.find_by_id_for_update(session_id, user_id)
             if not session:
                 raise SessionValidationError("Session not found")
             if session.user_id != user_id:
@@ -70,7 +76,15 @@ class LeaderboardApplicationService:
                 session_id=session_id,
             )
             self._leaderboard_repo.save(entry)
-            self._uow.commit()
+            try:
+                self._uow.commit()
+            except IntegrityError as e:
+                # Belt-and-braces: if the row-lock didn't serialise (e.g. SQLite
+                # ignores FOR UPDATE), the unique constraint on session_id still
+                # rejects the duplicate. Surface it as a clean 409.
+                if "uq_leaderboard_session_id" in str(getattr(e, "orig", "")) or "session_id" in str(getattr(e, "orig", "")):
+                    raise DuplicateSubmissionError("Score already submitted for this session") from e
+                raise
 
             logger.info(
                 "Score submitted: user=%s level=%d score=%d",

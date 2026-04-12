@@ -55,7 +55,12 @@ function selectLevel(levelId: number): void {
 
 <template>
   <div class="game-view">
-    <canvas ref="canvasRef" class="game-canvas" />
+    <canvas
+      ref="canvasRef"
+      class="game-canvas"
+      role="img"
+      aria-label="Math Defense game canvas — place towers and start waves using the overlay controls"
+    />
 
     <div v-if="ready" class="game-overlay">
       <HUD />

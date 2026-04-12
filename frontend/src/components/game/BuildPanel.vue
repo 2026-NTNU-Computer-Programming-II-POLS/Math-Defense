@@ -48,6 +48,11 @@ const fields = computed(() => {
 const localParams = ref<Record<string, number>>({})
 
 watch(tower, (t) => {
+  // Reset first so a stale key from the previous tower can't leak into the
+  // new panel between the null-check and the final assignment (F-11). This
+  // also covers the case where tower.value briefly becomes null during a
+  // close-then-reopen from a different placement click.
+  localParams.value = {}
   if (!t) return
   // Determine specialPanel from the new tower's type directly (not from the computed,
   // which may still reflect the previous tower in the same microtask).
@@ -60,7 +65,8 @@ watch(tower, (t) => {
     : fields.value
   const result: Record<string, number> = {}
   for (const field of paramDefs) {
-    result[field.key] = (t.params[field.key] as number) ?? field.default
+    const v = t.params[field.key]
+    result[field.key] = typeof v === 'number' && Number.isFinite(v) ? v : field.default
   }
   localParams.value = result
 }, { immediate: true })

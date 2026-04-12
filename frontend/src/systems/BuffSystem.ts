@@ -137,6 +137,8 @@ export class BuffSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
+    // Clear any prior subscriptions so HMR / re-init doesn't double-subscribe.
+    this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.BUFF_PHASE_START, () => this._drawCards(game)),
 

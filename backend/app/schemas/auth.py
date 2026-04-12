@@ -3,6 +3,19 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator
 
 
+# Low-effort passwords that pass the length/letter/digit check but are trivially
+# brute-forced. The list is small on purpose: a curated top-N beats a multi-MB
+# wordlist that still lets `Summer2026` through. Compared case-insensitively.
+_COMMON_PASSWORDS = frozenset({
+    "password1", "password12", "password123", "passw0rd", "p@ssw0rd",
+    "qwerty123", "qwerty1234", "abc12345", "abcd1234", "123456789", "1234567890",
+    "letmein1", "letmein123", "welcome1", "welcome123", "iloveyou1", "iloveyou123",
+    "admin123", "admin1234", "master123", "monkey123", "dragon123",
+    "football1", "baseball1", "superman1", "sunshine1", "princess1",
+    "test1234", "hello123", "changeme1", "trustno1", "starwars1",
+})
+
+
 class RegisterRequest(BaseModel):
     username: str
     password: str
@@ -27,6 +40,11 @@ class RegisterRequest(BaseModel):
             raise ValueError("Password must contain at least one letter")
         if not re.search(r'[0-9]', v):
             raise ValueError("Password must contain at least one digit")
+        # Reject five-or-more-in-a-row repeats (e.g. `aaaaaaaa1`, `11111abc`).
+        if re.search(r'(.)\1{4,}', v):
+            raise ValueError("Password must not contain five or more of the same character in a row")
+        if v.lower() in _COMMON_PASSWORDS:
+            raise ValueError("Password is too common; choose something less guessable")
         return v
 
 

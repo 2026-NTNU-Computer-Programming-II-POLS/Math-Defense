@@ -51,6 +51,43 @@ def test_submit_score_duplicate_rejected(client):
     assert res.status_code == 409
 
 
+def test_submit_score_for_active_session_rejected(client):
+    """Guards leaderboard_service.py status-check: an ACTIVE session must be rejected
+    with 400 so callers cannot pre-commit a score before finishing the level."""
+    token = _register_and_token(client, "active_submit")
+    session_res = client.post(
+        "/api/sessions",
+        json={"level": 1},
+        headers=_auth_headers(token),
+    )
+    session_id = session_res.json()["id"]
+    res = client.post(
+        "/api/leaderboard",
+        json={"level": 1, "score": 500, "kills": 30, "waves_survived": 3, "session_id": session_id},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 400
+    assert "not completed" in res.json()["detail"].lower()
+
+
+def test_submit_score_for_abandoned_session_rejected(client):
+    """Sibling to the ACTIVE case: an ABANDONED session must also be rejected."""
+    token = _register_and_token(client, "abandoned_submit")
+    session_res = client.post(
+        "/api/sessions",
+        json={"level": 1},
+        headers=_auth_headers(token),
+    )
+    session_id = session_res.json()["id"]
+    client.post(f"/api/sessions/{session_id}/abandon", headers=_auth_headers(token))
+    res = client.post(
+        "/api/leaderboard",
+        json={"level": 1, "score": 500, "kills": 30, "waves_survived": 3, "session_id": session_id},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 400
+
+
 def test_leaderboard_filter_by_level(client):
     token = _register_and_token(client, "scorer2")
     session_id = _create_completed_session(client, token, level=2, score=800, kills=50, waves_survived=5)

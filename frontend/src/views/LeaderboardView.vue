@@ -75,7 +75,7 @@ onBeforeUnmount(() => {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(e, idx) in entries" :key="`${e.rank}-${idx}`">
+        <tr v-for="e in entries" :key="`${e.username}-${e.level}-${e.score}-${e.waves_survived}`">
           <td class="rank">{{ e.rank }}</td>
           <td class="username">{{ e.username }}</td>
           <td>Lv.{{ e.level }}</td>

@@ -26,7 +26,16 @@ export function spawnChildren(
   context: SplitContext,
   spawnOffset = 0,
 ): Enemy[] {
-  if (!context.pathFunction) return []
+  if (!context.pathFunction) {
+    // Invariant: a split-slime is on the map, so a path must have been set on
+    // LEVEL_START. Reaching here means the path was cleared mid-level (e.g.
+    // destroy() firing during a WAVE_END callback). Log so it surfaces in dev
+    // instead of silently producing a dead parent with no children.
+    console.warn(
+      `[SplitSlimePolicy] pathFunction is null — parent id=${parent.id} will not split.`,
+    )
+    return []
+  }
 
   const children: Enemy[] = []
 

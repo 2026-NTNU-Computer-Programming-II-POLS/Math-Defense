@@ -37,22 +37,34 @@ export const useUiStore = defineStore('ui', () => {
     modalVisible.value = true
   }
 
+  function _showErrorFallback(): void {
+    modalTitle.value = '發生錯誤'
+    modalMessage.value = '操作未能完成，請再試一次。'
+    modalCallback.value = null
+    modalVisible.value = true
+  }
+
   function closeModal(): void {
     const cb = modalCallback.value
+    // Clear state first so that if cb throws / rejects we open a fresh error
+    // modal on top of a cleared slot instead of re-opening on top of itself.
     modalCallback.value = null
     modalVisible.value = false
     if (!cb) return
     try {
-      cb()
+      const result = cb() as unknown
+      // Catch async rejections too (e.g. router.push returning a rejected
+      // Promise) — otherwise the user sees the modal disappear but never
+      // finds out the action actually failed.
+      if (result && typeof (result as { then?: unknown }).then === 'function') {
+        (result as Promise<unknown>).catch((e) => {
+          console.error('[Modal] Async callback error:', e)
+          _showErrorFallback()
+        })
+      }
     } catch (e) {
       console.error('[Modal] Callback error:', e)
-      // Surface the failure to the user so the UI isn't silently stuck
-      // (e.g. router.push throwing leaves the player staring at an empty
-      // overlay). Re-open with a generic error message.
-      modalTitle.value = '發生錯誤'
-      modalMessage.value = '操作未能完成，請再試一次。'
-      modalCallback.value = null
-      modalVisible.value = true
+      _showErrorFallback()
     }
   }
 

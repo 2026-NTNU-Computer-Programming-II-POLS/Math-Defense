@@ -1,4 +1,4 @@
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _MIN_SECRET_KEY_LENGTH = 16
@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # No default: a hard-coded localhost list silently breaks prod deployments behind nginx.
     cors_origins: list[str]
     auto_create_tables: bool = True  # Set to False in production when using Alembic migrations
+    # Active sessions older than this are treated as stale and auto-abandoned.
+    session_stale_cutoff_hours: float = 2.0
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -37,6 +39,18 @@ class Settings(BaseSettings):
                 "a short key compromises JWT security"
             )
         return v
+
+    @model_validator(mode="after")
+    def require_cors_in_prod(self) -> "Settings":
+        # In prod mode (auto_create_tables=False gates Alembic-managed deployments)
+        # an empty CORS_ORIGINS disables all browser origins — requests then fail
+        # with a vague CORS error instead of surfacing the misconfiguration.
+        if not self.auto_create_tables and not self.cors_origins:
+            raise ValueError(
+                "CORS_ORIGINS must be set (comma-separated) in production mode "
+                "(auto_create_tables=False). Empty list silently blocks browsers."
+            )
+        return self
 
 
 settings = Settings()

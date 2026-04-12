@@ -16,6 +16,8 @@ export class WaveSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
+    // Clear any prior subscriptions so HMR / re-init doesn't double-subscribe.
+    this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.WAVE_START, (waveIndex) => {
         this._startWave(waveIndex as number, game)

@@ -7,6 +7,7 @@ import { ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
 import { sessionService } from '@/services/sessionService'
+import { ApiError } from '@/services/api'
 import { Events, GamePhase } from '@/data/constants'
 import type { Game } from '@/engine/Game'
 
@@ -38,6 +39,14 @@ export function useSessionSync() {
         return session.id
       } catch (e) {
         console.warn(`[SessionSync] Create attempt ${attempt + 1} failed:`, e)
+        // Auth failures are not recoverable without a refresh endpoint (which
+        // the backend does not expose). The 401 interceptor in api.ts has
+        // already cleared auth and navigated away; looping would just re-send
+        // a token we know is stale. Same for 403 / 422 — server-side schema or
+        // authorization mismatches won't resolve on retry.
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403 || e.status === 422)) {
+          return null
+        }
         if (attempt < MAX_CREATE_RETRIES) {
           await wait(RETRY_DELAY_MS)
         }
@@ -104,6 +113,15 @@ export function useSessionSync() {
         } while (pendingSync)
       } catch (e) {
         console.warn('[SessionSync] Failed to update session:', e)
+        // 401 means the access token was rejected; api.ts has already cleared
+        // auth and navigated to /auth. Drop the sessionId so subsequent
+        // WAVE_END events don't keep hammering the server with a dead token.
+        if (e instanceof ApiError && e.status === 401) {
+          sessionId.value = null
+          consecutiveUpdateFailures = 0
+          alertedForFailures = false
+          return
+        }
         consecutiveUpdateFailures++
         // After repeated consecutive failures, surface a modal once so the
         // player knows server score has diverged from what they see on screen.
@@ -137,6 +155,13 @@ export function useSessionSync() {
         await endSession(game)
       }
     }))
+
+    // Teardown: whoever calls this is responsible for unsubscribing engine
+    // listeners too (useGameLoop does so). We add one cleanup here that clears
+    // `pendingLevel` so a subsequent mount doesn't reuse the stale level after
+    // a failing create/end — otherwise a late retry from endSession() below
+    // would target the wrong level.
+    unsubs.push(() => { pendingLevel = null })
 
     return unsubs
   }

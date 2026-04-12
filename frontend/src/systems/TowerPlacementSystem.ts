@@ -5,6 +5,7 @@ import { Events, GamePhase, TowerType } from '@/data/constants'
 import { createTower } from '@/entities/TowerFactory'
 import { degToRad } from '@/math/MathUtils'
 import type { Game } from '@/engine/Game'
+import { getParam } from '@/entities/types'
 import type { Tower, TowerPreview } from '@/entities/types'
 
 export class TowerPlacementSystem {
@@ -17,6 +18,8 @@ export class TowerPlacementSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
+    // Clear any prior subscriptions so HMR / re-init doesn't double-subscribe.
+    this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.CANVAS_CLICK, ({ game: gp }) => {
         if (game.state.phase !== GamePhase.BUILD) return
@@ -91,31 +94,35 @@ export class TowerPlacementSystem {
   }
 
   private _getPreview(tower: Tower): TowerPreview {
-    const p = tower.params as Record<string, number>
     switch (tower.type) {
       case TowerType.FUNCTION_CANNON: {
         if (tower.level >= 2) {
-          const a = p.a ?? 0, bCoeff = p.b_coeff ?? 1, c = p.c ?? 0
+          const a = getParam(tower, 'a', 0)
+          const bCoeff = getParam(tower, 'b_coeff', 1)
+          const c = getParam(tower, 'c', 0)
           return { type: 'line', fn: (x) => a * x * x + bCoeff * x + c, xMin: -3, xMax: 25 }
         }
-        const m = p.m ?? 1, b = p.b ?? 0
+        const m = getParam(tower, 'm', 1)
+        const b = getParam(tower, 'b', 0)
         return { type: 'line', fn: (x) => m * x + b, xMin: -3, xMax: 25 }
       }
       case TowerType.RADAR_SWEEP: {
         return {
           type: 'sector',
-          radius: p.r ?? 4,
-          startAngle: degToRad(p.theta ?? 0),
-          sweepAngle: degToRad(p.deltaTheta ?? 60),
+          radius: getParam(tower, 'r', 4),
+          startAngle: degToRad(getParam(tower, 'theta', 0)),
+          sweepAngle: degToRad(getParam(tower, 'deltaTheta', 60)),
         }
       }
       case TowerType.INTEGRAL_CANNON: {
-        const a = p.a ?? -0.5, b = p.b ?? 3, c = p.c ?? 2
+        const a = getParam(tower, 'a', -0.5)
+        const b = getParam(tower, 'b', 3)
+        const c = getParam(tower, 'c', 2)
         return {
           type: 'integral',
           fn: (x) => a * x * x + b * x + c,
-          a: p.intA ?? 0,
-          b: p.intB ?? 6,
+          a: getParam(tower, 'intA', 0),
+          b: getParam(tower, 'intB', 6),
         }
       }
       default:

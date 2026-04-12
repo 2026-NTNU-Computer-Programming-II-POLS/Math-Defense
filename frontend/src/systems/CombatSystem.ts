@@ -8,6 +8,7 @@ import { distance, findIntersections, degToRad } from '@/math/MathUtils'
 import { pointInSector as wasmPointInSector } from '@/math/WasmBridge'
 import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
 import type { Game } from '@/engine/Game'
+import { getParam } from '@/entities/types'
 import type { Tower, Enemy, Projectile } from '@/entities/types'
 
 let _projId = 0
@@ -157,13 +158,12 @@ export class CombatSystem {
   private _functionCannonAttack(tower: Tower, game: Game): void {
     if (!game.pathFunction) return
 
-    const p = tower.params as Record<string, number>
     const isUpgraded = tower.level >= 2
 
     // linear mode: y = mx + b; upgraded mode: y = ax² + bx + c (keys: a, b_coeff, c)
     const shotFn = isUpgraded
-      ? (x: number) => (p.a ?? 0) * x * x + (p.b_coeff ?? 1) * x + (p.c ?? 0)
-      : (x: number) => (p.m ?? 1) * x + (p.b ?? 0)
+      ? (x: number) => getParam(tower, 'a', 0) * x * x + getParam(tower, 'b_coeff', 1) * x + getParam(tower, 'c', 0)
+      : (x: number) => getParam(tower, 'm', 1) * x + getParam(tower, 'b', 0)
 
     const intersections = findIntersections(shotFn, game.pathFunction, -3, 25)
     for (const xi of intersections) {
@@ -186,7 +186,9 @@ export class CombatSystem {
 
   /** Radar Sweep: sector-area DPS, deals continuous damage to enemies within range */
   private _radarSweepAttack(tower: Tower, game: Game): void {
-    const { theta = 0, deltaTheta = 60, r = 4 } = tower.params as Record<string, number>
+    const theta = getParam(tower, 'theta', 0)
+    const deltaTheta = getParam(tower, 'deltaTheta', 60)
+    const r = getParam(tower, 'r', 4)
     const startAngle = degToRad(theta)
     const sweepAngle = degToRad(deltaTheta)
 
@@ -207,7 +209,11 @@ export class CombatSystem {
 
   /** Integral Cannon: enemies covered by the integral area under the curve take damage */
   private _integralCannonAttack(tower: Tower, game: Game): void {
-    const { a = -0.5, b = 3, c = 2, intA = 0, intB = 6 } = tower.params as Record<string, number>
+    const a = getParam(tower, 'a', -0.5)
+    const b = getParam(tower, 'b', 3)
+    const c = getParam(tower, 'c', 2)
+    const intA = getParam(tower, 'intA', 0)
+    const intB = getParam(tower, 'intB', 6)
     const fn = (x: number) => a * x * x + b * x + c
 
     for (const enemy of game.enemies) {
@@ -225,7 +231,10 @@ export class CombatSystem {
 
   /** Matrix Link: applies a linear transform to enemies within range and deals damage */
   private _matrixLinkAttack(tower: Tower, game: Game): void {
-    const { a00 = 1, a01 = 0, a10 = 0, a11 = 1 } = tower.params as Record<string, number>
+    const a00 = getParam(tower, 'a00', 1)
+    const a01 = getParam(tower, 'a01', 0)
+    const a10 = getParam(tower, 'a10', 0)
+    const a11 = getParam(tower, 'a11', 1)
     const det = Math.abs(a00 * a11 - a01 * a10) // determinant ≈ scale factor
 
     for (const enemy of game.enemies) {

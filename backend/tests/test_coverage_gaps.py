@@ -443,9 +443,15 @@ class TestSessionStatusCommandMatrix:
                 # abandon() is a documented no-op on terminal states
                 assert ok
                 assert row.status == source.value
+            elif command == "complete" and source == SessionStatus.COMPLETED:
+                # end_session is idempotent on an already-completed session —
+                # a retry returns the stored state without mutating the row.
+                assert ok
+                assert row.status == source.value
+                assert row.score == 10
             else:
-                # update_progress / complete on a non-active session must raise
-                # without mutating the row
+                # update_progress on non-active, or complete on ABANDONED,
+                # must raise without mutating the row.
                 assert not ok
                 assert row.status == source.value
                 assert row.score == 10

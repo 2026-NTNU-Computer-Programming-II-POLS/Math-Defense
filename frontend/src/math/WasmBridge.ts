@@ -147,9 +147,15 @@ export function fourierComposite(t: number, freqs: number[], amps: number[]): nu
       return _module.ccall('fourier_composite', 'number', ['number', 'number', 'number'], [t, fPtr, aPtr])
     })
   }
-  return amps[0] * Math.sin(freqs[0] * t)
-       + amps[1] * Math.sin(freqs[1] * t)
-       + amps[2] * Math.sin(freqs[2] * t)
+  const n = Math.min(amps.length, freqs.length)
+  let sum = 0
+  for (let i = 0; i < n; i++) {
+    const a = amps[i]
+    const f = freqs[i]
+    if (typeof a !== 'number' || typeof f !== 'number') continue
+    sum += a * Math.sin(f * t)
+  }
+  return sum
 }
 
 export function fourierMatch(
