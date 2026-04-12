@@ -4,6 +4,7 @@
  */
 import { Events, GamePhase } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
 import type { Game } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
 
@@ -63,6 +64,18 @@ export class MovementSystem {
     if (distToOrigin < 0.5 || reachedTarget) {
       enemy.alive = false
       enemy.active = false
+
+      // Split slime: 委派給 SplitSlimePolicy（帶偏移讓玩家有機會擊殺子體）
+      if (shouldSplit(enemy)) {
+        spawnChildren(enemy, {
+          pathFunction: game.pathFunction,
+          onChildCreated: (child) => {
+            game.enemies.push(child)
+            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+          },
+        }, 3) // spawnOffset = 3 game units back along path
+      }
+
       game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, enemy)
     }
   }

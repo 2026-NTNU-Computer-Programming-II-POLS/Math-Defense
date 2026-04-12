@@ -5,6 +5,7 @@
  */
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { BUFF_POOL, CURSE_POOL, type BuffDef } from '@/data/buff-defs'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
 import type { Game } from '@/engine/Game'
 
 interface ActiveBuff extends BuffDef {
@@ -82,7 +83,8 @@ const effectStrategies: Record<string, EffectFn> = {
   SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false },
   ORIGIN_EXPLOSION: (g) => {
     // 對所有存活敵人造成 50 傷害
-    for (const enemy of g.enemies) {
+    const enemies = [...g.enemies] // snapshot 避免迭代中修改陣列
+    for (const enemy of enemies) {
       if (!enemy.alive) continue
       enemy.hp -= 50
       if (enemy.hp <= 0) {
@@ -90,6 +92,16 @@ const effectStrategies: Record<string, EffectFn> = {
         enemy.alive = false
         enemy.active = false
         g.eventBus.emit(Events.ENEMY_KILLED, enemy)
+
+        if (shouldSplit(enemy)) {
+          spawnChildren(enemy, {
+            pathFunction: g.pathFunction,
+            onChildCreated: (child) => {
+              g.enemies.push(child)
+              g.eventBus.emit(Events.ENEMY_SPAWNED, child)
+            },
+          })
+        }
       }
     }
   },
@@ -99,7 +111,6 @@ const effectStrategies: Record<string, EffectFn> = {
     if (g.towers.length > 0) {
       const t = g.towers[Math.floor(Math.random() * g.towers.length)]
       t.disabled = true
-      g.state.disabledTowerType = t.type
       buff._targetTowerId = t.id
     }
   },
@@ -107,7 +118,6 @@ const effectStrategies: Record<string, EffectFn> = {
     if (buff._targetTowerId) {
       const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
       if (t) t.disabled = false
-      g.state.disabledTowerType = null
       buff._targetTowerId = undefined
     }
   },
@@ -124,24 +134,32 @@ function applyEffect(effectId: string, game: Game, buff: ActiveBuff): void {
 export class BuffSystem {
   currentCards: (BuffDef & { isCurse: boolean })[] = []
   private activeBuffs: ActiveBuff[] = []
+  private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
-    game.eventBus.on(Events.BUFF_PHASE_START, () => this._drawCards())
+    this._unsubs.push(
+      game.eventBus.on(Events.BUFF_PHASE_START, () => this._drawCards()),
 
-    game.eventBus.on(Events.BUFF_CARD_SELECTED, (cardId) => {
-      const idx = this.currentCards.findIndex((c) => c.id === cardId)
-      this._applyCard(idx, game)
-    })
+      game.eventBus.on(Events.BUFF_CARD_SELECTED, (cardId) => {
+        const idx = this.currentCards.findIndex((c) => c.id === cardId)
+        this._applyCard(idx, game)
+      }),
 
-    game.eventBus.on(Events.WAVE_START, () => this._tickBuffs(game))
+      game.eventBus.on(Events.WAVE_START, () => this._tickBuffs(game)),
 
-    game.eventBus.on(Events.LEVEL_START, () => {
-      for (const buff of this.activeBuffs) {
-        if (buff.revertId) applyEffect(buff.revertId, game, buff)
-      }
-      this.activeBuffs = []
-      this.currentCards = []
-    })
+      game.eventBus.on(Events.LEVEL_START, () => {
+        for (const buff of this.activeBuffs) {
+          if (buff.revertId) applyEffect(buff.revertId, game, buff)
+        }
+        this.activeBuffs = []
+        this.currentCards = []
+      }),
+    )
+  }
+
+  destroy(): void {
+    this._unsubs.forEach((fn) => fn())
+    this._unsubs = []
   }
 
   private _drawCards(): void {

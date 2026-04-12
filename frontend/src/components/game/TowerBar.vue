@@ -4,7 +4,6 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import type { TowerType } from '@/data/constants'
-import type { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
 
 const gameStore = useGameStore()
 const uiStore = useUiStore()
@@ -16,13 +15,7 @@ const availableTowers = computed(() =>
 function selectTower(type: TowerType): void {
   const newType = uiStore.selectedTowerType === type ? null : type
   uiStore.selectTower(newType)
-
-  // 同步到引擎的 TowerPlacementSystem
-  const game = gameStore.getEngine()
-  if (game) {
-    const sys = game.getSystem<TowerPlacementSystem>('placement')
-    if (sys) sys.selectedTowerType = newType
-  }
+  // TowerPlacementSystem 透過注入的 getSelectedTowerType() 直接從 uiStore 讀取，不需手動同步
 }
 
 function canAfford(cost: number): boolean {

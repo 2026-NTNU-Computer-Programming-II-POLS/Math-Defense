@@ -1,27 +1,28 @@
 /**
  * Constants — 遊戲常數（TypeScript 版）
- * 與 shared/game-constants.json 保持一致。
+ * 從 shared/game-constants.json 匯入，確保前後端一致。
  */
+import gameConstants from '@shared/game-constants.json'
 
-// ── Canvas / 座標系 ──
-export const CANVAS_WIDTH = 1280
-export const CANVAS_HEIGHT = 720
-export const ORIGIN_X = 160   // px
-export const ORIGIN_Y = 600   // px（Canvas y 向下，遊戲 y 向上）
-export const UNIT_PX = 40     // 每座標單位的像素數
+// ── Canvas / 座標系（從 shared JSON 匯入）──
+export const CANVAS_WIDTH  = gameConstants.canvas.width
+export const CANVAS_HEIGHT = gameConstants.canvas.height
+export const ORIGIN_X      = gameConstants.canvas.originX   // px
+export const ORIGIN_Y      = gameConstants.canvas.originY   // px（Canvas y 向下，遊戲 y 向上）
+export const UNIT_PX       = gameConstants.canvas.unitPx    // 每座標單位的像素數
 
-export const GRID_MIN_X = -3
-export const GRID_MAX_X = 25
-export const GRID_MIN_Y = -2
-export const GRID_MAX_Y = 14
+export const GRID_MIN_X = gameConstants.grid.minX
+export const GRID_MAX_X = gameConstants.grid.maxX
+export const GRID_MIN_Y = gameConstants.grid.minY
+export const GRID_MAX_Y = gameConstants.grid.maxY
 
 // ── 遊戲初始值 ──
-export const INITIAL_HP = 20
-export const INITIAL_GOLD = 200
+export const INITIAL_HP   = gameConstants.player.initialHp
+export const INITIAL_GOLD = gameConstants.player.initialGold
 
 // ── 迴圈 ──
-export const TARGET_FPS = 60
-export const FIXED_DT = 1 / TARGET_FPS
+export const TARGET_FPS = gameConstants.loop.targetFps
+export const FIXED_DT   = 1 / TARGET_FPS  // 精確計算，避免 JSON 四捨五入的 0.016667 造成微小偏移
 
 // ── 遊戲階段 ──
 export const GamePhase = {

@@ -41,9 +41,15 @@ describe('TowerPlacementSystem', () => {
     return { game, system }
   }
 
+  /** Helper: 設定選中的塔類型（模擬 uiStore 注入） */
+  function selectType(system: TowerPlacementSystem, type: typeof TowerType[keyof typeof TowerType] | null) {
+    system.getSelectedTowerType = () => type
+    system.clearSelectedTowerType = () => { system.getSelectedTowerType = () => null }
+  }
+
   it('places tower on CANVAS_CLICK when tower type is selected', () => {
     const { game, system } = setup()
-    system.selectedTowerType = TowerType.FUNCTION_CANNON
+    selectType(system, TowerType.FUNCTION_CANNON)
 
     game.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: 200, y: 200 },
@@ -57,7 +63,7 @@ describe('TowerPlacementSystem', () => {
 
   it('does not place tower without selected type', () => {
     const { game } = setup()
-    // selectedTowerType is null by default
+    // getSelectedTowerType returns null by default
 
     game.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: 200, y: 200 },
@@ -70,7 +76,7 @@ describe('TowerPlacementSystem', () => {
   it('does not place tower with insufficient gold', () => {
     const { game, system } = setup()
     game.state.gold = 10
-    system.selectedTowerType = TowerType.FUNCTION_CANNON
+    selectType(system, TowerType.FUNCTION_CANNON)
 
     game.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: 200, y: 200 },
@@ -84,7 +90,7 @@ describe('TowerPlacementSystem', () => {
   it('does not place tower on occupied cell', () => {
     const { game, system } = setup()
     game.towers.push(createMockTower({ x: 5, y: 5 }))
-    system.selectedTowerType = TowerType.FUNCTION_CANNON
+    selectType(system, TowerType.FUNCTION_CANNON)
 
     game.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: 200, y: 200 },
@@ -112,7 +118,7 @@ describe('TowerPlacementSystem', () => {
 
   it('emits TOWER_PLACED on successful placement', () => {
     const { game, system } = setup()
-    system.selectedTowerType = TowerType.FUNCTION_CANNON
+    selectType(system, TowerType.FUNCTION_CANNON)
 
     let placed = false
     game.eventBus.on(Events.TOWER_PLACED, () => { placed = true })
@@ -127,20 +133,20 @@ describe('TowerPlacementSystem', () => {
 
   it('clears selectedTowerType after placement', () => {
     const { game, system } = setup()
-    system.selectedTowerType = TowerType.FUNCTION_CANNON
+    selectType(system, TowerType.FUNCTION_CANNON)
 
     game.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: 200, y: 200 },
       game: { x: 5, y: 5 },
     })
 
-    expect(system.selectedTowerType).toBeNull()
+    expect(system.getSelectedTowerType()).toBeNull()
   })
 
   it('uses free tower when freeTowerNext is true', () => {
     const { game, system } = setup()
     game.state.freeTowerNext = true
-    system.selectedTowerType = TowerType.FUNCTION_CANNON
+    selectType(system, TowerType.FUNCTION_CANNON)
 
     game.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: 200, y: 200 },
@@ -157,7 +163,7 @@ describe('TowerPlacementSystem', () => {
     game.phase.forceTransition(GamePhase.WAVE)
     const system = new TowerPlacementSystem()
     system.init(game)
-    system.selectedTowerType = TowerType.FUNCTION_CANNON
+    selectType(system, TowerType.FUNCTION_CANNON)
 
     game.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: 200, y: 200 },

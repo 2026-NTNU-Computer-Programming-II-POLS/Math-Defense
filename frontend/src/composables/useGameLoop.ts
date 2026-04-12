@@ -9,6 +9,7 @@ import { WaveSystem } from '@/systems/WaveSystem'
 import { MovementSystem } from '@/systems/MovementSystem'
 import { CombatSystem } from '@/systems/CombatSystem'
 import { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
+import { EconomySystem } from '@/systems/EconomySystem'
 import { EnemyRenderer } from '@/renderers/EnemyRenderer'
 import { TowerRenderer } from '@/renderers/TowerRenderer'
 import { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
@@ -17,7 +18,7 @@ import { initWasm } from '@/math/WasmBridge'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useSessionSync } from '@/composables/useSessionSync'
-import { Events } from '@/data/constants'
+import { Events, type TowerType } from '@/data/constants'
 import type { Tower } from '@/entities/types'
 
 export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
@@ -36,12 +37,16 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
 
     const g = new Game(canvas)
 
-    // 注入所有系統（順序：placement → combat → movement → wave → buff → renderers）
-    g.addSystem('placement', new TowerPlacementSystem())
+    // 注入所有系統（順序：placement → combat → movement → wave → buff → economy → renderers）
+    const placement = new TowerPlacementSystem()
+    placement.getSelectedTowerType = () => uiStore.selectedTowerType as TowerType | null
+    placement.clearSelectedTowerType = () => { uiStore.selectedTowerType = null }
+    g.addSystem('placement', placement)
     g.addSystem('combat', new CombatSystem())
     g.addSystem('movement', new MovementSystem())
     g.addSystem('wave', new WaveSystem())
     g.addSystem('buff', new BuffSystem())
+    g.addSystem('economy', new EconomySystem())
     g.addSystem('enemyRenderer', new EnemyRenderer())
     g.addSystem('towerRenderer', new TowerRenderer())
     g.addSystem('projectileRenderer', new ProjectileRenderer())
@@ -82,12 +87,10 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   })
 
   onUnmounted(() => {
-    unsubs.forEach((fn) => fn())
-    gameStore.unbindEngine()
+    unsubs.forEach((fn) => fn())  // 1. 移除 composable 層的事件監聽
+    gameStore.unbindEngine()      // 2. 解除 store 綁定
     if (game.value) {
-      game.value.stop()
-      game.value.input.destroy()
-      game.value.eventBus.clear()
+      game.value.destroy()        // 3. 停止迴圈 + destroy 所有 system + 清除 eventBus + input
     }
   })
 

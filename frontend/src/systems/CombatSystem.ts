@@ -6,7 +6,7 @@
 import { Events, GamePhase, TowerType, EnemyType, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
 import { distance, findIntersections, degToRad } from '@/math/MathUtils'
 import { pointInSector as wasmPointInSector } from '@/math/WasmBridge'
-import { createEnemy } from '@/entities/EnemyFactory'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy, Projectile } from '@/entities/types'
 
@@ -23,56 +23,61 @@ function makeProjectile(
 }
 
 export class CombatSystem {
-  /** Boss shield: timer-based immunity (stays in WAVE phase, no UI required yet) */
-  private _bossShieldTriggered = false
-  private _bossShieldTimer = 0
   private static readonly BOSS_SHIELD_DURATION = 5 // seconds
+  private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
-    game.eventBus.on(Events.CAST_SPELL, (tower) => {
-      tower.configured = true
-    })
+    this._unsubs.push(
+      game.eventBus.on(Events.CAST_SPELL, (tower) => {
+        tower.configured = true
+      }),
 
-    game.eventBus.on(Events.WAVE_START, () => {
-      for (const tower of game.towers) {
-        tower.cooldownTimer = 0
-      }
-    })
+      game.eventBus.on(Events.WAVE_START, () => {
+        for (const tower of game.towers) {
+          tower.cooldownTimer = 0
+        }
+      }),
 
-    game.eventBus.on(Events.LEVEL_START, () => {
-      this._bossShieldTriggered = false
-      this._bossShieldTimer = 0
-    })
+      game.eventBus.on(Events.LEVEL_START, () => {
+        game.state.bossShieldTriggered = false
+        game.state.bossShieldTimer = 0
+      }),
 
-    // Allow external shield-breaking (for future BOSS_SHIELD UI)
-    game.eventBus.on(Events.BOSS_SHIELD_ATTEMPT, ({ match }) => {
-      if (this._bossShieldTimer <= 0) return
-      if (match >= 70) {
-        this._breakBossShield(game)
-      }
-    })
+      // Allow external shield-breaking (for future BOSS_SHIELD UI)
+      game.eventBus.on(Events.BOSS_SHIELD_ATTEMPT, ({ match }) => {
+        if (game.state.bossShieldTimer <= 0) return
+        if (match >= 70) {
+          this._breakBossShield(game)
+        }
+      }),
+    )
+  }
+
+  destroy(): void {
+    this._unsubs.forEach((fn) => fn())
+    this._unsubs = []
   }
 
   update(dt: number, game: Game): void {
     if (game.state.phase !== GamePhase.WAVE) return
 
     // Boss shield: when boss dragon reaches x <= 8, grant temporary immunity
-    if (!this._bossShieldTriggered) {
+    if (!game.state.bossShieldTriggered) {
       const boss = game.enemies.find(
         (e) => e.type === EnemyType.BOSS_DRAGON && e.alive && e.x <= 8,
       )
       if (boss) {
-        this._bossShieldTriggered = true
-        this._bossShieldTimer = CombatSystem.BOSS_SHIELD_DURATION
+        game.state.bossShieldTriggered = true
+        game.state.bossShieldTimer = CombatSystem.BOSS_SHIELD_DURATION
         boss.isStealthed = true
         game.eventBus.emit(Events.BOSS_SHIELD_START, undefined)
       }
     }
 
     // Tick boss shield timer (auto-break after duration)
-    if (this._bossShieldTimer > 0) {
-      this._bossShieldTimer -= dt
-      if (this._bossShieldTimer <= 0) {
+    if (game.state.bossShieldTimer > 0) {
+      game.state.bossShieldTimer -= dt
+      if (game.state.bossShieldTimer <= 0) {
         this._breakBossShield(game)
       }
     }
@@ -210,7 +215,7 @@ export class CombatSystem {
   }
 
   private _breakBossShield(game: Game): void {
-    this._bossShieldTimer = 0
+    game.state.bossShieldTimer = 0
     const boss = game.enemies.find((e) => e.type === EnemyType.BOSS_DRAGON && e.alive)
     if (boss) boss.isStealthed = false
     game.eventBus.emit(Events.BOSS_SHIELD_END, undefined)
@@ -225,21 +230,15 @@ export class CombatSystem {
       enemy.active = false
       game.eventBus.emit(Events.ENEMY_KILLED, enemy)
 
-      // Split slime: spawn 2 smaller copies on death
-      if (enemy.type === EnemyType.SPLIT_SLIME && game.pathFunction) {
-        for (let i = 0; i < 2; i++) {
-          const child = createEnemy(EnemyType.BASIC_SLIME, game.pathFunction, {
-            startX: enemy.x + (i === 0 ? -0.3 : 0.3),
-            targetX: enemy._targetX,
-          })
-          child.hp = Math.round(enemy.maxHp * 0.4)
-          child.maxHp = child.hp
-          child.size = Math.round(enemy.size * 0.7)
-          child.reward = Math.round(enemy.reward * 0.3)
-          child.color = '#a070d0'
-          game.enemies.push(child)
-          game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-        }
+      // Split slime: 委派給 SplitSlimePolicy
+      if (shouldSplit(enemy)) {
+        spawnChildren(enemy, {
+          pathFunction: game.pathFunction,
+          onChildCreated: (child) => {
+            game.enemies.push(child)
+            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+          },
+        })
       }
     }
   }

@@ -14,7 +14,8 @@ let _useWasm = true
 export async function initWasm(): Promise<boolean> {
   try {
     // MODULARIZE=1 產生的 ES module，從 public/wasm/ 載入
-    const { default: createMathEngine } = await import('/wasm/math_engine.js')
+    // @vite-ignore: WASM 檔案由 emscripten 編譯後放入 public/wasm/，非 bundler 管理的模組
+    const { default: createMathEngine } = await import(/* @vite-ignore */ '/wasm/math_engine.js')
     _module = await createMathEngine()
     console.log('[WasmBridge] WASM 載入成功')
     return true
@@ -39,6 +40,7 @@ function withFloatBuffers<T>(
   sizes: number[],
   cb: (...ptrs: number[]) => T,
 ): T {
+  if (!_module) throw new Error('[WasmBridge] WASM module not loaded')
   const ptrs = sizes.map((n) => _module._malloc(n * 4))
   try {
     return cb(...ptrs)

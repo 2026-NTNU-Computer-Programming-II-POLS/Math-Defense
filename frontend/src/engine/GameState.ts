@@ -25,7 +25,10 @@ export interface GameState {
   goldMultiplier: number
   freeTowerNext: boolean
   enemySpeedMultiplier: number     // 詛咒：敵人加速（預設 1.0）
-  disabledTowerType: string | null // 詛咒：封印某塔型
+
+  // Boss Shield 狀態（集中管理，不散落在 CombatSystem）
+  bossShieldTriggered: boolean
+  bossShieldTimer: number
 
   // 路徑
   pathExpression: string
@@ -46,7 +49,8 @@ export function createInitialState(): GameState {
     goldMultiplier: 1,
     freeTowerNext: false,
     enemySpeedMultiplier: 1,
-    disabledTowerType: null,
+    bossShieldTriggered: false,
+    bossShieldTimer: 0,
     pathExpression: '',
   }
 }

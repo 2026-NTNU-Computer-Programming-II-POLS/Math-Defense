@@ -13,11 +13,19 @@ export class WaveSystem {
   private _spawnTimer = 0
   private _spawnInterval = 1.0
   private _allSpawned = false
+  private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
-    game.eventBus.on(Events.WAVE_START, (waveIndex) => {
-      this._startWave(waveIndex as number, game)
-    })
+    this._unsubs.push(
+      game.eventBus.on(Events.WAVE_START, (waveIndex) => {
+        this._startWave(waveIndex as number, game)
+      }),
+    )
+  }
+
+  destroy(): void {
+    this._unsubs.forEach((fn) => fn())
+    this._unsubs = []
   }
 
   private _startWave(waveIndex: number, game: Game): void {

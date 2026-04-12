@@ -8,27 +8,34 @@ import type { Game } from '@/engine/Game'
 import type { Tower, TowerPreview } from '@/entities/types'
 
 export class TowerPlacementSystem {
-  /** 當前選擇要放置的塔類型（來自 TowerBar） */
-  selectedTowerType: TowerType | null = null
+  /** 從外部注入的塔類型讀取器（由 useGameLoop 設定） */
+  getSelectedTowerType: () => TowerType | null = () => null
+  clearSelectedTowerType: () => void = () => {}
 
   /** 滑鼠懸停的已放置塔（供預覽） */
   private _hoveredTower: Tower | null = null
+  private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
-    // TowerBar 選擇塔類型（透過 uiStore.selectedTowerType 同步，這裡直接監聽 eventBus 自訂事件）
-    // GameView 通過 game.eventBus 傳遞選擇的 TowerType
-    game.eventBus.on(Events.CANVAS_CLICK, ({ game: gp }) => {
-      if (game.state.phase !== GamePhase.BUILD) return
-      this._handleClick(Math.round(gp.x), Math.round(gp.y), game)
-    })
+    this._unsubs.push(
+      game.eventBus.on(Events.CANVAS_CLICK, ({ game: gp }) => {
+        if (game.state.phase !== GamePhase.BUILD) return
+        this._handleClick(Math.round(gp.x), Math.round(gp.y), game)
+      }),
 
-    game.eventBus.on(Events.CANVAS_HOVER, ({ game: gp }) => {
-      const gx = Math.round(gp.x)
-      const gy = Math.round(gp.y)
-      this._hoveredTower = game.towers.find(
-        (t) => Math.round(t.x) === gx && Math.round(t.y) === gy,
-      ) ?? null
-    })
+      game.eventBus.on(Events.CANVAS_HOVER, ({ game: gp }) => {
+        const gx = Math.round(gp.x)
+        const gy = Math.round(gp.y)
+        this._hoveredTower = game.towers.find(
+          (t) => Math.round(t.x) === gx && Math.round(t.y) === gy,
+        ) ?? null
+      }),
+    )
+  }
+
+  destroy(): void {
+    this._unsubs.forEach((fn) => fn())
+    this._unsubs = []
   }
 
   private _handleClick(gx: number, gy: number, game: Game): void {
@@ -42,9 +49,10 @@ export class TowerPlacementSystem {
     }
 
     // 放置新塔
-    if (!this.selectedTowerType) return
+    const selectedType = this.getSelectedTowerType()
+    if (!selectedType) return
 
-    const tower = createTower(this.selectedTowerType, gx, gy)
+    const tower = createTower(selectedType, gx, gy)
     const cost = game.state.freeTowerNext ? 0 : tower.cost
     if (game.state.gold < cost) return
 
@@ -58,7 +66,7 @@ export class TowerPlacementSystem {
     if (game.state.freeTowerNext) game.state.freeTowerNext = false
 
     game.eventBus.emit(Events.TOWER_PLACED, tower)
-    this.selectedTowerType = null
+    this.clearSelectedTowerType()
   }
 
   update(_dt: number, _game: Game): void {}

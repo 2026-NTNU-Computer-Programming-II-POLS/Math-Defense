@@ -41,7 +41,7 @@ export interface GameEvents {
   [Events.TOWER_ATTACK]:         { tower: Tower; target: Enemy }
   [Events.BUFF_PHASE_START]:     void
   [Events.BUFF_CARD_SELECTED]:   string
-  [Events.BUFF_RESULT]:          { success: boolean; cardId: string; skipped: boolean }
+  [Events.BUFF_RESULT]:          { success: boolean; cardId: string; skipped: boolean; insufficientGold?: boolean }
   [Events.BUFF_PHASE_END]:       void
   [Events.BOSS_SHIELD_START]:    void
   [Events.BOSS_SHIELD_ATTEMPT]:  { match: number }
@@ -61,6 +61,7 @@ export interface GameSystem {
   init?(game: Game): void
   update?(dt: number, game: Game): void
   render?(renderer: Renderer, game: Game): void
+  destroy?(): void
 }
 
 // ── Game ──
@@ -98,8 +99,6 @@ export class Game {
     this.phase = new PhaseStateMachine()
     this.state = createInitialState()
     this._boundLoop = this._loop.bind(this)
-
-    this._setupEventHandlers()
   }
 
   // ── 事件捷徑（向後相容） ──
@@ -187,6 +186,16 @@ export class Game {
     }
   }
 
+  destroy(): void {
+    this.stop()
+    for (const system of this._systems.values()) {
+      system.destroy?.()
+    }
+    this._systems.clear()
+    this.input.destroy()
+    this.eventBus.clear()
+  }
+
   private _loop(): void {
     if (!this._running) return
     const now = performance.now()
@@ -229,20 +238,4 @@ export class Game {
     }
   }
 
-  // ── 內部事件 ──
-
-  private _setupEventHandlers(): void {
-    this.eventBus.on(Events.ENEMY_REACHED_ORIGIN, () => {
-      if (!this.state.shieldActive) {
-        this.changeHp(-1)
-      }
-    })
-
-    this.eventBus.on(Events.ENEMY_KILLED, (enemy) => {
-      this.state.kills++
-      this.addScore(10)
-      const reward = (enemy.reward || 15) * this.state.goldMultiplier
-      this.changeGold(reward)
-    })
-  }
 }

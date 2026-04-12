@@ -16,7 +16,14 @@ class ScoreSubmission(BaseModel):
             raise ValueError("關卡需在 1~4 之間")
         return v
 
-    @field_validator("score", "kills", "waves_survived")
+    @field_validator("score")
+    @classmethod
+    def check_score(cls, v: int) -> int:
+        if v < 0 or v > 9999999:
+            raise ValueError("分數需在 0~9999999 之間")
+        return v
+
+    @field_validator("kills", "waves_survived")
     @classmethod
     def check_non_negative(cls, v: int) -> int:
         if v < 0:
