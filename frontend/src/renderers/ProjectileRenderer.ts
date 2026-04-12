@@ -1,5 +1,5 @@
 /**
- * ProjectileRenderer — 渲染砲彈
+ * ProjectileRenderer — renders projectiles
  */
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'

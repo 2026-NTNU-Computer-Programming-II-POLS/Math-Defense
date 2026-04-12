@@ -6,18 +6,23 @@ export function useLeaderboard() {
   const total = ref(0)
   const loading = ref(false)
   const error = ref('')
+  let fetchId = 0
 
   async function fetch(level?: number, page = 1): Promise<void> {
+    const thisId = ++fetchId
     loading.value = true
     error.value = ''
     try {
       const res = await leaderboardService.get(level, page)
+      // Discard stale response if a newer request was issued
+      if (thisId !== fetchId) return
       entries.value = res.entries
       total.value = res.total
     } catch (e) {
+      if (thisId !== fetchId) return
       error.value = e instanceof Error ? e.message : '無法載入排行榜'
     } finally {
-      loading.value = false
+      if (thisId === fetchId) loading.value = false
     }
   }
 

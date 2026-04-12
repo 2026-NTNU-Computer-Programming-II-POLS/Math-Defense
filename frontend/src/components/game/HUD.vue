@@ -23,37 +23,41 @@ const hpStr   = computed(() => `${g.hp} / ${g.maxHp}`)
 
 <template>
   <div class="hud">
-    <!-- 階段 -->
+    <!-- Phase -->
     <div class="hud-item phase-label">
       <span class="hud-label">Phase</span>
       <span class="hud-value phase">{{ phaseLabel }}</span>
     </div>
 
-    <!-- 波次 -->
+    <!-- Wave -->
     <div class="hud-item">
       <span class="hud-label">Level</span>
       <span class="hud-value">{{ g.level }}</span>
     </div>
 
-    <!-- 金幣 -->
-    <div class="hud-item">
+    <!-- Gold -->
+    <div class="hud-item" role="group" :aria-label="`Gold: ${g.gold}`">
       <span class="hud-label">Gold</span>
-      <span class="hud-value gold">⬡ {{ goldStr }}</span>
+      <span class="hud-value gold">
+        <span aria-hidden="true">⬡</span> {{ goldStr }}
+      </span>
     </div>
 
     <!-- HP -->
-    <div class="hud-item">
+    <div class="hud-item" role="group" :aria-label="`Hit points: ${g.hp} of ${g.maxHp}`">
       <span class="hud-label">HP</span>
-      <span class="hud-value" :class="{ 'hp-low': g.hp <= 5 }">♥ {{ hpStr }}</span>
+      <span class="hud-value" :class="{ 'hp-low': g.hp <= 5 }">
+        <span aria-hidden="true">♥</span> {{ hpStr }}
+      </span>
     </div>
 
-    <!-- 分數 -->
+    <!-- Score -->
     <div class="hud-item score-item">
       <span class="hud-label">Score</span>
       <span class="hud-value score">{{ g.score.toLocaleString() }}</span>
     </div>
 
-    <!-- 路徑函數 -->
+    <!-- Path function -->
     <div class="hud-item path-item" v-if="g.pathExpression">
       <span class="hud-label">Path</span>
       <span class="hud-value path">{{ g.pathExpression }}</span>

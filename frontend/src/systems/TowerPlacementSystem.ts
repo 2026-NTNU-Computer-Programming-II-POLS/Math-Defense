@@ -1,5 +1,5 @@
 /**
- * TowerPlacementSystem — 塔的放置（Build Phase）與預覽
+ * TowerPlacementSystem — tower placement (Build Phase) and preview
  */
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { createTower } from '@/entities/TowerFactory'
@@ -8,11 +8,11 @@ import type { Game } from '@/engine/Game'
 import type { Tower, TowerPreview } from '@/entities/types'
 
 export class TowerPlacementSystem {
-  /** 從外部注入的塔類型讀取器（由 useGameLoop 設定） */
+  /** Tower-type reader injected from outside (set by useGameLoop) */
   getSelectedTowerType: () => TowerType | null = () => null
   clearSelectedTowerType: () => void = () => {}
 
-  /** 滑鼠懸停的已放置塔（供預覽） */
+  /** The placed tower currently under the mouse cursor (used for preview) */
   private _hoveredTower: Tower | null = null
   private _unsubs: (() => void)[] = []
 
@@ -39,7 +39,7 @@ export class TowerPlacementSystem {
   }
 
   private _handleClick(gx: number, gy: number, game: Game): void {
-    // 點到已有塔 → 選中（開啟 BuildPanel）
+    // clicked an existing tower → select it (open BuildPanel)
     const existing = game.towers.find(
       (t) => Math.round(t.x) === gx && Math.round(t.y) === gy,
     )
@@ -48,7 +48,7 @@ export class TowerPlacementSystem {
       return
     }
 
-    // 放置新塔
+    // place a new tower
     const selectedType = this.getSelectedTowerType()
     if (!selectedType) return
 

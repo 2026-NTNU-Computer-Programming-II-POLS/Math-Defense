@@ -1,4 +1,4 @@
-"""GameSession Aggregate Root — 封裝場次的所有不變量與狀態轉換"""
+"""GameSession Aggregate Root — encapsulates all session invariants and state transitions"""
 from __future__ import annotations
 
 import uuid
@@ -14,7 +14,17 @@ from app.domain.session.events import (
 
 STALE_CUTOFF = timedelta(hours=2)
 
-# 合法的狀態轉換表
+# Defense-in-depth bounds for client-supplied progress updates.
+# Pydantic checks shape; the aggregate enforces game rules (hp can't exceed maxHp,
+# score can't decrease, wave can't jump past the max).
+_MAX_HP = 100
+_MAX_GOLD = 99_999
+_MAX_WAVE = 30
+# Single-update score deltas above this are almost certainly cheating; the spec
+# tops out around ~1500/wave even with all multipliers, so 50k is a generous ceiling.
+_MAX_SCORE_DELTA = 50_000
+
+# Valid state transition table
 _ALLOWED_TRANSITIONS: dict[SessionStatus, set[SessionStatus]] = {
     SessionStatus.ACTIVE: {SessionStatus.COMPLETED, SessionStatus.ABANDONED},
     SessionStatus.COMPLETED: set(),   # 終態
@@ -24,13 +34,13 @@ _ALLOWED_TRANSITIONS: dict[SessionStatus, set[SessionStatus]] = {
 
 class GameSession:
     """
-    GameSession 聚合根。
+    GameSession aggregate root.
 
-    不變量：
-    1. 只有 ACTIVE 的場次可以被更新
-    2. 只有 ACTIVE 的場次可以被結束（轉為 COMPLETED）
-    3. 狀態轉換必須遵循合法轉換表
-    4. 結束場次時產生 SessionCompleted 領域事件
+    Invariants:
+    1. Only ACTIVE sessions can be updated
+    2. Only ACTIVE sessions can be completed
+    3. Status transitions must follow the valid transition table
+    4. Completing a session emits the SessionCompleted domain event
     """
 
     def __init__(
@@ -60,7 +70,7 @@ class GameSession:
 
     @classmethod
     def create(cls, user_id: str, level: Level) -> GameSession:
-        """工廠方法 — 建立新的 ACTIVE 場次"""
+        """Factory method — creates a new ACTIVE session"""
         session = cls(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -71,7 +81,7 @@ class GameSession:
         )
         return session
 
-    # ── 狀態查詢 ──
+    # ── Status queries ──
 
     @property
     def is_active(self) -> bool:
@@ -79,12 +89,17 @@ class GameSession:
 
     @property
     def is_stale(self) -> bool:
-        """超過 2 小時仍為 active → 視為過期"""
+        """Session still active after 2 hours → considered stale"""
         if not self.is_active:
             return False
-        return datetime.now(UTC) - self.started_at > STALE_CUTOFF
+        now = datetime.now(UTC)
+        started = self.started_at
+        # SQLite returns naive datetime; normalize to aware before comparing
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        return now - started > STALE_CUTOFF
 
-    # ── 指令（改變狀態的方法） ──
+    # ── Commands (state-mutating methods) ──
 
     def update_progress(
         self,
@@ -93,21 +108,36 @@ class GameSession:
         hp: int | None = None,
         score: int | None = None,
     ) -> None:
-        """更新遊戲進度 — 僅限 ACTIVE 狀態"""
-        self._assert_active("無法更新已結束的場次")
+        """Update game progress — only allowed in ACTIVE status.
+
+        Defense-in-depth: clamp each field to its physical range and reject
+        score regressions / large deltas that signal a tampered client.
+        """
+        self._assert_active("Cannot update a non-active session")
         if current_wave is not None:
-            self.current_wave = current_wave
+            if current_wave < self.current_wave:
+                raise ValueError("current_wave must not decrease")
+            self.current_wave = max(0, min(current_wave, _MAX_WAVE))
         if gold is not None:
-            self.gold = gold
+            self.gold = max(0, min(gold, _MAX_GOLD))
         if hp is not None:
-            self.hp = hp
+            self.hp = max(0, min(hp, _MAX_HP))
         if score is not None:
+            if score < self.score:
+                raise ValueError("score must not decrease")
+            if score - self.score > _MAX_SCORE_DELTA:
+                raise ValueError("score delta exceeds plausibility cap")
             self.score = score
         self._events.append(SessionUpdated(session_id=self.id))
 
     def complete(self, result: GameResult) -> None:
-        """結束場次 — 轉為 COMPLETED，產生領域事件"""
-        self._assert_active("場次已結束，無法重複提交")
+        """End session — transition to COMPLETED and emit domain event"""
+        self._assert_active("Session already ended, cannot resubmit")
+        # Reject end-payload scores that wildly exceed the most recent in-flight score
+        if result.score.value < self.score:
+            raise ValueError("final score must not be less than last reported score")
+        if result.score.value - self.score > _MAX_SCORE_DELTA:
+            raise ValueError("final score delta exceeds plausibility cap")
         self._transition_to(SessionStatus.COMPLETED)
         self.score = result.score.value
         self.ended_at = datetime.now(UTC)
@@ -123,24 +153,24 @@ class GameSession:
         )
 
     def abandon(self) -> None:
-        """放棄場次 — 冪等（已結束則 no-op）"""
+        """Abandon session — idempotent (no-op if already ended)"""
         if not self.is_active:
             return
         self._transition_to(SessionStatus.ABANDONED)
         self.ended_at = datetime.now(UTC)
         self._events.append(SessionAbandoned(session_id=self.id))
 
-    # ── 領域事件 ──
+    # ── Domain events ──
 
     def collect_events(self) -> list:
-        """回傳事件的快照（非破壞性），commit 成功後再呼叫 clear_events()"""
+        """Return a snapshot of events (non-destructive); call clear_events() after successful commit"""
         return self._events.copy()
 
     def clear_events(self) -> None:
-        """在 UoW commit 成功後呼叫，清除已處理的事件"""
+        """Call after UoW commit succeeds; clears processed events"""
         self._events.clear()
 
-    # ── 內部 ──
+    # ── Internal ──
 
     def _assert_active(self, message: str) -> None:
         if not self.is_active:
@@ -150,14 +180,14 @@ class GameSession:
         allowed = _ALLOWED_TRANSITIONS.get(self.status, set())
         if new_status not in allowed:
             raise InvalidStatusTransitionError(
-                f"不合法的狀態轉換：{self.status.value} → {new_status.value}"
+                f"Invalid status transition: {self.status.value} → {new_status.value}"
             )
         self.status = new_status
 
 
 class SessionNotActiveError(Exception):
-    """場次不在 ACTIVE 狀態"""
+    """Session is not in ACTIVE status"""
 
 
 class InvalidStatusTransitionError(Exception):
-    """不合法的狀態轉換"""
+    """Invalid status transition"""

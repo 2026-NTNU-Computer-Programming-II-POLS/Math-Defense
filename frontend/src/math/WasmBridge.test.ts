@@ -51,6 +51,88 @@ describe('WasmBridge (JS fallback)', () => {
     it('detects point outside sector (wrong angle)', () => {
       expect(pointInSector(0, -1, 0, 0, 2, 0, Math.PI / 4)).toBe(false)
     })
+
+    // ── JS-vs-WASM boundary parity (bug 2.12) ──
+    // The JS fallback uses a 1e-6 epsilon on angle comparisons. WASM (point_in_sector
+    // in math_engine.c) must agree on these exact boundary conditions or stealth
+    // detection / radar sweeps will diverge between platforms.
+    describe('boundary parity (must match WASM behaviour)', () => {
+      it('point exactly on the radius is inside (dist === radius, not >)', () => {
+        // Sector at origin, radius 2, full first quadrant. (2, 0) sits on the arc.
+        expect(pointInSector(2, 0, 0, 0, 2, 0, Math.PI / 2)).toBe(true)
+      })
+
+      it('point at exactly the start angle is inside (eps slack)', () => {
+        // start = π/4, width = π/2; point along start ray at radius 1
+        const start = Math.PI / 4
+        const px = Math.cos(start)
+        const py = Math.sin(start)
+        expect(pointInSector(px, py, 0, 0, 2, start, Math.PI / 2)).toBe(true)
+      })
+
+      it('point at exactly the end angle is inside (eps slack)', () => {
+        // start = 0, width = π/2; point along end ray (π/2) at radius 1 → (0, 1)
+        expect(pointInSector(0, 1, 0, 0, 2, 0, Math.PI / 2)).toBe(true)
+      })
+
+      it('point just past the end angle is outside', () => {
+        // angle slightly larger than end + eps
+        const end = Math.PI / 2
+        const a = end + 1e-3
+        expect(pointInSector(Math.cos(a), Math.sin(a), 0, 0, 2, 0, end)).toBe(false)
+      })
+
+      it('point just past the radius is outside', () => {
+        // radius = 2; place a point at distance 2 + 1e-3 along the +x axis
+        expect(pointInSector(2 + 1e-3, 0, 0, 0, 2, 0, Math.PI / 2)).toBe(false)
+      })
+
+      it('wrap-around sector: start near 2π, width crosses zero', () => {
+        // start = 350°, width = 20° → end = 370° → angle 5° must hit wrap branch
+        const start = (350 * Math.PI) / 180
+        const width = (20 * Math.PI) / 180
+        const angleAt5deg = (5 * Math.PI) / 180
+        const px = Math.cos(angleAt5deg)
+        const py = Math.sin(angleAt5deg)
+        expect(pointInSector(px, py, 0, 0, 2, start, width)).toBe(true)
+
+        // 30° must be outside the wrap window
+        const angleAt30 = (30 * Math.PI) / 180
+        const px2 = Math.cos(angleAt30)
+        const py2 = Math.sin(angleAt30)
+        expect(pointInSector(px2, py2, 0, 0, 2, start, width)).toBe(false)
+      })
+
+      it('negative angleStart is normalised to [0, 2π)', () => {
+        // start = -π/4 normalises to 7π/4, width = π/2 → covers (-π/4, π/4)
+        // Point at angle 0 (along +x axis) must be inside the wrapped window.
+        expect(pointInSector(1, 0, 0, 0, 2, -Math.PI / 4, Math.PI / 2)).toBe(true)
+      })
+
+      it('center of sector at non-origin is inside', () => {
+        // Sector centred at (10, 10), radius 1, full circle (effectively)
+        expect(pointInSector(10, 10, 10, 10, 1, 0, Math.PI * 2)).toBe(true)
+      })
+
+      it('parity table: independently-derived expected values', () => {
+        // Each row is an independently calculated expectation from the math
+        // (not a re-call of pointInSector). If JS and WASM both agree with
+        // these, parity holds.
+        type Row = [number, number, number, number, number, number, number, boolean, string]
+        const cases: Row[] = [
+          // px py cx cy r start width expected label
+          [1, 0, 0, 0, 1, 0, Math.PI / 2, true, 'inside, on radius'],
+          [0, 1, 0, 0, 1, 0, Math.PI / 2, true, 'inside, end ray'],
+          [-1, 0, 0, 0, 1, 0, Math.PI / 2, false, 'opposite quadrant'],
+          [0.5, 0.5, 0, 0, 1, 0, Math.PI / 2, true, 'interior 45°'],
+          [0.5, 0.5, 0, 0, 1, Math.PI, Math.PI / 2, false, 'rotated sector excludes Q1'],
+          [0, 0, 5, 5, 10, 0, Math.PI * 2, true, 'origin inside large sector'],
+        ]
+        for (const [px, py, cx, cy, r, st, w, expected, label] of cases) {
+          expect(pointInSector(px, py, cx, cy, r, st, w), label).toBe(expected)
+        }
+      })
+    })
   })
 
   describe('numericalIntegrate', () => {

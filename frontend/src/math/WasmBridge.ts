@@ -1,26 +1,39 @@
 /**
- * WasmBridge — WASM 載入器（TypeScript 版，RAII 記憶體管理）
- * 提供統一 API，隱藏 ccall/malloc 細節；WASM 失敗時自動 fallback 至純 JS。
+ * WasmBridge — WASM loader (TypeScript, RAII memory management)
+ * Provides a unified API hiding ccall/malloc details; automatically falls back to pure JS on WASM failure.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type WasmModule = any
+// Minimal Emscripten surface we actually use. Typed so a typo in an exported name
+// or a wrong return-type asserts at compile time instead of shipping NaN/undefined.
+type WasmCType = 'number' | 'string' | 'array' | null
+type WasmValueType = 'i8' | 'i16' | 'i32' | 'i64' | 'float' | 'double' | '*'
 
-let _module: WasmModule = null
+interface WasmModule {
+  ccall(name: string, returnType: WasmCType, argTypes: WasmCType[], args: unknown[]): number
+  cwrap(name: string, returnType: WasmCType, argTypes: WasmCType[]): (...args: unknown[]) => number
+  _malloc(n: number): number
+  _free(ptr: number): void
+  getValue(ptr: number, type: WasmValueType): number
+  setValue(ptr: number, value: number, type: WasmValueType): void
+}
+
+let _module: WasmModule | null = null
 let _useWasm = true
 
-// ── 初始化 ──
+// ── Initialization ──
 
 export async function initWasm(): Promise<boolean> {
   try {
-    // MODULARIZE=1 產生的 ES module，從 public/wasm/ 載入
-    // @vite-ignore: WASM 檔案由 emscripten 編譯後放入 public/wasm/，非 bundler 管理的模組
-    const { default: createMathEngine } = await import(/* @vite-ignore */ '/wasm/math_engine.js')
+    // ES module generated with MODULARIZE=1, compiled by emscripten and placed in frontend/public/wasm/.
+    // This file is not managed by the Vite bundler; it must be loaded via a runtime URL to bypass vite:import-analysis
+    // static checks on /public/ (and supports BASE_URL deployment to a sub-path).
+    const wasmUrl = `${import.meta.env.BASE_URL ?? '/'}wasm/math_engine.js`
+    const { default: createMathEngine } = await import(/* @vite-ignore */ wasmUrl)
     _module = await createMathEngine()
-    console.log('[WasmBridge] WASM 載入成功')
+    console.log('[WasmBridge] WASM loaded successfully')
     return true
   } catch (e) {
-    console.warn('[WasmBridge] WASM 載入失敗，使用 JS fallback:', e)
+    console.warn('[WasmBridge] WASM failed to load, using JS fallback:', e)
   }
   _module = null
   return false
@@ -34,22 +47,23 @@ export function isUsingWasm(): boolean {
   return _useWasm && _module !== null
 }
 
-// ── RAII 記憶體包裝器 ──
+// ── RAII memory wrapper ──
 
 function withFloatBuffers<T>(
   sizes: number[],
   cb: (...ptrs: number[]) => T,
 ): T {
-  if (!_module) throw new Error('[WasmBridge] WASM module not loaded')
-  const ptrs = sizes.map((n) => _module._malloc(n * 4))
+  const m = _module
+  if (!m) throw new Error('[WasmBridge] WASM module not loaded')
+  const ptrs = sizes.map((n) => m._malloc(n * 4))
   try {
     return cb(...ptrs)
   } finally {
-    ptrs.forEach((p) => _module._free(p))
+    ptrs.forEach((p) => m._free(p))
   }
 }
 
-// ── 公開 API ──
+// ── Public API ──
 
 export function matrixMultiply(a: number[], b: number[]): number[] {
   if (_useWasm && _module) {
@@ -165,6 +179,87 @@ export function fourierMatch(
   }
   if (totalEnergy < 0.001) return 1.0
   return Math.max(0, Math.min(1, 1 - Math.sqrt(totalError / totalEnergy)))
+}
+
+/**
+ * Sample y = a·x² + b·x + c across [xStart, xEnd] at the given step.
+ * Hard-capped at 1000 points to match the WASM safety bound.
+ */
+export function calculateTrajectory(
+  a: number, b: number, c: number,
+  xStart: number, xEnd: number, step: number,
+): { xs: number[]; ys: number[] } {
+  if (step <= 0) return { xs: [], ys: [] }
+  if (_useWasm && _module) {
+    return withFloatBuffers([1000, 1000, 1], (xPtr, yPtr, countPtr) => {
+      _module.ccall(
+        'calculate_trajectory', null,
+        ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+        [a, b, c, xStart, xEnd, step, xPtr, yPtr, countPtr],
+      )
+      const n = _module.getValue(countPtr, 'i32')
+      const xs = new Array<number>(n)
+      const ys = new Array<number>(n)
+      for (let i = 0; i < n; i++) {
+        xs[i] = _module.getValue(xPtr + i * 4, 'float')
+        ys[i] = _module.getValue(yPtr + i * 4, 'float')
+      }
+      return { xs, ys }
+    })
+  }
+  const dir = xEnd >= xStart ? 1 : -1
+  const n = Math.min(1000, Math.max(0, Math.floor(((xEnd - xStart) * dir) / step) + 1))
+  const xs = new Array<number>(n)
+  const ys = new Array<number>(n)
+  for (let i = 0; i < n; i++) {
+    const x = xStart + i * step * dir
+    xs[i] = x
+    ys[i] = a * x * x + b * x + c
+  }
+  return { xs, ys }
+}
+
+/**
+ * Intersect line y = m·x + b with circle centered at (cx, cy) of radius r.
+ * Returns 0, 1, or 2 (x, y) points.
+ */
+export function lineCircleIntersect(
+  m: number, b: number,
+  cx: number, cy: number, r: number,
+): { x: number; y: number }[] {
+  if (_useWasm && _module) {
+    return withFloatBuffers([2, 2], (xPtr, yPtr) => {
+      const count = _module.ccall(
+        'line_circle_intersect', 'number',
+        ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+        [m, b, cx, cy, r, xPtr, yPtr],
+      )
+      const out: { x: number; y: number }[] = []
+      for (let i = 0; i < count; i++) {
+        out.push({
+          x: _module.getValue(xPtr + i * 4, 'float'),
+          y: _module.getValue(yPtr + i * 4, 'float'),
+        })
+      }
+      return out
+    })
+  }
+  const A = 1 + m * m
+  const B = 2 * (m * (b - cy) - cx)
+  const C = cx * cx + (b - cy) * (b - cy) - r * r
+  const disc = B * B - 4 * A * C
+  if (disc < 0) return []
+  if (disc < 1e-6) {
+    const x = -B / (2 * A)
+    return [{ x, y: m * x + b }]
+  }
+  const s = Math.sqrt(disc)
+  const x1 = (-B + s) / (2 * A)
+  const x2 = (-B - s) / (2 * A)
+  return [
+    { x: x1, y: m * x1 + b },
+    { x: x2, y: m * x2 + b },
+  ]
 }
 
 export function benchmark(fn: () => void, iterations = 10000): number {

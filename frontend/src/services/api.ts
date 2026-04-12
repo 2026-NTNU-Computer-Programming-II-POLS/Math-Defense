@@ -1,5 +1,5 @@
 /**
- * api.ts — fetch 封裝 + 認證攔截器
+ * api.ts — fetch wrapper + authentication interceptor
  */
 
 export class ApiError extends Error {
@@ -16,6 +16,11 @@ function getToken(): string | null {
   return localStorage.getItem('auth_token')
 }
 
+// In dev, leave empty so Vite proxy handles "/api" → backend (vite.config.ts).
+// In prod, set VITE_API_BASE_URL to the backend origin (e.g. https://api.example.com)
+// so requests work without an external reverse proxy.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -26,12 +31,26 @@ async function request<T>(
   }
 
   const token = getToken()
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (token && token.length > 0) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(path, { ...options, headers })
+  const url = API_BASE_URL && path.startsWith('/') ? `${API_BASE_URL}${path}` : path
+  const res = await fetch(url, { ...options, headers })
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
+    // 401 interceptor: access token expired / rejected by server. Clear local
+    // auth state and (if on a protected route) navigate to /auth so the user
+    // isn't stranded on a blank panel with repeating errors. Dynamic import
+    // avoids a static cycle (api → authStore → authService → api).
+    if (res.status === 401) {
+      try {
+        const { useAuthStore } = await import('@/stores/authStore')
+        useAuthStore().logout()
+      } catch {
+        // Pinia not installed yet (very early bootstrap) — best-effort cleanup
+        localStorage.removeItem('auth_token')
+      }
+    }
     throw new ApiError(res.status, body.detail ?? res.statusText)
   }
 

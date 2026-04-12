@@ -67,4 +67,49 @@ describe('EconomySystem', () => {
 
     expect(game.state.gold).toBe(115) // 100 + 15 (fallback)
   })
+
+  // ── Boss dragon reaching origin ends the level (bug 2.6) ──
+  // Boss dragon damage = 99 (per enemy-defs); player maxHp = 20.
+  // A single boss reaching origin must drop HP to 0 and trigger GAME_OVER.
+  describe('boss dragon reaches origin', () => {
+    function bossSetup() {
+      const game = createMockGame({ phase: GamePhase.WAVE, gold: 100, hp: 20 })
+      // The mock game's setPhase consults its PhaseStateMachine; sync it to WAVE
+      // so the GAME_OVER transition triggered by HP=0 is legal.
+      game.phase.forceTransition(GamePhase.WAVE)
+      const system = new EconomySystem()
+      system.init(game)
+      return { game }
+    }
+
+    it('drops HP to 0 and transitions to GAME_OVER', () => {
+      const { game } = bossSetup()
+      const boss = createMockEnemy({ damage: 99 })
+
+      game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, boss)
+
+      expect(game.state.hp).toBe(0)
+      expect(game.state.phase).toBe(GamePhase.GAME_OVER)
+    })
+
+    it('shield absorbs the boss hit (no HP change, no GAME_OVER)', () => {
+      const { game } = bossSetup()
+      game.state.shieldActive = true
+      const boss = createMockEnemy({ damage: 99 })
+
+      game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, boss)
+
+      expect(game.state.hp).toBe(20)
+      expect(game.state.phase).not.toBe(GamePhase.GAME_OVER)
+    })
+
+    it('per-enemy damage is honoured (tank slime damage=2)', () => {
+      const { game } = bossSetup()
+      const tank = createMockEnemy({ damage: 2 })
+
+      game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, tank)
+
+      expect(game.state.hp).toBe(18)
+    })
+  })
 })

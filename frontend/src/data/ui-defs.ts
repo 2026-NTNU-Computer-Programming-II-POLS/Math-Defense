@@ -1,6 +1,6 @@
 /**
- * ui-defs.ts — Build Panel 輸入欄位規格
- * 從 tower-defs 分離出來，純 UI 描述，不含遊戲數值。
+ * ui-defs.ts — Build Panel input field specifications
+ * Separated from tower-defs; pure UI descriptions, no game-balance values.
  */
 import { TowerType } from './constants'
 
@@ -48,7 +48,7 @@ export const TOWER_PARAM_FIELDS: Record<TowerType, ParamField[]> = {
   ],
 }
 
-/** 升級後的函數砲參數欄位（二次函數版） */
+/** Parameter fields for the upgraded Function Cannon (quadratic mode) */
 export const FUNCTION_CANNON_UPGRADED_FIELDS: ParamField[] = [
   { key: 'a',       label: '二次係數 (a)', mathLabel: 'a', min: -5, max: 5,   step: 0.1, default: 0 },
   { key: 'b_coeff', label: '一次係數 (b)', mathLabel: 'b', min: -10, max: 10, step: 0.1, default: 1 },

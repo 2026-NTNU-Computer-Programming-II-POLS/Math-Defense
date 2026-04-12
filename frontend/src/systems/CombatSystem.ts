@@ -1,7 +1,7 @@
 /**
- * CombatSystem — 塔攻擊 + 砲彈 + 碰撞判定
- * 合併舊版 TowerSystem 的攻擊邏輯 + CollisionSystem。
- * Entity 無 update/render 方法；這個 System 全權負責戰鬥邏輯。
+ * CombatSystem — tower attacks + projectiles + collision detection
+ * Merges the attack logic from the old TowerSystem with CollisionSystem.
+ * Entities have no update/render methods; this System owns all combat logic.
  */
 import { Events, GamePhase, TowerType, EnemyType, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
 import { distance, findIntersections, degToRad } from '@/math/MathUtils'
@@ -25,8 +25,12 @@ function makeProjectile(
 export class CombatSystem {
   private static readonly BOSS_SHIELD_DURATION = 5 // seconds
   private _unsubs: (() => void)[] = []
+  private _pendingShieldAttempt: { match: number } | null = null
 
   init(game: Game): void {
+    // Prevent duplicate listeners if init() is called without destroy()
+    this.destroy()
+
     this._unsubs.push(
       game.eventBus.on(Events.CAST_SPELL, (tower) => {
         tower.configured = true
@@ -41,11 +45,16 @@ export class CombatSystem {
       game.eventBus.on(Events.LEVEL_START, () => {
         game.state.bossShieldTriggered = false
         game.state.bossShieldTimer = 0
+        game.state.bossShieldTarget = null
       }),
 
-      // Allow external shield-breaking (for future BOSS_SHIELD UI)
+      // Allow external shield-breaking (for BOSS_SHIELD UI)
       game.eventBus.on(Events.BOSS_SHIELD_ATTEMPT, ({ match }) => {
-        if (game.state.bossShieldTimer <= 0) return
+        if (game.state.bossShieldTimer <= 0) {
+          // Shield not active yet — queue attempt for when it starts
+          this._pendingShieldAttempt = { match }
+          return
+        }
         if (match >= 70) {
           this._breakBossShield(game)
         }
@@ -56,6 +65,7 @@ export class CombatSystem {
   destroy(): void {
     this._unsubs.forEach((fn) => fn())
     this._unsubs = []
+    this._pendingShieldAttempt = null
   }
 
   update(dt: number, game: Game): void {
@@ -69,8 +79,19 @@ export class CombatSystem {
       if (boss) {
         game.state.bossShieldTriggered = true
         game.state.bossShieldTimer = CombatSystem.BOSS_SHIELD_DURATION
+        // Pseudo-random target waveform seeded by boss id so it stays stable across re-renders
+        game.state.bossShieldTarget = CombatSystem._makeBossTarget(boss.id)
         boss.isStealthed = true
         game.eventBus.emit(Events.BOSS_SHIELD_START, undefined)
+
+        // Process queued shield attempt from before shield was active
+        if (this._pendingShieldAttempt) {
+          const { match } = this._pendingShieldAttempt
+          this._pendingShieldAttempt = null
+          if (match >= 70) {
+            this._breakBossShield(game)
+          }
+        }
       }
     }
 
@@ -82,7 +103,7 @@ export class CombatSystem {
       }
     }
 
-    // 塔攻擊
+    // tower attacks
     for (const tower of game.towers) {
       if (tower.disabled || !tower.configured) continue
       tower.cooldownTimer -= dt
@@ -92,20 +113,22 @@ export class CombatSystem {
       }
     }
 
-    // 更新砲彈
+    // update projectiles
     for (let i = game.projectiles.length - 1; i >= 0; i--) {
       const proj = game.projectiles[i]
       proj.x += proj.vx * dt
       proj.y += proj.vy * dt
 
-      // 離開格線範圍後失效
+      // deactivate once it leaves the grid bounds
       if (proj.x < GRID_MIN_X - 2 || proj.x > GRID_MAX_X + 5 || proj.y < GRID_MIN_Y - 3 || proj.y > GRID_MAX_Y + 2) {
         proj.active = false
       }
 
-      // 碰撞判定
+      // Collision detection — snapshot enemies because _dealDamage may push split-slime children
+      // into game.enemies via ENEMY_KILLED, and forward iteration over a mutated array
+      // can skip newly added entries or revisit older ones.
       if (proj.active) {
-        for (const enemy of game.enemies) {
+        for (const enemy of [...game.enemies]) {
           if (!enemy.alive || enemy.isStealthed) continue
           if (distance(proj.x, proj.y, enemy.x, enemy.y) < 0.5) {
             this._dealDamage(enemy, proj.damage, game)
@@ -125,19 +148,19 @@ export class CombatSystem {
       case TowerType.RADAR_SWEEP:       this._radarSweepAttack(tower, game); break
       case TowerType.INTEGRAL_CANNON:   this._integralCannonAttack(tower, game); break
       case TowerType.MATRIX_LINK:       this._matrixLinkAttack(tower, game); break
-      case TowerType.PROBABILITY_SHRINE: /* 不攻擊，Buff 系統負責 */ break
-      case TowerType.FOURIER_SHIELD:    /* Boss 專用 */ break
+      case TowerType.PROBABILITY_SHRINE: /* no attack — handled by BuffSystem */ break
+      case TowerType.FOURIER_SHIELD:    /* boss battle only */ break
     }
   }
 
-  /** 函數砲：砲彈沿 y = mx+b（或 ax²+bx+c）與敵人路徑交點發射 */
+  /** Function Cannon: fires projectiles toward intersections of y = mx+b (or ax²+bx+c) with the enemy path */
   private _functionCannonAttack(tower: Tower, game: Game): void {
     if (!game.pathFunction) return
 
     const p = tower.params as Record<string, number>
     const isUpgraded = tower.level >= 2
 
-    // 線性模式：y = mx + b；升級模式：y = ax² + bx + c（key: a, b_coeff, c）
+    // linear mode: y = mx + b; upgraded mode: y = ax² + bx + c (keys: a, b_coeff, c)
     const shotFn = isUpgraded
       ? (x: number) => (p.a ?? 0) * x * x + (p.b_coeff ?? 1) * x + (p.c ?? 0)
       : (x: number) => (p.m ?? 1) * x + (p.b ?? 0)
@@ -149,7 +172,7 @@ export class CombatSystem {
       const dy = yi - tower.y
       const len = Math.sqrt(dx * dx + dy * dy)
       if (len === 0) continue
-      const speed = 10  // 遊戲單位/秒
+      const speed = 10  // game units per second
       const proj = makeProjectile(
         tower.x, tower.y,
         (dx / len) * speed, (dy / len) * speed,
@@ -161,7 +184,7 @@ export class CombatSystem {
     }
   }
 
-  /** 雷達掃描塔：扇形 DPS，直接對範圍內敵人持續傷害 */
+  /** Radar Sweep: sector-area DPS, deals continuous damage to enemies within range */
   private _radarSweepAttack(tower: Tower, game: Game): void {
     const { theta = 0, deltaTheta = 60, r = 4 } = tower.params as Record<string, number>
     const startAngle = degToRad(theta)
@@ -169,7 +192,7 @@ export class CombatSystem {
 
     for (const enemy of game.enemies) {
       if (!enemy.alive || enemy.isStealthed) continue
-      // wasmPointInSector 內部已含 JS fallback，不需再呼叫 isPointInSector
+      // wasmPointInSector already includes a JS fallback; no need to call isPointInSector separately
       const inSector = wasmPointInSector(
         enemy.x, enemy.y,
         tower.x, tower.y,
@@ -182,7 +205,7 @@ export class CombatSystem {
     }
   }
 
-  /** 積分砲：曲線積分面積覆蓋的敵人受傷 */
+  /** Integral Cannon: enemies covered by the integral area under the curve take damage */
   private _integralCannonAttack(tower: Tower, game: Game): void {
     const { a = -0.5, b = 3, c = 2, intA = 0, intB = 6 } = tower.params as Record<string, number>
     const fn = (x: number) => a * x * x + b * x + c
@@ -200,10 +223,10 @@ export class CombatSystem {
     }
   }
 
-  /** 矩陣連結塔：對範圍內敵人施加線性變換後傷害 */
+  /** Matrix Link: applies a linear transform to enemies within range and deals damage */
   private _matrixLinkAttack(tower: Tower, game: Game): void {
     const { a00 = 1, a01 = 0, a10 = 0, a11 = 1 } = tower.params as Record<string, number>
-    const det = Math.abs(a00 * a11 - a01 * a10) // 行列式 ≈ 縮放倍率
+    const det = Math.abs(a00 * a11 - a01 * a10) // determinant ≈ scale factor
 
     for (const enemy of game.enemies) {
       if (!enemy.alive || enemy.isStealthed) continue
@@ -215,10 +238,25 @@ export class CombatSystem {
   }
 
   private _breakBossShield(game: Game): void {
+    // Reset both flags so a still-living boss that re-crosses the trigger threshold
+    // can re-arm its shield. Without this, the shield only ever fires once per level.
     game.state.bossShieldTimer = 0
+    game.state.bossShieldTriggered = false
+    game.state.bossShieldTarget = null
     const boss = game.enemies.find((e) => e.type === EnemyType.BOSS_DRAGON && e.alive)
     if (boss) boss.isStealthed = false
     game.eventBus.emit(Events.BOSS_SHIELD_END, undefined)
+  }
+
+  /** Cheap deterministic target waveform derived from the boss id. */
+  private static _makeBossTarget(seed: string): { freqs: number[]; amps: number[] } {
+    let h = 0
+    for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
+    const r = (n: number) => ((Math.abs((h * (n + 1)) ^ 0x9e3779b9)) % 1000) / 1000
+    return {
+      freqs: [1 + r(0) * 4, 2 + r(1) * 4, 3 + r(2) * 4],
+      amps: [0.5 + r(3) * 1.5, 0.3 + r(4), 0.2 + r(5)],
+    }
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
@@ -230,7 +268,7 @@ export class CombatSystem {
       enemy.active = false
       game.eventBus.emit(Events.ENEMY_KILLED, enemy)
 
-      // Split slime: 委派給 SplitSlimePolicy
+      // Split slime: delegate to SplitSlimePolicy
       if (shouldSplit(enemy)) {
         spawnChildren(enemy, {
           pathFunction: game.pathFunction,

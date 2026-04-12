@@ -74,4 +74,37 @@ describe('PhaseStateMachine', () => {
     sm.forceTransition(GamePhase.LEVEL_END)
     expect(sm.transition(GamePhase.LEVEL_SELECT)).toBe(true)
   })
+
+  // ── startLevel retry/replay coverage ──
+  // Game.startLevel forceTransitions to MENU then setPhase(BUILD); the
+  // transition table must allow that pattern from any prior phase, including
+  // the terminal GAME_OVER (replay after defeat) and mid-game WAVE (early reset).
+  describe('startLevel reset pattern (forceTransition(MENU) → transition(BUILD))', () => {
+    function startLevelPattern(sm: PhaseStateMachine): boolean {
+      sm.forceTransition(GamePhase.MENU)
+      return sm.transition(GamePhase.BUILD)
+    }
+
+    it('GAME_OVER → BUILD via startLevel reset', () => {
+      const sm = new PhaseStateMachine()
+      sm.forceTransition(GamePhase.GAME_OVER)
+      expect(startLevelPattern(sm)).toBe(true)
+      expect(sm.current).toBe(GamePhase.BUILD)
+    })
+
+    it('WAVE → BUILD via startLevel reset (mid-game restart)', () => {
+      const sm = new PhaseStateMachine()
+      sm.forceTransition(GamePhase.WAVE)
+      expect(startLevelPattern(sm)).toBe(true)
+      expect(sm.current).toBe(GamePhase.BUILD)
+    })
+
+    it('GAME_OVER → BUILD also works as a direct transition', () => {
+      // Defense-in-depth: even without the MENU reset, the table permits this
+      // since users might short-circuit via the menu UI.
+      const sm = new PhaseStateMachine()
+      sm.forceTransition(GamePhase.GAME_OVER)
+      expect(sm.transition(GamePhase.BUILD)).toBe(true)
+    })
+  })
 })

@@ -1,6 +1,6 @@
 /**
- * enemy-defs.ts — 敵人數值定義（純資料，無工廠函式）
- * 工廠邏輯在 entities/EnemyFactory.ts。
+ * enemy-defs.ts — enemy stat definitions (pure data, no factory functions)
+ * Factory logic lives in entities/EnemyFactory.ts.
  */
 import { EnemyType, Colors } from './constants'
 
@@ -12,6 +12,7 @@ export interface EnemyDef {
   speed: number
   size: number
   reward: number
+  damage: number      // HP cost to player when this enemy reaches the origin
   stealthRanges?: [number, number][]
 }
 
@@ -24,6 +25,7 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     speed: 2.0,
     size: 16,
     reward: 15,
+    damage: 1,
   },
   [EnemyType.FAST_SLIME]: {
     type: EnemyType.FAST_SLIME,
@@ -33,6 +35,7 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     speed: 4.0,
     size: 12,
     reward: 20,
+    damage: 1,
   },
   [EnemyType.TANK_SLIME]: {
     type: EnemyType.TANK_SLIME,
@@ -42,6 +45,7 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     speed: 1.0,
     size: 24,
     reward: 40,
+    damage: 2,
   },
   [EnemyType.SPLIT_SLIME]: {
     type: EnemyType.SPLIT_SLIME,
@@ -51,6 +55,7 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     speed: 2.0,
     size: 16,
     reward: 25,
+    damage: 1,
   },
   [EnemyType.STEALTH_SLIME]: {
     type: EnemyType.STEALTH_SLIME,
@@ -60,6 +65,7 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     speed: 2.0,
     size: 16,
     reward: 30,
+    damage: 1,
     stealthRanges: [[4, 6]],
   },
   [EnemyType.BOSS_DRAGON]: {
@@ -70,5 +76,7 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     speed: 0.8,
     size: 40,
     reward: 200,
+    // Reaching the origin with the boss alive is a guaranteed game-over (player maxHp=20)
+    damage: 99,
   },
 }

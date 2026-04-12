@@ -1,15 +1,13 @@
-"""SQLAlchemy 實作的 GameSessionRepository"""
+"""SQLAlchemy implementation of GameSessionRepository"""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session as DbSession
 
-from app.domain.session.aggregate import GameSession
+from app.domain.session.aggregate import GameSession, STALE_CUTOFF
 from app.domain.value_objects import SessionStatus, Level
 from app.models.game_session import GameSession as GameSessionModel
-
-STALE_CUTOFF = timedelta(hours=2)
 
 
 class SqlAlchemySessionRepository:

@@ -1,6 +1,6 @@
 /**
- * useGameLoop — 遊戲迴圈生命週期管理 Composable
- * 在 Vue 元件 onMounted/onUnmounted 中啟動/停止遊戲引擎。
+ * useGameLoop — game loop lifecycle management composable
+ * Starts/stops the game engine in Vue component's onMounted/onUnmounted hooks.
  */
 import { onMounted, onUnmounted, ref, type Ref } from 'vue'
 import { Game } from '@/engine/Game'
@@ -37,7 +37,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
 
     const g = new Game(canvas)
 
-    // 注入所有系統（順序：placement → combat → movement → wave → buff → economy → renderers）
+    // Inject all systems (order: placement → combat → movement → wave → buff → economy → renderers)
     const placement = new TowerPlacementSystem()
     placement.getSelectedTowerType = () => uiStore.selectedTowerType as TowerType | null
     placement.clearSelectedTowerType = () => { uiStore.selectedTowerType = null }
@@ -51,7 +51,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     g.addSystem('towerRenderer', new TowerRenderer())
     g.addSystem('projectileRenderer', new ProjectileRenderer())
 
-    // 每次關卡開始時生成隨機路徑，並同步到 store
+    // Generate a random path on each level start and sync it to the store
     unsubs.push(g.eventBus.on(Events.LEVEL_START, (levelNum) => {
       const path = generatePath(levelNum as number)
       g.pathFunction = path.fn
@@ -59,7 +59,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
       gameStore.pathExpression = path.expr
     }))
 
-    // 塔被點選 → 開啟 BuildPanel（引擎 → Vue UI 橋接）
+    // Tower selected → open BuildPanel (engine → Vue UI bridge)
     unsubs.push(g.eventBus.on(Events.TOWER_SELECTED, (tower) => {
       if (tower && typeof tower === 'object' && 'id' in tower) {
         uiStore.buildPanelTowerId = (tower as Tower).id
@@ -70,7 +70,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
       }
     }))
 
-    // 塔放置成功 → 選中它，開啟面板設定參數
+    // Tower placed successfully → select it and open the panel for parameter setup
     unsubs.push(g.eventBus.on(Events.TOWER_PLACED, (tower) => {
       uiStore.buildPanelTowerId = tower.id
       uiStore.buildPanelVisible = true
@@ -87,10 +87,11 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   })
 
   onUnmounted(() => {
-    unsubs.forEach((fn) => fn())  // 1. 移除 composable 層的事件監聽
-    gameStore.unbindEngine()      // 2. 解除 store 綁定
+    unsubs.forEach((fn) => fn())  // 1. Remove composable-level event listeners
+    gameStore.unbindEngine()      // 2. Unbind store from engine
     if (game.value) {
-      game.value.destroy()        // 3. 停止迴圈 + destroy 所有 system + 清除 eventBus + input
+      game.value.destroy()        // 3. Stop loop + destroy all systems + clear eventBus + input
+      game.value = null           // 4. Release reference to prevent memory leak
     }
   })
 

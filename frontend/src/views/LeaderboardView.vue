@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLeaderboard } from '@/composables/useLeaderboard'
 
@@ -8,22 +8,38 @@ const { entries, total, loading, error, fetch: fetchLb } = useLeaderboard()
 const selectedLevel = ref<number | undefined>(undefined)
 const currentPage = ref(1)
 const perPage = 20
+const DEBOUNCE_MS = 250
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
+
+// Debounce rapid filter/page clicks so only the last intent hits the network.
+// useLeaderboard already drops stale responses via fetchId; this stops the
+// requests from being fired in the first place.
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleFetch(lv: number | undefined, page: number): void {
+  if (debounceTimer !== null) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null
+    fetchLb(lv, page)
+  }, DEBOUNCE_MS)
+}
 
 function selectLevel(lv: number | undefined): void {
   selectedLevel.value = lv
   currentPage.value = 1
-  fetchLb(lv, 1)
+  scheduleFetch(lv, 1)
 }
 
 function goToPage(page: number): void {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
-  fetchLb(selectedLevel.value, page)
+  scheduleFetch(selectedLevel.value, page)
 }
 
 onMounted(() => fetchLb())
+onBeforeUnmount(() => {
+  if (debounceTimer !== null) clearTimeout(debounceTimer)
+})
 </script>
 
 <template>

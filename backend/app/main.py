@@ -18,15 +18,17 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # create_all() for dev convenience; use Alembic migrations for production schema changes
-    create_tables()
-    logger.info("Database tables ensured (dev mode: create_all)")
+    if settings.auto_create_tables:
+        create_tables()
+        logger.info("Database tables ensured (dev mode: create_all)")
+    else:
+        logger.info("Skipping create_all — use Alembic migrations for schema changes")
     yield
 
 
 app = FastAPI(
     title="Math Defense API",
-    description="數學防線遊戲後端 API",
+    description="Math Defense Game Backend API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -43,7 +45,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# 路由
+# Routes
 app.include_router(auth.router)
 app.include_router(leaderboard.router)
 app.include_router(game_session.router)

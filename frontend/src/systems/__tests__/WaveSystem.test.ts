@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { WaveSystem } from '../WaveSystem'
 import { GamePhase, Events } from '@/data/constants'
-import { createMockGame, createMockEnemy } from './helpers'
+import { createMockGame } from './helpers'
 
 // Mock level-defs to provide deterministic wave data
 vi.mock('@/data/level-defs', () => ({

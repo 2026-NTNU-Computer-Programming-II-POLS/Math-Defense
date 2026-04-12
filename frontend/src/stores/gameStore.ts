@@ -1,16 +1,19 @@
 /**
- * gameStore — 遊戲狀態 Pinia Store
- * 橋接引擎 EventBus → Vue reactivity，讓 Vue 元件讀取遊戲狀態。
+ * gameStore — game state Pinia Store
+ * Bridges the engine EventBus → Vue reactivity so Vue components can read game state.
  */
 import { defineStore } from 'pinia'
 import { ref, shallowRef, computed } from 'vue'
+// buffCards intentionally uses `ref` (not shallowRef) so future in-place
+// mutations (e.g. `buffCards.value[0].probability = 0.7`) still trigger UI
+// updates. The performance cost is negligible for a 3-element array.
 import { GamePhase } from '@/data/constants'
 import type { Game } from '@/engine/Game'
 import { Events } from '@/data/constants'
 import type { BuffDef } from '@/data/buff-defs'
 
 export const useGameStore = defineStore('game', () => {
-  // ── 狀態（mirror 自 Game.state） ──
+  // ── State (mirrored from Game.state) ──
   const phase = ref<GamePhase>(GamePhase.MENU)
   const level = ref(1)
   const wave = ref(0)
@@ -21,7 +24,8 @@ export const useGameStore = defineStore('game', () => {
   const score = ref(0)
   const kills = ref(0)
   const pathExpression = ref('')
-  const buffCards = shallowRef<(BuffDef & { isCurse: boolean })[]>([])
+  const buffCards = ref<(BuffDef & { isCurse: boolean })[]>([])
+  const bossShieldTarget = shallowRef<{ freqs: number[]; amps: number[] } | null>(null)
 
   // ── Computed ──
   const isBuilding = computed(() => phase.value === GamePhase.BUILD)
@@ -29,20 +33,20 @@ export const useGameStore = defineStore('game', () => {
   const isBuff = computed(() => phase.value === GamePhase.BUFF_SELECT)
   const hpPercent = computed(() => (hp.value / maxHp.value) * 100)
 
-  // ── 引擎綁定 ──
+  // ── Engine binding ──
   let _game: Game | null = null
   let _unsubscribes: (() => void)[] = []
 
   function bindEngine(game: Game): void {
-    // 先清除舊的綁定
+    // clear any existing binding first
     unbindEngine()
 
     _game = game
 
-    // 同步初始狀態
+    // sync initial state
     syncFromEngine(game)
 
-    // 監聽事件更新 reactive state，保留 unsubscribe handles
+    // subscribe to events to update reactive state; retain unsubscribe handles
     _unsubscribes = [
       game.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
         phase.value = to
@@ -66,6 +70,12 @@ export const useGameStore = defineStore('game', () => {
       game.eventBus.on(Events.BUFF_PHASE_START, () => {
         const buffSys = game.getSystem('buff') as { currentCards: (BuffDef & { isCurse: boolean })[] } | undefined
         if (buffSys) buffCards.value = [...buffSys.currentCards]
+      }),
+      game.eventBus.on(Events.BOSS_SHIELD_START, () => {
+        bossShieldTarget.value = game.state.bossShieldTarget
+      }),
+      game.eventBus.on(Events.BOSS_SHIELD_END, () => {
+        bossShieldTarget.value = null
       }),
     ]
   }
@@ -95,7 +105,7 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     phase, level, wave, totalWaves,
-    gold, hp, maxHp, score, kills, pathExpression, buffCards,
+    gold, hp, maxHp, score, kills, pathExpression, buffCards, bossShieldTarget,
     isBuilding, isWave, isBuff, hpPercent,
     bindEngine, unbindEngine, syncFromEngine, getEngine,
   }

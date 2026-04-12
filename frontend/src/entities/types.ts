@@ -1,5 +1,5 @@
 /**
- * Entity 介面定義 — 純資料物件，不含 render 或 update 方法
+ * Entity interface definitions — pure data objects with no render or update methods
  */
 import type { TowerType, EnemyType } from '@/data/constants'
 
@@ -21,21 +21,21 @@ export interface Tower {
   disabled: boolean
   level: number
 
-  // 有效數值（Buff 修正後）
+  // Effective values (after Buff modifiers)
   effectiveDamage: number
   effectiveRange: number
   cooldown: number
   cooldownTimer: number
 
-  // Buff 加成修正器
+  // Buff multiplier modifiers
   damageBonus: number
   rangeBonus: number
 
-  // 原始基礎值（供 Buff 計算用）
+  // Raw base values (used for Buff calculations)
   baseDamage: number
   baseRange: number
 
-  // 顏色（供 Renderer 用）
+  // Color (used by Renderer)
   color: string
 }
 
@@ -50,19 +50,20 @@ export interface Enemy {
   maxHp: number
   speed: number
   speedMultiplier: number
-  size: number      // 像素大小
+  size: number      // pixel size
   reward: number
+  damage: number    // HP cost to player when this enemy reaches the origin
   color: string
   active: boolean
   alive: boolean
 
-  // 路徑跟隨（內部狀態）
+  // Path following (internal state)
   pathFn: (x: number) => number
   _pathX: number
   _targetX: number
   _direction: 1 | -1
 
-  // 隱身
+  // Stealth
   stealthRanges: [number, number][]
   isStealthed: boolean
 }

@@ -1,10 +1,9 @@
 /**
- * MovementSystem — 敵人沿數學路徑移動
- * 從舊 Enemy.update() 提取，Entity 不再需要 update() 方法。
+ * MovementSystem — enemies move along the mathematical path
+ * Extracted from the old Enemy.update(); entities no longer need an update() method.
  */
 import { Events, GamePhase } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
 import type { Game } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
 
@@ -32,7 +31,7 @@ export class MovementSystem {
   private _moveEnemy(enemy: Enemy, dt: number, game: Game): void {
     const effectiveSpeed = enemy.speed * enemy.speedMultiplier * game.state.enemySpeedMultiplier
 
-    // 弧長修正：讓速度沿曲線而非沿 x 軸
+    // arc-length correction: move at constant speed along the curve, not along the x-axis
     const dx = effectiveSpeed * dt * enemy._direction
     const currentY = enemy.pathFn(enemy._pathX)
     const nextX = enemy._pathX + dx
@@ -49,12 +48,12 @@ export class MovementSystem {
     enemy.x = enemy._pathX
     enemy.y = enemy.pathFn(enemy._pathX)
 
-    // 更新隱身狀態
+    // update stealth state
     enemy.isStealthed = enemy.stealthRanges.some(
       ([min, max]) => enemy.x >= min && enemy.x <= max,
     )
 
-    // 到達原點判定
+    // check if enemy has reached the origin
     const distToOrigin = distance(enemy.x, enemy.y, 0, 0)
     const reachedTarget =
       enemy._direction < 0
@@ -65,17 +64,9 @@ export class MovementSystem {
       enemy.alive = false
       enemy.active = false
 
-      // Split slime: 委派給 SplitSlimePolicy（帶偏移讓玩家有機會擊殺子體）
-      if (shouldSplit(enemy)) {
-        spawnChildren(enemy, {
-          pathFunction: game.pathFunction,
-          onChildCreated: (child) => {
-            game.enemies.push(child)
-            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-          },
-        }, 3) // spawnOffset = 3 game units back along path
-      }
-
+      // Reaching origin damages the player (handled by EconomySystem) and the enemy disappears.
+      // Splitting only happens on combat death — otherwise children would spawn next to the
+      // origin and immediately deal more damage on their way out.
       game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, enemy)
     }
   }

@@ -1,6 +1,6 @@
 /**
- * Renderer — Canvas 渲染原語（TypeScript 版）
- * 只負責低階繪製，不持有遊戲狀態。
+ * Renderer — Canvas rendering primitives (TypeScript)
+ * Responsible only for low-level drawing; holds no game state.
  */
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, UNIT_PX,
@@ -36,7 +36,7 @@ export class Renderer {
   drawGrid(): void {
     const { ctx } = this
 
-    // 棋盤格石板底色
+    // Checkerboard stone floor tiles
     for (let gx = GRID_MIN_X; gx < GRID_MAX_X; gx++) {
       for (let gy = GRID_MIN_Y; gy < GRID_MAX_Y; gy++) {
         const px = gameToCanvasX(gx)
@@ -46,7 +46,7 @@ export class Renderer {
       }
     }
 
-    // 格線（暗金色符文線）
+    // Grid lines (dark gold rune lines)
     ctx.strokeStyle = Colors.GRID_LINE
     ctx.lineWidth = 0.5
     ctx.beginPath()
@@ -62,7 +62,7 @@ export class Renderer {
     }
     ctx.stroke()
 
-    // 座標軸（亮金色）
+    // Coordinate axes (bright gold)
     ctx.strokeStyle = Colors.AXIS
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -74,7 +74,7 @@ export class Renderer {
     ctx.lineTo(yAxisX, gameToCanvasY(GRID_MAX_Y))
     ctx.stroke()
 
-    // 刻度數字
+    // Tick labels
     ctx.fillStyle = Colors.AXIS
     ctx.font = '10px monospace'
     ctx.textAlign = 'center'
@@ -196,7 +196,7 @@ export class Renderer {
     const pcx = gameToCanvasX(cx)
     const pcy = gameToCanvasY(cy)
     const pr = r * UNIT_PX
-    // Canvas y 軸翻轉，角度需鏡像
+    // Canvas y-axis is inverted; angles must be mirrored
     const cStart = -startAngle - sweepAngle
     const cEnd = -startAngle
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * MatrixInputPanel — 2x2 矩陣視覺化輸入
- * 以矩陣格式排列 4 個輸入欄，即時顯示行列式值。
- * 呼叫 WasmBridge.matrixMultiply() 驗證結果。
+ * MatrixInputPanel — 2×2 matrix visual input
+ * Arranges 4 input fields in matrix layout and displays the determinant live.
+ * Calls WasmBridge.matrixMultiply() to compute the transform preview.
  */
 import { computed } from 'vue'
 import { matrixMultiply } from '@/math/WasmBridge'

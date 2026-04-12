@@ -52,18 +52,21 @@ void matrix_multiply(const float *a, const float *b, float *result) {
 void calculate_trajectory(float a, float b, float c,
                           float x_start, float x_end, float step,
                           float *out_x, float *out_y, int *count) {
-    int i = 0;
-    float x;
+    /* Index-based iteration so float accumulation rounding can't drop the final point. */
     float dir = (x_end >= x_start) ? 1.0f : -1.0f;
+    if (step <= 0.0f) { *count = 0; return; }
 
-    for (x = x_start; (dir > 0 ? x <= x_end : x >= x_end); x += step * dir) {
+    int n = (int)floorf((x_end - x_start) * dir / step) + 1;
+    if (n < 0) n = 0;
+    if (n > 1000) n = 1000;
+
+    for (int i = 0; i < n; i++) {
+        float x = x_start + (float)i * step * dir;
         out_x[i] = x;
         out_y[i] = a * x * x + b * x + c;
-        i++;
-        if (i >= 1000) break;  /* 安全上限 */
     }
 
-    *count = i;
+    *count = n;
 }
 
 /* ══════════════════════════════════════════
@@ -77,6 +80,11 @@ void calculate_trajectory(float a, float b, float c,
  * @return 扇形面積
  */
 float sector_coverage(float radius, float angle_width) {
+    /* Clamp to [0, 2π] so future buff stacks pushing past a full circle don't return
+       garbage area > π·r² that breaks coverage % UI. */
+    const float TWO_PI = 2.0f * (float)M_PI;
+    if (angle_width < 0.0f) angle_width = 0.0f;
+    if (angle_width > TWO_PI) angle_width = TWO_PI;
     return 0.5f * radius * radius * angle_width;
 }
 
@@ -196,7 +204,12 @@ float fourier_match(const float *freqs1, const float *amps1,
 
     if (totalEnergy < 0.001f) return 1.0f;  /* 都是零波形 */
 
+    /* Clamp ratio before sqrtf — under -ffast-math a stray negative ratio
+       would yield NaN, which then propagates through clamp comparisons
+       (NaN < 0 is false, NaN > 1 is false) and into bossShieldTimer. */
     float ratio = totalError / totalEnergy;
+    if (ratio < 0.0f) ratio = 0.0f;
+    if (ratio > 1.0f) ratio = 1.0f;
     float match = 1.0f - sqrtf(ratio);
     if (match < 0.0f) match = 0.0f;
     if (match > 1.0f) match = 1.0f;

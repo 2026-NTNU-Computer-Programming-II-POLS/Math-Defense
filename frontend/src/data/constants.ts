@@ -1,30 +1,30 @@
 /**
- * Constants — 遊戲常數（TypeScript 版）
- * 從 shared/game-constants.json 匯入，確保前後端一致。
+ * Constants — game constants (TypeScript)
+ * Imported from shared/game-constants.json to ensure consistency between frontend and backend.
  */
 import gameConstants from '@shared/game-constants.json'
 
-// ── Canvas / 座標系（從 shared JSON 匯入）──
+// ── Canvas / coordinate system (imported from shared JSON) ──
 export const CANVAS_WIDTH  = gameConstants.canvas.width
 export const CANVAS_HEIGHT = gameConstants.canvas.height
 export const ORIGIN_X      = gameConstants.canvas.originX   // px
-export const ORIGIN_Y      = gameConstants.canvas.originY   // px（Canvas y 向下，遊戲 y 向上）
-export const UNIT_PX       = gameConstants.canvas.unitPx    // 每座標單位的像素數
+export const ORIGIN_Y      = gameConstants.canvas.originY   // px (Canvas y points downward, game y points upward)
+export const UNIT_PX       = gameConstants.canvas.unitPx    // pixels per coordinate unit
 
 export const GRID_MIN_X = gameConstants.grid.minX
 export const GRID_MAX_X = gameConstants.grid.maxX
 export const GRID_MIN_Y = gameConstants.grid.minY
 export const GRID_MAX_Y = gameConstants.grid.maxY
 
-// ── 遊戲初始值 ──
+// ── Initial game values ──
 export const INITIAL_HP   = gameConstants.player.initialHp
 export const INITIAL_GOLD = gameConstants.player.initialGold
 
-// ── 迴圈 ──
+// ── Game loop ──
 export const TARGET_FPS = gameConstants.loop.targetFps
-export const FIXED_DT   = 1 / TARGET_FPS  // 精確計算，避免 JSON 四捨五入的 0.016667 造成微小偏移
+export const FIXED_DT   = 1 / TARGET_FPS  // Computed precisely to avoid the minor drift from JSON-rounded 0.016667
 
-// ── 遊戲階段 ──
+// ── Game phases ──
 export const GamePhase = {
   MENU:         'menu',
   LEVEL_SELECT: 'levelSelect',
@@ -37,7 +37,7 @@ export const GamePhase = {
 } as const
 export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase]
 
-// ── 塔類型 ──
+// ── Tower types ──
 export const TowerType = {
   FUNCTION_CANNON:    'functionCannon',
   RADAR_SWEEP:        'radarSweep',
@@ -48,7 +48,7 @@ export const TowerType = {
 } as const
 export type TowerType = (typeof TowerType)[keyof typeof TowerType]
 
-// ── 敵人類型 ──
+// ── Enemy types ──
 export const EnemyType = {
   BASIC_SLIME:   'basicSlime',
   FAST_SLIME:    'fastSlime',
@@ -59,7 +59,7 @@ export const EnemyType = {
 } as const
 export type EnemyType = (typeof EnemyType)[keyof typeof EnemyType]
 
-// ── 事件名稱 ──
+// ── Event names ──
 export const Events = Object.freeze({
   PHASE_CHANGED:        'phaseChanged',
   LEVEL_START:          'levelStart',
@@ -97,7 +97,7 @@ export const Events = Object.freeze({
   CANVAS_HOVER:         'canvasHover',
 } as const)
 
-// ── 配色 ──
+// ── Color palette ──
 export const Colors = Object.freeze({
   STONE_DARK:       '#1a1520',
   STONE_LIGHT:      '#252030',

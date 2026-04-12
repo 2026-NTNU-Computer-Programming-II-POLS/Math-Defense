@@ -1,6 +1,6 @@
 /**
- * PathEvaluator — 路徑函數求值與生成（TypeScript 版）
- * 忠實移植自 PathGenerator.js，保持與原版完全一致的數值範圍。
+ * PathEvaluator — path function evaluation and generation (TypeScript)
+ * Faithfully ported from PathGenerator.js; preserves the exact same numerical ranges as the original.
  */
 
 export interface PathDef {
@@ -11,7 +11,7 @@ export interface PathDef {
   targetX: number
 }
 
-// ── 輔助函數 ──
+// ── Helper functions ──
 
 function rand(min: number, max: number): number {
   return Math.random() * (max - min) + min
@@ -22,7 +22,7 @@ function round(n: number, decimals = 1): number {
   return Math.round(n * f) / f
 }
 
-// ── 各類型生成器（數值範圍與原版完全一致） ──
+// ── Per-type generators (numerical ranges exactly match the original) ──
 
 function generateHorizontalLine(): PathDef {
   const a = round(rand(2, 10))
@@ -50,20 +50,20 @@ function generateLinear(): PathDef {
 function generateQuadratic(): PathDef {
   const h = round(rand(8, 14), 1)
   const k = round(rand(6, 12), 1)
-  const a = round(rand(-0.08, -0.02), 3)  // 原版 -0.02，非 -0.03
+  const a = round(rand(-0.08, -0.02), 3)  // original uses -0.02, not -0.03
   return {
     fn: (x) => a * (x - h) ** 2 + k,
     expr: `y = ${a}(x − ${h})² + ${k}`,
     type: 'quadratic',
-    startX: 22,  // 原版為 22
+    startX: 22,  // original value is 22
     targetX: 0,
   }
 }
 
 function generateTrigonometric(): PathDef {
-  const A = round(rand(1.5, 4), 1)   // 原版下界 1.5，非 2
+  const A = round(rand(1.5, 4), 1)   // original lower bound is 1.5, not 2
   const B = round(rand(0.3, 0.8), 2)
-  const C = round(rand(3, 7), 1)     // 原版上界 7，非 8
+  const C = round(rand(3, 7), 1)     // original upper bound is 7, not 8
   return {
     fn: (x) => A * Math.sin(B * x) + C,
     expr: `y = ${A}sin(${B}x) + ${C}`,
@@ -74,11 +74,11 @@ function generateTrigonometric(): PathDef {
 }
 
 function generatePiecewise(): PathDef {
-  // 原版：x>10 時下降（m1 負），x≤10 時上升（m2 正）
+  // original: descending when x>10 (m1 negative), ascending when x≤10 (m2 positive)
   const m1 = round(rand(-0.5, -0.1), 2)
   const b1 = round(rand(5, 10), 1)
   const m2 = round(rand(0.2, 0.6), 2)
-  // 確保在 x=10 處連續
+  // ensure continuity at x=10
   const y10 = m1 * 10 + b1
   const roundedB2 = round(y10 - m2 * 10, 1)
 
@@ -104,7 +104,7 @@ function generateComposite(): PathDef {
   }
 }
 
-// ── 關卡隨機池（與原版完全一致） ──
+// ── Level generator pool (matches the original exactly) ──
 
 const GENERATORS_BY_LEVEL: Array<Array<() => PathDef>> = [
   // Level 1
@@ -113,11 +113,11 @@ const GENERATORS_BY_LEVEL: Array<Array<() => PathDef>> = [
   [generateHorizontalLine, generateLinear, generateQuadratic],
   // Level 3
   [generateHorizontalLine, generateLinear, generateQuadratic, generateTrigonometric],
-  // Level 4: 移除水平線，加入 piecewise + composite
+  // Level 4: remove horizontal line, add piecewise + composite
   [generateLinear, generateQuadratic, generateTrigonometric, generatePiecewise, generateComposite],
 ]
 
-// ── 路徑驗證（與原版一致：>80% 的點在有效區域） ──
+// ── Path validation (matches the original: >80% of points must be in the valid area) ──
 
 function validatePath(path: PathDef): boolean {
   const step = 0.5
@@ -132,7 +132,7 @@ function validatePath(path: PathDef): boolean {
 }
 
 /**
- * 依關卡隨機生成路徑
+ * Generate a path randomly based on the given level.
  */
 export function generatePath(level: number, maxAttempts = 20): PathDef {
   const pool = GENERATORS_BY_LEVEL[Math.min(level - 1, GENERATORS_BY_LEVEL.length - 1)]

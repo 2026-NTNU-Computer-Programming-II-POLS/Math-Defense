@@ -88,11 +88,12 @@ describe('BuffSystem', () => {
       game.eventBus.emit(Events.BUFF_CARD_SELECTED, buffCard.id)
       expect(tower.damageBonus).toBeCloseTo(1.5)
 
-      // Tick 2 waves to expire the buff (duration = 2)
-      game.eventBus.emit(Events.WAVE_START, 1 as never)
+      // Tick 2 waves to expire the buff (duration = 2). Tick fires on WAVE_END so a
+      // duration=1 buff lasts the wave it was selected for.
+      game.eventBus.emit(Events.WAVE_END, 1 as never)
       expect(tower.damageBonus).toBeCloseTo(1.5) // still active after 1 wave
 
-      game.eventBus.emit(Events.WAVE_START, 2 as never)
+      game.eventBus.emit(Events.WAVE_END, 2 as never)
       expect(tower.damageBonus).toBeCloseTo(1.0) // reverted after 2 waves
     }
   })
@@ -101,13 +102,14 @@ describe('BuffSystem', () => {
     game.state.gold = 10
     game.eventBus.emit(Events.BUFF_PHASE_START, undefined)
 
-    let result: { success: boolean } | null = null
-    game.eventBus.on(Events.BUFF_RESULT, (r) => { result = r as { success: boolean } })
+    // Wrap so closure mutation is visible to TS flow analysis
+    const captured: { result: { success: boolean } | null } = { result: null }
+    game.eventBus.on(Events.BUFF_RESULT, (r) => { captured.result = r as { success: boolean } })
 
     const buffCard = system.currentCards.find((c) => c.id === 'test_buff')
     if (buffCard) {
       game.eventBus.emit(Events.BUFF_CARD_SELECTED, buffCard.id)
-      expect(result?.success).toBe(false)
+      expect(captured.result?.success).toBe(false)
       expect(game.state.gold).toBe(10) // unchanged
     }
   })

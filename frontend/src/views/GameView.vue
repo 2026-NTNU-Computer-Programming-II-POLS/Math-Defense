@@ -21,19 +21,25 @@ const uiStore = useUiStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const { game, ready } = useGameLoop(canvasRef)
 
-// 監聽關卡結算 / GAME_OVER → 顯示 Modal
+// listen for level-end / GAME_OVER → show modal
+function navigateHome(): void {
+  router.push('/').catch((err) => {
+    console.warn('[GameView] Navigation failed:', err)
+  })
+}
+
 watch(() => gameStore.phase, (phase) => {
   if (phase === GamePhase.LEVEL_END) {
     uiStore.showModal(
       '關卡通關！',
       `Score: ${gameStore.score.toLocaleString()}  Kills: ${gameStore.kills}`,
-      () => router.push('/'),
+      navigateHome,
     )
   } else if (phase === GamePhase.GAME_OVER) {
     uiStore.showModal(
       'Game Over',
       `已存活 ${gameStore.wave} 波  Score: ${gameStore.score.toLocaleString()}`,
-      () => router.push('/'),
+      navigateHome,
     )
   }
 })
@@ -55,7 +61,7 @@ function selectLevel(levelId: number): void {
       <HUD />
       <BuildHint />
 
-      <!-- 關卡選擇 -->
+      <!-- Level select -->
       <LevelSelect
         v-if="gameStore.phase === GamePhase.MENU || gameStore.phase === GamePhase.LEVEL_SELECT"
         @select="selectLevel"
@@ -65,7 +71,11 @@ function selectLevel(levelId: number): void {
       <template v-if="gameStore.isBuilding">
         <TowerBar />
         <BuildPanel v-if="uiStore.buildPanelVisible" />
-        <button class="btn start-wave-btn" @click="startWave">
+        <button
+          class="btn start-wave-btn"
+          :disabled="gameStore.phase !== GamePhase.BUILD"
+          @click="startWave"
+        >
           ▶ Start Wave {{ gameStore.wave + 1 }}
         </button>
       </template>

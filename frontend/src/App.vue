@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// App 根元件：掛載路由出口
+// App root component: mounts the router outlet
 </script>
 
 <template>

@@ -9,7 +9,7 @@ from app.limiter import limiter
 
 @pytest.fixture
 def client():
-    # StaticPool 讓所有連線共用同一個 in-memory DB
+    # StaticPool forces all connections to share a single in-memory DB
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},

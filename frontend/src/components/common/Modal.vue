@@ -1,15 +1,71 @@
 <script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useUiStore } from '@/stores/uiStore'
 
 const uiStore = useUiStore()
+
+const titleId = `modal-title-${Math.random().toString(36).slice(2, 10)}`
+const boxRef = ref<HTMLElement | null>(null)
+const okBtnRef = ref<HTMLButtonElement | null>(null)
+
+// Save the previously focused element so focus can be restored on close
+let previousFocus: HTMLElement | null = null
+
+function close(): void {
+  uiStore.closeModal()
+}
+
+function trapFocus(event: KeyboardEvent): void {
+  // Keep keyboard focus inside the modal while it's open
+  if (event.key !== 'Tab') return
+  const box = boxRef.value
+  if (!box) return
+  const focusables = box.querySelectorAll<HTMLElement>(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )
+  if (focusables.length === 0) return
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (event.shiftKey && active === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+onMounted(async () => {
+  previousFocus = document.activeElement as HTMLElement | null
+  await nextTick()
+  okBtnRef.value?.focus()
+})
+
+onBeforeUnmount(() => {
+  previousFocus?.focus?.()
+  previousFocus = null
+})
 </script>
 
 <template>
-  <div class="modal-overlay" @click.self="uiStore.closeModal">
-    <div class="modal-box rune-panel">
-      <h3 class="modal-title">{{ uiStore.modalTitle }}</h3>
+  <div
+    class="modal-overlay"
+    @click.self="close"
+    @keydown.esc.prevent.stop="close"
+    @keydown="trapFocus"
+  >
+    <div
+      ref="boxRef"
+      class="modal-box rune-panel"
+      role="alertdialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      tabindex="-1"
+    >
+      <h3 :id="titleId" class="modal-title">{{ uiStore.modalTitle }}</h3>
       <p class="modal-message">{{ uiStore.modalMessage }}</p>
-      <button class="btn modal-ok" @click="uiStore.closeModal">確認</button>
+      <button ref="okBtnRef" class="btn modal-ok" @click="close">確認</button>
     </div>
   </div>
 </template>

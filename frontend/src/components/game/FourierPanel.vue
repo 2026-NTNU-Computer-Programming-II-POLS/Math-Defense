@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * FourierPanel — 傅立葉護盾波形合成 UI
- * 3 個 sin 波分量（頻率/振幅），即時繪製合成波形。
- * Boss 戰 mini-game：調參數匹配目標波形。
+ * FourierPanel — Fourier Shield waveform synthesis UI
+ * 3 sin-wave components (frequency/amplitude), with live composite waveform rendering.
+ * Boss battle mini-game: tune parameters to match the target waveform.
  */
 import { computed, ref, watch, onMounted } from 'vue'
 import { fourierComposite, fourierMatch } from '@/math/WasmBridge'

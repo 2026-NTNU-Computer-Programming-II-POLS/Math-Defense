@@ -17,8 +17,8 @@ export function useAuth() {
         const me = await authService.me()
         authStore.setUser({ id: me.id, username: me.username })
       } catch {
-        // /me failed but login succeeded — use username from token response
-        authStore.setUser({ id: '', username: res.username })
+        // /me failed but login succeeded — use known username from login call
+        authStore.setUser({ id: '', username: res.username ?? username })
       }
       return true
     } catch (e) {
@@ -39,8 +39,8 @@ export function useAuth() {
         const me = await authService.me()
         authStore.setUser({ id: me.id, username: me.username })
       } catch {
-        // /me failed but register succeeded — use username from token response
-        authStore.setUser({ id: '', username: res.username })
+        // /me failed but register succeeded — use known username from register call
+        authStore.setUser({ id: '', username: res.username ?? username })
       }
       return true
     } catch (e) {

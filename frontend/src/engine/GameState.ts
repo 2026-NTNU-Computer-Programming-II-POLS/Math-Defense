@@ -1,36 +1,39 @@
 /**
- * GameState — 強型別遊戲狀態
- * 所有 buff flag、遊戲數值在此明確宣告。
- * 不再有 game._shieldActive 等動態屬性。
+ * GameState — strongly-typed game state
+ * All buff flags and game values are explicitly declared here.
+ * No more dynamic properties like game._shieldActive.
  */
 import { GamePhase } from '@/data/constants'
 import { INITIAL_HP, INITIAL_GOLD } from '@/data/constants'
 
 export interface GameState {
-  // 流程
+  // Flow
   phase: GamePhase
   level: number
   wave: number
   totalWaves: number
 
-  // 資源
+  // Resources
   gold: number
   hp: number
   maxHp: number
   score: number
   kills: number
 
-  // Buff flags（明確宣告，不再動態注入）
+  // Buff flags (explicitly declared; no longer dynamically injected)
   shieldActive: boolean
   goldMultiplier: number
   freeTowerNext: boolean
-  enemySpeedMultiplier: number     // 詛咒：敵人加速（預設 1.0）
+  enemySpeedMultiplier: number     // Curse: enemy speed multiplier (default 1.0)
 
-  // Boss Shield 狀態（集中管理，不散落在 CombatSystem）
+  // Boss Shield state (centrally managed; not scattered in CombatSystem)
   bossShieldTriggered: boolean
   bossShieldTimer: number
+  // Target waveform the player must match with the Fourier Shield slider UI.
+  // Populated when BOSS_SHIELD_START fires so the FourierPanel can compare against it.
+  bossShieldTarget: { freqs: number[]; amps: number[] } | null
 
-  // 路徑
+  // Path
   pathExpression: string
 }
 
@@ -51,6 +54,7 @@ export function createInitialState(): GameState {
     enemySpeedMultiplier: 1,
     bossShieldTriggered: false,
     bossShieldTimer: 0,
+    bossShieldTarget: null,
     pathExpression: '',
   }
 }

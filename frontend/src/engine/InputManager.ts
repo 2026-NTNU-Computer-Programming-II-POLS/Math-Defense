@@ -1,5 +1,5 @@
 /**
- * InputManager — 滑鼠與鍵盤輸入管理（TypeScript 版）
+ * InputManager — mouse and keyboard input management (TypeScript)
  */
 import { Events } from '@/data/constants'
 import { canvasToGame } from '@/math/MathUtils'
@@ -10,7 +10,7 @@ export class InputManager {
   private bus: GameEventBus
   private _keysDown = new Set<string>()
 
-  // 保留 listener 引用以便 destroy 時移除
+  // Retain listener references for removal during destroy
   private _onClick: (e: MouseEvent) => void
   private _onMove: (e: MouseEvent) => void
   private _onKeyDown: (e: KeyboardEvent) => void

@@ -1,4 +1,4 @@
-"""SQLAlchemy 實作的 LeaderboardRepository"""
+"""SQLAlchemy implementation of LeaderboardRepository"""
 from __future__ import annotations
 
 from sqlalchemy import func
@@ -41,7 +41,7 @@ class SqlAlchemyLeaderboardRepository:
         page: int,
         per_page: int,
     ) -> tuple[list[dict], int]:
-        """回傳 (entries_with_rank, total_count)"""
+        """Returns (entries_with_rank, total_count)"""
         base_q = self._db.query(LeaderboardEntryModel).join(
             User, LeaderboardEntryModel.user_id == User.id
         )
@@ -50,13 +50,20 @@ class SqlAlchemyLeaderboardRepository:
 
         total = base_q.count()
 
-        # DENSE_RANK for tie handling
-        rank_col = func.dense_rank().over(
-            order_by=[
+        # DENSE_RANK for tie handling.
+        # Partition by level when filtering so rank reflects the per-level ladder
+        # (without partition_by, GET ?level=2 would still report global rank).
+        # id is the final tie-breaker so pagination stays stable across pages.
+        rank_kwargs = {
+            "order_by": [
                 LeaderboardEntryModel.score.desc(),
                 LeaderboardEntryModel.created_at.asc(),
-            ]
-        ).label("rank")
+                LeaderboardEntryModel.id.asc(),
+            ],
+        }
+        if level is not None:
+            rank_kwargs["partition_by"] = LeaderboardEntryModel.level
+        rank_col = func.dense_rank().over(**rank_kwargs).label("rank")
 
         ranked_q = self._db.query(
             LeaderboardEntryModel, User.username, rank_col
@@ -67,7 +74,11 @@ class SqlAlchemyLeaderboardRepository:
 
         rows = (
             ranked_q
-            .order_by(LeaderboardEntryModel.score.desc(), LeaderboardEntryModel.created_at.asc())
+            .order_by(
+                LeaderboardEntryModel.score.desc(),
+                LeaderboardEntryModel.created_at.asc(),
+                LeaderboardEntryModel.id.asc(),
+            )
             .offset((page - 1) * per_page)
             .limit(per_page)
             .all()

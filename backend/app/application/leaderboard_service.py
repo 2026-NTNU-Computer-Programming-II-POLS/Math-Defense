@@ -1,4 +1,4 @@
-"""LeaderboardApplicationService — 排行榜 Use Cases"""
+"""LeaderboardApplicationService — Leaderboard Use Cases"""
 from __future__ import annotations
 
 import logging
@@ -43,23 +43,22 @@ class LeaderboardApplicationService:
         score: int,
         kills: int,
         waves_survived: int,
-        session_id: str | None,
+        session_id: str,
     ) -> dict:
         with self._uow:
-            # 驗證 session 歸屬與狀態
-            if session_id:
-                session = self._session_repo.find_by_id(session_id, user_id)
-                if not session:
-                    raise SessionValidationError("Session 不存在")
-                if session.user_id != user_id:
-                    raise PermissionDeniedError("無權操作此 Session")
-                if session.status != SessionStatus.COMPLETED:
-                    raise SessionValidationError("Session 尚未完成")
+            # Validate session ownership and status (session_id must be provided)
+            session = self._session_repo.find_by_id(session_id, user_id)
+            if not session:
+                raise SessionValidationError("Session not found")
+            if session.user_id != user_id:
+                raise PermissionDeniedError("Not authorized to access this session")
+            if session.status != SessionStatus.COMPLETED:
+                raise SessionValidationError("Session is not completed")
 
-                # 領域規則：重複提交檢查
-                existing = self._leaderboard_repo.find_by_session_id(session_id)
-                if existing:
-                    raise DuplicateSubmissionError("此 Session 已提交過排行榜")
+            # Domain rule: duplicate submission check
+            existing = self._leaderboard_repo.find_by_session_id(session_id)
+            if existing:
+                raise DuplicateSubmissionError("Score already submitted for this session")
 
             entry = LeaderboardEntry(
                 id=str(uuid.uuid4()),

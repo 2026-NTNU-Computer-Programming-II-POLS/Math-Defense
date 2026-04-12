@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * IntegralPanel — 積分砲參數輸入 + 積分區域視覺化
- * 即時繪製 f(x) = ax² + bx + c 曲線及 [a,b] 積分區域，
- * 並顯示 numericalIntegrate() 計算的面積 = 傷害值。
+ * IntegralPanel — Integral Cannon parameter input + integral area visualization
+ * Live-renders the f(x) = ax² + bx + c curve and [a,b] integral region,
+ * and displays the area computed by numericalIntegrate() as the damage value.
  */
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { numericalIntegrate } from '@/math/WasmBridge'
 
 const props = defineProps<{
@@ -16,6 +16,9 @@ const emit = defineEmits<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+// Component-scoped so a second instance (e.g. kept-alive) can't flip the
+// surviving instance's flag via module-level state.
+const mounted = ref(true)
 
 const coeffA = computed(() => props.params.a ?? -0.5)
 const coeffB = computed(() => props.params.b ?? 3)
@@ -32,6 +35,7 @@ function f(x: number): number {
 }
 
 function draw() {
+  if (!mounted.value) return
   const canvas = canvasRef.value
   if (!canvas) return
   const ctx = canvas.getContext('2d')
@@ -128,6 +132,7 @@ function draw() {
 
 watch([coeffA, coeffB, coeffC, intA, intB], draw)
 onMounted(draw)
+onUnmounted(() => { mounted.value = false })
 
 const paramFields = [
   { key: 'a', label: 'a (x\u00B2)', min: -5, max: 5, step: 0.1 },
@@ -136,7 +141,13 @@ const paramFields = [
 ]
 
 function onInput(key: string, event: Event) {
-  const val = parseFloat((event.target as HTMLInputElement).value) || 0
+  const el = event.target as HTMLInputElement
+  let val = parseFloat(el.value) || 0
+  // Enforce min/max boundaries (HTML attributes are advisory only)
+  const min = parseFloat(el.min)
+  const max = parseFloat(el.max)
+  if (!isNaN(min)) val = Math.max(val, min)
+  if (!isNaN(max)) val = Math.min(val, max)
   emit('update', key, val)
 }
 </script>

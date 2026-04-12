@@ -1,6 +1,6 @@
 /**
- * EconomySystem — 遊戲經濟規則
- * 從 Game._setupEventHandlers 提取，讓 Game.ts 不再包含業務邏輯。
+ * EconomySystem — game economy rules
+ * Extracted from Game._setupEventHandlers to keep Game.ts free of business logic.
  */
 import { Events } from '@/data/constants'
 import type { Game, GameSystem } from '@/engine/Game'
@@ -11,10 +11,10 @@ export class EconomySystem implements GameSystem {
 
   init(game: Game): void {
     this._unsubs.push(
-      game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, () => {
-        if (!game.state.shieldActive) {
-          game.changeHp(-1)
-        }
+      game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
+        if (game.state.shieldActive) return
+        // Per-enemy damage so a boss reaching origin actually ends the game; basic slimes still cost 1.
+        game.changeHp(-(enemy.damage ?? 1))
       }),
 
       game.eventBus.on(Events.ENEMY_KILLED, (enemy) => {

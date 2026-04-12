@@ -1,8 +1,10 @@
-"""SessionApplicationService — 編排 GameSession 的 Use Cases"""
+"""SessionApplicationService — Orchestrates GameSession Use Cases"""
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
+
+from sqlalchemy.exc import IntegrityError
 
 from app.domain.value_objects import Level, Score, GameResult
 from app.domain.session.aggregate import GameSession
@@ -19,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 class SessionApplicationService:
     """
-    協調場次的建立、更新、結束。
-    消費 SessionCompleted 事件以自動建立排行榜條目。
+    Coordinates session creation, updates, and termination.
+    Consumes SessionCompleted events to auto-create leaderboard entries.
     """
 
     def __init__(
@@ -34,20 +36,32 @@ class SessionApplicationService:
         self._uow = uow
 
     def create_session(self, user_id: str, level: int) -> GameSession:
+        # Two concurrent creates can both pass find_active_by_user (SQLite ignores FOR UPDATE),
+        # then collide on the unique partial index. Retry once after abandoning the row that won.
+        for attempt in range(2):
+            try:
+                return self._create_session_once(user_id, level)
+            except IntegrityError:
+                if attempt == 1:
+                    raise
+                logger.info("create_session race: retrying after abandoning concurrent active session user=%s", user_id)
+        raise RuntimeError("unreachable")
+
+    def _create_session_once(self, user_id: str, level: int) -> GameSession:
         with self._uow:
-            # 1. 放棄過期場次
+            # 1. Abandon stale sessions
             stale = self._session_repo.find_stale_sessions(user_id)
             for s in stale:
                 s.abandon()
             self._session_repo.save_all(stale)
 
-            # 2. 放棄現有 active 場次（每人限一個）
+            # 2. Abandon existing active session (one per user limit)
             existing = self._session_repo.find_active_by_user(user_id)
             if existing:
                 existing.abandon()
                 self._session_repo.save(existing)
 
-            # 3. 建立新場次
+            # 3. Create new session
             session = GameSession.create(user_id, Level(level))
             self._session_repo.save(session)
             self._uow.commit()
@@ -92,21 +106,38 @@ class SessionApplicationService:
             session.complete(result)
             self._session_repo.save(session)
 
-            # 消費 SessionCompleted 事件 → 自動建立排行榜條目
+            # Consume SessionCompleted event → auto-create leaderboard entry
             for event in session.collect_events():
                 if isinstance(event, SessionCompleted):
                     self._handle_session_completed(event)
 
             self._uow.commit()
-            session.clear_events()  # commit 成功後才清除事件
+            session.clear_events()  # clear events only after successful commit
             logger.info(
                 "Session ended: session=%s user=%s score=%d",
                 session.id, user_id, score,
             )
             return session
 
+    def abandon_session(self, session_id: str, user_id: str) -> GameSession:
+        """Abandon an active session on the owner's explicit request.
+
+        Used by the frontend to clean up an orphan active session discovered
+        at mount time (e.g. after a rapid LEVEL_START race left a server-side
+        session whose id was never surfaced client-side). Idempotent: calling
+        abandon on an already-ended session is a no-op.
+        """
+        with self._uow:
+            session = self._session_repo.find_by_id(session_id, user_id)
+            if not session:
+                raise SessionNotFoundError("Session not found")
+            session.abandon()
+            self._session_repo.save(session)
+            self._uow.commit()
+            return session
+
     def _handle_session_completed(self, event: SessionCompleted) -> None:
-        """處理場次完成事件 — 自動建立排行榜條目（冪等）"""
+        """Handle session completed event — auto-create leaderboard entry (idempotent)"""
         existing = self._leaderboard_repo.find_by_session_id(event.session_id)
         if existing:
             return
@@ -123,9 +154,21 @@ class SessionApplicationService:
     def _get_session(self, session_id: str, user_id: str) -> GameSession:
         session = self._session_repo.find_by_id(session_id, user_id)
         if not session:
-            raise SessionNotFoundError("Session 不存在")
+            raise SessionNotFoundError("Session not found")
+        # Force timeout: stale active session is automatically abandoned.
+        # Commit before raising so the surrounding UoW.__exit__ cannot roll the abandon back.
+        if session.is_stale:
+            session.abandon()
+            self._session_repo.save(session)
+            self._uow.commit()
+            raise SessionStaleError("Session timed out (over 2 hours) and was automatically abandoned")
         return session
 
 
 class SessionNotFoundError(Exception):
+    pass
+
+
+class SessionStaleError(Exception):
+    """Session has timed out"""
     pass

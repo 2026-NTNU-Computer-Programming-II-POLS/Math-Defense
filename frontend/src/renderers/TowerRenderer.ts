@@ -1,5 +1,5 @@
 /**
- * TowerRenderer — 渲染塔（只讀 Tower 資料，只寫 Canvas）
+ * TowerRenderer — renders towers (reads Tower data, writes to Canvas only)
  */
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
@@ -19,19 +19,19 @@ export class TowerRenderer {
 
       ctx.globalAlpha = alpha
 
-      // 底部陰影
+      // drop shadow
       ctx.fillStyle = 'rgba(0,0,0,0.3)'
       ctx.beginPath()
       ctx.arc(px, py + 3, 14, 0, Math.PI * 2)
       ctx.fill()
 
-      // 塔主體
+      // tower body
       ctx.fillStyle = tower.color
       ctx.beginPath()
       ctx.arc(px, py, 14, 0, Math.PI * 2)
       ctx.fill()
 
-      // 已設定參數的塔加亮邊框
+      // bright border for towers that have been configured
       if (tower.configured) {
         ctx.strokeStyle = '#ffffff'
         ctx.lineWidth = 2
@@ -41,7 +41,7 @@ export class TowerRenderer {
         ctx.stroke()
       }
 
-      // 停機效果（X 標記）
+      // disabled overlay (X mark)
       if (tower.disabled) {
         ctx.strokeStyle = '#cc4444'
         ctx.lineWidth = 2
@@ -56,7 +56,7 @@ export class TowerRenderer {
 
       ctx.globalAlpha = 1.0
 
-      // Build Phase：顯示格點座標
+      // Build Phase: show grid coordinates
       if (game.state.phase === GamePhase.BUILD) {
         ctx.fillStyle = 'rgba(212,168,64,0.7)'
         ctx.font = '9px monospace'

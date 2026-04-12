@@ -1,6 +1,6 @@
 /**
- * PhaseStateMachine — 顯式遊戲階段狀態機
- * 定義合法的階段轉換，防止非法跳轉。
+ * PhaseStateMachine — explicit game-phase state machine
+ * Defines valid phase transitions and rejects illegal ones.
  */
 import { GamePhase } from '@/data/constants'
 
@@ -37,7 +37,7 @@ export class PhaseStateMachine {
     return true
   }
 
-  /** 強制轉換（用於初始化或緊急情況） */
+  /** Force a transition (for initialization or emergency recovery) */
   forceTransition(to: GamePhase): void {
     this._current = to
   }

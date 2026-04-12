@@ -1,7 +1,7 @@
 /**
- * Game — 精簡遊戲迴圈（只做 update + render 調度）
- * 不再是 God Object：狀態在 GameState，階段在 PhaseStateMachine，
- * Buff flags 在 GameState 中明確宣告。
+ * Game — lightweight game loop (handles only update + render scheduling)
+ * No longer a God Object: state is in GameState, phases are in PhaseStateMachine,
+ * Buff flags are explicitly declared in GameState.
  */
 import { EventBus } from './EventBus'
 import { Renderer } from './Renderer'
@@ -14,7 +14,7 @@ import {
 } from '@/data/constants'
 import type { Tower, Enemy, Projectile } from '@/entities/types'
 
-// ── 型別安全的事件 Map ──
+// ── Type-safe event map ──
 
 export interface CoordPayload {
   pixel: { x: number; y: number }
@@ -55,7 +55,7 @@ export interface GameEvents {
 
 export type GameEventBus = EventBus<GameEvents>
 
-// ── System 介面 ──
+// ── System interface ──
 
 export interface GameSystem {
   init?(game: Game): void
@@ -74,15 +74,15 @@ export class Game {
 
   state: GameState
 
-  // 實體容器
+  // Entity containers
   towers: Tower[] = []
   enemies: Enemy[] = []
   projectiles: Projectile[] = []
 
-  // 當前路徑函數
+  // Current path function
   pathFunction: ((x: number) => number) | null = null
 
-  // 遊戲時間（秒，用於動畫）
+  // Game time in seconds (used for animation)
   time = 0
 
   private _systems = new Map<string, GameSystem>()
@@ -101,13 +101,13 @@ export class Game {
     this._boundLoop = this._loop.bind(this)
   }
 
-  // ── 事件捷徑（向後相容） ──
+  // ── Event shorthand (backward compatibility) ──
 
   on<K extends keyof GameEvents>(event: K, cb: (p: GameEvents[K]) => void) {
     return this.eventBus.on(event, cb)
   }
 
-  // ── 系統管理 ──
+  // ── System management ──
 
   addSystem(name: string, system: GameSystem): void {
     this._systems.set(name, system)
@@ -118,7 +118,7 @@ export class Game {
     return this._systems.get(name) as T | undefined
   }
 
-  // ── 狀態操作 ──
+  // ── State operations ──
 
   changeGold(amount: number): void {
     this.state.gold = Math.max(0, this.state.gold + amount)
@@ -143,18 +143,18 @@ export class Game {
     this.eventBus.emit(Events.PHASE_CHANGED, { from, to })
   }
 
-  // ── 遊戲流程 ──
+  // ── Game flow ──
 
   startLevel(levelIndex: number): void {
-    const oldPhase = this.state.phase
     this.state = createInitialState()
     this.state.level = levelIndex
     this.towers = []
     this.enemies = []
     this.projectiles = []
     this.pathFunction = null
-    // Sync state machine to the old phase, then transition properly to BUILD
-    this.phase.forceTransition(oldPhase)
+    // Reset to MENU first so terminal phases (GAME_OVER) and any in-progress phase
+    // can legally transition into BUILD on retry/replay.
+    this.phase.forceTransition(GamePhase.MENU)
     this.setPhase(GamePhase.BUILD)
     this.eventBus.emit(Events.LEVEL_START, levelIndex)
   }
@@ -168,7 +168,7 @@ export class Game {
     this.eventBus.emit(Events.WAVE_START, this.state.wave)
   }
 
-  // ── 遊戲迴圈 ──
+  // ── Game loop ──
 
   start(): void {
     if (this._running) return

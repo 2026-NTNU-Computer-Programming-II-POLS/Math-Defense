@@ -1,6 +1,6 @@
 /**
- * SplitSlimePolicy — 統一處理分裂史萊姆的子體生成
- * 消除 CombatSystem 和 MovementSystem 之間的重複邏輯
+ * SplitSlimePolicy — centralizes split-slime child spawning logic
+ * Eliminates duplicated code between CombatSystem and MovementSystem.
  */
 import { EnemyType } from '@/data/constants'
 import { createEnemy } from '@/entities/EnemyFactory'
@@ -16,10 +16,10 @@ export function shouldSplit(enemy: Enemy): boolean {
 }
 
 /**
- * 生成分裂子體
- * @param parent 父體（已死亡或到達原點）
- * @param context pathFunction + onChildCreated 回呼
- * @param spawnOffset 沿路徑向後偏移的距離（到達原點時用 3，被殺時用 0）
+ * Spawn split children from a parent slime.
+ * @param parent the parent enemy (dead or reached origin)
+ * @param context pathFunction + onChildCreated callback
+ * @param spawnOffset distance to offset back along the path (use 3 when reaching origin, 0 when killed)
  */
 export function spawnChildren(
   parent: Enemy,

@@ -1,6 +1,6 @@
 /**
- * EnemyFactory — 敵人工廠（純 TypeScript，不依賴 Vue）
- * 從 ENEMY_DEFS 資料建立 Enemy 物件，移動邏輯由 MovementSystem 處理。
+ * EnemyFactory — enemy factory (pure TypeScript, no Vue dependency)
+ * Builds Enemy objects from ENEMY_DEFS data; movement logic is handled by MovementSystem.
  */
 import { ENEMY_DEFS } from '@/data/enemy-defs'
 import type { EnemyType } from '@/data/constants'
@@ -31,6 +31,7 @@ export function createEnemy(
     speedMultiplier: 1.0,
     size: def.size,
     reward: def.reward,
+    damage: def.damage,
     color: def.color,
     active: true,
     alive: true,

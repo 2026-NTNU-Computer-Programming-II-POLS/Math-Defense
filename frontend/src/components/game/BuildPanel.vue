@@ -15,8 +15,12 @@ const gameStore = useGameStore()
 const tower = computed(() => {
   const id = uiStore.buildPanelTowerId
   if (!id) return null
-  return gameStore.getEngine()?.towers.find((t) => t.id === id) ?? null
+  const engine = gameStore.getEngine()
+  if (!engine) return null
+  return engine.towers.find((t) => t.id === id) ?? null
 })
+
+const bossTarget = computed(() => gameStore.bossShieldTarget)
 
 const towerDef = computed(() =>
   tower.value ? TOWER_DEFS[tower.value.type as TowerType] : null,
@@ -45,9 +49,14 @@ const localParams = ref<Record<string, number>>({})
 
 watch(tower, (t) => {
   if (!t) return
-  // For specialized panels, load ALL param fields from ui-defs
-  const paramDefs = hasSpecialPanel.value
-    ? (TOWER_PARAM_FIELDS[t.type as TowerType] ?? [])
+  // Determine specialPanel from the new tower's type directly (not from the computed,
+  // which may still reflect the previous tower in the same microtask).
+  const type = t.type as TowerType
+  const isSpecial = type === TowerType.MATRIX_LINK
+    || type === TowerType.INTEGRAL_CANNON
+    || type === TowerType.FOURIER_SHIELD
+  const paramDefs = isSpecial
+    ? (TOWER_PARAM_FIELDS[type] ?? [])
     : fields.value
   const result: Record<string, number> = {}
   for (const field of paramDefs) {
@@ -58,6 +67,15 @@ watch(tower, (t) => {
 
 function updateParam(key: string, value: number): void {
   localParams.value[key] = value
+}
+
+// Fourier Shield: as the player tunes sliders, push the live match score to CombatSystem.
+// CombatSystem queues the attempt if the boss shield isn't active yet, then breaks it
+// the moment the shield triggers if match >= 70.
+function onFourierMatch(score: number): void {
+  const game = gameStore.getEngine()
+  if (!game) return
+  game.eventBus.emit(Events.BOSS_SHIELD_ATTEMPT, { match: score })
 }
 
 function castSpell(): void {
@@ -83,7 +101,9 @@ function close(): void {
       <span class="panel-title" :style="{ color: towerDef.color }">
         {{ towerDef.nameEn }}
       </span>
-      <button class="close-btn" @click="close">✕</button>
+      <button class="close-btn" aria-label="關閉面板" @click="close">
+        <span aria-hidden="true">✕</span>
+      </button>
     </header>
 
     <p class="math-concept">{{ towerDef.mathConcept }}</p>
@@ -102,7 +122,10 @@ function close(): void {
     <FourierPanel
       v-else-if="tower.type === TowerType.FOURIER_SHIELD"
       :params="localParams"
+      :target-freqs="bossTarget?.freqs"
+      :target-amps="bossTarget?.amps"
       @update="updateParam"
+      @match="onFourierMatch"
     />
 
     <!-- Generic param fields for simpler towers -->
@@ -122,7 +145,9 @@ function close(): void {
     </div>
     <p v-else class="no-params">此塔無需設定參數</p>
 
-    <button class="btn cast-btn" @click="castSpell">✦ Cast Spell</button>
+    <button class="btn cast-btn" aria-label="施放法術 Cast Spell" @click="castSpell">
+      <span aria-hidden="true">✦</span> Cast Spell
+    </button>
   </div>
 </template>
 

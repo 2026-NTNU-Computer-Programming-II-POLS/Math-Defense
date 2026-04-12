@@ -1,6 +1,6 @@
 /**
- * tower-defs.ts — 塔數值定義（純資料，不含 UI 欄位）
- * UI 欄位定義在 ui-defs.ts。
+ * tower-defs.ts — tower stat definitions (pure data, no UI field specs)
+ * UI field specs live in ui-defs.ts.
  */
 import { TowerType, Colors } from './constants'
 

@@ -1,6 +1,6 @@
 /**
- * WaveSystem — 波次管理（TypeScript 版）
- * 敵人以純資料描述（type + overrides），工廠由 EnemyFactory 負責。
+ * WaveSystem — wave management (TypeScript)
+ * Enemies are described as pure data (type + overrides); the EnemyFactory handles instantiation.
  */
 import { Events, GamePhase } from '@/data/constants'
 import { LEVELS } from '@/data/level-defs'
@@ -64,7 +64,7 @@ export class WaveSystem {
   private _spawn(config: EnemySpawnEntry, game: Game): void {
     if (!game.pathFunction) return
     const enemy = createEnemy(config.type, game.pathFunction, config.overrides)
-    // 詛咒：敵人加速由 MovementSystem 讀取 game.state.enemySpeedMultiplier，不需在此注入
+    // curse: enemy speed-up is read by MovementSystem from game.state.enemySpeedMultiplier — no injection needed here
     game.enemies.push(enemy)
     game.eventBus.emit(Events.ENEMY_SPAWNED, enemy)
   }

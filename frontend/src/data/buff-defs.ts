@@ -1,7 +1,7 @@
 /**
- * buff-defs.ts — Buff / Curse 卡池定義（純資料）
- * 效果以 effectId 字串表示，實際執行由 BuffSystem 的策略 Map 負責。
- * 解決原本 buffs.js 把函式嵌入資料的問題。
+ * buff-defs.ts — Buff / Curse card pool definitions (pure data)
+ * Effects are represented as effectId strings; execution is handled by the strategy Map in BuffSystem.
+ * Resolves the issue of the original buffs.js embedding functions directly in data.
  */
 
 export type BuffCategory = 'tower' | 'economy' | 'defense' | 'curse'
@@ -11,16 +11,16 @@ export interface BuffDef {
   name: string
   description: string
   category: BuffCategory
-  probability: number   // 擲骰成功機率 0~1
-  cost: number          // 消耗金幣
-  goldReward?: number   // Curse 給予的金幣獎勵
-  duration: number      // 持續波數（Infinity = 永久）
-  effectId: string      // 策略 ID，BuffSystem 據此執行
-  revertId?: string     // 還原策略 ID（若有）
+  probability: number   // roll success probability 0~1
+  cost: number          // gold cost
+  goldReward?: number   // gold reward granted when a Curse is accepted
+  duration: number      // duration in waves (Infinity = permanent)
+  effectId: string      // strategy ID looked up by BuffSystem
+  revertId?: string     // revert strategy ID (if applicable)
 }
 
 export const BUFF_POOL: BuffDef[] = [
-  // ── 塔增強 ──
+  // ── Tower buffs ──
   {
     id: 'buff_atk50_2w',
     name: '全塔攻擊力 +50%',
@@ -54,7 +54,7 @@ export const BUFF_POOL: BuffDef[] = [
     effectId: 'UPGRADE_FUNCTION_CANNON',
   },
 
-  // ── 經濟 ──
+  // ── Economy ──
   {
     id: 'buff_double_gold',
     name: '下一波擊殺金幣翻倍',
@@ -88,7 +88,7 @@ export const BUFF_POOL: BuffDef[] = [
     effectId: 'REFUND_LAST_TOWER',
   },
 
-  // ── 防禦 ──
+  // ── Defense ──
   {
     id: 'buff_heal3',
     name: '回復 3 HP',

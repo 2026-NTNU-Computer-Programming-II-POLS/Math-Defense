@@ -1,6 +1,6 @@
 /**
- * EventBus — 泛型型別安全事件匯流排
- * 使用 string literal union 作為事件名，payload 型別由泛型推導。
+ * EventBus — generic type-safe event bus
+ * Uses a string literal union for event names; payload types are inferred from generics.
  */
 
 export type EventMap = { [key: string]: unknown }
@@ -38,9 +38,10 @@ export class EventBus<TEvents extends EventMap> {
 
   emit<K extends keyof TEvents>(event: K, payload: TEvents[K]): void {
     const set = this._listeners.get(event as string)
-    if (set) {
-      for (const cb of set) cb(payload)
-    }
+    if (!set) return
+    // Snapshot before iterating so once()/off() invoked during dispatch can't skip later listeners
+    const snapshot = Array.from(set)
+    for (const cb of snapshot) cb(payload)
   }
 
   clear(): void {

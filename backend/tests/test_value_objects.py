@@ -1,4 +1,4 @@
-"""Value Objects 單元測試 — 純 Python，不需要資料庫"""
+"""Unit tests for Value Objects — pure Python, no database required"""
 import pytest
 from app.domain.value_objects import SessionStatus, Level, Score, GameResult
 
@@ -25,15 +25,15 @@ class TestLevel:
             assert lv == i
 
     def test_level_zero_raises(self):
-        with pytest.raises(ValueError, match="1~4"):
+        with pytest.raises(ValueError, match="between 1 and 4"):
             Level(0)
 
     def test_level_five_raises(self):
-        with pytest.raises(ValueError, match="1~4"):
+        with pytest.raises(ValueError, match="between 1 and 4"):
             Level(5)
 
     def test_negative_level_raises(self):
-        with pytest.raises(ValueError, match="1~4"):
+        with pytest.raises(ValueError, match="between 1 and 4"):
             Level(-1)
 
 
@@ -53,11 +53,11 @@ class TestScore:
         assert s.value == 9_999_999
 
     def test_negative_score_raises(self):
-        with pytest.raises(ValueError, match="0~9999999"):
+        with pytest.raises(ValueError, match="between 0 and 9999999"):
             Score(value=-1)
 
     def test_overflow_score_raises(self):
-        with pytest.raises(ValueError, match="0~9999999"):
+        with pytest.raises(ValueError, match="between 0 and 9999999"):
             Score(value=10_000_000)
 
     def test_frozen(self):
@@ -76,9 +76,9 @@ class TestGameResult:
         assert r.waves_survived == 3
 
     def test_negative_kills_raises(self):
-        with pytest.raises(ValueError, match="擊殺數"):
+        with pytest.raises(ValueError, match="Kills must not be negative"):
             GameResult(score=Score(0), kills=-1, waves_survived=0)
 
     def test_negative_waves_raises(self):
-        with pytest.raises(ValueError, match="存活波數"):
+        with pytest.raises(ValueError, match="Waves survived must not be negative"):
             GameResult(score=Score(0), kills=0, waves_survived=-1)

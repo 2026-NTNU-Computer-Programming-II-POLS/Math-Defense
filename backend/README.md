@@ -122,7 +122,7 @@ Create a new game session when a level starts.
 
 **Response `201`**
 ```json
-{ "id": "uuid", "user_id": "uuid", "level": 1, "status": "active", "score": 0, "gold": 200, "hp": 20, "wave": 0 }
+{ "id": "uuid", "user_id": "uuid", "level": 1, "status": "active", "score": 0, "gold": 200, "hp": 20, "current_wave": 0, "started_at": "datetime", "ended_at": null }
 ```
 
 ---
@@ -131,9 +131,9 @@ Create a new game session when a level starts.
 
 Update session state during gameplay (called periodically by the frontend).
 
-**Request body** (all fields optional)
+**Request body** (all optional, but at least one field required)
 ```json
-{ "gold": 320, "hp": 18, "score": 450, "wave": 2 }
+{ "gold": 320, "hp": 18, "score": 450, "current_wave": 2 }
 ```
 
 **Response `200`** — updated session object.
@@ -142,12 +142,14 @@ Update session state during gameplay (called periodically by the frontend).
 
 #### `POST /api/sessions/{session_id}/end`
 
-End a session and automatically submit the score to the leaderboard.
+End a session and automatically create a leaderboard entry via the `SessionCompleted` domain event.
 
-**Response `200`**
+**Request body**
 ```json
-{ "session": { ... }, "leaderboard_entry": { "id": "uuid", "rank": 5, "score": 1200 } }
+{ "score": 4800, "kills": 120, "waves_survived": 5 }
 ```
+
+**Response `200`** — updated session object (same shape as `POST /api/sessions` response, with `status: "completed"` and `ended_at` populated).
 
 ---
 
@@ -162,14 +164,14 @@ Fetch leaderboard entries, optionally filtered by level.
 | Param | Type | Default | Description |
 |---|---|---|---|
 | `level` | int | — | Filter to a specific level (1–4) |
-| `limit` | int | 20 | Max entries to return |
-| `offset` | int | 0 | Pagination offset |
+| `page` | int | 1 | Page number (1-indexed) |
+| `per_page` | int | 20 | Entries per page (max 100) |
 
 **Response `200`**
 ```json
 {
   "entries": [
-    { "rank": 1, "username": "string", "level": 2, "score": 4800, "kills": 120, "waves_cleared": 5, "submitted_at": "datetime" }
+    { "rank": 1, "username": "string", "level": 2, "score": 4800, "kills": 120, "waves_survived": 5, "created_at": "datetime" }
   ],
   "total": 42
 }
@@ -183,7 +185,7 @@ Submit a score directly (used if auto-submit on session end fails). Requires `Au
 
 **Request body**
 ```json
-{ "session_id": "uuid", "level": 2, "score": 4800, "kills": 120, "waves_cleared": 5 }
+{ "session_id": "uuid", "level": 2, "score": 4800, "kills": 120, "waves_survived": 5 }
 ```
 
 **Response `201`** — created leaderboard entry.
@@ -213,7 +215,7 @@ Submit a score directly (used if auto-submit on session end fails). Requires `Au
 | `score` | INT | Running score |
 | `gold` | INT | Current gold |
 | `hp` | INT | Current HP |
-| `wave` | INT | Current wave number |
+| `current_wave` | INT | Current wave number |
 | `started_at` | DATETIME | |
 | `ended_at` | DATETIME | Nullable |
 
@@ -227,8 +229,8 @@ Submit a score directly (used if auto-submit on session end fails). Requires `Au
 | `level` | INT | |
 | `score` | INT | |
 | `kills` | INT | |
-| `waves_cleared` | INT | |
-| `submitted_at` | DATETIME | |
+| `waves_survived` | INT | |
+| `created_at` | DATETIME | |
 
 ---
 
@@ -286,7 +288,7 @@ docker-compose up backend
 |---|---|---|
 | `SECRET_KEY` | Yes | JWT signing secret — use a long random string |
 | `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `sqlite:///./math_defense.db` |
-| `ALLOWED_ORIGINS` | No | Comma-separated CORS origins (default: `http://localhost:5173`) |
+| `CORS_ORIGINS` | Yes | Comma-separated browser-visible origins, e.g. `http://localhost:5173,http://localhost:3000` |
 
 ---
 

@@ -1,7 +1,7 @@
 /**
- * BuffSystem — Buff 卡 / 詛咒系統（策略模式重寫）
- * buff-defs.ts 存 effectId 字串；本檔維護 effectStrategies Map 執行效果。
- * 不再有 game._shieldActive 等動態注入屬性。
+ * BuffSystem — Buff card / curse system (strategy-pattern rewrite)
+ * buff-defs.ts stores effectId strings; this file owns the effectStrategies Map that executes them.
+ * No more dynamically injected properties like game._shieldActive.
  */
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { BUFF_POOL, CURSE_POOL, type BuffDef } from '@/data/buff-defs'
@@ -11,10 +11,10 @@ import type { Game } from '@/engine/Game'
 interface ActiveBuff extends BuffDef {
   remainingWaves: number
   isCurse: boolean
-  _targetTowerId?: string   // 用於 RANDOM_TOWER_RANGE 系列
+  _targetTowerId?: string   // used by RANDOM_TOWER_RANGE effects
 }
 
-// ── 效果策略 Map ──
+// ── Effect strategy map ──
 
 type EffectFn = (game: Game, buff: ActiveBuff) => void
 
@@ -30,7 +30,7 @@ function recalcDamage(g: Game): void {
 
 const effectStrategies: Record<string, EffectFn> = {
   ALL_TOWERS_DAMAGE_MULTIPLY_1_5: (g) => {
-    g.towers.forEach((t) => { t.damageBonus *= 1.5 })
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 1.5) })
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_1_5: (g) => {
@@ -38,7 +38,7 @@ const effectStrategies: Record<string, EffectFn> = {
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_MULTIPLY_0_8: (g) => {
-    g.towers.forEach((t) => { t.damageBonus *= 0.8 })
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 0.8) })
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_0_8: (g) => {
@@ -48,7 +48,7 @@ const effectStrategies: Record<string, EffectFn> = {
   RANDOM_TOWER_RANGE_MULTIPLY_1_3: (g, buff) => {
     if (g.towers.length > 0) {
       const t = g.towers[Math.floor(Math.random() * g.towers.length)]
-      t.rangeBonus *= 1.3
+      t.rangeBonus = snap(t.rangeBonus * 1.3)
       t.effectiveRange = t.baseRange * t.rangeBonus
       buff._targetTowerId = t.id
     }
@@ -82,8 +82,8 @@ const effectStrategies: Record<string, EffectFn> = {
   SHIELD_ACTIVATE: (g) => { g.state.shieldActive = true },
   SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false },
   ORIGIN_EXPLOSION: (g) => {
-    // 對所有存活敵人造成 50 傷害
-    const enemies = [...g.enemies] // snapshot 避免迭代中修改陣列
+    // deal 50 damage to all living enemies
+    const enemies = [...g.enemies] // snapshot to avoid mutating the array during iteration
     for (const enemy of enemies) {
       if (!enemy.alive) continue
       enemy.hp -= 50
@@ -138,14 +138,16 @@ export class BuffSystem {
 
   init(game: Game): void {
     this._unsubs.push(
-      game.eventBus.on(Events.BUFF_PHASE_START, () => this._drawCards()),
+      game.eventBus.on(Events.BUFF_PHASE_START, () => this._drawCards(game)),
 
       game.eventBus.on(Events.BUFF_CARD_SELECTED, (cardId) => {
         const idx = this.currentCards.findIndex((c) => c.id === cardId)
         this._applyCard(idx, game)
       }),
 
-      game.eventBus.on(Events.WAVE_START, () => this._tickBuffs(game)),
+      // Tick at WAVE_END so a duration=1 buff stays active for the wave that follows
+      // its selection. Decrementing at WAVE_START would revert it before the wave ran.
+      game.eventBus.on(Events.WAVE_END, () => this._tickBuffs(game)),
 
       game.eventBus.on(Events.LEVEL_START, () => {
         for (const buff of this.activeBuffs) {
@@ -162,10 +164,15 @@ export class BuffSystem {
     this._unsubs = []
   }
 
-  private _drawCards(): void {
+  private _drawCards(game?: Game): void {
     this.currentCards = []
-    for (let i = 0; i < 3; i++) {
-      if (Math.random() < 0.3 && CURSE_POOL.length > 0) {
+    // Each Probability Shrine adds one extra card and tilts the curse-vs-buff
+    // coin against the player less often. With no shrines, behave as before.
+    const shrines = game ? game.towers.filter((t) => t.type === TowerType.PROBABILITY_SHRINE).length : 0
+    const cardCount = 3 + shrines
+    const curseChance = Math.max(0.05, 0.3 - shrines * 0.08)
+    for (let i = 0; i < cardCount; i++) {
+      if (Math.random() < curseChance && CURSE_POOL.length > 0) {
         const curse = CURSE_POOL[Math.floor(Math.random() * CURSE_POOL.length)]
         this.currentCards.push({ ...curse, isCurse: true })
       } else {
@@ -209,14 +216,23 @@ export class BuffSystem {
   }
 
   /**
-   * duration > 0（含 Infinity）→ 加入 activeBuffs 追蹤（LEVEL_START 或 _tickBuffs 會還原）
-   * duration === 0 且有 revertId → 即時效果，執行完立刻還原
+   * duration > 0 (including Infinity) → add to activeBuffs for tracking (reverted on LEVEL_START or _tickBuffs)
+   * duration === 0 with revertId → instant effect, revert immediately after applying
    */
   private _trackOrRevertImmediate(card: BuffDef & { isCurse: boolean }, entry: ActiveBuff, game: Game): void {
     if (card.duration > 0) {
       this.activeBuffs.push(entry)
     } else if (card.duration === 0 && card.revertId) {
       applyEffect(card.revertId, game, entry)
+    } else if (card.duration === 0 && !card.revertId) {
+      // One-shot effect (e.g. heal, explosion) — no revert needed.
+      // Warn if this looks like a persistent modifier that's missing a revertId.
+      if (import.meta.env.DEV) {
+        const id = card.effectId
+        if (id.includes('MULTIPLY') || id.includes('DIVIDE') || id.includes('DISABLE')) {
+          console.warn(`[BuffSystem] duration=0 buff "${card.id}" (${id}) modifies persistent state but has no revertId`)
+        }
+      }
     }
   }
 
@@ -231,6 +247,6 @@ export class BuffSystem {
     }
   }
 
-  update(_dt: number, _game: Game): void { /* 無需每幀更新 */ }
-  render(_renderer: unknown, _game: Game): void { /* 渲染由 Vue UI 層負責 */ }
+  update(_dt: number, _game: Game): void { /* no per-frame update needed */ }
+  render(_renderer: unknown, _game: Game): void { /* rendering handled by the Vue UI layer */ }
 }

@@ -1,9 +1,10 @@
 /**
- * authStore — 使用者認證狀態 Pinia Store
+ * authStore — user authentication state Pinia Store
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
+import router from '@/router'
 
 export interface User {
   id: string
@@ -24,10 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await authService.me()
       user.value = { id: res.id, username: res.username }
     } catch {
-      // Token is invalid or expired — clear it
-      token.value = null
-      user.value = null
-      localStorage.removeItem('auth_token')
+      // Token is invalid or expired — clear it (no route change; init() runs pre-mount)
+      clearAuth()
     } finally {
       initializing.value = false
     }
@@ -42,10 +41,23 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = u
   }
 
-  function logout(): void {
+  function clearAuth(): void {
     token.value = null
     user.value = null
     localStorage.removeItem('auth_token')
+  }
+
+  function logout(): void {
+    clearAuth()
+    // If the user is on a protected route (e.g. /game), navigate away so the
+    // view unmounts. That releases the engine, useSessionSync/useGameLoop
+    // listeners, and any cached per-user state — otherwise a subsequent login
+    // as a different account would reuse stale in-game state.
+    const PROTECTED = new Set(['game', 'leaderboard'])
+    const currentName = router.currentRoute.value.name as string | undefined
+    if (currentName && PROTECTED.has(currentName)) {
+      router.push({ name: 'auth' }).catch(() => { /* navigation failures are non-fatal */ })
+    }
   }
 
   return { token, user, isLoggedIn, initializing, setToken, setUser, logout, init }

@@ -1,4 +1,4 @@
-"""GameSession Aggregate 單元測試 — 純 Python，不需要資料庫"""
+"""Unit tests for GameSession Aggregate — pure Python, no database required"""
 import pytest
 from datetime import datetime, timedelta, UTC
 
@@ -16,7 +16,7 @@ from app.domain.session.events import (
 )
 
 
-# ── 工廠方法 ──
+# ── Factory method ──
 
 class TestCreate:
     def test_create_returns_active_session(self):
@@ -51,7 +51,7 @@ class TestCreate:
         assert session.collect_events() == []
 
 
-# ── 更新進度 ──
+# ── Update progress ──
 
 class TestUpdateProgress:
     def test_update_all_fields(self):
@@ -94,7 +94,7 @@ class TestUpdateProgress:
             session.update_progress(score=50)
 
 
-# ── 完成場次 ──
+# ── Complete session ──
 
 class TestComplete:
     def test_complete_transitions_to_completed(self):
@@ -127,7 +127,7 @@ class TestComplete:
         session = GameSession.create("user-1", Level(1))
         session.complete(GameResult(Score(100), 5, 2))
 
-        with pytest.raises(SessionNotActiveError, match="已結束"):
+        with pytest.raises(SessionNotActiveError, match="already ended"):
             session.complete(GameResult(Score(200), 10, 4))
 
     def test_complete_abandoned_session_raises(self):
@@ -138,7 +138,7 @@ class TestComplete:
             session.complete(GameResult(Score(100), 5, 2))
 
 
-# ── 放棄場次 ──
+# ── Abandon session ──
 
 class TestAbandon:
     def test_abandon_transitions_to_abandoned(self):
@@ -175,7 +175,7 @@ class TestAbandon:
         assert session.collect_events() == []
 
 
-# ── 過期判定 ──
+# ── Stale detection ──
 
 class TestIsStale:
     def test_fresh_session_not_stale(self):
@@ -202,7 +202,7 @@ class TestIsStale:
         assert not session.is_stale
 
 
-# ── 狀態轉換守衛 ──
+# ── Status transition guards ──
 
 class TestStatusTransitions:
     def test_completed_to_abandoned_raises(self):

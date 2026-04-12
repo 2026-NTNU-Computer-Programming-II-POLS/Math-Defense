@@ -15,7 +15,7 @@ const availableTowers = computed(() =>
 function selectTower(type: TowerType): void {
   const newType = uiStore.selectedTowerType === type ? null : type
   uiStore.selectTower(newType)
-  // TowerPlacementSystem 透過注入的 getSelectedTowerType() 直接從 uiStore 讀取，不需手動同步
+  // TowerPlacementSystem reads uiStore directly via the injected getSelectedTowerType() — no manual sync needed
 }
 
 function canAfford(cost: number): boolean {

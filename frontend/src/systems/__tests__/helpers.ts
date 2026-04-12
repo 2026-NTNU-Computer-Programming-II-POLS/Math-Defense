@@ -15,6 +15,8 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
   const phase = new PhaseStateMachine()
   const state = { ...createInitialState(), ...overrides }
 
+  // Methods reference `this` against the cast-to-Game return value; explicit `this: Game`
+  // annotations let TS resolve `this.state` etc. without the body itself seeing Game's shape.
   return {
     eventBus,
     phase,
@@ -24,20 +26,20 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
     projectiles: [] as Projectile[],
     pathFunction: (x: number) => x,
     time: 0,
-    changeGold(amount: number) {
+    changeGold(this: Game, amount: number) {
       this.state.gold = Math.max(0, this.state.gold + amount)
       this.eventBus.emit('goldChanged', this.state.gold)
     },
-    changeHp(amount: number) {
+    changeHp(this: Game, amount: number) {
       this.state.hp = Math.max(0, Math.min(this.state.maxHp, this.state.hp + amount))
       this.eventBus.emit('hpChanged', this.state.hp)
       if (this.state.hp <= 0) this.setPhase(GamePhase.GAME_OVER)
     },
-    addScore(points: number) {
+    addScore(this: Game, points: number) {
       this.state.score += points
       this.eventBus.emit('scoreChanged', this.state.score)
     },
-    setPhase(to: GamePhase) {
+    setPhase(this: Game, to: GamePhase) {
       const from = this.state.phase
       if (!this.phase.transition(to)) return
       this.state.phase = to
@@ -59,6 +61,7 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     speedMultiplier: 1,
     size: 20,
     reward: 15,
+    damage: 1,
     color: '#b84040',
     active: true,
     alive: true,

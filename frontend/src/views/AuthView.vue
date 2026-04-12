@@ -12,15 +12,49 @@ const password = ref('')
 
 const title = computed(() => isLogin.value ? '登入' : '註冊')
 
+// Mirror backend constraints (backend/app/schemas/auth.py):
+//   username: 3-50 chars, [a-zA-Z0-9_-] only
+//   password: 8-128 chars, must contain at least one letter and one digit
+const USERNAME_MIN = 3
+const USERNAME_MAX = 50
+const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/
+const PASSWORD_MIN = 8
+const PASSWORD_MAX = 128
+
 function toggleMode(): void {
   isLogin.value = !isLogin.value
   error.value = ''
 }
 
+function validate(u: string, p: string): string {
+  if (!u) return '請輸入玩家名稱'
+  if (!p) return '請輸入密碼'
+  if (isLogin.value) return ''
+  if (u.length < USERNAME_MIN || u.length > USERNAME_MAX) {
+    return `玩家名稱需 ${USERNAME_MIN}-${USERNAME_MAX} 字`
+  }
+  if (!USERNAME_PATTERN.test(u)) {
+    return '玩家名稱僅能包含英數、底線、連字號'
+  }
+  if (p.length < PASSWORD_MIN || p.length > PASSWORD_MAX) {
+    return `密碼需 ${PASSWORD_MIN}-${PASSWORD_MAX} 字`
+  }
+  if (!/[a-zA-Z]/.test(p) || !/[0-9]/.test(p)) {
+    return '密碼需同時包含英文字母與數字'
+  }
+  return ''
+}
+
 async function submit(): Promise<void> {
-  const ok = isLogin.value
-    ? await login(username.value, password.value)
-    : await register(username.value, password.value)
+  const u = username.value.trim()
+  const p = password.value
+  username.value = u
+  const msg = validate(u, p)
+  if (msg) {
+    error.value = msg
+    return
+  }
+  const ok = isLogin.value ? await login(u, p) : await register(u, p)
   if (ok) router.push('/')
 }
 </script>

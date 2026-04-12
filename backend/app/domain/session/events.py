@@ -1,4 +1,4 @@
-"""GameSession Domain Events — 場次生命週期中的重要狀態變化"""
+"""GameSession Domain Events — significant state changes in the session lifecycle"""
 from dataclasses import dataclass
 
 
@@ -16,7 +16,7 @@ class SessionUpdated:
 
 @dataclass(frozen=True)
 class SessionCompleted:
-    """場次完成 — Leaderboard BC 消費此事件以自動建立排行榜條目"""
+    """Session completed — the Leaderboard BC consumes this event to auto-create a leaderboard entry"""
     session_id: str
     user_id: str
     level: int

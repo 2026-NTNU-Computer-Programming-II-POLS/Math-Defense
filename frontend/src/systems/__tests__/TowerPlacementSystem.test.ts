@@ -41,7 +41,7 @@ describe('TowerPlacementSystem', () => {
     return { game, system }
   }
 
-  /** Helper: 設定選中的塔類型（模擬 uiStore 注入） */
+  /** Helper: set the selected tower type (simulates uiStore injection) */
   function selectType(system: TowerPlacementSystem, type: typeof TowerType[keyof typeof TowerType] | null) {
     system.getSelectedTowerType = () => type
     system.clearSelectedTowerType = () => { system.getSelectedTowerType = () => null }
