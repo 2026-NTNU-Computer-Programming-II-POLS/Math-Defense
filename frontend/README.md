@@ -1,18 +1,19 @@
 # Frontend — Vue 3 + TypeScript
 
-The frontend contains both the Vue 3 UI layer and the entire game engine. It renders to an HTML5 Canvas and communicates with the backend REST API for authentication, session persistence, and leaderboards.
+The frontend hosts both the Vue 3 UI layer and the entire game engine. It renders to an HTML5 Canvas and talks to the FastAPI backend for authentication, session persistence, and the leaderboard. Business logic lives in a pure-TypeScript engine; Vue only provides the reactive UI shell.
 
 ## Tech Stack
 
 | | |
 |---|---|
 | Framework | Vue 3 (Composition API, `<script setup>`) |
-| State | Pinia |
+| State | Pinia 3 |
 | Router | Vue Router 4 |
 | Build | Vite 8 |
-| Language | TypeScript 5.9 (strict mode) |
+| Language | TypeScript 5.9 (strict, `erasableSyntaxOnly`, `verbatimModuleSyntax`) |
 | Rendering | HTML5 Canvas 2D |
-| Math Module | WebAssembly (Emscripten C) via `WasmBridge.ts` |
+| Math Module | WebAssembly (Emscripten C) via `WasmBridge.ts` — pure-JS fallback for every call |
+| Testing | Vitest 4 + `@vue/test-utils` + `happy-dom` |
 
 ---
 
@@ -21,92 +22,101 @@ The frontend contains both the Vue 3 UI layer and the entire game engine. It ren
 ```
 frontend/
 ├── src/
-│   ├── main.ts                App entry — bootstrap Vue, restore auth, mount
-│   ├── App.vue                Root component (router-view)
+│   ├── main.ts                     App entry — bootstrap Vue, restore auth, mount
+│   ├── App.vue                     Root component (router-view)
 │   │
-│   ├── views/                 Page-level components
-│   │   ├── MenuView.vue       Main menu
-│   │   ├── AuthView.vue       Login / register
-│   │   ├── GameView.vue       Game container (canvas + HUD overlay)
-│   │   └── LeaderboardView.vue  Score table
+│   ├── views/                      Page-level screens
+│   │   ├── MenuView.vue            Main menu + level select
+│   │   ├── AuthView.vue            Login / register
+│   │   ├── GameView.vue            Game container (canvas + HUD overlay)
+│   │   └── LeaderboardView.vue     Score table
 │   │
 │   ├── components/
 │   │   ├── common/
-│   │   │   ├── Modal.vue      Generic modal wrapper
-│   │   │   └── LevelCard.vue  Level selection card
+│   │   │   ├── Modal.vue           Generic modal wrapper
+│   │   │   └── LevelCard.vue       Level-selection card (emits 'select')
 │   │   └── game/
-│   │       ├── HUD.vue        In-game HUD (HP, gold, wave, score)
-│   │       ├── BuildPanel.vue Tower purchase panel
-│   │       ├── BuffCardPanel.vue  Buff card selection overlay
-│   │       └── TowerBar.vue   Tower info bar
+│   │       ├── HUD.vue             HP / gold / wave / score bar
+│   │       ├── TowerBar.vue        Tower info / selection bar
+│   │       ├── BuildPanel.vue      Tower purchase + parameter routing
+│   │       ├── BuildHint.vue       First-time placement hints
+│   │       ├── BuffCardPanel.vue   Buff-card selection overlay
+│   │       ├── MatrixInputPanel.vue    2×2 matrix input → Matrix Link
+│   │       ├── IntegralPanel.vue       [a,b] interval + visualisation → Integral Cannon
+│   │       └── FourierPanel.vue        3-sine composite sliders → Fourier Shield
 │   │
 │   ├── composables/
-│   │   ├── useGameLoop.ts     Mount/unmount game engine; wire systems and events
-│   │   ├── useAuth.ts         Reactive auth state helpers
-│   │   └── useLeaderboard.ts  Leaderboard fetch helpers
+│   │   ├── useGameLoop.ts          Mount/unmount engine, inject systems, wire UI bridges
+│   │   ├── useSessionSync.ts       Bridge engine lifecycle ↔ backend session API
+│   │   ├── useAuth.ts              Reactive auth helpers
+│   │   └── useLeaderboard.ts       Leaderboard fetch helpers
 │   │
-│   ├── stores/                Pinia stores (Vue reactivity layer)
-│   │   ├── authStore.ts       User auth state (token, user object)
-│   │   ├── gameStore.ts       Mirror of engine state → drives HUD reactivity
-│   │   └── uiStore.ts         Modal visibility, active panel, overlay state
+│   ├── stores/                     Pinia stores (Vue reactivity layer)
+│   │   ├── authStore.ts            token, user, initialisation flag
+│   │   ├── gameStore.ts            Mirror of engine state → drives HUD reactivity
+│   │   └── uiStore.ts              Panel visibility, selected tower type, hint step
 │   │
-│   ├── services/              Backend API clients
-│   │   ├── api.ts             Fetch wrapper with auto-attached Bearer token + error types
-│   │   ├── authService.ts     register(), login(), getMe()
-│   │   ├── sessionService.ts  createSession(), updateSession(), endSession()
-│   │   └── leaderboardService.ts  fetchLeaderboard(), submitScore()
+│   ├── services/                   Backend API clients
+│   │   ├── api.ts                  fetch wrapper; auto-attaches Bearer token; ApiError
+│   │   ├── authService.ts          register / login / me / logout
+│   │   ├── sessionService.ts       create / update / end / abandon / getActive
+│   │   └── leaderboardService.ts   fetchLeaderboard, submitScore
 │   │
-│   ├── router/
-│   │   └── index.ts           Routes: /, /auth, /game, /leaderboard
+│   ├── router/index.ts             Routes: /, /auth, /game, /leaderboard
 │   │
-│   ├── engine/                Core game engine
-│   │   ├── Game.ts            Main loop orchestrator (fixed 60 FPS timestep)
-│   │   ├── GameState.ts       Strongly typed game state container
-│   │   ├── PhaseStateMachine.ts  FSM for game phases with transition validation
-│   │   ├── EventBus.ts        Type-safe pub/sub event system
-│   │   ├── InputManager.ts    Canvas mouse/click/hover handling
-│   │   └── Renderer.ts        Canvas rendering orchestrator
+│   ├── engine/                     Core engine — pure TS, no Vue imports
+│   │   ├── Game.ts                 Fixed-timestep loop orchestrator + GameEvents map
+│   │   ├── GameState.ts            Strongly typed state container
+│   │   ├── PhaseStateMachine.ts    FSM with transition validation table
+│   │   ├── EventBus.ts             Generic, type-safe pub/sub
+│   │   ├── InputManager.ts         Canvas mouse → game-unit coord events
+│   │   └── Renderer.ts             Canvas-2D drawing primitives
 │   │
-│   ├── systems/               Game systems (pure update logic, no rendering)
-│   │   ├── TowerPlacementSystem.ts   Click-to-place tower; grid snapping
-│   │   ├── CombatSystem.ts    Tower attack logic, projectile lifecycle, boss shield
-│   │   ├── MovementSystem.ts  Enemy movement along path expression
-│   │   ├── WaveSystem.ts      Spawn enemies; advance wave counter
-│   │   └── BuffSystem.ts      Buff card activation and effect application
+│   ├── domain/                     Domain policies (shared across systems)
+│   │   └── combat/
+│   │       └── SplitSlimePolicy.ts Single source for SPLIT_SLIME split rules
 │   │
-│   ├── renderers/             Rendering systems (read state, draw to canvas)
+│   ├── systems/                    ECS systems — pure update logic, no rendering
+│   │   ├── TowerPlacementSystem.ts Click-to-place, grid snap, preview on hover
+│   │   ├── CombatSystem.ts         Attacks, projectile lifecycle, boss-shield trigger
+│   │   ├── MovementSystem.ts       Path movement with arc-length correction
+│   │   ├── WaveSystem.ts           Enemy spawn queue per level-defs
+│   │   ├── BuffSystem.ts           Strategy-map buff/curse effects + timers
+│   │   ├── EconomySystem.ts        Gold on kill, HP on origin reach
+│   │   └── __tests__/              Vitest unit tests for every system
+│   │
+│   ├── renderers/                  Draw entities to canvas (read-only state)
 │   │   ├── EnemyRenderer.ts
 │   │   ├── TowerRenderer.ts
 │   │   └── ProjectileRenderer.ts
 │   │
 │   ├── entities/
-│   │   ├── types.ts           Tower, Enemy, Projectile, Buff TypeScript interfaces
-│   │   ├── TowerFactory.ts    Construct towers from tower-defs
-│   │   └── EnemyFactory.ts    Construct enemies from enemy-defs
+│   │   ├── types.ts                Tower, Enemy, Projectile, TowerPreview interfaces
+│   │   ├── TowerFactory.ts         Build towers from tower-defs + ui-defs params
+│   │   └── EnemyFactory.ts         Build enemies from enemy-defs
 │   │
 │   ├── math/
-│   │   ├── WasmBridge.ts      Load WASM module; expose MathAPI; JS fallbacks
-│   │   ├── MathUtils.ts       Distance, angle, vector helpers (pure TS)
-│   │   └── PathEvaluator.ts   Evaluate enemy path expression; validate coverage
+│   │   ├── WasmBridge.ts           initWasm, RAII float buffers, JS fallbacks
+│   │   ├── MathUtils.ts            Coordinate conversion, findIntersections, sector test
+│   │   └── PathEvaluator.ts        Random path generation (5 families) + validation
 │   │
-│   ├── data/                  Static game definitions (no logic)
-│   │   ├── constants.ts       Enums (GamePhase, TowerType, EnemyType) + magic numbers
-│   │   ├── tower-defs.ts      Tower cost, damage, range, description, math concept
-│   │   ├── enemy-defs.ts      Enemy HP, speed, reward, size
-│   │   ├── level-defs.ts      Levels 1–4: wave count, enemy distribution, path seed
-│   │   ├── buff-defs.ts       Buff card IDs, descriptions, effect specs
-│   │   └── ui-defs.ts         Panel layout, colour palette
+│   ├── data/                       Static definitions — no functions
+│   │   ├── constants.ts            GamePhase / TowerType / EnemyType / Events (`as const`)
+│   │   ├── tower-defs.ts           Cost, damage, range, math concept, default params
+│   │   ├── enemy-defs.ts           HP, speed, reward, size
+│   │   ├── level-defs.ts           Levels 1–4: wave count, enemy distribution, path seed
+│   │   ├── buff-defs.ts            Buff / curse IDs, labels, effect specs
+│   │   └── ui-defs.ts              Panel layout, colour palette
 │   │
-│   └── styles/
-│       └── global.css
+│   └── styles/global.css
 │
 ├── public/
-│   └── wasm/                  Compiled WASM output (generated — do not edit)
+│   └── wasm/                       Compiled WASM (generated — do not edit)
 │       ├── math_engine.js
 │       └── math_engine.wasm
 │
 ├── package.json
-├── tsconfig.json
+├── tsconfig.json / tsconfig.app.json / tsconfig.node.json
 └── vite.config.ts
 ```
 
@@ -116,181 +126,150 @@ frontend/
 
 ### Overview
 
-The engine is **ECS-inspired**: entities (towers, enemies, projectiles) are plain data objects; systems contain all update and rendering logic. The game runs a fixed-timestep loop at 60 FPS.
+The engine is **ECS-inspired**: entities (towers, enemies, projectiles) are plain data; systems contain all update and render logic. The main loop runs a fixed-timestep 60 FPS accumulator. The engine is pure TypeScript — it has no Vue imports and is independently testable.
 
 ```
 Game.start()
   └─ requestAnimationFrame loop
-       ├─ accumulate elapsed time
-       └─ while accumulated >= fixedDt (1/60 s):
-            ├─ TowerPlacementSystem.update(state, dt)
-            ├─ WaveSystem.update(state, dt)
-            ├─ MovementSystem.update(state, dt)
-            ├─ CombatSystem.update(state, dt)
-            ├─ BuffSystem.update(state, dt)
-            └─ Renderer.render(state)
-                 ├─ EnemyRenderer.draw(ctx, state)
-                 ├─ TowerRenderer.draw(ctx, state)
-                 └─ ProjectileRenderer.draw(ctx, state)
+       ├─ accumulate frame time (clamped to 0.1 s to avoid spiral-of-death)
+       └─ while accumulator >= FIXED_DT (1/60 s):
+            ├─ for each system: system.update(dt, game)
+            │     placement → combat → movement → wave → buff → economy
+            └─ accumulator -= FIXED_DT
+       └─ render pass:
+            renderer.clear() → drawGrid → drawOrigin → drawFunction (path)
+            for each system: system.render?.(renderer, game)
+              EnemyRenderer → TowerRenderer → ProjectileRenderer
 ```
 
 ### `Game.ts`
 
-Central orchestrator. Responsibilities:
+Central orchestrator. Owns:
 
-- Owns the `requestAnimationFrame` loop
-- Applies fixed-timestep accumulation
-- Holds references to all systems and renderers
-- Calls `EventBus.emit('stateChanged', state)` after each tick so Pinia stores stay reactive
+- The RAF loop with fixed-timestep accumulation (`FIXED_DT = 1 / TARGET_FPS`)
+- A `Map<string, GameSystem>` of registered systems
+- State operations with event side effects: `changeGold`, `changeHp`, `addScore`, `setPhase` (validated via `PhaseStateMachine`)
+- Flow entry points: `startLevel(n)`, `startWave()`
 
 ### `GameState.ts`
 
-Strongly typed state container passed to every system each tick. Key fields:
-
 ```typescript
 interface GameState {
-  phase: GamePhase           // Current phase (see FSM below)
-  level: number              // 1–4
-  wave: number               // Current wave
+  // Flow
+  phase: GamePhase
+  level: number
+  wave: number
   totalWaves: number
+
+  // Resources
   gold: number
   hp: number
-  maxHp: number              // 20
+  maxHp: number
   score: number
   kills: number
 
-  towers: Tower[]
-  enemies: Enemy[]
-  projectiles: Projectile[]
-
-  // Buff flags — explicit fields, not dynamic properties
+  // Buff flags — explicit fields
   shieldActive: boolean
   goldMultiplier: number
   freeTowerNext: boolean
   enemySpeedMultiplier: number
-  disabledTowerType: TowerType | null
 
-  pathExpression: string     // e.g. "sin(x) + 0.5*cos(2x)"
+  // Boss Shield (centrally managed, not buried in CombatSystem)
+  bossShieldTriggered: boolean
+  bossShieldTimer: number
+  bossShieldTarget: { freqs: number[]; amps: number[] } | null
+
+  // Path
+  pathExpression: string
 }
 ```
 
+`createInitialState()` returns a fresh state; `Game.startLevel()` calls it on every level entry, which also handles retry from `GAME_OVER`.
+
 ### `PhaseStateMachine.ts`
 
-Enforces valid phase transitions. Invalid transitions throw at development time.
+Enforces valid phase transitions. Attempts to transition illegally simply return `false` (logged in dev). `forceTransition()` is used during `startLevel` to escape terminal phases like `GAME_OVER`.
 
 ```
 Valid transitions:
-
-MENU          → LEVEL_SELECT
-LEVEL_SELECT  → BUILD
-BUILD         → WAVE
-WAVE          → BUFF_SELECT | BOSS_SHIELD | LEVEL_END | GAME_OVER
-BUFF_SELECT   → BUILD
-BOSS_SHIELD   → WAVE
-LEVEL_END     → BUILD (next level) | MENU (game complete)
-GAME_OVER     → MENU
+  MENU          → LEVEL_SELECT | BUILD
+  LEVEL_SELECT  → BUILD
+  BUILD         → WAVE
+  WAVE          → BUFF_SELECT | BOSS_SHIELD | LEVEL_END | GAME_OVER
+  BUFF_SELECT   → BUILD
+  BOSS_SHIELD   → WAVE
+  LEVEL_END     → BUILD | MENU
+  GAME_OVER     → MENU (or reset via startLevel)
 ```
 
 ### `EventBus.ts`
 
-Type-safe pub/sub. All event names and payload shapes are declared in the `GameEvents` interface:
+Type-safe generic pub/sub. All event names and payload shapes live in the `GameEvents` interface in `Game.ts` (includes an index signature so custom event names still type-check). Every subscription returns an `unsubscribe()` function; `useGameLoop` collects these and calls them all on unmount.
 
-```typescript
-interface GameEvents {
-  stateChanged:   GameState
-  phaseChanged:   { from: GamePhase; to: GamePhase }
-  enemyKilled:    { enemy: Enemy; reward: number }
-  towerPlaced:    Tower
-  waveStarted:    { wave: number }
-  waveCleared:    { wave: number }
-  buffSelected:   BuffCard
-  bossShieldHit:  { similarity: number }
-  gameOver:       { score: number }
-}
-```
-
-Components subscribe via `EventBus.on(event, handler)` and unsubscribe on `onUnmounted`.
+Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_START/END`, `WAVE_START/END`, `TOWER_PLACED/SELECTED/PARAMS_SET`, `CAST_SPELL`, `TOWER_ATTACK`, `ENEMY_SPAWNED/KILLED/REACHED_ORIGIN`, `BUFF_PHASE_START/END`, `BUFF_CARD_SELECTED`, `BUFF_RESULT`, `BOSS_SHIELD_START/ATTEMPT/END`, `GOLD_CHANGED`, `HP_CHANGED`, `SCORE_CHANGED`, `CANVAS_CLICK/HOVER`.
 
 ### `InputManager.ts`
 
-Translates raw canvas mouse events (click, mousemove, mouseout) into game-unit coordinates:
+Translates raw canvas mouse events into both pixel and game-unit coordinates:
 
 ```
-pixel (x, y)  →  game unit  =  (pixel - origin) / unitPx
+game unit = (pixel - origin) / unitPx
 ```
 
-Emits `gridClick`, `gridHover` events to `EventBus` so systems can react without referencing the DOM.
+Emits `CANVAS_CLICK` and `CANVAS_HOVER` on the EventBus so systems never reach into the DOM.
 
 ---
 
 ## Game Systems
 
-### `TowerPlacementSystem`
+| System | Responsibility |
+|---|---|
+| `TowerPlacementSystem` | Handles `CANVAS_CLICK` during `BUILD`; validates grid cell + gold; creates a tower via `TowerFactory`; emits `TOWER_PLACED`. Accepts **injected callbacks** `getSelectedTowerType` / `clearSelectedTowerType` instead of reaching into a Pinia store. |
+| `CombatSystem` | Per-tower cooldown; picks target in range; dispatches by tower type (Function Cannon → `calculateTrajectory`, Radar Sweep → `pointInSector`, Integral Cannon → `numericalIntegrate`, Matrix Link → `matrixMultiply`). Triggers boss-shield mini-game via `Events.BOSS_SHIELD_START`. |
+| `MovementSystem` | Advances enemies along `pathFunction` with arc-length correction; reads `state.enemySpeedMultiplier`; emits `ENEMY_REACHED_ORIGIN`. Uses `SplitSlimePolicy` for split-on-death children. |
+| `WaveSystem` | Reads wave schedule from `level-defs.ts`; spawns via `EnemyFactory` at configured intervals; detects clear and emits `WAVE_END`. |
+| `BuffSystem` | Strategy-map (`effectId` → handler) lookup; manages active buff durations across `WAVE_END` ticks; handles curse cards too. |
+| `EconomySystem` | Single place that awards gold on `ENEMY_KILLED` and deals damage on `ENEMY_REACHED_ORIGIN`. Previously inlined in `Game._setupEventHandlers`; factored out for testability. Includes Boss-dragon `GAME_OVER` trigger (damage = 99). |
 
-- Listens for `gridClick` events
-- Validates placement: grid cell unoccupied, player has enough gold, phase is `BUILD`
-- Creates a `Tower` via `TowerFactory` and appends to `state.towers`
-- Opens math parameter configuration modal for applicable tower types
+### `SplitSlimePolicy` (shared domain policy)
 
-### `WaveSystem`
-
-- Reads wave configuration from `level-defs.ts`
-- Spawns enemies at configured intervals using `EnemyFactory`
-- Advances `state.wave` and emits `waveStarted`
-- Detects wave clear (all enemies dead + none queued) and emits `waveCleared`
-
-### `MovementSystem`
-
-- Evaluates `state.pathExpression` via `PathEvaluator` to compute enemy waypoints
-- Advances each enemy along the path by `enemy.speed * dt` per tick
-- Enemies that reach the end deal damage to `state.hp` and are removed
-
-### `CombatSystem`
-
-- Each tower fires when its cooldown expires and an enemy is in range
-- Projectile creation differs per tower type:
-  - **Function Cannon**: calls `MathAPI.calculateTrajectory()` to get hit-point
-  - **Radar Sweep**: calls `MathAPI.pointInSector()` on all nearby enemies each tick
-  - **Integral Cannon**: calls `MathAPI.numericalIntegrate()` to compute damage value
-  - **Matrix Link**: calls `MathAPI.matrixMultiply()` to transform target coordinates
-  - **Fourier Shield**: each tick calls `MathAPI.fourierMatch()` to evaluate boss shield HP
-- Collision detection checks each projectile against each enemy (`hitRadius = 0.5` game units)
-- Applies damage, updates `state.kills`, awards gold
-
-### `BuffSystem`
-
-- Activates when phase is `BUFF_SELECT`
-- Presents 3 randomly selected cards from `buff-defs.ts`
-- Applies selected buff effects directly to `state` fields
-- Transitions phase back to `BUILD`
+`src/domain/combat/SplitSlimePolicy.ts` exports `shouldSplit()` and `spawnChildren()` — the single source of truth for how Slime-family enemies split on death. Used by both `CombatSystem` and `MovementSystem` so the rules cannot drift.
 
 ---
 
-## Vue–Engine Bridge
+## Vue ↔ Engine Bridge
 
-The game engine is pure TypeScript and knows nothing about Vue. The bridge is two-way:
-
-### Engine → Vue (read direction)
-
-`useGameLoop.ts` subscribes to `EventBus.on('stateChanged', ...)` and calls `gameStore.sync(state)`. Pinia's reactivity system propagates updates to all HUD components.
+The engine knows nothing about Vue. `useGameLoop.ts` is the only bridge:
 
 ```
-Engine tick
-  └─ EventBus.emit('stateChanged', state)
-       └─ gameStore.sync(state)           ← useGameLoop.ts
-            └─ HUD.vue, BuildPanel.vue, etc. re-render via computed properties
+onMounted:
+  await initWasm()
+  g = new Game(canvas)
+  inject systems (placement has UI callbacks injected)
+  subscribe to LEVEL_START   → generatePath + sync pathExpression to gameStore
+  subscribe to TOWER_PLACED  → open BuildPanel, advance BuildHint
+  subscribe to TOWER_SELECTED → open/close BuildPanel
+  useSessionSync().bind(g)   → backend session lifecycle
+  gameStore.bindEngine(g)    → reactive state mirror
+  g.start()
+
+onUnmounted:
+  run every unsub()
+  gameStore.unbindEngine()
+  g.destroy()  (stops loop, destroys systems, clears event bus + input)
 ```
 
-### Vue → Engine (write direction)
+### Engine → Vue (reads)
 
-User interactions in Vue components dispatch actions through `gameStore`:
+`gameStore.bindEngine(g)` subscribes to state-mutation events (`GOLD_CHANGED`, `HP_CHANGED`, `SCORE_CHANGED`, `PHASE_CHANGED`, `WAVE_START`, …) and mirrors the fields the HUD needs.
 
-```
-BuildPanel.vue: user clicks "Buy Tower"
-  └─ gameStore.requestTowerPlacement(towerType)
-       └─ EventBus.emit('towerPlacementRequested', towerType)
-            └─ TowerPlacementSystem picks up on next input event
-```
+### Vue → Engine (writes)
+
+User actions call engine methods directly through the store — e.g. `BuildPanel.vue` calls `gameStore.setTowerParams(tower, params)` which calls `game.eventBus.emit(Events.TOWER_PARAMS_SET, { tower, params })`.
+
+### Session Sync
+
+`useSessionSync.ts` subscribes to `LEVEL_START` / `WAVE_END` / `LEVEL_END` / `GAME_OVER` and mirrors state to the backend via `sessionService` (create on level start, patch on wave end, end on level complete / game over). It is resilient to transient network failures so the final score is not lost.
 
 ---
 
@@ -302,9 +281,9 @@ BuildPanel.vue: user clicks "Buy Tower"
 |---|---|
 | `token` | JWT access token (persisted to `localStorage`) |
 | `user` | `{ id, username }` or `null` |
-| `isAuthenticated` | Derived from `token !== null` |
+| `initializing` | `true` while `me()` is in-flight on boot |
 
-Actions: `login()`, `register()`, `logout()`, `restoreSession()`.
+Actions: `init()`, `setToken()`, `setUser()`, `clearAuth()`, `logout()`.
 
 ### `gameStore`
 
@@ -313,38 +292,54 @@ Mirrors a subset of `GameState` for Vue reactivity:
 | State | Description |
 |---|---|
 | `phase` | Current `GamePhase` |
-| `hp / maxHp` | Player health |
-| `gold` | Current gold |
-| `score` | Current score |
+| `hp / maxHp / gold / score` | Player resources |
 | `wave / totalWaves` | Wave progress |
-| `activeBuffs` | Currently active buff labels |
+| `buffCards` | Currently drawn buff-card trio |
+| `bossShieldTarget` | Fourier target (populated by engine on `BOSS_SHIELD_START`) |
+| `pathExpression` | String expression for the current level path |
+
+Actions: `bindEngine(g)`, `unbindEngine()`, `syncFromEngine(g)`.
 
 ### `uiStore`
 
-| State | Description |
+Panel visibility, selected tower type, build-hint step, modal state.
+
+---
+
+## Services
+
+| Service | Methods |
 |---|---|
-| `activeModal` | Which modal is open (`null` if none) |
-| `selectedTowerType` | Tower type selected in build panel |
-| `buildPanelOpen` | Whether build panel is visible |
+| `api.ts` | `request<T>(path, opts)` — fetch wrapper with auto Bearer token + `ApiError` class |
+| `authService.ts` | `register(u, p)`, `login(u, p)`, `me()`, `logout()` |
+| `sessionService.ts` | `createSession(level)`, `getActiveSession()`, `updateSession(id, patch)`, `endSession(id, result)`, `abandonSession(id)` |
+| `leaderboardService.ts` | `fetchLeaderboard({ level, page, perPage })`, `submitScore(payload)` |
+
+`api.ts` returns typed `ApiError(status, body)` on non-2xx responses so callers can branch on `err.status === 409`, etc.
 
 ---
 
 ## WASM Integration
 
-`WasmBridge.ts` handles loading and exposes a unified `MathAPI` object:
+`WasmBridge.ts` handles loading and exposes a unified public surface:
 
 ```typescript
-// Usage in CombatSystem.ts
-import { MathAPI } from '../math/WasmBridge';
+await initWasm()                         // loads math_engine.js; returns false if unavailable
+isUsingWasm()                            // true if WASM is the active backend
 
-const pts = MathAPI.calculateTrajectory(a, b, c, xStart, xEnd, 0.1);
-const inside = MathAPI.pointInSector(px, py, cx, cy, r, aStart, aWidth);
-const dmg = MathAPI.numericalIntegrate(a, b, c, lo, hi, 100);
+matrixMultiply(a, b)                     // 2×2 × 2×2
+sectorCoverage(r, θ)
+pointInSector(px, py, cx, cy, r, aStart, aWidth)
+numericalIntegrate(a, b, c, lo, hi, n = 100)
+fourierComposite(t, freqs, amps)
+fourierMatch(f1, a1, f2, a2, samples = 200)
+calculateTrajectory(a, b, c, xStart, xEnd, step)
+lineCircleIntersect(m, b, cx, cy, r)
 ```
 
-The WASM module is loaded once asynchronously at app startup. Until it resolves, all calls use pure-JS fallbacks transparently.
+**RAII memory management** — `withFloatBuffers<T>(sizes, cb)` allocates via `_malloc`, runs the callback, and `_free`s in a `finally` block. Callers never handle raw pointers.
 
-Memory for array arguments is managed inside `WasmBridge.ts` with `_malloc` / `_free` in `try/finally` blocks — callers never handle raw pointers.
+**Pure-JS fallback** — every function has a TypeScript implementation used when WASM fails to load. Game systems always call `WasmBridge.*` and never import `math_engine.js` directly. Bridge-level tests assert parity between the two backends.
 
 ---
 
@@ -352,35 +347,16 @@ Memory for array arguments is managed inside `WasmBridge.ts` with `_malloc` / `_
 
 | Path | Component | Guard |
 |---|---|---|
-| `/` | `MenuView` | none |
-| `/auth` | `AuthView` | redirect to `/` if already logged in |
-| `/game` | `GameView` | requires auth |
-| `/leaderboard` | `LeaderboardView` | none |
+| `/` | `MenuView` | — |
+| `/auth` | `AuthView` | Redirect to `/` if already logged in |
+| `/game` | `GameView` | Requires auth |
+| `/leaderboard` | `LeaderboardView` | — |
 
 ---
 
 ## API Communication
 
-All backend calls go through `services/api.ts`:
-
-```typescript
-// api.ts — simplified
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-    const token = authStore.token;
-    const response = await fetch(`${BASE_URL}${path}`, {
-        ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...options?.headers,
-        },
-    });
-    if (!response.ok) throw new ApiError(response.status, await response.json());
-    return response.json();
-}
-```
-
-Vite proxies `/api/*` to `http://localhost:8000` in development so there are no CORS issues during local dev.
+All requests go through `services/api.ts`. The dev server proxies `/api/*` → `http://localhost:8000` (see `vite.config.ts`), so the browser sees no CORS in local dev. The Authorization header is injected automatically when `authStore.token` is set.
 
 ---
 
@@ -390,29 +366,48 @@ Vite proxies `/api/*` to `http://localhost:8000` in development so there are no 
 cd frontend
 npm install
 npm run dev        # Vite dev server at http://localhost:5173
-npm run build      # Production build → dist/
-npm run preview    # Preview production build locally
+npm run build      # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
+npm run preview    # Preview the production build
+npm test           # Vitest — 13 test files, ~500 assertions
+npm run test:watch # Vitest in watch mode
 ```
 
-TypeScript compilation is checked separately (no emit, Vite handles transpilation):
+Type-check only (no emit): `npx vue-tsc -b`.
 
-```bash
-npx tsc --noEmit   # type-check only
+### TypeScript project settings of note
+
+- `erasableSyntaxOnly: true` — no `enum`; use `as const` + type alias.
+- `verbatimModuleSyntax: true` — type-only imports must use `import type`.
+- `noUnusedLocals` / `noUnusedParameters: true` — prefix intentionally unused params with `_`.
+- Path aliases: `@/*` → `src/*`; `@shared/*` → `../shared/*`.
+
+---
+
+## Testing
+
 ```
+src/engine/*.test.ts                EventBus, Game, PhaseStateMachine
+src/composables/useSessionSync.test.ts
+src/math/*.test.ts                  PathEvaluator, WasmBridge (WASM/JS parity)
+src/systems/__tests__/*.test.ts     BuffSystem (+ duration), CombatSystem, EconomySystem,
+                                    MovementSystem, TowerPlacementSystem, WaveSystem
+```
+
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. `WasmBridge.test.ts` in particular asserts the JS fallback produces the same output as the WASM module for `pointInSector` boundary cases.
 
 ---
 
 ## Canvas Coordinate System
 
-The game uses its own coordinate system separate from pixel space:
+The game has its own coordinate system, separate from pixels:
 
 ```
 Game unit (0, 0) = pixel (originX, originY) = pixel (160, 600)
-1 game unit       = 40 pixels (unitPx)
+1 game unit      = 40 pixels (unitPx)
 
 Conversion:
   pixelX = originX + gameX * unitPx
-  pixelY = originY - gameY * unitPx   ← Y axis is inverted (game Y up = pixel Y down)
+  pixelY = originY - gameY * unitPx      ← Y axis inverted (game-Y up = pixel-Y down)
 ```
 
-Grid bounds: X ∈ [-3, 25], Y ∈ [-2, 14]. Tower placement is snapped to integer grid cells.
+Grid bounds: X ∈ [-3, 25], Y ∈ [-2, 14]. Tower placement snaps to integer grid cells. Canvas size, origin, unit, bounds, initial HP/gold and `hitRadius` all come from `shared/game-constants.json`.

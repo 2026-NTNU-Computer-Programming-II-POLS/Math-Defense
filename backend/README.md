@@ -1,6 +1,6 @@
-# Backend — FastAPI
+# Backend — FastAPI (DDD)
 
-REST API server providing authentication, game session management, and leaderboard services for Math Defense.
+REST API server for Math Defense: authentication, game-session lifecycle, and leaderboard. The code is organised into **Domain / Application / Infrastructure** layers — routers are thin HTTP adapters, business rules live in aggregates, and SQLAlchemy is kept behind repository protocols.
 
 ## Tech Stack
 
@@ -10,11 +10,11 @@ REST API server providing authentication, game session management, and leaderboa
 | Server | Uvicorn (ASGI) |
 | ORM | SQLAlchemy 2.0 |
 | Migrations | Alembic |
-| Validation | Pydantic v2 |
+| Validation | Pydantic v2 + pydantic-settings |
 | Auth | PyJWT (HS256) + bcrypt |
 | Rate Limiting | slowapi |
 | Database | SQLite (dev) |
-| Testing | pytest + pytest-asyncio |
+| Testing | pytest + pytest-asyncio (69 tests) |
 
 ---
 
@@ -23,172 +23,182 @@ REST API server providing authentication, game session management, and leaderboa
 ```
 backend/
 ├── app/
-│   ├── main.py              FastAPI app factory, CORS, lifespan, route registration
-│   ├── config.py            Settings loaded from .env (SECRET_KEY, DATABASE_URL, etc.)
-│   ├── limiter.py           slowapi rate limiter instance
-│   ├── db/
-│   │   └── database.py      SQLAlchemy engine, Base, get_db() session factory
-│   ├── models/
-│   │   ├── user.py          User table (UUID PK, username, password_hash, timestamps)
-│   │   ├── game_session.py  GameSession table (user_id FK, level, status, metrics)
-│   │   └── leaderboard.py   LeaderboardEntry table (user_id, level, score, kills, waves)
-│   ├── schemas/
-│   │   ├── auth.py          RegisterRequest, LoginRequest, TokenResponse, UserResponse
-│   │   ├── game_session.py  CreateSessionRequest, UpdateSessionRequest, SessionResponse
-│   │   └── leaderboard.py   SubmitScoreRequest, LeaderboardEntryResponse
-│   ├── routers/
-│   │   ├── auth.py          POST /register, POST /login, GET /me
-│   │   ├── game_session.py  POST /, PATCH /{id}, POST /{id}/end
-│   │   └── leaderboard.py   GET /, POST /
-│   ├── middleware/
-│   │   └── auth.py          get_current_user() dependency (JWT → User)
-│   └── utils/
-│       └── security.py      hash_password(), verify_password(), create_access_token()
+│   ├── main.py                    FastAPI factory, CORS, lifespan, router registration
+│   ├── config.py                  Settings (Pydantic): SECRET_KEY, DATABASE_URL, CORS_ORIGINS, ...
+│   ├── limiter.py                 slowapi Limiter instance shared across routers
+│   │
+│   ├── domain/                    ── DOMAIN LAYER ──
+│   │   ├── value_objects.py       SessionStatus enum, Level, Score, GameResult
+│   │   ├── session/
+│   │   │   ├── aggregate.py       GameSession aggregate root (state machine + invariants + events)
+│   │   │   ├── events.py          SessionCreated / Updated / Completed / Abandoned
+│   │   │   └── repository.py      Repository Protocol (interface only)
+│   │   └── leaderboard/
+│   │       ├── aggregate.py       LeaderboardEntry aggregate
+│   │       └── repository.py      Repository Protocol
+│   │
+│   ├── application/               ── APPLICATION LAYER ──
+│   │   ├── session_service.py     Session use cases; consumes SessionCompleted to auto-create leaderboard
+│   │   └── leaderboard_service.py Leaderboard query + manual score submission (idempotent)
+│   │
+│   ├── infrastructure/            ── INFRASTRUCTURE LAYER ──
+│   │   ├── unit_of_work.py        SqlAlchemyUnitOfWork — explicit commit; auto-rollback on exit
+│   │   └── persistence/
+│   │       ├── session_repository.py      SQLAlchemy impl of SessionRepository
+│   │       └── leaderboard_repository.py  SQLAlchemy impl with per-level DENSE_RANK ranking
+│   │
+│   ├── models/                    SQLAlchemy ORM models
+│   │   ├── user.py                User
+│   │   ├── game_session.py        GameSession (CHECK level 1–4, partial unique index on active)
+│   │   └── leaderboard.py         LeaderboardEntry (unique session_id)
+│   │
+│   ├── schemas/                   Pydantic request/response DTOs
+│   │   ├── auth.py
+│   │   ├── game_session.py
+│   │   └── leaderboard.py
+│   │
+│   ├── routers/                   HTTP adapters — translate + map error codes only
+│   │   ├── auth.py                /api/auth
+│   │   ├── game_session.py        /api/sessions
+│   │   └── leaderboard.py         /api/leaderboard
+│   │
+│   ├── db/database.py             Engine, Base, get_db() session factory
+│   ├── middleware/auth.py         get_current_user() dependency (JWT → User)
+│   └── utils/security.py          hash_password, verify_password, create_access_token
+│
 ├── tests/
-│   ├── test_auth.py
-│   ├── test_sessions.py
-│   └── test_leaderboard.py
+│   ├── conftest.py                Fixtures (in-memory SQLite, test client, auth helpers)
+│   ├── test_auth.py               (5)
+│   ├── test_game_session.py       (11)
+│   ├── test_leaderboard.py        (4)
+│   ├── test_session_aggregate.py  (22) — pure aggregate unit tests
+│   ├── test_value_objects.py      (15) — VO invariants
+│   └── test_coverage_gaps.py      (12) — audit-driven edge cases
+│
 ├── requirements.txt
 └── Dockerfile
 ```
 
 ---
 
+## DDD Layers
+
+### Domain
+
+Pure Python — no SQLAlchemy, no FastAPI.
+
+- **Value objects** (`value_objects.py`): `SessionStatus` enum, `Level` (1–4), `Score` (0 – 9,999,999), `GameResult`. Immutable dataclasses that validate on construction.
+- **`GameSession` aggregate** (`session/aggregate.py`): the root. Owns its state transitions via `_ALLOWED_TRANSITIONS`; `update_progress()` / `complete()` / `abandon()` raise if called in an illegal status. Score is monotonic; per-update deltas are capped to reject obvious abuse. Emits domain events into an internal buffer collected by the application layer.
+- **`LeaderboardEntry` aggregate** — created from a `GameSession` result. Holds `score` as a `Score` VO.
+- **Repository protocols** — interface-only (`typing.Protocol`) so the domain never imports from `infrastructure/`.
+
+### Application
+
+Use-case orchestration. One method per user intent.
+
+- **`SessionApplicationService`**
+  - `create_session(user_id, level)` — abandons stale sessions (>2h) and any existing active session, then creates a new one. Retries once on `IntegrityError` to handle the race against the partial-unique index.
+  - `update_session(session_id, user_id, **patch)` — delegates to aggregate; auto-abandons if stale before raising `SessionStaleError` (committed first so the abandon persists).
+  - `end_session(session_id, user_id, score, kills, waves_survived)` — transitions to COMPLETED, then **consumes the `SessionCompleted` event within the same UoW** to create a `LeaderboardEntry` (idempotent via `find_by_session_id`).
+  - `abandon_session(session_id, user_id)` — idempotent.
+- **`LeaderboardApplicationService`**
+  - `get_leaderboard(level, page, per_page)` — per-level `DENSE_RANK` when `level` is provided, global rank otherwise.
+  - `submit_score(...)` — manual fallback if the auto-submit path fails.
+
+Exceptions: `SessionNotFoundError`, `SessionStaleError`, `SessionValidationError`, `PermissionDeniedError`, `DuplicateSubmissionError`. Routers map these to HTTP status codes.
+
+### Infrastructure
+
+- **`SqlAlchemyUnitOfWork`** — context manager. Auto-rollback on exit unless `.commit()` is called explicitly. Prevents accidental partial writes.
+- **`SqlAlchemySessionRepository`** — maps `GameSessionModel` ↔ `GameSession` aggregate. Uses `with_for_update()` for the active-session query to serialise under concurrent requests. Finds stale sessions by `started_at < now - STALE_CUTOFF`.
+- **`SqlAlchemyLeaderboardRepository`** — implements `query_ranked()` with `func.dense_rank().over(partition_by=level when filtered)` so `/leaderboard?level=2` reports per-level ranks, not global ones.
+
+---
+
+## Domain Event Flow
+
+```
+Router           Application Service             Aggregate
+──────           ───────────────────             ─────────
+POST /end  ───>  end_session()
+                   │
+                   ├─> session.complete(result)  ──>  emits SessionCompleted
+                   │
+                   ├─> session.collect_events()  <──
+                   │
+                   ├─> for event in events:
+                   │     _handle_session_completed()
+                   │        └─> leaderboard_repo.save(entry)  (idempotent)
+                   │
+                   └─> uow.commit()   ← single transaction
+```
+
+The four events emitted by `GameSession`:
+
+| Event | Trigger | Consumer |
+|---|---|---|
+| `SessionCreated` | `.create()` factory | — |
+| `SessionUpdated` | `.update_progress()` | — |
+| `SessionCompleted` | `.complete(result)` | `SessionApplicationService` → leaderboard auto-create |
+| `SessionAbandoned` | `.abandon()` | — |
+
+---
+
 ## API Reference
 
-Base path: `/api`
+Base path: `/api`. All session / leaderboard-submit endpoints require `Authorization: Bearer <token>`.
 
 ### Authentication — `/api/auth`
 
-#### `POST /api/auth/register`
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| POST | `/api/auth/register` | 5/min | Create account, return token |
+| POST | `/api/auth/login` | 10/min | Authenticate, return token |
+| GET | `/api/auth/me` | — | Current user |
 
-Create a new user account.
-
-**Request body**
-```json
-{ "username": "string", "password": "string" }
-```
-
-**Response `201`**
-```json
-{ "access_token": "string", "token_type": "bearer", "user": { "id": "uuid", "username": "string" } }
-```
-
-Rate limit: 5 requests/minute per IP.
-
----
-
-#### `POST /api/auth/login`
-
-Authenticate an existing user.
-
-**Request body**
-```json
-{ "username": "string", "password": "string" }
-```
-
-**Response `200`**
-```json
-{ "access_token": "string", "token_type": "bearer", "user": { "id": "uuid", "username": "string" } }
-```
-
-Rate limit: 10 requests/minute per IP.
-
----
-
-#### `GET /api/auth/me`
-
-Get the current authenticated user. Requires `Authorization: Bearer <token>`.
-
-**Response `200`**
-```json
-{ "id": "uuid", "username": "string", "created_at": "datetime" }
-```
-
----
+Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars with letter + digit.
 
 ### Game Sessions — `/api/sessions`
 
-All session endpoints require `Authorization: Bearer <token>`.
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| POST | `/api/sessions` | 30/min | Create session for `level` (1–4); abandons existing active session first |
+| GET | `/api/sessions/active` | 60/min | Fetch caller's active session (null if none) |
+| PATCH | `/api/sessions/{id}` | 120/min | Update `current_wave`, `gold`, `hp`, `score` (any subset; ≥1 field) |
+| POST | `/api/sessions/{id}/abandon` | 30/min | Idempotent abandon |
+| POST | `/api/sessions/{id}/end` | 30/min | Complete with `score` / `kills` / `waves_survived` → auto-creates leaderboard entry |
 
-#### `POST /api/sessions`
+**Validation bounds** (enforced at schema + aggregate + DB layers):
 
-Create a new game session when a level starts.
+| Field | Range |
+|---|---|
+| `level` | 1 – 4 |
+| `current_wave` | 0 – 999 |
+| `gold` | 0 – 99,999 |
+| `hp` | 0 – 100 |
+| `score` | 0 – 9,999,999; monotonically non-decreasing; per-PATCH delta capped at 50,000 |
+| `kills` | 0 – 9,999 |
+| `waves_survived` | 0 – 999 |
 
-**Request body**
-```json
-{ "level": 1 }
-```
+**Error codes**
 
-**Response `201`**
-```json
-{ "id": "uuid", "user_id": "uuid", "level": 1, "status": "active", "score": 0, "gold": 200, "hp": 20, "current_wave": 0, "started_at": "datetime", "ended_at": null }
-```
-
----
-
-#### `PATCH /api/sessions/{session_id}`
-
-Update session state during gameplay (called periodically by the frontend).
-
-**Request body** (all optional, but at least one field required)
-```json
-{ "gold": 320, "hp": 18, "score": 450, "current_wave": 2 }
-```
-
-**Response `200`** — updated session object.
-
----
-
-#### `POST /api/sessions/{session_id}/end`
-
-End a session and automatically create a leaderboard entry via the `SessionCompleted` domain event.
-
-**Request body**
-```json
-{ "score": 4800, "kills": 120, "waves_survived": 5 }
-```
-
-**Response `200`** — updated session object (same shape as `POST /api/sessions` response, with `status: "completed"` and `ended_at` populated).
-
----
+| Code | Meaning |
+|---|---|
+| `404` | `SessionNotFoundError` |
+| `410` | `SessionStaleError` (session > 2h active — auto-abandoned) |
+| `422` | `SessionValidationError` (invalid transition, bounds violation) |
+| `403` | `PermissionDeniedError` (session not owned by caller) |
+| `409` | `DuplicateSubmissionError` (manual submit for already-scored session) |
+| `429` | Rate limit exceeded |
 
 ### Leaderboard — `/api/leaderboard`
 
-#### `GET /api/leaderboard`
-
-Fetch leaderboard entries, optionally filtered by level.
-
-**Query params**
-
-| Param | Type | Default | Description |
+| Method | Path | Rate | Description |
 |---|---|---|---|
-| `level` | int | — | Filter to a specific level (1–4) |
-| `page` | int | 1 | Page number (1-indexed) |
-| `per_page` | int | 20 | Entries per page (max 100) |
+| GET | `/api/leaderboard?level=&page=&per_page=` | — | Ranked entries. `level` gives per-level dense rank; omitting gives global rank |
+| POST | `/api/leaderboard` | 10/min | Manual score submission (fallback if auto-create failed) |
 
-**Response `200`**
-```json
-{
-  "entries": [
-    { "rank": 1, "username": "string", "level": 2, "score": 4800, "kills": 120, "waves_survived": 5, "created_at": "datetime" }
-  ],
-  "total": 42
-}
-```
-
----
-
-#### `POST /api/leaderboard`
-
-Submit a score directly (used if auto-submit on session end fails). Requires `Authorization: Bearer <token>`.
-
-**Request body**
-```json
-{ "session_id": "uuid", "level": 2, "score": 4800, "kills": 120, "waves_survived": 5 }
-```
-
-**Response `201`** — created leaderboard entry.
+Query params: `level` 1–4 optional, `page` default 1, `per_page` default 20 (max 100).
 
 ---
 
@@ -198,86 +208,56 @@ Submit a score directly (used if auto-submit on session end fails). Requires `Au
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | UUID | Primary key |
-| `username` | VARCHAR(50) | Unique, indexed |
-| `password_hash` | VARCHAR | bcrypt hash |
-| `created_at` | DATETIME | Auto-set |
-| `updated_at` | DATETIME | Auto-updated |
+| `id` | String | UUID primary key |
+| `username` | String(50) | Unique, indexed |
+| `password_hash` | String(255) | bcrypt hash |
+| `created_at`, `updated_at` | DateTime | Auto-managed |
 
 ### GameSession
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | UUID | Primary key |
-| `user_id` | UUID | FK → User |
-| `level` | INT | 1–4 |
-| `status` | ENUM | `active` / `completed` / `abandoned` |
-| `score` | INT | Running score |
-| `gold` | INT | Current gold |
-| `hp` | INT | Current HP |
-| `current_wave` | INT | Current wave number |
-| `started_at` | DATETIME | |
-| `ended_at` | DATETIME | Nullable |
+| `id` | String | UUID primary key |
+| `user_id` | String | FK → User (ON DELETE CASCADE) |
+| `level` | Integer | CHECK 1–4 |
+| `status` | Enum | `active` / `completed` / `abandoned` |
+| `current_wave`, `gold`, `hp`, `score` | Integer | Progress metrics |
+| `started_at`, `ended_at` | DateTime | `ended_at` nullable |
+
+Indexes: `ix_game_session_user_id`; partial unique `uq_one_active_per_user WHERE status='active'` — enforces at most one active session per user.
 
 ### LeaderboardEntry
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | UUID | Primary key |
-| `user_id` | UUID | FK → User |
-| `session_id` | UUID | FK → GameSession |
-| `level` | INT | |
-| `score` | INT | |
-| `kills` | INT | |
-| `waves_survived` | INT | |
-| `created_at` | DATETIME | |
+| `id` | String | UUID primary key |
+| `user_id` | String | FK → User (ON DELETE CASCADE) |
+| `session_id` | String | FK → GameSession (ON DELETE SET NULL), unique |
+| `level` | Integer | CHECK 1–4 |
+| `score`, `kills`, `waves_survived` | Integer | |
+| `created_at` | DateTime | |
 
----
-
-## Authentication Flow
-
-```
-Client                        Backend
-  │                              │
-  ├── POST /auth/register ──────>│ hash_password(bcrypt)
-  │<── {access_token, user} ─────│ create_access_token(HS256, exp=30min)
-  │                              │
-  ├── POST /auth/login ─────────>│ verify_password → create_access_token
-  │<── {access_token, user} ─────│
-  │                              │
-  ├── GET /auth/me ─────────────>│ decode JWT → load User from DB
-  │   Authorization: Bearer ...  │
-  │<── {id, username} ───────────│
-```
-
-Token format: HS256 JWT, 30-minute expiry. The secret key comes from `SECRET_KEY` in `.env`.
+Unique on `session_id` — guarantees one leaderboard entry per completed session, which is what makes the event-driven auto-create idempotent.
 
 ---
 
 ## Setup & Running
 
-### Local (no Docker)
+### Local
 
 ```bash
 cd backend
 pip install -r requirements.txt
-
-# Copy and configure environment
-cp ../.env.example ../.env
-
+cp ../.env.example ../.env       # then fill in SECRET_KEY
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The database file is created automatically on first run at the path specified by `DATABASE_URL`.
-
-Interactive API docs are available at http://localhost:8000/docs.
+The SQLite database file is created automatically on first run (path from `DATABASE_URL`). Interactive API docs: http://localhost:8000/docs.
 
 ### Docker
 
-From the project root:
-
 ```bash
-docker-compose up backend
+docker-compose up backend        # from project root
 ```
 
 ---
@@ -286,32 +266,47 @@ docker-compose up backend
 
 | Variable | Required | Description |
 |---|---|---|
-| `SECRET_KEY` | Yes | JWT signing secret — use a long random string |
-| `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `sqlite:///./math_defense.db` |
-| `CORS_ORIGINS` | Yes | Comma-separated browser-visible origins, e.g. `http://localhost:5173,http://localhost:3000` |
+| `SECRET_KEY` | Yes | JWT signing secret — minimum 16 characters |
+| `DATABASE_URL` | Yes | SQLAlchemy URL, default `sqlite:///./data/math_defense.db` |
+| `CORS_ORIGINS` | Yes | Comma-separated browser origins |
+| `ALGORITHM` | No | JWT algorithm (default `HS256`) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `30` |
+| `AUTO_CREATE_TABLES` | No | Default `True`; set `False` in production (use Alembic) |
 
 ---
 
 ## Testing
 
 ```bash
-cd backend
-pytest                        # run all tests
-pytest tests/test_auth.py     # run a single file
-pytest -v                     # verbose output
+pytest                                      # all 69 tests
+pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
+pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 ```
 
-Tests use an in-memory SQLite database and do not touch the dev database.
+The test suite uses an isolated in-memory SQLite database (see `tests/conftest.py`) and never touches the dev database. Notable coverage includes:
+
+- Aggregate state-transition matrix (`SessionStatus × {update, complete, abandon}` — 12 cases)
+- Stale-session auto-abandon side-effect ordering (must commit *before* raising)
+- Per-level vs global `dense_rank` partitioning
+- Real rate-limiter enablement (session create → 429 at 30/min)
+- Abuse cases: negative hp, `score` going backwards, score delta > 50 000
+- FK cascade behaviour (with a dedicated fixture that enables `PRAGMA foreign_keys=ON`)
 
 ---
 
 ## Rate Limiting
 
-Implemented via `slowapi` (a Starlette-compatible port of Flask-Limiter).
+Implemented via `slowapi` (Starlette port of Flask-Limiter).
 
 | Endpoint | Limit |
 |---|---|
-| `POST /auth/register` | 5/minute per IP |
-| `POST /auth/login` | 10/minute per IP |
+| `POST /auth/register` | 5/min per IP |
+| `POST /auth/login` | 10/min per IP |
+| `POST /sessions` | 30/min |
+| `GET /sessions/active` | 60/min |
+| `PATCH /sessions/{id}` | 120/min |
+| `POST /sessions/{id}/end` | 30/min |
+| `POST /sessions/{id}/abandon` | 30/min |
+| `POST /leaderboard` | 10/min |
 
 Exceeding the limit returns `HTTP 429 Too Many Requests`.

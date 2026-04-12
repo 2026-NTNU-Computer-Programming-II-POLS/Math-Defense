@@ -9,11 +9,11 @@ Each tower type corresponds to a real math topic:
 | Tower | Math Concept | How It Works |
 |---|---|---|
 | Function Cannon | Quadratic Functions | Projectile follows `y = ax² + bx + c`; hits enemy where trajectory intersects path |
-| Radar Sweep | Trigonometry & Sectors | Scans a sector area; damage applied to enemies inside using `pointInSector()` |
+| Radar Sweep | Trigonometry & Sectors | Scans a sector area; damage applied to enemies inside via `pointInSector()` |
 | Matrix Link | 2×2 Matrix / Linear Transforms | Select two towers; input a matrix; applies rotation/scaling transformation |
-| Probability Shrine | Probability & Buffs | No direct attack; triggers Buff card selection phase after a wave |
-| Integral Cannon | Definite Integration | Damage calculated as a definite integral via the trapezoid rule |
-| Fourier Shield | Fourier Series | Defensive tower; mini-game where player matches a 3-sine composite wave |
+| Probability Shrine | Probability & Buffs | No direct attack; triggers buff-card selection phase after a wave clears |
+| Integral Cannon | Definite Integration | Damage computed as `∫[a,b] (ax² + bx + c) dx` via the trapezoid rule |
+| Fourier Shield | Fourier Series | Defensive mini-game; player matches a 3-sine composite target wave |
 
 ---
 
@@ -21,24 +21,31 @@ Each tower type corresponds to a real math topic:
 
 ```
 Math Game/
-├── frontend/          Vue 3 + TypeScript + Vite — UI and game engine
-├── backend/           FastAPI (Python) — auth, sessions, leaderboard
-├── wasm/              C + Emscripten — high-performance math module (WebAssembly)
+├── frontend/          Vue 3 + TypeScript + Vite — UI, game engine, ECS systems
+├── backend/           FastAPI — DDD layers (domain / application / infrastructure)
+├── wasm/              C + Emscripten — math module compiled to WebAssembly
 ├── shared/            Shared constants (canvas size, grid bounds, player defaults)
 ├── assets/            Sprites, audio, fonts
-├── docker-compose.yml Docker orchestration for frontend + backend
-└── Math_Defense_Spec.md  Full game design specification
+├── emsdk/             Vendored Emscripten SDK for WASM builds
+├── docker-compose.yml Orchestration for frontend + backend containers
+├── nginx.conf         Production reverse-proxy config (SPA + /api)
+├── .env.example       Template for required environment variables
+└── Math_Defense_Spec.md  Full game-design specification
 ```
 
-The three main layers communicate as follows:
+The three runtime layers communicate as follows:
 
 ```
 Browser
-  └─ Vue 3 App
-       ├─ Game Engine (ECS-style systems, Canvas rendering)
-       │    └─ WasmBridge → math_engine.wasm (C, compiled by Emscripten)
-       └─ API Services → FastAPI Backend
-                              └─ SQLite database
+  └─ Vue 3 SPA
+       ├─ Pinia stores (reactivity bridge)
+       ├─ Game Engine (ECS-style systems, Canvas rendering, fixed 60 FPS)
+       │    └─ WasmBridge → math_engine.wasm (C, Emscripten) with JS fallback
+       └─ Services → FastAPI Backend
+                          ├─ Routers (HTTP translation + error mapping)
+                          ├─ Application Services (use cases)
+                          ├─ Domain Aggregates (GameSession, LeaderboardEntry)
+                          └─ SQLAlchemy Repositories → SQLite
 ```
 
 ---
@@ -47,10 +54,10 @@ Browser
 
 | Layer | Technology |
 |---|---|
-| Frontend | Vue 3 (Composition API), TypeScript, Pinia, Vue Router, Vite |
-| Backend | FastAPI, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT, bcrypt |
-| WASM | C, Emscripten SDK |
-| Database | SQLite (dev) |
+| Frontend | Vue 3 (Composition API, `<script setup>`), TypeScript 5.9 strict, Pinia, Vue Router, Vite 8, Vitest |
+| Backend | FastAPI 0.115, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
+| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`) |
+| Database | SQLite (dev; Alembic-ready) |
 | Container | Docker, Docker Compose |
 
 ---
@@ -63,10 +70,12 @@ MENU
        └─ BUILD (place towers, configure math parameters)
             └─ WAVE (enemies spawn; towers attack)
                  ├─ BUFF_SELECT (wave cleared → pick a buff card → return to BUILD)
-                 ├─ BOSS_SHIELD (boss activates Fourier shield mini-game)
+                 ├─ BOSS_SHIELD (boss activates Fourier-match mini-game)
                  ├─ LEVEL_END (all waves cleared → next level)
                  └─ GAME_OVER (HP reaches 0)
 ```
+
+Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend.
 
 ---
 
@@ -77,18 +86,18 @@ MENU
 - Node.js 18+
 - Python 3.11+
 - Docker & Docker Compose (optional)
-- Emscripten SDK (only if rebuilding WASM)
+- Emscripten SDK (only if rebuilding WASM; `emsdk/` is vendored)
 
 ### Option A — Docker (recommended)
 
 ```bash
-cp .env.example .env          # fill in SECRET_KEY
+cp .env.example .env          # fill in SECRET_KEY (≥16 chars)
 docker-compose up
 ```
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
-- API docs: http://localhost:8000/docs
+- OpenAPI docs: http://localhost:8000/docs
 
 ### Option B — Manual
 
@@ -105,46 +114,72 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev        # Vite dev server on http://localhost:5173
 ```
+
+Vite proxies `/api/*` to `http://localhost:8000` in development so the browser sees no CORS.
 
 ### Rebuild WASM (optional)
 
 ```bash
 cd wasm
-make          # outputs to frontend/public/wasm/
+make               # writes math_engine.js / .wasm into frontend/public/wasm/
 ```
+
+`npm run build` in the frontend automatically triggers `make` via the `prebuild` script.
 
 ---
 
 ## Environment Variables
 
-Create a `.env` file at project root:
+Create `.env` at the project root (see `.env.example`):
 
-```env
-SECRET_KEY=<long-random-string>
-DATABASE_URL=sqlite:///./math_defense.db
-```
+| Variable | Required | Description |
+|---|---|---|
+| `SECRET_KEY` | Yes | JWT signing secret — minimum 16 characters |
+| `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `sqlite:///./data/math_defense.db` |
+| `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
 
 ---
 
 ## Shared Constants
 
-`shared/game-constants.json` is the single source of truth for values used by both frontend and backend:
+`shared/game-constants.json` is the single source of truth for values referenced by both frontend and backend:
 
 ```json
 {
-  "canvas":  { "width": 1280, "height": 720, "originX": 160, "originY": 600, "unitPx": 40 },
-  "grid":    { "minX": -3, "maxX": 25, "minY": -2, "maxY": 14 },
-  "player":  { "initialHp": 20, "initialGold": 200 },
-  "loop":    { "targetFps": 60, "fixedDt": 0.016667 }
+  "canvas":      { "width": 1280, "height": 720, "originX": 160, "originY": 600, "unitPx": 40 },
+  "grid":        { "minX": -3, "maxX": 25, "minY": -2, "maxY": 14 },
+  "player":      { "initialHp": 20, "initialGold": 200 },
+  "loop":        { "targetFps": 60 },
+  "collision":   { "hitRadius": 0.5 },
+  "waveSystem":  { "pathValidationMinCoverage": 0.8 }
 }
 ```
+
+`fixedDt` is intentionally derived in code (`1 / targetFps`) rather than stored.
+
+---
+
+## Testing
+
+```bash
+cd backend  && pytest              # 69 tests (DDD aggregates, routers, coverage gaps)
+cd frontend && npm test            # 13 test files, ~500 assertions (systems, engine, WASM bridge)
+```
+
+The frontend uses Vitest with `happy-dom`; the backend uses pytest with an in-memory SQLite database.
+
+---
+
+## Production Deployment
+
+A sample `nginx.conf` is included at the project root — it serves the Vite `dist/` build as an SPA and reverse-proxies `/api/` to the backend container. CORS preflight is short-circuited at the nginx layer and response headers are forwarded from the backend.
 
 ---
 
 ## Sub-project READMEs
 
-- [frontend/README.md](frontend/README.md) — Vue 3 app, game engine, ECS systems, rendering
-- [backend/README.md](backend/README.md) — FastAPI app, auth, sessions, leaderboard API
+- [frontend/README.md](frontend/README.md) — Vue 3 app, ECS game engine, systems, stores, WASM bridge
+- [backend/README.md](backend/README.md) — FastAPI DDD layers, REST API, domain events, rate limits
 - [wasm/README.md](wasm/README.md) — C math engine, Emscripten build, exported functions
