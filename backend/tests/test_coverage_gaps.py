@@ -9,20 +9,17 @@
 from datetime import datetime, timedelta, UTC
 
 import pytest
-from sqlalchemy import StaticPool, create_engine, event
-from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
 
 from app.application.session_service import (
     SessionApplicationService,
     SessionNotFoundError,
 )
-from app.db.database import Base, get_db
+from app.db.database import get_db
 from app.domain.session.aggregate import (
     GameSession as DomainGameSession,
     SessionNotActiveError,
 )
-from app.domain.value_objects import GameResult, Level, Score, SessionStatus
+from app.domain.value_objects import Level, SessionStatus
 from app.infrastructure.persistence.leaderboard_repository import (
     SqlAlchemyLeaderboardRepository,
 )
@@ -35,44 +32,6 @@ from app.main import app
 from app.models.game_session import GameSession as GameSessionModel
 from app.models.leaderboard import LeaderboardEntry as LeaderboardEntryModel
 from app.models.user import User as UserModel
-
-
-# ── Fixtures ──
-
-@pytest.fixture
-def fk_client():
-    """Variant of the default `client` fixture that keeps SQLite FK enforcement on
-    so cascade tests actually exercise ON DELETE CASCADE / SET NULL."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-
-    @event.listens_for(engine, "connect")
-    def _enable_fk(dbapi_conn, _conn_record):
-        cur = dbapi_conn.cursor()
-        try:
-            cur.execute("PRAGMA foreign_keys=ON")
-        finally:
-            cur.close()
-
-    TestSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-
-    def override_get_db():
-        db = TestSession()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-    limiter.enabled = False
-    yield TestClient(app), TestSession
-    limiter.enabled = True
-    app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine)
 
 
 def _register_and_token(client, username):
@@ -322,8 +281,7 @@ class TestAbuseCases:
 # ── 5. FK-cascade on user deletion ──────────────────────────────────────────
 
 class TestUserDeletionCascade:
-    def test_deleting_user_cascades_sessions_and_nulls_leaderboard_session_id(self, fk_client):
-        client, TestSession = fk_client
+    def test_deleting_user_cascades_sessions_and_nulls_leaderboard_session_id(self, client, session_factory):
         token = _register_and_token(client, "cascade_user")
 
         sid = client.post("/api/sessions", json={"level": 1}, headers=_auth(token)).json()["id"]
@@ -334,7 +292,7 @@ class TestUserDeletionCascade:
         )
 
         # Sanity: rows exist before deletion
-        db = TestSession()
+        db = session_factory()
         try:
             user = db.query(UserModel).filter(UserModel.username == "cascade_user").one()
             assert db.query(GameSessionModel).filter(GameSessionModel.user_id == user.id).count() == 1
@@ -348,7 +306,7 @@ class TestUserDeletionCascade:
         finally:
             db.close()
 
-        db = TestSession()
+        db = session_factory()
         try:
             # game_sessions: ON DELETE CASCADE → rows gone
             assert db.query(GameSessionModel).filter(GameSessionModel.id == sid).count() == 0
@@ -361,25 +319,13 @@ class TestUserDeletionCascade:
 
 # ── 6. Parametrised SessionStatus × command matrix ──────────────────────────
 
-@pytest.fixture
-def db_session():
-    """Standalone in-memory SQLite session (no FastAPI client) for direct
-    aggregate × repository commit checks."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    TestSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-    db = TestSession()
 
-    # Seed a user we can hang sessions off
-    user = UserModel(id="u-matrix", username="u_matrix", password_hash="x")
-    db.add(user)
-    db.commit()
-    yield db
-    db.close()
+@pytest.fixture
+def matrix_db(db_session):
+    """PG session seeded with the user we hang parametrised sessions off."""
+    db_session.add(UserModel(id="u-matrix", username="u_matrix", password_hash="x"))
+    db_session.commit()
+    return db_session
 
 
 def _seed_session(db, status: SessionStatus) -> str:
@@ -411,18 +357,18 @@ class TestSessionStatusCommandMatrix:
         elif command == "abandon":
             service.abandon_session(sid, "u-matrix")
 
-    def test_db_state_after_commit(self, db_session, source, command):
-        sid = _seed_session(db_session, source)
+    def test_db_state_after_commit(self, matrix_db, source, command):
+        sid = _seed_session(matrix_db, source)
         # Re-bind a fresh service per test (UoW has internal commit flag)
         try:
-            self._run_command(command, db_session, sid)
+            self._run_command(command, matrix_db, sid)
             ok = True
         except (SessionNotActiveError, SessionNotFoundError):
-            db_session.rollback()
+            matrix_db.rollback()
             ok = False
         # Read row freshly
         row = (
-            db_session.query(GameSessionModel)
+            matrix_db.query(GameSessionModel)
             .filter(GameSessionModel.id == sid)
             .one()
         )

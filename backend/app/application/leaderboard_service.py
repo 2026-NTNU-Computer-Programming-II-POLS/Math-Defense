@@ -14,6 +14,7 @@ from app.domain.errors import (
 )
 from app.domain.value_objects import Level, Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
+from app.utils.integrity import is_constraint_violation
 
 if TYPE_CHECKING:
     from app.domain.leaderboard.repository import LeaderboardRepository
@@ -84,10 +85,11 @@ class LeaderboardApplicationService:
             try:
                 self._uow.commit()
             except IntegrityError as e:
-                # Belt-and-braces: if the row-lock didn't serialise (e.g. SQLite
-                # ignores FOR UPDATE), the unique constraint on session_id still
-                # rejects the duplicate. Surface it as a clean 409.
-                if "uq_leaderboard_session_id" in str(getattr(e, "orig", "")) or "session_id" in str(getattr(e, "orig", "")):
+                # Belt-and-braces behind the row-lock in find_by_id_for_update:
+                # a duplicate submission that slips past the lock still trips
+                # the unique constraint. Match the exact constraint so unrelated
+                # FK violations don't get silently mis-mapped to 409.
+                if is_constraint_violation(e, constraint_name="uq_leaderboard_session_id"):
                     raise DuplicateSubmissionError("Score already submitted for this session") from e
                 raise
 

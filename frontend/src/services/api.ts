@@ -12,6 +12,11 @@ export class ApiError extends Error {
   }
 }
 
+// Requests over this wall-clock time are aborted. Keeps the UI from hanging
+// indefinitely if the backend disappears; tuned above the slowest expected
+// leaderboard page render and well below any human patience threshold.
+const REQUEST_TIMEOUT_MS = 10_000
+
 function getToken(): string | null {
   return localStorage.getItem('auth_token')
 }
@@ -33,8 +38,35 @@ async function request<T>(
   const token = getToken()
   if (token && token.length > 0) headers['Authorization'] = `Bearer ${token}`
 
+  // Compose a single AbortSignal from (a) the caller's signal, if any, and
+  // (b) our own timeout. Either trigger aborts the fetch. Using a dedicated
+  // controller (rather than AbortSignal.any / AbortSignal.timeout, which
+  // aren't available everywhere) keeps this working on older browsers.
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const callerSignal = options.signal
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort()
+    else callerSignal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+
   const url = API_BASE_URL && path.startsWith('/') ? `${API_BASE_URL}${path}` : path
-  const res = await fetch(url, { ...options, headers })
+  let res: Response
+  try {
+    res = await fetch(url, { ...options, headers, signal: controller.signal })
+  } catch (e) {
+    // Caller-initiated abort: re-throw so consumers can detect & ignore it
+    // (e.g. a newer request superseded this one). Otherwise the abort came
+    // from our own timeout — surface as a dedicated ApiError so UIs can
+    // distinguish "server is slow/down" from other network failures.
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      if (callerSignal?.aborted) throw e
+      throw new ApiError(0, 'Request timed out')
+    }
+    throw e
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
@@ -63,14 +95,18 @@ async function request<T>(
   return res.json() as Promise<T>
 }
 
+export interface ApiOptions {
+  signal?: AbortSignal
+}
+
 export const api = {
-  get<T>(path: string) {
-    return request<T>(path)
+  get<T>(path: string, opts: ApiOptions = {}) {
+    return request<T>(path, { signal: opts.signal })
   },
-  post<T>(path: string, body: unknown) {
-    return request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+  post<T>(path: string, body: unknown, opts: ApiOptions = {}) {
+    return request<T>(path, { method: 'POST', body: JSON.stringify(body), signal: opts.signal })
   },
-  patch<T>(path: string, body: unknown) {
-    return request<T>(path, { method: 'PATCH', body: JSON.stringify(body) })
+  patch<T>(path: string, body: unknown, opts: ApiOptions = {}) {
+    return request<T>(path, { method: 'PATCH', body: JSON.stringify(body), signal: opts.signal })
   },
 }

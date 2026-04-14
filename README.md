@@ -45,7 +45,7 @@ Browser
                           ├─ Routers (HTTP translation + error mapping)
                           ├─ Application Services (use cases)
                           ├─ Domain Aggregates (GameSession, LeaderboardEntry)
-                          └─ SQLAlchemy Repositories → SQLite
+                          └─ SQLAlchemy Repositories → PostgreSQL
 ```
 
 ---
@@ -57,7 +57,7 @@ Browser
 | Frontend | Vue 3 (Composition API, `<script setup>`), TypeScript 5.9 strict, Pinia, Vue Router, Vite 8, Vitest |
 | Backend | FastAPI 0.115, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
 | WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`) |
-| Database | SQLite (dev; Alembic-ready) |
+| Database | PostgreSQL 16 (Alembic migrations) |
 | Container | Docker, Docker Compose |
 
 ---
@@ -137,7 +137,8 @@ Create `.env` at the project root (see `.env.example`):
 | Variable | Required | Description |
 |---|---|---|
 | `SECRET_KEY` | Yes | JWT signing secret — minimum 16 characters |
-| `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `sqlite:///./data/math_defense.db` |
+| `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense` |
+| `POSTGRES_PASSWORD` | Yes | Password for the `postgres` service (matches the password embedded in `DATABASE_URL`) |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
 
 ---
@@ -168,7 +169,7 @@ cd backend  && pytest              # 69 tests (DDD aggregates, routers, coverage
 cd frontend && npm test            # 13 test files, ~500 assertions (systems, engine, WASM bridge)
 ```
 
-The frontend uses Vitest with `happy-dom`; the backend uses pytest with an in-memory SQLite database.
+The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
 
 ---
 

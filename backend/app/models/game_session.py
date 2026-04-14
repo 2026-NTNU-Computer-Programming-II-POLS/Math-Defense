@@ -15,7 +15,6 @@ class GameSession(Base):
             "uq_one_active_per_user",
             "user_id",
             unique=True,
-            sqlite_where=text("status = 'active'"),
             postgresql_where=text("status = 'active'"),
         ),
         CheckConstraint("level BETWEEN 1 AND 4", name="ck_game_session_level_range"),

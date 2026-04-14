@@ -13,8 +13,8 @@ REST API server for Math Defense: authentication, game-session lifecycle, and le
 | Validation | Pydantic v2 + pydantic-settings |
 | Auth | PyJWT (HS256) + bcrypt |
 | Rate Limiting | slowapi |
-| Database | SQLite (dev) |
-| Testing | pytest + pytest-asyncio (69 tests) |
+| Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
+| Testing | pytest + pytest-asyncio |
 
 ---
 
@@ -67,7 +67,7 @@ backend/
 │   └── utils/security.py          hash_password, verify_password, create_access_token
 │
 ├── tests/
-│   ├── conftest.py                Fixtures (in-memory SQLite, test client, auth helpers)
+│   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py               (5)
 │   ├── test_game_session.py       (11)
 │   ├── test_leaderboard.py        (4)
@@ -252,7 +252,7 @@ cp ../.env.example ../.env       # then fill in SECRET_KEY
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The SQLite database file is created automatically on first run (path from `DATABASE_URL`). Interactive API docs: http://localhost:8000/docs.
+The schema is applied on first boot via `alembic upgrade head` (invoked from the FastAPI `lifespan`). Interactive API docs: http://localhost:8000/docs.
 
 ### Docker
 
@@ -267,7 +267,7 @@ docker-compose up backend        # from project root
 | Variable | Required | Description |
 |---|---|---|
 | `SECRET_KEY` | Yes | JWT signing secret — minimum 16 characters |
-| `DATABASE_URL` | Yes | SQLAlchemy URL, default `sqlite:///./data/math_defense.db` |
+| `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense` |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins |
 | `ALGORITHM` | No | JWT algorithm (default `HS256`) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `30` |
@@ -283,14 +283,14 @@ pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 ```
 
-The test suite uses an isolated in-memory SQLite database (see `tests/conftest.py`) and never touches the dev database. Notable coverage includes:
+The test suite targets a dedicated PostgreSQL database (the dev DB name with a `_test` suffix; auto-created on first run). Each test truncates all tables before it starts so the suite shares one connection pool without cross-test pollution. Notable coverage includes:
 
 - Aggregate state-transition matrix (`SessionStatus × {update, complete, abandon}` — 12 cases)
 - Stale-session auto-abandon side-effect ordering (must commit *before* raising)
 - Per-level vs global `dense_rank` partitioning
 - Real rate-limiter enablement (session create → 429 at 30/min)
 - Abuse cases: negative hp, `score` going backwards, score delta > 50 000
-- FK cascade behaviour (with a dedicated fixture that enables `PRAGMA foreign_keys=ON`)
+- FK cascade behaviour (PG enforces `ON DELETE CASCADE` / `SET NULL` natively — no fixture gymnastics)
 
 ---
 

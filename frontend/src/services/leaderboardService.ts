@@ -16,10 +16,10 @@ export interface LeaderboardResponse {
 }
 
 export const leaderboardService = {
-  get(level?: number, page = 1, perPage = 20) {
+  get(level?: number, page = 1, perPage = 20, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
     if (level != null) params.set('level', String(level))
-    return api.get<LeaderboardResponse>(`/api/leaderboard?${params}`)
+    return api.get<LeaderboardResponse>(`/api/leaderboard?${params}`, { signal })
   },
   submit(payload: {
     level: number

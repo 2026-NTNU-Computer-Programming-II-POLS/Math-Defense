@@ -108,8 +108,9 @@ class StartedAtMutationError(RuntimeError):
 
 
 def _ensure_utc(value: datetime | None) -> datetime | None:
-    # SQLite (and any DateTime column without timezone=True) returns naive datetimes;
-    # treat them as UTC so downstream comparisons against datetime.now(UTC) are well-defined.
+    # All DateTime columns are tz-aware under PG, so this is a safety net that
+    # normalises any stray naive datetime to UTC before it hits downstream
+    # comparisons (e.g. started_at < now - STALE_CUTOFF).
     if value is None:
         return None
     if value.tzinfo is None:

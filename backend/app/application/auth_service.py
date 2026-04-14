@@ -26,6 +26,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Precomputed bcrypt hash of an unreachable password. Used to equalise login
+# latency between "user not found" and "user found, wrong password" so an
+# attacker can't enumerate valid usernames by timing the response.
+_DUMMY_PASSWORD_HASH = hash_password("__timing_equaliser__")
+
 
 class AuthApplicationService:
 
@@ -57,7 +62,13 @@ class AuthApplicationService:
     def login(self, username: str, password: str) -> tuple[User, str]:
         """Authenticate credentials and issue an access token."""
         user = self._user_repo.find_by_username(username)
-        if not user or not verify_password(password, user.password_hash):
+        # Always run one bcrypt verify so the "user not found" and "wrong
+        # password" branches take the same wall-clock time. Without this,
+        # an attacker can enumerate valid usernames via response timing.
+        if user is None:
+            verify_password(password, _DUMMY_PASSWORD_HASH)
+            raise InvalidCredentialsError("Invalid username or password")
+        if not verify_password(password, user.password_hash):
             raise InvalidCredentialsError("Invalid username or password")
         token = create_access_token({"sub": user.id})
         return user, token

@@ -11,6 +11,20 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mathdefense
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: math_defense
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U mathdefense -d math_defense"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,10 +35,10 @@ jobs:
       - run: pip install -r requirements.txt
       - name: pytest
         env:
-          # Minimal env so pydantic-settings is satisfied during test collection;
-          # the test suite's conftest swaps in an in-memory SQLite anyway.
-          SECRET_KEY: ci-placeholder-secret-key-not-used
-          DATABASE_URL: sqlite:///./data/ci.db
+          SECRET_KEY: ci-placeholder-secret-key-not-used-in-prod
+          # conftest derives the test DB name by appending _test; it also creates
+          # the DB on first run against the postgres admin DB.
+          DATABASE_URL: postgresql+psycopg://mathdefense:changeme@localhost:5432/math_defense
           CORS_ORIGINS: http://localhost:5173
         run: pytest -q
 

@@ -7,15 +7,18 @@ _MIN_SECRET_KEY_LENGTH = 16
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Default lands inside the docker volume mount so dev / docker / tests share a path
-    database_url: str = "sqlite:///./data/math_defense.db"
+    # Scheme is `postgresql+psycopg` (psycopg v3) rather than the bare `postgresql`
+    # alias, which SQLAlchemy still resolves to the unmaintained psycopg2.
+    database_url: str = "postgresql+psycopg://mathdefense:changeme@localhost:5432/math_defense"
     secret_key: str  # Required — must be set via SECRET_KEY env var or .env file
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30  # 30 minutes
     # Required — set CORS_ORIGINS env var (comma-separated) to the browser-visible origins.
     # No default: a hard-coded localhost list silently breaks prod deployments behind nginx.
-    cors_origins: list[str]
-    auto_create_tables: bool = True  # Set to False in production when using Alembic migrations
+    # Union is load-bearing: pydantic-settings only tolerates JSON-decode failure on
+    # complex-type *unions*, so the `parse_cors_origins` validator below never runs for
+    # a plain `list[str]` annotation (a comma-separated string trips JSON.loads first).
+    cors_origins: str | list[str]
     # Active sessions older than this are treated as stale and auto-abandoned.
     session_stale_cutoff_hours: float = 2.0
 
@@ -41,14 +44,12 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def require_cors_in_prod(self) -> "Settings":
-        # In prod mode (auto_create_tables=False gates Alembic-managed deployments)
-        # an empty CORS_ORIGINS disables all browser origins — requests then fail
+    def require_non_empty_cors(self) -> "Settings":
+        # An empty list silently disables all browser origins — requests then fail
         # with a vague CORS error instead of surfacing the misconfiguration.
-        if not self.auto_create_tables and not self.cors_origins:
+        if not self.cors_origins:
             raise ValueError(
-                "CORS_ORIGINS must be set (comma-separated) in production mode "
-                "(auto_create_tables=False). Empty list silently blocks browsers."
+                "CORS_ORIGINS must be set (comma-separated). Empty list silently blocks browsers."
             )
         return self
 

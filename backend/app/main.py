@@ -1,12 +1,16 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
 from app.config import settings
-from app.db.database import create_tables
 from app.domain.errors import DomainError
 from app.routers import auth, leaderboard, game_session
 from app.limiter import limiter
@@ -17,14 +21,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# backend/app/main.py -> backend/app -> backend -> backend/alembic.ini
+_ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    if settings.auto_create_tables:
-        create_tables()
-        logger.info("Database tables ensured (dev mode: create_all)")
-    else:
-        logger.info("Skipping create_all — use Alembic migrations for schema changes")
+    # Alembic is the single source of truth for schema. `upgrade head` is idempotent
+    # when the DB is already current, so running it every boot is cheap and removes
+    # the prior race between Base.metadata.create_all and operator-run migrations.
+    cfg = Config(str(_ALEMBIC_INI))
+    command.upgrade(cfg, "head")
+    logger.info("Alembic: schema at head")
     yield
 
 

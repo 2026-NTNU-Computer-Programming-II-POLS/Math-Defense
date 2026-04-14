@@ -36,6 +36,18 @@ export function useSessionSync() {
       if (gen !== createGeneration) return null  // stale request — abort
       try {
         const session = await sessionService.create(levelNum)
+        // Late arrival: a newer LEVEL_START fired while we were awaiting.
+        // The session we just created is still ACTIVE server-side and would
+        // linger for 2h until the stale sweep — abandon it now so the next
+        // create doesn't collide with the one-active-per-user index and so
+        // we don't leak resources. Fire-and-forget; a failing abandon will
+        // be cleaned up by cleanupOrphanSession on next mount.
+        if (gen !== createGeneration) {
+          sessionService.abandon(session.id).catch((err) =>
+            console.warn('[SessionSync] Failed to abandon late-arrival session:', err),
+          )
+          return null
+        }
         return session.id
       } catch (e) {
         console.warn(`[SessionSync] Create attempt ${attempt + 1} failed:`, e)

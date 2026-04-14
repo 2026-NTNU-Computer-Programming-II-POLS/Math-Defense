@@ -11,6 +11,7 @@ from app.domain.value_objects import Level, Score, GameResult, SessionStatus
 from app.domain.session.aggregate import GameSession
 from app.domain.session.events import SessionCompleted
 from app.domain.leaderboard.aggregate import LeaderboardEntry
+from app.utils.integrity import is_constraint_violation
 
 if TYPE_CHECKING:
     from app.domain.session.repository import GameSessionRepository
@@ -41,8 +42,10 @@ class SessionApplicationService:
         self._uow = uow
 
     def create_session(self, user_id: str, level: int) -> GameSession:
-        # Two concurrent creates can both pass find_active_by_user (SQLite ignores FOR UPDATE),
-        # then collide on the unique partial index. Retry once after abandoning the row that won.
+        # Under PG, find_active_by_user holds a row lock via with_for_update, so the
+        # race between concurrent creates is closed. The retry here is defence-in-depth
+        # for the case where no row exists yet (FOR UPDATE has nothing to lock) and
+        # two inserts both reach the unique partial index simultaneously.
         for attempt in range(2):
             try:
                 return self._create_session_once(user_id, level)
@@ -211,16 +214,8 @@ class SessionApplicationService:
 def _is_active_session_conflict(err: IntegrityError) -> bool:
     """Return True iff err was raised by the one-active-session-per-user unique index.
 
-    We don't want to blindly retry on any IntegrityError — FK, check, or unrelated
-    unique violations indicate a real bug and must surface. We look at the driver
-    exception text (portable across SQLite/Postgres) for the index name.
+    FK, check, or unrelated unique violations indicate a real bug and must
+    surface — so we match on the exact constraint/index name rather than
+    any broader heuristic.
     """
-    orig = getattr(err, "orig", None)
-    if orig is None:
-        return False
-    # Postgres: psycopg2 exposes .diag.constraint_name; fall through to string match otherwise.
-    diag = getattr(orig, "diag", None)
-    constraint = getattr(diag, "constraint_name", None) if diag is not None else None
-    if constraint == _ACTIVE_SESSION_UNIQUE_INDEX:
-        return True
-    return _ACTIVE_SESSION_UNIQUE_INDEX in str(orig)
+    return is_constraint_violation(err, constraint_name=_ACTIVE_SESSION_UNIQUE_INDEX)
