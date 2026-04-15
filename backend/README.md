@@ -23,27 +23,36 @@ REST API server for Math Defense: authentication, game-session lifecycle, and le
 ```
 backend/
 ├── app/
-│   ├── main.py                    FastAPI factory, CORS, lifespan, router registration
+│   ├── main.py                    FastAPI factory, CORS, lifespan (Alembic upgrade), global DomainError/ValueError handlers
 │   ├── config.py                  Settings (Pydantic): SECRET_KEY, DATABASE_URL, CORS_ORIGINS, ...
 │   ├── limiter.py                 slowapi Limiter instance shared across routers
+│   ├── shared_constants.py        Loads shared/game-constants.json so Python sees the same canvas / grid / player values as the frontend
 │   │
 │   ├── domain/                    ── DOMAIN LAYER ──
 │   │   ├── value_objects.py       SessionStatus enum, Level, Score, GameResult
+│   │   ├── constraints.py         Numeric bounds (LEVEL/SCORE/HP/GOLD/KILLS/WAVES ranges, MAX_SCORE_DELTA) — single source of truth
+│   │   ├── errors.py              DomainError hierarchy; each subclass carries its own HTTP status_code
 │   │   ├── session/
 │   │   │   ├── aggregate.py       GameSession aggregate root (state machine + invariants + events)
 │   │   │   ├── events.py          SessionCreated / Updated / Completed / Abandoned
 │   │   │   └── repository.py      Repository Protocol (interface only)
-│   │   └── leaderboard/
-│   │       ├── aggregate.py       LeaderboardEntry aggregate
+│   │   ├── leaderboard/
+│   │   │   ├── aggregate.py       LeaderboardEntry aggregate
+│   │   │   └── repository.py      Repository Protocol
+│   │   └── user/
+│   │       ├── aggregate.py       User aggregate root (password_hash only — plaintext never reaches domain)
 │   │       └── repository.py      Repository Protocol
 │   │
 │   ├── application/               ── APPLICATION LAYER ──
+│   │   ├── auth_service.py        AuthApplicationService — register / login / authenticate_token
 │   │   ├── session_service.py     Session use cases; consumes SessionCompleted to auto-create leaderboard
-│   │   └── leaderboard_service.py Leaderboard query + manual score submission (idempotent)
+│   │   ├── leaderboard_service.py Leaderboard query + manual score submission (idempotent)
+│   │   └── mappers.py             Aggregate → Pydantic DTO mappers; keeps domain free of Pydantic imports
 │   │
 │   ├── infrastructure/            ── INFRASTRUCTURE LAYER ──
 │   │   ├── unit_of_work.py        SqlAlchemyUnitOfWork — explicit commit; auto-rollback on exit
 │   │   └── persistence/
+│   │       ├── user_repository.py         SQLAlchemy impl of UserRepository
 │   │       ├── session_repository.py      SQLAlchemy impl of SessionRepository
 │   │       └── leaderboard_repository.py  SQLAlchemy impl with per-level DENSE_RANK ranking
 │   │
@@ -57,23 +66,27 @@ backend/
 │   │   ├── game_session.py
 │   │   └── leaderboard.py
 │   │
-│   ├── routers/                   HTTP adapters — translate + map error codes only
+│   ├── routers/                   HTTP adapters — thin controllers; error translation lives in main.py handlers
 │   │   ├── auth.py                /api/auth
 │   │   ├── game_session.py        /api/sessions
 │   │   └── leaderboard.py         /api/leaderboard
 │   │
 │   ├── db/database.py             Engine, Base, get_db() session factory
-│   ├── middleware/auth.py         get_current_user() dependency (JWT → User)
-│   └── utils/security.py          hash_password, verify_password, create_access_token
+│   ├── middleware/auth.py         get_current_user() dependency (JWT → User aggregate)
+│   └── utils/security.py          hash_password, verify_password, create_access_token, decode_token
+│
+├── alembic/                       Alembic migration environment (versions/ + env.py)
+├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
 ├── tests/
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
-│   ├── test_auth.py               (5)
-│   ├── test_game_session.py       (11)
-│   ├── test_leaderboard.py        (4)
-│   ├── test_session_aggregate.py  (22) — pure aggregate unit tests
-│   ├── test_value_objects.py      (15) — VO invariants
-│   └── test_coverage_gaps.py      (12) — audit-driven edge cases
+│   ├── test_auth.py                       (5)
+│   ├── test_game_session.py               (11)
+│   ├── test_leaderboard.py                (6)
+│   ├── test_session_aggregate.py          (26) — pure aggregate unit tests
+│   ├── test_value_objects.py              (15) — VO invariants
+│   ├── test_coverage_gaps.py              (12) — audit-driven edge cases
+│   └── test_shared_constants_parity.py    (3)  — Python ↔ shared/game-constants.json parity
 │
 ├── requirements.txt
 └── Dockerfile
@@ -88,16 +101,24 @@ backend/
 Pure Python — no SQLAlchemy, no FastAPI.
 
 - **Value objects** (`value_objects.py`): `SessionStatus` enum, `Level` (1–4), `Score` (0 – 9,999,999), `GameResult`. Immutable dataclasses that validate on construction.
+- **Constraints** (`constraints.py`): numeric bounds (level / score / hp / gold / kills / waves ranges, `MAX_SCORE_DELTA`) — imported by both Pydantic schemas and value-object/aggregate invariants so each limit is encoded exactly once.
 - **`GameSession` aggregate** (`session/aggregate.py`): the root. Owns its state transitions via `_ALLOWED_TRANSITIONS`; `update_progress()` / `complete()` / `abandon()` raise if called in an illegal status. Score is monotonic; per-update deltas are capped to reject obvious abuse. Emits domain events into an internal buffer collected by the application layer.
 - **`LeaderboardEntry` aggregate** — created from a `GameSession` result. Holds `score` as a `Score` VO.
+- **`User` aggregate** (`user/aggregate.py`) — stable `id`, immutable `password_hash`. Plaintext passwords never reach the domain — hashing happens in `AuthApplicationService` before construction.
+- **Errors** (`errors.py`): `DomainError` hierarchy. Each subclass owns its `status_code`; the global exception handler in `main.py` reads the attribute so routers never see try/except walls.
 - **Repository protocols** — interface-only (`typing.Protocol`) so the domain never imports from `infrastructure/`.
 
 ### Application
 
 Use-case orchestration. One method per user intent.
 
+- **`AuthApplicationService`**
+  - `register(username, password)` — hashes the password with bcrypt, persists a `User`, returns `(user, access_token)`. `UsernameTakenError` on unique-violation.
+  - `login(username, password)` — `InvalidCredentialsError` on mismatch.
+  - `authenticate_token(token)` — decodes the JWT and loads the `User`; raises `InvalidTokenError` / `UserNotFoundError`. Used by the `get_current_user` dependency.
 - **`SessionApplicationService`**
   - `create_session(user_id, level)` — abandons stale sessions (>2h) and any existing active session, then creates a new one. Retries once on `IntegrityError` to handle the race against the partial-unique index.
+  - `get_active_for_user(user_id)` — returns the caller's active session or `None`.
   - `update_session(session_id, user_id, **patch)` — delegates to aggregate; auto-abandons if stale before raising `SessionStaleError` (committed first so the abandon persists).
   - `end_session(session_id, user_id, score, kills, waves_survived)` — transitions to COMPLETED, then **consumes the `SessionCompleted` event within the same UoW** to create a `LeaderboardEntry` (idempotent via `find_by_session_id`).
   - `abandon_session(session_id, user_id)` — idempotent.
@@ -105,7 +126,7 @@ Use-case orchestration. One method per user intent.
   - `get_leaderboard(level, page, per_page)` — per-level `DENSE_RANK` when `level` is provided, global rank otherwise.
   - `submit_score(...)` — manual fallback if the auto-submit path fails.
 
-Exceptions: `SessionNotFoundError`, `SessionStaleError`, `SessionValidationError`, `PermissionDeniedError`, `DuplicateSubmissionError`. Routers map these to HTTP status codes.
+All domain errors (`SessionNotFoundError`, `SessionStaleError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `PermissionDeniedError`, `DuplicateSubmissionError`, `UsernameTakenError`, `InvalidCredentialsError`, `InvalidTokenError`, `UserNotFoundError`, `SessionValidationError`) inherit from `DomainError` and carry their own `status_code`. The global handler in `main.py` surfaces them — routers never translate manually. Aggregate invariants that raise plain `ValueError` are mapped to `422` by a second handler. `mappers.py` converts aggregates to Pydantic DTOs so routers stay one-liners.
 
 ### Infrastructure
 
@@ -182,14 +203,15 @@ Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars
 
 **Error codes**
 
-| Code | Meaning |
-|---|---|
-| `404` | `SessionNotFoundError` |
-| `410` | `SessionStaleError` (session > 2h active — auto-abandoned) |
-| `422` | `SessionValidationError` (invalid transition, bounds violation) |
-| `403` | `PermissionDeniedError` (session not owned by caller) |
-| `409` | `DuplicateSubmissionError` (manual submit for already-scored session) |
-| `429` | Rate limit exceeded |
+| Code | Domain error(s) | Meaning |
+|---|---|---|
+| `401` | `InvalidCredentialsError`, `InvalidTokenError`, `UserNotFoundError` | Login mismatch / bad or expired JWT |
+| `403` | `PermissionDeniedError` | Session not owned by caller |
+| `404` | `SessionNotFoundError` | Session id does not exist |
+| `409` | `UsernameTakenError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `DuplicateSubmissionError` | Conflict: unique violation, illegal state transition, already-scored session |
+| `410` | `SessionStaleError` | Session > 2h active — auto-abandoned before raise |
+| `422` | `ValueError` from aggregate invariants | Bounds violation, score going backwards, delta > 50 000 |
+| `429` | slowapi `RateLimitExceeded` | Rate limit exceeded |
 
 ### Leaderboard — `/api/leaderboard`
 
@@ -267,18 +289,21 @@ docker-compose up backend        # from project root
 | Variable | Required | Description |
 |---|---|---|
 | `SECRET_KEY` | Yes | JWT signing secret — minimum 16 characters |
-| `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense` |
-| `CORS_ORIGINS` | Yes | Comma-separated browser origins |
+| `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense`. Scheme must be `postgresql+psycopg` (psycopg v3); the bare `postgresql://` alias resolves to unmaintained psycopg2. |
+| `POSTGRES_PASSWORD` | Yes (Docker) | Password for the `postgres` service. Must match the password embedded in `DATABASE_URL`. |
+| `CORS_ORIGINS` | Yes | Comma-separated browser origins. No default — an absent value raises at startup rather than silently defaulting to localhost in prod. |
 | `ALGORITHM` | No | JWT algorithm (default `HS256`) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `30` |
-| `AUTO_CREATE_TABLES` | No | Default `True`; set `False` in production (use Alembic) |
+| `SESSION_STALE_CUTOFF_HOURS` | No | Default `2.0`; active sessions older than this are auto-abandoned |
+
+> Schema is managed exclusively by Alembic — `lifespan` runs `alembic upgrade head` on boot. There is no `AUTO_CREATE_TABLES` toggle (removed during the PostgreSQL-only migration).
 
 ---
 
 ## Testing
 
 ```bash
-pytest                                      # all 69 tests
+pytest                                      # all 78 tests
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 ```

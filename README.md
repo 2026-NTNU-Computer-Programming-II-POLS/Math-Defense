@@ -27,10 +27,11 @@ Math Game/
 ├── shared/            Shared constants (canvas size, grid bounds, player defaults)
 ├── assets/            Sprites, audio, fonts
 ├── emsdk/             Vendored Emscripten SDK for WASM builds
-├── docker-compose.yml Orchestration for frontend + backend containers
-├── nginx.conf         Production reverse-proxy config (SPA + /api)
-├── .env.example       Template for required environment variables
-└── Math_Defense_Spec.md  Full game-design specification
+├── docker-compose.yml        Dev orchestration: Postgres + backend (hot reload) + frontend (Vite)
+├── docker-compose.prod.yml   Prod orchestration: images are self-contained, nginx terminates /api
+├── nginx.conf                Production reverse-proxy config (SPA + /api)
+├── .env.example              Template for required environment variables
+└── Math_Defense_Spec.md      Full game-design specification
 ```
 
 The three runtime layers communicate as follows:
@@ -42,9 +43,10 @@ Browser
        ├─ Game Engine (ECS-style systems, Canvas rendering, fixed 60 FPS)
        │    └─ WasmBridge → math_engine.wasm (C, Emscripten) with JS fallback
        └─ Services → FastAPI Backend
-                          ├─ Routers (HTTP translation + error mapping)
-                          ├─ Application Services (use cases)
-                          ├─ Domain Aggregates (GameSession, LeaderboardEntry)
+                          ├─ Routers (thin controllers)
+                          ├─ Global exception handlers → HTTP status from DomainError.status_code
+                          ├─ Application Services (Auth / Session / Leaderboard use cases)
+                          ├─ Domain Aggregates (User, GameSession, LeaderboardEntry)
                           └─ SQLAlchemy Repositories → PostgreSQL
 ```
 
@@ -165,8 +167,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 69 tests (DDD aggregates, routers, coverage gaps)
-cd frontend && npm test            # 13 test files, ~500 assertions (systems, engine, WASM bridge)
+cd backend  && pytest              # 78 tests (DDD aggregates, routers, coverage gaps, shared-constants parity)
+cd frontend && npm test            # 13 test files, 117 tests (systems, engine, WASM bridge)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
@@ -175,7 +177,11 @@ The frontend uses Vitest with `happy-dom`; the backend uses pytest against a rea
 
 ## Production Deployment
 
-A sample `nginx.conf` is included at the project root — it serves the Vite `dist/` build as an SPA and reverse-proxies `/api/` to the backend container. CORS preflight is short-circuited at the nginx layer and response headers are forwarded from the backend.
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+`docker-compose.prod.yml` builds self-contained images (no bind-mounted source) and fronts them with nginx. `nginx.conf` serves the Vite `dist/` build as an SPA and reverse-proxies `/api/` to the backend container; CORS preflight is short-circuited at the nginx layer and response headers are forwarded from the backend. Postgres is only reachable from the docker network — no host port is published.
 
 ---
 

@@ -368,7 +368,7 @@ npm install
 npm run dev        # Vite dev server at http://localhost:5173
 npm run build      # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
 npm run preview    # Preview the production build
-npm test           # Vitest — 13 test files, ~500 assertions
+npm test           # Vitest — 13 test files, 117 tests
 npm run test:watch # Vitest in watch mode
 ```
 
