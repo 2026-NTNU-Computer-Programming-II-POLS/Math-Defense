@@ -50,7 +50,7 @@ router.beforeEach(async (to) => {
   // This prevents granting access based on stale state during initialization.
   if (auth.initPromise) await auth.initPromise
   if (auth.isLoggedIn) return true
-  return { name: 'auth', query: { next: to.fullPath } }
+  return { name: 'auth', query: { mode: 'login', next: to.fullPath } }
 })
 
 export default router

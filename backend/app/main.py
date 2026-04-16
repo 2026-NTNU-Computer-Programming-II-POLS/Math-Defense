@@ -14,10 +14,11 @@ from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
-from app.db.database import engine
+from app.db.database import engine, SessionLocal
 from app.domain.errors import DomainError
 from app.routers import auth, leaderboard, game_session
 from app.limiter import limiter
+from app.seed import ensure_demo_user
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +47,12 @@ async def lifespan(_app: FastAPI):
         finally:
             conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": _MIGRATION_LOCK_ID})
             conn.commit()
+    # Seed demo user after schema is up-to-date
+    db = SessionLocal()
+    try:
+        ensure_demo_user(db)
+    finally:
+        db.close()
     yield
 
 

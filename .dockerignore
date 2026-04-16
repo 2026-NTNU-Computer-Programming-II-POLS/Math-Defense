@@ -1,0 +1,26 @@
+# Secrets — never send to the Docker daemon
+.env
+.env.*
+certs
+
+# Version control
+.git
+.gitignore
+
+# Emscripten SDK (~1 GB)
+emsdk
+
+# Dependencies installed on the host (containers install their own)
+node_modules
+__pycache__
+*.pyc
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build artifacts
+dist
+*.egg-info

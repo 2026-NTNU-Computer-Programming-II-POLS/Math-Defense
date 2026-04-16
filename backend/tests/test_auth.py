@@ -20,7 +20,7 @@ def test_login(client):
 
 
 def test_login_wrong_password(client):
-    client.post("/api/auth/register", json={"username": "wpuser", "password": "correct"})
+    client.post("/api/auth/register", json={"username": "wpuser", "password": "correct1"})
     res = client.post("/api/auth/login", json={"username": "wpuser", "password": "wrong"})
     assert res.status_code == 401
 

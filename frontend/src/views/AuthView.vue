@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 
@@ -7,7 +7,12 @@ const router = useRouter()
 const route = useRoute()
 const { loading, error, login, register } = useAuth()
 
-const isLogin = ref(true)
+// Default to register mode so first-time visitors land on the right form.
+// Switch to login when arriving from a protected-route redirect (?next=…)
+// or when the caller explicitly requests it (?mode=login).
+const isLogin = ref(
+  route.query.mode === 'login' || (!route.query.mode && !!route.query.next),
+)
 const username = ref('')
 const password = ref('')
 
@@ -22,9 +27,29 @@ const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/
 const PASSWORD_MIN = 8
 const PASSWORD_MAX = 128
 
+// Real-time password rule checks shown during registration
+const passwordRules = reactive({
+  length: false,
+  hasLetter: false,
+  hasDigit: false,
+})
+
+function updatePasswordRules(p: string): void {
+  passwordRules.length = p.length >= PASSWORD_MIN
+  passwordRules.hasLetter = /[a-zA-Z]/.test(p)
+  passwordRules.hasDigit = /[0-9]/.test(p)
+}
+
+function onPasswordInput(event: Event): void {
+  const value = (event.target as HTMLInputElement).value
+  password.value = value
+  if (!isLogin.value) updatePasswordRules(value)
+}
+
 function toggleMode(): void {
   isLogin.value = !isLogin.value
   error.value = ''
+  if (!isLogin.value) updatePasswordRules(password.value)
 }
 
 function validate(u: string, p: string): string {
@@ -78,13 +103,20 @@ async function submit(): Promise<void> {
         <label class="auth-field">
           <span>密碼</span>
           <input
-            v-model="password"
+            :value="password"
             class="rune-input"
             type="password"
             :autocomplete="isLogin ? 'current-password' : 'new-password'"
             required
+            @input="onPasswordInput"
           />
         </label>
+
+        <ul v-if="!isLogin" class="password-rules">
+          <li :class="{ met: passwordRules.length }">至少 8 個字元</li>
+          <li :class="{ met: passwordRules.hasLetter }">包含英文字母</li>
+          <li :class="{ met: passwordRules.hasDigit }">包含數字</li>
+        </ul>
 
         <div v-if="error" class="auth-error">{{ error }}</div>
 
@@ -96,6 +128,10 @@ async function submit(): Promise<void> {
       <button class="btn toggle-btn" @click="toggleMode">
         {{ isLogin ? '沒有帳號？前往註冊' : '已有帳號？前往登入' }}
       </button>
+
+      <p v-if="isLogin" class="demo-hint">
+        體驗帳號：<code>demo</code> / <code>Demo1234</code>
+      </p>
 
       <button class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
     </div>
@@ -141,6 +177,45 @@ async function submit(): Promise<void> {
 .rune-input { width: 100%; }
 
 .auth-error { font-size: 11px; color: var(--enemy-red); }
+
+.password-rules {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--axis);
+  opacity: 0.7;
+}
+
+.password-rules li::before {
+  content: '✕ ';
+  color: var(--enemy-red);
+}
+
+.password-rules li.met::before {
+  content: '✓ ';
+  color: var(--gold);
+}
+
+.password-rules li.met {
+  opacity: 0.5;
+}
+
+.demo-hint {
+  text-align: center;
+  font-size: 10px;
+  color: var(--axis);
+  opacity: 0.6;
+  margin: 0;
+}
+
+.demo-hint code {
+  color: var(--gold);
+  font-family: inherit;
+}
 
 .toggle-btn, .back-btn {
   font-size: 11px;
