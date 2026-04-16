@@ -55,10 +55,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.clearAllMocks()
     // Pretend the user is logged in so the sync path actually runs
     const auth = useAuthStore()
-    // @ts-expect-error — we drive the store directly to avoid mounting auth flow
-    auth.token = 'fake-token'
-    // @ts-expect-error
-    auth.user = { id: 'u1', username: 'tester' }
+    auth.setUser({ id: 'u1', username: 'tester' })
 
     // No orphan session at mount
     vi.mocked(sessionService.getActive).mockResolvedValue(null)

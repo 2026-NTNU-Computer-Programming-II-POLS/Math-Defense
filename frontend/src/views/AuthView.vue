@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
+const route = useRoute()
 const { loading, error, login, register } = useAuth()
 
 const isLogin = ref(true)
@@ -55,7 +56,12 @@ async function submit(): Promise<void> {
     return
   }
   const ok = isLogin.value ? await login(u, p) : await register(u, p)
-  if (ok) router.push('/')
+  if (ok) {
+    const raw = typeof route.query.next === 'string' ? route.query.next : ''
+    // Only allow relative paths to prevent open-redirect attacks
+    const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
+    router.push(next)
+  }
 }
 </script>
 

@@ -1,25 +1,22 @@
 from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 from app.domain.constraints import (
     KILLS_MAX,
     KILLS_MIN,
-    LEVEL_MAX,
-    LEVEL_MIN,
-    SCORE_MAX,
-    SCORE_MIN,
     WAVES_MAX,
     WAVES_MIN,
 )
 
 
 class ScoreSubmission(BaseModel):
-    level: int = Field(ge=LEVEL_MIN, le=LEVEL_MAX)
-    score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
+    # level and score are intentionally absent — the backend reads them from
+    # the authoritative GameSession record to prevent score/level forgery.
     kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
     waves_survived: int = Field(ge=WAVES_MIN, le=WAVES_MAX)
-    # A valid session_id must be provided to prevent score forgery.
-    session_id: str
+    session_id: UUID
 
 
 class LeaderboardEntryOut(BaseModel):

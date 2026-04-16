@@ -4,7 +4,7 @@
  * 3 sin-wave components (frequency/amplitude), with live composite waveform rendering.
  * Boss battle mini-game: tune parameters to match the target waveform.
  */
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { fourierComposite, fourierMatch } from '@/math/WasmBridge'
 
 const props = defineProps<{
@@ -111,8 +111,9 @@ function draw() {
   ctx.stroke()
 }
 
-watch([freqs, amps], draw, { deep: true })
+const stopWatch = watch([freqs, amps], draw, { deep: true })
 onMounted(draw)
+onUnmounted(stopWatch)
 
 const components = [
   { freq: 'freq1', amp: 'amp1', label: '\u03C91 / A\u2081', color: '#c85050' },

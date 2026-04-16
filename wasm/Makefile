@@ -26,6 +26,7 @@ FLAGS = -sEXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
         -sEXPORT_ES6=1 \
         -sEXPORT_NAME=createMathEngine \
         -sALLOW_MEMORY_GROWTH=1 \
+        -sMAXIMUM_MEMORY=268435456 \
         -O2
 
 .PHONY: all clean dts
@@ -44,8 +45,11 @@ $(DTS): $(MAKEFILE_LIST)
 	@mkdir -p $(dir $(DTS))
 	@{ \
 	  echo '// AUTO-GENERATED from wasm/Makefile EXPORTED_FUNCTIONS. Do not edit — run `make` in wasm/ to regenerate.'; \
+	  echo '// Note: _malloc and _free are exported for WASM heap management in WasmBridge'; \
+	  echo '// but are NOT listed here because they are accessed as module._malloc/_free,'; \
+	  echo '// not via ccall/cwrap.'; \
 	  printf 'export type WasmExport =\n'; \
-	  echo "$(EXPORTED_FUNCTIONS)" | tr ',' '\n' | sed -e 's/^_//' -e "s/.*/  | '&'/"; \
+	  echo "$(EXPORTED_FUNCTIONS)" | tr ',' '\n' | grep -v -E '^_(malloc|free)$$' | sed -e 's/^_//' -e "s/.*/  | '&'/"; \
 	  echo ';'; \
 	} > $(DTS)
 

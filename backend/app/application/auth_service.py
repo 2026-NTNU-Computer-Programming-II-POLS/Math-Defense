@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING
 from sqlalchemy.exc import IntegrityError
 
 from app.domain.errors import (
+    AccountLockedError,
     InvalidCredentialsError,
     InvalidTokenError,
     UserNotFoundError,
     UsernameTakenError,
 )
 from app.domain.user.aggregate import User
+from app.infrastructure.token_denylist import is_denied as is_token_denied
 from app.utils.security import (
     hash_password,
     verify_password,
@@ -61,15 +63,26 @@ class AuthApplicationService:
 
     def login(self, username: str, password: str) -> tuple[User, str]:
         """Authenticate credentials and issue an access token."""
+        from app.infrastructure.login_guard import is_locked, record_failure, record_success
+
+        if is_locked(username):
+            raise AccountLockedError(
+                "Account temporarily locked due to too many failed attempts. "
+                "Try again in a few minutes."
+            )
+
         user = self._user_repo.find_by_username(username)
         # Always run one bcrypt verify so the "user not found" and "wrong
         # password" branches take the same wall-clock time. Without this,
         # an attacker can enumerate valid usernames via response timing.
         if user is None:
             verify_password(password, _DUMMY_PASSWORD_HASH)
+            record_failure(username)
             raise InvalidCredentialsError("Invalid username or password")
         if not verify_password(password, user.password_hash):
+            record_failure(username)
             raise InvalidCredentialsError("Invalid username or password")
+        record_success(username)
         token = create_access_token({"sub": user.id})
         return user, token
 
@@ -77,11 +90,26 @@ class AuthApplicationService:
         """Decode a bearer token and return the owning user."""
         payload = decode_token(token)
         if payload is None:
-            raise InvalidTokenError("Token 無效或已過期")
+            raise InvalidTokenError("Token is invalid or expired")
+        jti = payload.get("jti")
+        if jti and is_token_denied(jti):
+            raise InvalidTokenError("Token has been revoked")
         user_id = payload.get("sub")
         if not user_id:
-            raise InvalidTokenError("Token 格式錯誤")
+            raise InvalidTokenError("Token format error")
         user = self._user_repo.find_by_id(user_id)
         if user is None:
-            raise UserNotFoundError("使用者不存在")
+            raise UserNotFoundError("User not found")
         return user
+
+    def logout_token(self, token: str) -> None:
+        """Revoke a token by adding its JTI to the deny-list."""
+        from app.infrastructure.token_denylist import deny
+
+        payload = decode_token(token)
+        if payload is None:
+            return  # already expired, nothing to revoke
+        jti = payload.get("jti")
+        exp = payload.get("exp", 0)
+        if jti:
+            deny(jti, float(exp))

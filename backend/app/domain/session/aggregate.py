@@ -5,8 +5,11 @@ import uuid
 from datetime import datetime, timedelta, UTC
 
 from app.config import settings
-from app.domain.constraints import GOLD_MAX, HP_MAX, MAX_SCORE_DELTA, MAX_WAVE
-from app.domain.errors import InvalidStatusTransitionError, SessionNotActiveError
+from app.domain.constraints import (
+    GOLD_MAX, HP_MAX, MAX_SCORE_DELTA, MAX_WAVE, SCORE_MAX,
+    LEVEL_MAX_SCORES, LEVEL_MAX_KILLS, LEVEL_MAX_WAVES,
+)
+from app.domain.errors import DomainValueError, InvalidStatusTransitionError, SessionNotActiveError
 from app.domain.value_objects import SessionStatus, Level, GameResult
 from app.domain.session.events import (
     SessionCreated,
@@ -20,10 +23,6 @@ from app.shared_constants import INITIAL_GOLD, INITIAL_HP
 def _stale_cutoff() -> timedelta:
     # Read at call time so tests / runtime overrides of the setting take effect.
     return timedelta(hours=settings.session_stale_cutoff_hours)
-
-
-# Kept for backwards compatibility with callers that imported the constant.
-STALE_CUTOFF = _stale_cutoff()
 
 # Bounds live in domain.constraints; the aggregate enforces game rules
 # (hp can't exceed maxHp, score can't decrease, wave can't jump past the max).
@@ -120,7 +119,7 @@ class GameSession:
         self._assert_active("Cannot update a non-active session")
         if current_wave is not None:
             if current_wave < self.current_wave:
-                raise ValueError("current_wave must not decrease")
+                raise DomainValueError("current_wave must not decrease")
             self.current_wave = max(0, min(current_wave, MAX_WAVE))
         if gold is not None:
             self.gold = max(0, min(gold, GOLD_MAX))
@@ -128,9 +127,12 @@ class GameSession:
             self.hp = max(0, min(hp, HP_MAX))
         if score is not None:
             if score < self.score:
-                raise ValueError("score must not decrease")
+                raise DomainValueError("score must not decrease")
             if score - self.score > MAX_SCORE_DELTA:
-                raise ValueError("score delta exceeds plausibility cap")
+                raise DomainValueError("score delta exceeds plausibility cap")
+            level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
+            if score > level_cap:
+                raise DomainValueError("score exceeds level maximum")
             self.score = score
         self._events.append(SessionUpdated(session_id=self.id))
 
@@ -139,9 +141,21 @@ class GameSession:
         self._assert_active("Session already ended, cannot resubmit")
         # Reject end-payload scores that wildly exceed the most recent in-flight score
         if result.score.value < self.score:
-            raise ValueError("final score must not be less than last reported score")
+            raise DomainValueError("final score must not be less than last reported score")
         if result.score.value - self.score > MAX_SCORE_DELTA:
-            raise ValueError("final score delta exceeds plausibility cap")
+            raise DomainValueError("final score delta exceeds plausibility cap")
+
+        # Per-level caps — reject impossible scores/kills/waves (C-02)
+        level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
+        if result.score.value > level_cap:
+            raise DomainValueError("final score exceeds level maximum")
+        kill_cap = LEVEL_MAX_KILLS.get(int(self.level), result.kills + 1)
+        if result.kills > kill_cap:
+            raise DomainValueError("kills exceed level maximum")
+        wave_cap = LEVEL_MAX_WAVES.get(int(self.level), MAX_WAVE)
+        if result.waves_survived > wave_cap:
+            raise DomainValueError("waves_survived exceeds level wave count")
+
         self._transition_to(SessionStatus.COMPLETED)
         self.score = result.score.value
         self.ended_at = datetime.now(UTC)

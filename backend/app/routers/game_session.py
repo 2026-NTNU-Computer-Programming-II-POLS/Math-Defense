@@ -3,6 +3,8 @@
 Error translation lives in the global DomainError / ValueError handlers in
 main.py, so per-endpoint try/except walls are unnecessary here.
 """
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
@@ -57,13 +59,13 @@ def get_active_session(
 @limiter.limit("120/minute")
 def update_session(
     request: Request,
-    session_id: str,
+    session_id: UUID,
     req: SessionUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     session = _get_service(db).update_session(
-        session_id,
+        str(session_id),
         current_user.id,
         current_wave=req.current_wave,
         gold=req.gold,
@@ -77,11 +79,11 @@ def update_session(
 @limiter.limit("30/minute")
 def abandon_session(
     request: Request,
-    session_id: str,
+    session_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).abandon_session(session_id, current_user.id)
+    session = _get_service(db).abandon_session(str(session_id), current_user.id)
     return session_to_out(session)
 
 
@@ -89,13 +91,13 @@ def abandon_session(
 @limiter.limit("30/minute")
 def end_session(
     request: Request,
-    session_id: str,
+    session_id: UUID,
     req: SessionEnd,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     session = _get_service(db).end_session(
-        session_id,
+        str(session_id),
         current_user.id,
         score=req.score,
         kills=req.kills,

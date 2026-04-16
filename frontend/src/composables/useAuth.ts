@@ -11,14 +11,14 @@ export function useAuth() {
     loading.value = true
     error.value = ''
     try {
+      // The backend sets the HTTP-only auth cookie in its response.
       const res = await authService.login(username, password)
-      authStore.setToken(res.access_token)
       try {
         const me = await authService.me()
         authStore.setUser({ id: me.id, username: me.username })
       } catch {
-        // /me failed but login succeeded — use known username from login call
-        authStore.setUser({ id: '', username: res.username ?? username })
+        // /me failed but login succeeded — use known data from login response
+        authStore.setUser({ id: res.id ?? '', username: res.username ?? username })
       }
       return true
     } catch (e) {
@@ -33,14 +33,14 @@ export function useAuth() {
     loading.value = true
     error.value = ''
     try {
+      // The backend sets the HTTP-only auth cookie in its response.
       const res = await authService.register(username, password)
-      authStore.setToken(res.access_token)
       try {
         const me = await authService.me()
         authStore.setUser({ id: me.id, username: me.username })
       } catch {
-        // /me failed but register succeeded — use known username from register call
-        authStore.setUser({ id: '', username: res.username ?? username })
+        // /me failed but register succeeded — use known data from register response
+        authStore.setUser({ id: res.id ?? '', username: res.username ?? username })
       }
       return true
     } catch (e) {
@@ -51,8 +51,8 @@ export function useAuth() {
     }
   }
 
-  function logout(): void {
-    authStore.logout()
+  async function logout(): Promise<void> {
+    await authStore.logout()
   }
 
   return { loading, error, login, register, logout }

@@ -39,12 +39,29 @@ class InvalidCredentialsError(DomainError):
     status_code = 401
 
 
+class AccountLockedError(DomainError):
+    status_code = 429
+
+
 class InvalidTokenError(DomainError):
     status_code = 401
 
 
 class UserNotFoundError(DomainError):
     status_code = 401
+
+
+# ── Validation ──
+
+class DomainValueError(DomainError, ValueError):
+    """Domain invariant expressed as a value constraint (e.g. score must not decrease).
+
+    Inherits from both DomainError (carries status_code for the global handler)
+    and ValueError (semantic compatibility with existing except-clauses / tests).
+    The DomainError handler takes precedence over the generic ValueError handler
+    because it is registered first.
+    """
+    status_code = 422
 
 
 # ── Leaderboard ──

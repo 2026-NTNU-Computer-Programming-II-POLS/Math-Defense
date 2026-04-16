@@ -35,3 +35,29 @@ GOLD_RANGE = (GOLD_MIN, GOLD_MAX)
 # Per-wave anti-cheat ceilings.
 MAX_WAVE = 30
 MAX_SCORE_DELTA = 50_000
+
+# ── Per-level anti-cheat caps ──
+# Based on enemy counts × 10 pts/kill (with split-slime children), multiplied
+# by a generous safety margin so legitimate play never trips these.
+
+LEVEL_MAX_SCORES: dict[int, int] = {
+    1: 5_000,
+    2: 10_000,
+    3: 15_000,
+    4: 50_000,
+}
+
+LEVEL_MAX_KILLS: dict[int, int] = {
+    1: 50,
+    2: 100,
+    3: 200,
+    4: 300,
+}
+
+# Total waves per level (mirrors frontend level-defs.ts).
+LEVEL_MAX_WAVES: dict[int, int] = {
+    1: 3,
+    2: 4,
+    3: 5,
+    4: 5,
+}

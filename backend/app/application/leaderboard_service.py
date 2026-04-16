@@ -47,8 +47,6 @@ class LeaderboardApplicationService:
     def submit_score(
         self,
         user_id: str,
-        level: int,
-        score: int,
         kills: int,
         waves_survived: int,
         session_id: str,
@@ -67,16 +65,24 @@ class LeaderboardApplicationService:
             if session.status != SessionStatus.COMPLETED:
                 raise SessionValidationError("Session is not completed")
 
+            # Cross-validate client-reported waves against server-tracked progress
+            if session.current_wave > 0 and waves_survived > session.current_wave:
+                raise SessionValidationError(
+                    "waves_survived exceeds server-tracked wave count"
+                )
+
             # Domain rule: duplicate submission check
             existing = self._leaderboard_repo.find_by_session_id(session_id)
             if existing:
                 raise DuplicateSubmissionError("Score already submitted for this session")
 
+            # Use the session's authoritative level and score — NOT client-
+            # reported values — to prevent score/level forgery (C-01).
             entry = LeaderboardEntry(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
-                level=Level(level),
-                score=Score(score),
+                level=session.level,
+                score=Score(session.score),
                 kills=kills,
                 waves_survived=waves_survived,
                 session_id=session_id,
@@ -95,6 +101,6 @@ class LeaderboardApplicationService:
 
             logger.info(
                 "Score submitted: user=%s level=%d score=%d",
-                user_id, level, score,
+                user_id, int(session.level), session.score,
             )
             return {"id": entry.id, "score": entry.score.value}

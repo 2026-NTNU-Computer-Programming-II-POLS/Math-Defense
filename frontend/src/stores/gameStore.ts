@@ -60,7 +60,10 @@ export const useGameStore = defineStore('game', () => {
         wave.value = w
         totalWaves.value = game.state.totalWaves
       }),
-      game.eventBus.on(Events.ENEMY_KILLED, () => { kills.value++ }),
+      // Kill count is owned by EconomySystem (game.state.kills++); the store
+      // mirrors it via syncFromEngine so there is a single source of truth.
+      // Do NOT increment kills.value here — it would double-count.
+      game.eventBus.on(Events.ENEMY_KILLED, () => { kills.value = game.state.kills }),
       game.eventBus.on(Events.LEVEL_START, (l) => {
         level.value = l
         wave.value = 0

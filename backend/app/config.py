@@ -1,3 +1,7 @@
+import os
+import re
+import sys
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,13 +25,20 @@ class Settings(BaseSettings):
     cors_origins: str | list[str]
     # Active sessions older than this are treated as stale and auto-abandoned.
     session_stale_cutoff_hours: float = 2.0
+    # Cookie settings — secure=True requires HTTPS (works on localhost in modern
+    # browsers). Set COOKIE_SECURE=false in .env for plain-HTTP dev if needed.
+    cookie_secure: bool = True
 
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        origins = [origin.strip() for origin in v.split(",") if origin.strip()] if isinstance(v, str) else list(v)
+        for origin in origins:
+            if not re.match(r'^https?://', origin):
+                raise ValueError(
+                    f"Invalid CORS origin '{origin}': must start with http:// or https://"
+                )
+        return origins
 
     @field_validator("secret_key")
     @classmethod
@@ -40,6 +51,17 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"SECRET_KEY must be at least {_MIN_SECRET_KEY_LENGTH} characters; "
                 "a short key compromises JWT security"
+            )
+        return v
+
+    @field_validator("database_url")
+    @classmethod
+    def reject_default_password(cls, v: str) -> str:
+        is_test = os.environ.get("CI") or "pytest" in sys.modules
+        if not is_test and ":changeme@" in v:
+            raise ValueError(
+                "DATABASE_URL contains the default password 'changeme'. "
+                "Set a strong password via the DATABASE_URL env var or .env file."
             )
         return v
 

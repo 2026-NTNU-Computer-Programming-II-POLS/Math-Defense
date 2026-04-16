@@ -146,8 +146,8 @@ export function numericalIntegrate(
 export function fourierComposite(t: number, freqs: number[], amps: number[]): number {
   if (_useWasm && _module) {
     return withFloatBuffers([3, 3], (fPtr, aPtr) => {
-      freqs.forEach((v, i) => _module.setValue(fPtr + i * 4, v, 'float'))
-      amps.forEach((v, i) => _module.setValue(aPtr + i * 4, v, 'float'))
+      freqs.slice(0, 3).forEach((v, i) => _module.setValue(fPtr + i * 4, v, 'float'))
+      amps.slice(0, 3).forEach((v, i) => _module.setValue(aPtr + i * 4, v, 'float'))
       return _module.ccall('fourier_composite', 'number', ['number', 'number', 'number'], [t, fPtr, aPtr])
     })
   }
@@ -169,10 +169,10 @@ export function fourierMatch(
 ): number {
   if (_useWasm && _module) {
     return withFloatBuffers([3, 3, 3, 3], (f1, a1, f2, a2) => {
-      freqs1.forEach((v, i) => _module.setValue(f1 + i * 4, v, 'float'))
-      amps1.forEach((v, i) => _module.setValue(a1 + i * 4, v, 'float'))
-      freqs2.forEach((v, i) => _module.setValue(f2 + i * 4, v, 'float'))
-      amps2.forEach((v, i) => _module.setValue(a2 + i * 4, v, 'float'))
+      freqs1.slice(0, 3).forEach((v, i) => _module.setValue(f1 + i * 4, v, 'float'))
+      amps1.slice(0, 3).forEach((v, i) => _module.setValue(a1 + i * 4, v, 'float'))
+      freqs2.slice(0, 3).forEach((v, i) => _module.setValue(f2 + i * 4, v, 'float'))
+      amps2.slice(0, 3).forEach((v, i) => _module.setValue(a2 + i * 4, v, 'float'))
       return _module.ccall('fourier_match', 'number',
         ['number', 'number', 'number', 'number', 'number'], [f1, a1, f2, a2, samples])
     })
@@ -207,7 +207,7 @@ export function calculateTrajectory(
         ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
         [a, b, c, xStart, xEnd, step, xPtr, yPtr, countPtr],
       )
-      const n = _module.getValue(countPtr, 'i32')
+      const n = Math.max(0, Math.min(_module.getValue(countPtr, 'i32'), 1000))
       const xs = new Array<number>(n)
       const ys = new Array<number>(n)
       for (let i = 0; i < n; i++) {

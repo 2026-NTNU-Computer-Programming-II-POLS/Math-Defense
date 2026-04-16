@@ -9,8 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
+
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
+from app.db.database import engine
 from app.domain.errors import DomainError
 from app.routers import auth, leaderboard, game_session
 from app.limiter import limiter
@@ -24,15 +28,24 @@ logger = logging.getLogger(__name__)
 # backend/app/main.py -> backend/app -> backend -> backend/alembic.ini
 _ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
+# Arbitrary fixed key for the PostgreSQL advisory lock that serialises migrations.
+_MIGRATION_LOCK_ID = 483_921_746
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Alembic is the single source of truth for schema. `upgrade head` is idempotent
-    # when the DB is already current, so running it every boot is cheap and removes
-    # the prior race between Base.metadata.create_all and operator-run migrations.
-    cfg = Config(str(_ALEMBIC_INI))
-    command.upgrade(cfg, "head")
-    logger.info("Alembic: schema at head")
+    # Use a PostgreSQL advisory lock to serialise migrations across concurrent
+    # workers. Only one worker runs `upgrade head`; the rest wait for the lock
+    # and then proceed (the upgrade is a no-op when already at head).
+    with engine.connect() as conn:
+        conn.execute(text("SELECT pg_advisory_lock(:id)"), {"id": _MIGRATION_LOCK_ID})
+        try:
+            cfg = Config(str(_ALEMBIC_INI))
+            command.upgrade(cfg, "head")
+            logger.info("Alembic: schema at head")
+        finally:
+            conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": _MIGRATION_LOCK_ID})
+            conn.commit()
     yield
 
 
@@ -56,10 +69,26 @@ async def _domain_error_handler(_request: Request, exc: DomainError) -> JSONResp
 
 @app.exception_handler(ValueError)
 async def _value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
-    # Domain invariants (e.g. score must not decrease) raise plain ValueError;
-    # treat them as 422 so routers don't need to re-wrap every call.
-    return JSONResponse(status_code=422, content={"detail": str(exc)})
+    # Domain invariants now raise DomainValueError (a DomainError subclass)
+    # and are handled above. Plain ValueErrors from libraries or Python internals
+    # get a generic message to avoid leaking stack/internal details.
+    return JSONResponse(status_code=422, content={"detail": "Unprocessable request"})
 
+
+# Security headers — defence-in-depth for direct backend access (dev docker-compose
+# exposes port 8000). In production, nginx adds its own set of headers as well.
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+        if request.url.path.startswith("/api/auth"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS
 app.add_middleware(

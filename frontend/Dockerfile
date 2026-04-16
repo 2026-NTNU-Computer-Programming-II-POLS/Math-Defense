@@ -30,7 +30,10 @@ COPY frontend/ .
 # are committed to the repo. Invoke vue-tsc + vite directly to bypass it.
 RUN npx vue-tsc -b && npx vite build
 
-FROM nginx:1.27-alpine AS prod
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS prod
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
+# Place nginx.conf as a template so Docker's entrypoint runs envsubst on
+# ${CORS_ORIGIN_1} / ${CORS_ORIGIN_2} before nginx starts.
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+ENV CORS_ORIGIN_1="http://localhost:5173" CORS_ORIGIN_2="http://localhost:3000"
+EXPOSE 8080

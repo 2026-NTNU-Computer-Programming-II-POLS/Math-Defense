@@ -33,7 +33,6 @@ venv.bak/
 
 # Node/npm
 node_modules/
-package-lock.json
 dist/
 .env.local
 .env.*.local
@@ -62,6 +61,9 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+
+# TLS certificates
+certs/
 
 # Claude Code
 .claude/

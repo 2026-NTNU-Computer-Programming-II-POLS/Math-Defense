@@ -10,7 +10,7 @@ async function bootstrap() {
   app.use(createPinia())
   app.use(router)
 
-  // Validate stored token and restore user before mounting
+  // Probe /auth/me (cookie-based) to restore user session before mounting
   const authStore = useAuthStore()
   await authStore.init()
 

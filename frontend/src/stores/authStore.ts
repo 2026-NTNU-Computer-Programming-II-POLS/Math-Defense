@@ -1,5 +1,9 @@
 /**
  * authStore — user authentication state Pinia Store
+ *
+ * Authentication is cookie-based (HTTP-only). The store does not hold a token;
+ * login state is determined by calling /auth/me and checking whether a user
+ * object comes back.
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -12,29 +16,32 @@ export interface User {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('auth_token'))
   const user = ref<User | null>(null)
   const initializing = ref(false)
 
-  const isLoggedIn = computed(() => token.value !== null && user.value !== null)
+  // Exposed so the router guard can await the /auth/me probe before making
+  // access decisions (fixes M-07: no more granting access with a stale token
+  // string during the init window).
+  let _initResolve: (() => void) | null = null
+  const initPromise = ref<Promise<void> | null>(null)
+
+  const isLoggedIn = computed(() => user.value !== null)
 
   async function init(): Promise<void> {
-    if (!token.value) return
     initializing.value = true
+    initPromise.value = new Promise<void>((resolve) => { _initResolve = resolve })
     try {
       const res = await authService.me()
       user.value = { id: res.id, username: res.username }
     } catch {
-      // Token is invalid or expired — clear it (no route change; init() runs pre-mount)
-      clearAuth()
+      // Cookie is invalid / expired / absent — user stays logged out
+      user.value = null
     } finally {
       initializing.value = false
+      _initResolve?.()
+      _initResolve = null
+      initPromise.value = null
     }
-  }
-
-  function setToken(t: string): void {
-    token.value = t
-    localStorage.setItem('auth_token', t)
   }
 
   function setUser(u: User): void {
@@ -42,24 +49,19 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clearAuth(): void {
-    token.value = null
     user.value = null
-    localStorage.removeItem('auth_token')
   }
 
   async function logout(): Promise<void> {
+    // Server clears the HTTP-only cookie in its response.
+    await authService.logout()
     clearAuth()
     // Serialize close-modal → navigate → toast so a 401 triggered mid-modal
     // doesn't leave the user trapped behind stacked overlays (cf. F-7/F-8/F-9).
-    // Dynamic import avoids a static cycle (authStore → uiStore → …).
     try {
       const { useUiStore } = await import('@/stores/uiStore')
       const uiStore = useUiStore()
       if (uiStore.modalVisible) {
-        // Force-close any existing modal before we navigate. We intentionally
-        // bypass the callback (modalCallback.value = null first) because the
-        // modal's original caller is now mid-logout and any router.push it
-        // wanted to run would race with ours.
         uiStore.modalCallback = null
         uiStore.modalVisible = false
       }
@@ -78,5 +80,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isLoggedIn, initializing, setToken, setUser, logout, init }
+  return { user, isLoggedIn, initializing, initPromise, setUser, logout, init }
 })

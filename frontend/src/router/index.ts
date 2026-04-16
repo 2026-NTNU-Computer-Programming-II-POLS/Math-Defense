@@ -43,12 +43,12 @@ router.beforeEach(() => {
   return true
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (!PROTECTED_ROUTES.has(to.name as string)) return true
   const auth = useAuthStore()
-  // Token-hydrated-from-localStorage + in-flight /me validation: allow through.
-  // Without the token check, a still-initializing anonymous user would be let in.
-  if (auth.initializing && auth.token) return true
+  // Wait for the /auth/me probe to finish before making access decisions.
+  // This prevents granting access based on stale state during initialization.
+  if (auth.initPromise) await auth.initPromise
   if (auth.isLoggedIn) return true
   return { name: 'auth', query: { next: to.fullPath } }
 })

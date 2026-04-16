@@ -109,7 +109,7 @@ def test_end_session(client):
 
     res = client.post(
         f"/api/sessions/{session_id}/end",
-        json={"score": 2500, "kills": 40, "waves_survived": 8},
+        json={"score": 2500, "kills": 40, "waves_survived": 3},
         headers=_auth_headers(token),
     )
     assert res.status_code == 200
@@ -151,7 +151,7 @@ def test_end_session_creates_leaderboard_entry(client):
 
     client.post(
         f"/api/sessions/{session_id}/end",
-        json={"score": 3000, "kills": 50, "waves_survived": 10},
+        json={"score": 3000, "kills": 18, "waves_survived": 3},
         headers=_auth_headers(token),
     )
 

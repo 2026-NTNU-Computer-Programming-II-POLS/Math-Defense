@@ -34,7 +34,9 @@ class RegisterRequest(BaseModel):
     def password_valid(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
-        if len(v) > 128:
+        # bcrypt silently truncates at 72 *bytes*; check encoded length so
+        # multi-byte Unicode passwords don't slip past the limit.
+        if len(v.encode("utf-8")) > 72:
             raise ValueError("Password is too long")
         if not re.search(r'[a-zA-Z]', v):
             raise ValueError("Password must contain at least one letter")
@@ -52,10 +54,27 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+    @field_validator("username")
+    @classmethod
+    def username_max_length(cls, v: str) -> str:
+        if len(v) > 50:
+            raise ValueError("Username must not exceed 50 characters")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def password_max_length(cls, v: str) -> str:
+        # bcrypt silently truncates at 72 *bytes*; check encoded length so
+        # multi-byte Unicode passwords don't cause CPU-bound DoS.
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password is too long")
+        return v
+
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    id: str
     username: str
 
 

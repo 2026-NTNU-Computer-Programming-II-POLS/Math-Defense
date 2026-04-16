@@ -32,7 +32,9 @@ def _get_service(db: Session) -> LeaderboardApplicationService:
 
 
 @router.get("", response_model=LeaderboardResponse)
+@limiter.limit("30/minute")
 def get_leaderboard(
+    request: Request,
     level: int | None = Query(None, ge=1, le=4),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
@@ -53,9 +55,7 @@ def submit_score(
 ):
     return _get_service(db).submit_score(
         user_id=current_user.id,
-        level=req.level,
-        score=req.score,
         kills=req.kills,
         waves_survived=req.waves_survived,
-        session_id=req.session_id,
+        session_id=str(req.session_id),
     )

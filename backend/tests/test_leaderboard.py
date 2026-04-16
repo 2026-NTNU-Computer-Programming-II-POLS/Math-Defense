@@ -45,7 +45,7 @@ def test_submit_score_duplicate_rejected(client):
     session_id = _create_completed_session(client, token, score=500)
     res = client.post(
         "/api/leaderboard",
-        json={"level": 1, "score": 500, "kills": 30, "waves_survived": 3, "session_id": session_id},
+        json={"kills": 30, "waves_survived": 3, "session_id": session_id},
         headers=_auth_headers(token),
     )
     assert res.status_code == 409
@@ -63,7 +63,7 @@ def test_submit_score_for_active_session_rejected(client):
     session_id = session_res.json()["id"]
     res = client.post(
         "/api/leaderboard",
-        json={"level": 1, "score": 500, "kills": 30, "waves_survived": 3, "session_id": session_id},
+        json={"kills": 30, "waves_survived": 3, "session_id": session_id},
         headers=_auth_headers(token),
     )
     assert res.status_code == 400
@@ -82,7 +82,7 @@ def test_submit_score_for_abandoned_session_rejected(client):
     client.post(f"/api/sessions/{session_id}/abandon", headers=_auth_headers(token))
     res = client.post(
         "/api/leaderboard",
-        json={"level": 1, "score": 500, "kills": 30, "waves_survived": 3, "session_id": session_id},
+        json={"kills": 30, "waves_survived": 3, "session_id": session_id},
         headers=_auth_headers(token),
     )
     assert res.status_code == 400
@@ -90,12 +90,8 @@ def test_submit_score_for_abandoned_session_rejected(client):
 
 def test_leaderboard_filter_by_level(client):
     token = _register_and_token(client, "scorer2")
-    session_id = _create_completed_session(client, token, level=2, score=800, kills=50, waves_survived=5)
-    client.post(
-        "/api/leaderboard",
-        json={"level": 2, "score": 800, "kills": 50, "waves_survived": 5, "session_id": session_id},
-        headers=_auth_headers(token),
-    )
+    # waves_survived must not exceed level 2's wave count (4)
+    _create_completed_session(client, token, level=2, score=800, kills=50, waves_survived=4)
     res = client.get("/api/leaderboard?level=2")
     assert res.status_code == 200
     for entry in res.json()["entries"]:
