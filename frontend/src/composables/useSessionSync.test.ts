@@ -31,18 +31,20 @@ import { useSessionSync } from './useSessionSync'
 import { Events, GamePhase } from '@/data/constants'
 import { EventBus } from '@/engine/EventBus'
 import { ApiError } from '@/services/api'
+import type { Game } from '@/engine/Game'
 
 // Minimal Game stub matching what useSessionSync.bind() actually touches
 function makeGameStub() {
   const eventBus = new EventBus<Record<string, unknown>>()
-  return {
+  const stub = {
     eventBus,
     state: {
       score: 1234,
       kills: 7,
       wave: 5,
     },
-  } as never
+  }
+  return stub as unknown as Game & { eventBus: EventBus<Record<string, unknown>> }
 }
 
 function flushPromises(): Promise<void> {

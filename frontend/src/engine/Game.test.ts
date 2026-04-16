@@ -4,7 +4,8 @@ import { GamePhase, Events } from '@/data/constants'
 // Mock Renderer/InputManager so we don't need a real canvas2d context
 vi.mock('./Renderer', () => ({
   Renderer: class {
-    constructor(public canvas: HTMLCanvasElement) {}
+    canvas: HTMLCanvasElement
+    constructor(canvas: HTMLCanvasElement) { this.canvas = canvas }
     clear(): void {}
     drawGrid(): void {}
     drawOrigin(): void {}
@@ -13,7 +14,12 @@ vi.mock('./Renderer', () => ({
 }))
 vi.mock('./InputManager', () => ({
   InputManager: class {
-    constructor(public canvas: HTMLCanvasElement, public bus: unknown) {}
+    canvas: HTMLCanvasElement
+    bus: unknown
+    constructor(canvas: HTMLCanvasElement, bus: unknown) {
+      this.canvas = canvas
+      this.bus = bus
+    }
     destroy(): void {}
   },
 }))

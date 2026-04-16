@@ -70,12 +70,13 @@ function withFloatBuffers<T>(
 // ── Public API ──
 
 export function matrixMultiply(a: number[], b: number[]): number[] {
-  if (_useWasm && _module) {
+  const m = _module
+  if (_useWasm && m) {
     return withFloatBuffers([4, 4, 4], (aPtr, bPtr, rPtr) => {
-      a.forEach((v, i) => _module.setValue(aPtr + i * 4, v, 'float'))
-      b.forEach((v, i) => _module.setValue(bPtr + i * 4, v, 'float'))
-      _module.ccall('matrix_multiply', null, ['number', 'number', 'number'], [aPtr, bPtr, rPtr])
-      return Array.from({ length: 4 }, (_, i) => _module.getValue(rPtr + i * 4, 'float'))
+      a.forEach((v, i) => m.setValue(aPtr + i * 4, v, 'float'))
+      b.forEach((v, i) => m.setValue(bPtr + i * 4, v, 'float'))
+      m.ccall('matrix_multiply', null, ['number', 'number', 'number'], [aPtr, bPtr, rPtr])
+      return Array.from({ length: 4 }, (_, i) => m.getValue(rPtr + i * 4, 'float'))
     })
   }
   return [
@@ -87,8 +88,9 @@ export function matrixMultiply(a: number[], b: number[]): number[] {
 }
 
 export function sectorCoverage(radius: number, angleWidth: number): number {
-  if (_useWasm && _module) {
-    return _module.ccall('sector_coverage', 'number', ['number', 'number'], [radius, angleWidth])
+  const m = _module
+  if (_useWasm && m) {
+    return m.ccall('sector_coverage', 'number', ['number', 'number'], [radius, angleWidth])
   }
   return 0.5 * radius * radius * angleWidth
 }
@@ -100,9 +102,10 @@ export function pointInSector(
   angleStart: number,
   angleWidth: number,
 ): boolean {
-  if (_useWasm && _module) {
+  const m = _module
+  if (_useWasm && m) {
     return (
-      _module.ccall(
+      m.ccall(
         'point_in_sector', 'number',
         ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
         [px, py, cx, cy, radius, angleStart, angleWidth],
@@ -128,8 +131,9 @@ export function numericalIntegrate(
   lo: number, hi: number,
   n = 100,
 ): number {
-  if (_useWasm && _module) {
-    return _module.ccall('numerical_integrate', 'number',
+  const m = _module
+  if (_useWasm && m) {
+    return m.ccall('numerical_integrate', 'number',
       ['number', 'number', 'number', 'number', 'number', 'number'],
       [a, b, c, lo, hi, n])
   }
@@ -144,11 +148,12 @@ export function numericalIntegrate(
 }
 
 export function fourierComposite(t: number, freqs: number[], amps: number[]): number {
-  if (_useWasm && _module) {
+  const m = _module
+  if (_useWasm && m) {
     return withFloatBuffers([3, 3], (fPtr, aPtr) => {
-      freqs.slice(0, 3).forEach((v, i) => _module.setValue(fPtr + i * 4, v, 'float'))
-      amps.slice(0, 3).forEach((v, i) => _module.setValue(aPtr + i * 4, v, 'float'))
-      return _module.ccall('fourier_composite', 'number', ['number', 'number', 'number'], [t, fPtr, aPtr])
+      freqs.slice(0, 3).forEach((v, i) => m.setValue(fPtr + i * 4, v, 'float'))
+      amps.slice(0, 3).forEach((v, i) => m.setValue(aPtr + i * 4, v, 'float'))
+      return m.ccall('fourier_composite', 'number', ['number', 'number', 'number'], [t, fPtr, aPtr])
     })
   }
   const n = Math.min(amps.length, freqs.length)
@@ -167,13 +172,14 @@ export function fourierMatch(
   freqs2: number[], amps2: number[],
   samples = 200,
 ): number {
-  if (_useWasm && _module) {
+  const m = _module
+  if (_useWasm && m) {
     return withFloatBuffers([3, 3, 3, 3], (f1, a1, f2, a2) => {
-      freqs1.slice(0, 3).forEach((v, i) => _module.setValue(f1 + i * 4, v, 'float'))
-      amps1.slice(0, 3).forEach((v, i) => _module.setValue(a1 + i * 4, v, 'float'))
-      freqs2.slice(0, 3).forEach((v, i) => _module.setValue(f2 + i * 4, v, 'float'))
-      amps2.slice(0, 3).forEach((v, i) => _module.setValue(a2 + i * 4, v, 'float'))
-      return _module.ccall('fourier_match', 'number',
+      freqs1.slice(0, 3).forEach((v, i) => m.setValue(f1 + i * 4, v, 'float'))
+      amps1.slice(0, 3).forEach((v, i) => m.setValue(a1 + i * 4, v, 'float'))
+      freqs2.slice(0, 3).forEach((v, i) => m.setValue(f2 + i * 4, v, 'float'))
+      amps2.slice(0, 3).forEach((v, i) => m.setValue(a2 + i * 4, v, 'float'))
+      return m.ccall('fourier_match', 'number',
         ['number', 'number', 'number', 'number', 'number'], [f1, a1, f2, a2, samples])
     })
   }
@@ -200,19 +206,20 @@ export function calculateTrajectory(
   xStart: number, xEnd: number, step: number,
 ): { xs: number[]; ys: number[] } {
   if (step <= 0) return { xs: [], ys: [] }
-  if (_useWasm && _module) {
+  const m = _module
+  if (_useWasm && m) {
     return withFloatBuffers([1000, 1000, 1], (xPtr, yPtr, countPtr) => {
-      _module.ccall(
+      m.ccall(
         'calculate_trajectory', null,
         ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
         [a, b, c, xStart, xEnd, step, xPtr, yPtr, countPtr],
       )
-      const n = Math.max(0, Math.min(_module.getValue(countPtr, 'i32'), 1000))
+      const n = Math.max(0, Math.min(m.getValue(countPtr, 'i32'), 1000))
       const xs = new Array<number>(n)
       const ys = new Array<number>(n)
       for (let i = 0; i < n; i++) {
-        xs[i] = _module.getValue(xPtr + i * 4, 'float')
-        ys[i] = _module.getValue(yPtr + i * 4, 'float')
+        xs[i] = m.getValue(xPtr + i * 4, 'float')
+        ys[i] = m.getValue(yPtr + i * 4, 'float')
       }
       return { xs, ys }
     })
@@ -237,9 +244,10 @@ export function lineCircleIntersect(
   m: number, b: number,
   cx: number, cy: number, r: number,
 ): { x: number; y: number }[] {
-  if (_useWasm && _module) {
+  const mod = _module
+  if (_useWasm && mod) {
     return withFloatBuffers([2, 2], (xPtr, yPtr) => {
-      const count = _module.ccall(
+      const count = mod.ccall(
         'line_circle_intersect', 'number',
         ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
         [m, b, cx, cy, r, xPtr, yPtr],
@@ -247,8 +255,8 @@ export function lineCircleIntersect(
       const out: { x: number; y: number }[] = []
       for (let i = 0; i < count; i++) {
         out.push({
-          x: _module.getValue(xPtr + i * 4, 'float'),
-          y: _module.getValue(yPtr + i * 4, 'float'),
+          x: mod.getValue(xPtr + i * 4, 'float'),
+          y: mod.getValue(yPtr + i * 4, 'float'),
         })
       }
       return out
