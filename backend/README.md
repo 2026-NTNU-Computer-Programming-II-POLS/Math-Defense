@@ -27,6 +27,7 @@ backend/
 │   ├── config.py                  Settings (Pydantic): SECRET_KEY, DATABASE_URL, CORS_ORIGINS, ...
 │   ├── limiter.py                 slowapi Limiter instance shared across routers
 │   ├── shared_constants.py        Loads shared/game-constants.json so Python sees the same canvas / grid / player values as the frontend
+│   ├── seed.py                    Demo user seeding — ensure_demo_user(); called from lifespan after migrations
 │   │
 │   ├── domain/                    ── DOMAIN LAYER ──
 │   │   ├── value_objects.py       SessionStatus enum, Level, Score, GameResult
@@ -51,6 +52,8 @@ backend/
 │   │
 │   ├── infrastructure/            ── INFRASTRUCTURE LAYER ──
 │   │   ├── unit_of_work.py        SqlAlchemyUnitOfWork — explicit commit; auto-rollback on exit
+│   │   ├── login_guard.py         Per-account login-attempt tracker — 5 failures/5-min window triggers 5-min lockout
+│   │   ├── token_denylist.py      In-memory JWT deny-list for server-side logout (jti → expiry); bounded by natural JWT TTL
 │   │   └── persistence/
 │   │       ├── user_repository.py         SQLAlchemy impl of UserRepository
 │   │       ├── session_repository.py      SQLAlchemy impl of SessionRepository
@@ -73,7 +76,9 @@ backend/
 │   │
 │   ├── db/database.py             Engine, Base, get_db() session factory
 │   ├── middleware/auth.py         get_current_user() dependency (JWT → User aggregate)
-│   └── utils/security.py          hash_password, verify_password, create_access_token, decode_token
+│   └── utils/
+│       ├── security.py            hash_password, verify_password, create_access_token, decode_token
+│       └── integrity.py           is_constraint_violation() — matches PG constraint name on IntegrityError.orig.diag
 │
 ├── alembic/                       Alembic migration environment (versions/ + env.py)
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
@@ -175,9 +180,10 @@ Base path: `/api`. All session / leaderboard-submit endpoints require `Authoriza
 |---|---|---|---|
 | POST | `/api/auth/register` | 5/min | Create account, return token |
 | POST | `/api/auth/login` | 10/min | Authenticate, return token |
+| POST | `/api/auth/logout` | — | Revoke current token — adds JTI to deny-list until natural expiry |
 | GET | `/api/auth/me` | — | Current user |
 
-Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars with letter + digit.
+Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars with letter + digit. Logout is server-side: the JTI is denied even if the token has not yet expired. Login failures are tracked per-account (`login_guard`): 5 consecutive failures within 5 minutes trigger a 5-minute lockout.
 
 ### Game Sessions — `/api/sessions`
 
@@ -303,7 +309,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # all 78 tests
+pytest                                      # all 86 tests
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 ```

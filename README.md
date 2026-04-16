@@ -167,7 +167,7 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 78 tests (DDD aggregates, routers, coverage gaps, shared-constants parity)
+cd backend  && pytest              # 86 tests (DDD aggregates, routers, coverage gaps, shared-constants parity)
 cd frontend && npm test            # 13 test files, 117 tests (systems, engine, WASM bridge)
 ```
 
