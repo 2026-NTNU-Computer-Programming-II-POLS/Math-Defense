@@ -94,7 +94,7 @@ def test_update_ended_session_returns_409(client):
 def test_update_nonexistent_session(client):
     token = _register_and_token(client, "sess_update_404")
     res = client.patch(
-        "/api/sessions/nonexistent",
+        "/api/sessions/00000000-0000-0000-0000-000000000000",
         json={"gold": 100},
         headers=_auth_headers(token),
     )
