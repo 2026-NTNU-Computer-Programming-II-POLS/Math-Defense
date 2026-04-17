@@ -3,7 +3,7 @@
  */
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { createTower } from '@/entities/TowerFactory'
-import { degToRad } from '@/math/MathUtils'
+import { degToRad, findIntersections, gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import type { Game } from '@/engine/Game'
 import { getParam } from '@/entities/types'
 import type { Tower, TowerPreview } from '@/entities/types'
@@ -86,20 +86,58 @@ export class TowerPlacementSystem {
   render(renderer: import('@/engine/Renderer').Renderer, game: Game): void {
     if (game.state.phase !== GamePhase.BUILD) return
     if (this._hoveredTower) {
-      this._drawPreview(renderer, this._hoveredTower)
+      this._drawPreview(renderer, this._hoveredTower, game)
     }
   }
 
-  private _drawPreview(renderer: import('@/engine/Renderer').Renderer, tower: Tower): void {
+  private _drawPreview(
+    renderer: import('@/engine/Renderer').Renderer,
+    tower: Tower,
+    game: Game,
+  ): void {
     const preview = this._getPreview(tower)
     if (preview.type === 'line') {
       renderer.drawFunction(preview.fn, preview.xMin, preview.xMax, tower.color, 1.5)
+      // FUNCTION_CANNON projectiles fly in a straight line from the tower to
+      // each intersection of `shotFn` with the path, not along `shotFn`
+      // itself. Overlay the actual trajectories so the preview matches what
+      // the player will see when the wave starts.
+      if (tower.type === TowerType.FUNCTION_CANNON && game.pathFunction) {
+        this._drawShotTrajectories(renderer, tower, preview.fn, game.pathFunction)
+      }
     } else if (preview.type === 'sector') {
+      // The sector radius already has rangeBonus baked in by _getPreview.
       renderer.drawSector(tower.x, tower.y, preview.radius, preview.startAngle, preview.sweepAngle, tower.color)
     } else if (preview.type === 'integral') {
       renderer.drawIntegralArea(preview.fn, preview.a, preview.b, tower.color)
       renderer.drawFunction(preview.fn, preview.a, preview.b, tower.color, 2)
     }
+  }
+
+  private _drawShotTrajectories(
+    renderer: import('@/engine/Renderer').Renderer,
+    tower: Tower,
+    shotFn: (x: number) => number,
+    pathFn: (x: number) => number,
+  ): void {
+    const intersections = findIntersections(shotFn, pathFn, -3, 25)
+    if (intersections.length === 0) return
+    const { ctx } = renderer
+    const tpx = gameToCanvasX(tower.x)
+    const tpy = gameToCanvasY(tower.y)
+    ctx.save()
+    ctx.strokeStyle = tower.color
+    ctx.globalAlpha = 0.55
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 4])
+    for (const xi of intersections) {
+      const yi = shotFn(xi)
+      ctx.beginPath()
+      ctx.moveTo(tpx, tpy)
+      ctx.lineTo(gameToCanvasX(xi), gameToCanvasY(yi))
+      ctx.stroke()
+    }
+    ctx.restore()
   }
 
   private _getPreview(tower: Tower): TowerPreview {
@@ -116,9 +154,11 @@ export class TowerPlacementSystem {
         return { type: 'line', fn: (x) => m * x + b, xMin: -3, xMax: 25 }
       }
       case TowerType.RADAR_SWEEP: {
+        // Mirror the rangeBonus applied inside CombatSystem so the preview
+        // sector matches the actual damage area after a range buff/curse.
         return {
           type: 'sector',
-          radius: getParam(tower, 'r', 4),
+          radius: getParam(tower, 'r', 4) * tower.rangeBonus,
           startAngle: degToRad(getParam(tower, 'theta', 0)),
           sweepAngle: degToRad(getParam(tower, 'deltaTheta', 60)),
         }
@@ -127,11 +167,16 @@ export class TowerPlacementSystem {
         const a = getParam(tower, 'a', -0.5)
         const b = getParam(tower, 'b', 3)
         const c = getParam(tower, 'c', 2)
+        // Mirror the integration-window scaling from CombatSystem.
+        const rawA = getParam(tower, 'intA', 0)
+        const rawB = getParam(tower, 'intB', 6)
+        const mid = (rawA + rawB) / 2
+        const half = ((rawB - rawA) / 2) * tower.rangeBonus
         return {
           type: 'integral',
           fn: (x) => a * x * x + b * x + c,
-          a: getParam(tower, 'intA', 0),
-          b: getParam(tower, 'intB', 6),
+          a: mid - half,
+          b: mid + half,
         }
       }
       default:

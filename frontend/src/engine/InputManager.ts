@@ -49,11 +49,13 @@ export class InputManager {
   }
 
   private _updateMouse(e: MouseEvent): void {
+    // Renderer applies ctx.scale(dpr, dpr), so the drawing context and
+    // gameToCanvasX/Y work in CSS pixels. Mouse coordinates must stay in
+    // CSS pixels too — multiplying by canvas.width/rect.width scales them
+    // into device pixels and misplaces towers/clicks on HiDPI displays.
     const rect = this.canvas.getBoundingClientRect()
-    const scaleX = this.canvas.width / rect.width
-    const scaleY = this.canvas.height / rect.height
-    this.mousePixel.x = (e.clientX - rect.left) * scaleX
-    this.mousePixel.y = (e.clientY - rect.top) * scaleY
+    this.mousePixel.x = e.clientX - rect.left
+    this.mousePixel.y = e.clientY - rect.top
     const gp = canvasToGame(this.mousePixel.x, this.mousePixel.y)
     this.mouseGame.x = gp.x
     this.mouseGame.y = gp.y

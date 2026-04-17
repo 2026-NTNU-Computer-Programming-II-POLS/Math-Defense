@@ -59,6 +59,11 @@ const effectStrategies: Record<string, EffectFn> = {
       if (t) {
         t.rangeBonus = snap(t.rangeBonus / 1.3)
         t.effectiveRange = t.baseRange * t.rangeBonus
+      } else if (import.meta.env.DEV) {
+        // Target tower is gone (refund/destroy). The range bonus stays
+        // applied to nobody, so it's a no-op — surface it during dev so
+        // the leak is obvious if towers ever become removable.
+        console.warn(`[BuffSystem] RANDOM_TOWER_RANGE revert: tower ${buff._targetTowerId} no longer exists`)
       }
       buff._targetTowerId = undefined
     }
@@ -118,6 +123,9 @@ const effectStrategies: Record<string, EffectFn> = {
     if (buff._targetTowerId) {
       const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
       if (t) t.disabled = false
+      else if (import.meta.env.DEV) {
+        console.warn(`[BuffSystem] DISABLE_RANDOM_TOWER revert: tower ${buff._targetTowerId} no longer exists`)
+      }
       buff._targetTowerId = undefined
     }
   },

@@ -40,7 +40,11 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     nameEn: 'Radar Sweep',
     color: Colors.RADAR_SWEEP,
     cost: 60,
-    damage: 8,
+    // damage is per-fire (consistent with every other tower). Previously
+    // CombatSystem multiplied this by `cooldown`, so 8 × 0.5 = 4 damage per
+    // fire. Semantics were normalized; keep the same observed DPS by setting
+    // the per-fire value directly here.
+    damage: 4,
     range: 6,
     cooldown: 0.5,
     unlockLevel: 2,

@@ -3,7 +3,7 @@
  * Merges the attack logic from the old TowerSystem with CollisionSystem.
  * Entities have no update/render methods; this System owns all combat logic.
  */
-import { Events, GamePhase, TowerType, EnemyType, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
+import { Events, GamePhase, TowerType, EnemyType, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y, UNIT_PX } from '@/data/constants'
 import { distance, findIntersections, degToRad, mulberry32, stringHash } from '@/math/MathUtils'
 import { pointInSector as wasmPointInSector } from '@/math/WasmBridge'
 import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
@@ -136,9 +136,14 @@ export class CombatSystem {
       // into game.enemies via ENEMY_KILLED, and forward iteration over a mutated array
       // can skip newly added entries or revisit older ones.
       if (proj.active) {
+        // Hit threshold grows for large enemies (e.g. the 40 px boss) so their
+        // sprite isn't larger than the collision circle, but is floored at the
+        // original 0.5 game units so small/fast enemies don't become harder to
+        // hit than before. A generous threshold is the intended game feel.
         for (const enemy of [...game.enemies]) {
           if (!enemy.alive || enemy.isStealthed) continue
-          if (distance(proj.x, proj.y, enemy.x, enemy.y) < 0.5) {
+          const hitRadius = Math.max(0.5, (enemy.size / 2 + 3) / UNIT_PX)
+          if (distance(proj.x, proj.y, enemy.x, enemy.y) < hitRadius) {
             this._dealDamage(enemy, proj.damage, game)
             proj.active = false
             break
@@ -191,11 +196,13 @@ export class CombatSystem {
     }
   }
 
-  /** Radar Sweep: sector-area DPS, deals continuous damage to enemies within range */
+  /** Radar Sweep: sector-area tower, damages each enemy inside the sector per fire */
   private _radarSweepAttack(tower: Tower, game: Game): void {
     const theta = getParam(tower, 'theta', 0)
     const deltaTheta = getParam(tower, 'deltaTheta', 60)
-    const r = getParam(tower, 'r', 4)
+    // rangeBonus applies to the sector radius so RANDOM_TOWER_RANGE buffs
+    // affect Radar the same way they affect Matrix Link.
+    const r = getParam(tower, 'r', 4) * tower.rangeBonus
     const startAngle = degToRad(theta)
     const sweepAngle = degToRad(deltaTheta)
 
@@ -209,7 +216,10 @@ export class CombatSystem {
       )
 
       if (inSector) {
-        this._dealDamage(enemy, tower.effectiveDamage * tower.cooldown, game)
+        // effectiveDamage is damage-per-fire (same semantic as every other
+        // tower). Previous `* tower.cooldown` was a damage-to-DPS conversion
+        // that made Radar's damage formula diverge from the rest.
+        this._dealDamage(enemy, tower.effectiveDamage, game)
       }
     }
   }
@@ -219,8 +229,14 @@ export class CombatSystem {
     const a = getParam(tower, 'a', -0.5)
     const b = getParam(tower, 'b', 3)
     const c = getParam(tower, 'c', 2)
-    const intA = getParam(tower, 'intA', 0)
-    const intB = getParam(tower, 'intB', 6)
+    // Scale the integration window by rangeBonus around its midpoint so
+    // range buffs widen (and curses narrow) the damage zone symmetrically.
+    const rawA = getParam(tower, 'intA', 0)
+    const rawB = getParam(tower, 'intB', 6)
+    const mid = (rawA + rawB) / 2
+    const half = ((rawB - rawA) / 2) * tower.rangeBonus
+    const intA = mid - half
+    const intB = mid + half
     const fn = (x: number) => a * x * x + b * x + c
 
     for (const enemy of game.enemies) {
