@@ -56,9 +56,14 @@ void calculate_trajectory(float a, float b, float c,
     float dir = (x_end >= x_start) ? 1.0f : -1.0f;
     if (step <= 0.0f) { *count = 0; return; }
 
-    int n = (int)floorf((x_end - x_start) * dir / step) + 1;
-    if (n < 0) n = 0;
-    if (n > 1000) n = 1000;
+    /* Clamp the float-domain sample count to [0, 1000] before the int cast.
+       Without this, a near-zero step or huge range produces a float that exceeds
+       INT_MAX, and casting an out-of-range float to int is undefined behaviour in C
+       (the JS fallback is safe via Math.min, so they'd diverge on extreme inputs). */
+    float nf = floorf((x_end - x_start) * dir / step) + 1.0f;
+    if (!(nf >= 0.0f)) nf = 0.0f;      /* also traps NaN */
+    if (nf > 1000.0f) nf = 1000.0f;
+    int n = (int)nf;
 
     for (int i = 0; i < n; i++) {
         float x = x_start + (float)i * step * dir;

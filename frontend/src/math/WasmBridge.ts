@@ -26,12 +26,15 @@ let _useWasm = true
 
 // ── Initialization ──
 
-export async function initWasm(): Promise<boolean> {
+// urlOverride lets the Node-environment parity test (WasmBridge.wasm.test.ts) pass
+// a file:// URL pointing at frontend/public/wasm/math_engine.js. Production callers
+// leave it undefined and get BASE_URL-based resolution as before.
+export async function initWasm(urlOverride?: string): Promise<boolean> {
   try {
     // ES module generated with MODULARIZE=1, compiled by emscripten and placed in frontend/public/wasm/.
     // This file is not managed by the Vite bundler; it must be loaded via a runtime URL to bypass vite:import-analysis
     // static checks on /public/ (and supports BASE_URL deployment to a sub-path).
-    const wasmUrl = `${import.meta.env.BASE_URL ?? '/'}wasm/math_engine.js`
+    const wasmUrl = urlOverride ?? `${import.meta.env.BASE_URL}wasm/math_engine.js`
     const { default: createMathEngine } = await import(/* @vite-ignore */ wasmUrl)
     _module = await createMathEngine()
     console.log('[WasmBridge] WASM loaded successfully')
@@ -69,21 +72,39 @@ function withFloatBuffers<T>(
 
 // ── Public API ──
 
+// matrix_multiply in math_engine.c reads exactly 4 floats from each input pointer.
+// Normalise on entry so that (a) an under-length input can't make the WASM side
+// read uninitialised heap slots, and (b) an over-length input can't overrun the
+// 16-byte buffer into the adjacent allocation. JS uses the same four slots so the
+// two backends stay in lock-step regardless of caller-side array length.
+function toFixed4(arr: number[]): [number, number, number, number] {
+  return [
+    typeof arr[0] === 'number' ? arr[0] : 0,
+    typeof arr[1] === 'number' ? arr[1] : 0,
+    typeof arr[2] === 'number' ? arr[2] : 0,
+    typeof arr[3] === 'number' ? arr[3] : 0,
+  ]
+}
+
 export function matrixMultiply(a: number[], b: number[]): number[] {
+  const av = toFixed4(a)
+  const bv = toFixed4(b)
   const m = _module
   if (_useWasm && m) {
     return withFloatBuffers([4, 4, 4], (aPtr, bPtr, rPtr) => {
-      a.forEach((v, i) => m.setValue(aPtr + i * 4, v, 'float'))
-      b.forEach((v, i) => m.setValue(bPtr + i * 4, v, 'float'))
+      for (let i = 0; i < 4; i++) {
+        m.setValue(aPtr + i * 4, av[i], 'float')
+        m.setValue(bPtr + i * 4, bv[i], 'float')
+      }
       m.ccall('matrix_multiply', null, ['number', 'number', 'number'], [aPtr, bPtr, rPtr])
       return Array.from({ length: 4 }, (_, i) => m.getValue(rPtr + i * 4, 'float'))
     })
   }
   return [
-    a[0] * b[0] + a[1] * b[2],
-    a[0] * b[1] + a[1] * b[3],
-    a[2] * b[0] + a[3] * b[2],
-    a[2] * b[1] + a[3] * b[3],
+    av[0] * bv[0] + av[1] * bv[2],
+    av[0] * bv[1] + av[1] * bv[3],
+    av[2] * bv[0] + av[3] * bv[2],
+    av[2] * bv[1] + av[3] * bv[3],
   ]
 }
 
@@ -147,24 +168,33 @@ export function numericalIntegrate(
   return Math.abs((sum * h) / 2)
 }
 
+// The C side (fourier_composite / fourier_match in math_engine.c) hard-codes 3 sine
+// components — it reads freqs[0..2] and amps[0..2] unconditionally. To keep the JS
+// and WASM backends numerically identical (and to avoid reading uninitialised heap
+// bytes when callers pass arrays shorter than 3), both paths normalise inputs to
+// exactly three floats via toFixed3 before use.
+function toFixed3(arr: number[]): [number, number, number] {
+  return [
+    typeof arr[0] === 'number' ? arr[0] : 0,
+    typeof arr[1] === 'number' ? arr[1] : 0,
+    typeof arr[2] === 'number' ? arr[2] : 0,
+  ]
+}
+
 export function fourierComposite(t: number, freqs: number[], amps: number[]): number {
+  const f = toFixed3(freqs)
+  const a = toFixed3(amps)
   const m = _module
   if (_useWasm && m) {
     return withFloatBuffers([3, 3], (fPtr, aPtr) => {
-      freqs.slice(0, 3).forEach((v, i) => m.setValue(fPtr + i * 4, v, 'float'))
-      amps.slice(0, 3).forEach((v, i) => m.setValue(aPtr + i * 4, v, 'float'))
+      for (let i = 0; i < 3; i++) {
+        m.setValue(fPtr + i * 4, f[i], 'float')
+        m.setValue(aPtr + i * 4, a[i], 'float')
+      }
       return m.ccall('fourier_composite', 'number', ['number', 'number', 'number'], [t, fPtr, aPtr])
     })
   }
-  const n = Math.min(amps.length, freqs.length)
-  let sum = 0
-  for (let i = 0; i < n; i++) {
-    const a = amps[i]
-    const f = freqs[i]
-    if (typeof a !== 'number' || typeof f !== 'number') continue
-    sum += a * Math.sin(f * t)
-  }
-  return sum
+  return a[0] * Math.sin(f[0] * t) + a[1] * Math.sin(f[1] * t) + a[2] * Math.sin(f[2] * t)
 }
 
 export function fourierMatch(
@@ -172,13 +202,19 @@ export function fourierMatch(
   freqs2: number[], amps2: number[],
   samples = 200,
 ): number {
+  const f1v = toFixed3(freqs1)
+  const a1v = toFixed3(amps1)
+  const f2v = toFixed3(freqs2)
+  const a2v = toFixed3(amps2)
   const m = _module
   if (_useWasm && m) {
     return withFloatBuffers([3, 3, 3, 3], (f1, a1, f2, a2) => {
-      freqs1.slice(0, 3).forEach((v, i) => m.setValue(f1 + i * 4, v, 'float'))
-      amps1.slice(0, 3).forEach((v, i) => m.setValue(a1 + i * 4, v, 'float'))
-      freqs2.slice(0, 3).forEach((v, i) => m.setValue(f2 + i * 4, v, 'float'))
-      amps2.slice(0, 3).forEach((v, i) => m.setValue(a2 + i * 4, v, 'float'))
+      for (let i = 0; i < 3; i++) {
+        m.setValue(f1 + i * 4, f1v[i], 'float')
+        m.setValue(a1 + i * 4, a1v[i], 'float')
+        m.setValue(f2 + i * 4, f2v[i], 'float')
+        m.setValue(a2 + i * 4, a2v[i], 'float')
+      }
       return m.ccall('fourier_match', 'number',
         ['number', 'number', 'number', 'number', 'number'], [f1, a1, f2, a2, samples])
     })
@@ -188,8 +224,8 @@ export function fourierMatch(
   let totalEnergy = 0
   for (let i = 0; i < samples; i++) {
     const t = i * dt
-    const v1 = fourierComposite(t, freqs1, amps1)
-    const v2 = fourierComposite(t, freqs2, amps2)
+    const v1 = a1v[0] * Math.sin(f1v[0] * t) + a1v[1] * Math.sin(f1v[1] * t) + a1v[2] * Math.sin(f1v[2] * t)
+    const v2 = a2v[0] * Math.sin(f2v[0] * t) + a2v[1] * Math.sin(f2v[1] * t) + a2v[2] * Math.sin(f2v[2] * t)
     totalError += (v1 - v2) ** 2
     totalEnergy += v1 * v1
   }

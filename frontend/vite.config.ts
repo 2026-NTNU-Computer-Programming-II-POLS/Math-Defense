@@ -23,9 +23,9 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.test.ts'],
-    // WASM bridge builds its import URL at runtime (`${BASE_URL}wasm/math_engine.js`),
-    // so vite-import-analysis no longer eagerly resolves it. In tests the dynamic
-    // import simply rejects, and WasmBridge falls back to its pure-JS implementation —
-    // exactly the path these tests cover.
+    // WasmBridge.test.ts runs under happy-dom and covers the pure-JS fallback.
+    // WasmBridge.wasm.test.ts opts into the Node environment via its own
+    // `// @vitest-environment node` pragma and loads the real math_engine.js from
+    // frontend/public/wasm/ to assert WASM/JS numeric parity.
   },
 })
