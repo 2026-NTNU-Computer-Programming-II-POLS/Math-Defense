@@ -8,7 +8,7 @@ from app.config import settings
 from app.db.database import Base
 
 # Import all models so Base.metadata is populated for autogenerate.
-from app.models import user, leaderboard, game_session  # noqa: F401
+from app.models import user, leaderboard, game_session, login_attempt, denied_token  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

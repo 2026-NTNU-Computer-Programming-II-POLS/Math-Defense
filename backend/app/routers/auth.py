@@ -29,6 +29,7 @@ def _get_service(db: Session) -> AuthApplicationService:
     return AuthApplicationService(
         user_repo=SqlAlchemyUserRepository(db),
         uow=SqlAlchemyUnitOfWork(db),
+        db=db,
     )
 
 
@@ -76,6 +77,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
 def logout(
     request: Request,
     response: Response,

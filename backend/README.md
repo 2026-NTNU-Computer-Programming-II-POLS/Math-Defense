@@ -52,8 +52,8 @@ backend/
 │   │
 │   ├── infrastructure/            ── INFRASTRUCTURE LAYER ──
 │   │   ├── unit_of_work.py        SqlAlchemyUnitOfWork — explicit commit; auto-rollback on exit
-│   │   ├── login_guard.py         Per-account login-attempt tracker — 5 failures/5-min window triggers 5-min lockout
-│   │   ├── token_denylist.py      In-memory JWT deny-list for server-side logout (jti → expiry); bounded by natural JWT TTL
+│   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers 5-min lockout
+│   │   ├── token_denylist.py      DB-backed JWT deny-list for server-side logout (jti → expiry); bounded by natural JWT TTL
 │   │   └── persistence/
 │   │       ├── user_repository.py         SQLAlchemy impl of UserRepository
 │   │       ├── session_repository.py      SQLAlchemy impl of SessionRepository
@@ -62,7 +62,9 @@ backend/
 │   ├── models/                    SQLAlchemy ORM models
 │   │   ├── user.py                User
 │   │   ├── game_session.py        GameSession (CHECK level 1–4, partial unique index on active)
-│   │   └── leaderboard.py         LeaderboardEntry (unique session_id)
+│   │   ├── leaderboard.py         LeaderboardEntry (unique session_id)
+│   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline)
+│   │   └── denied_token.py        DeniedToken (revoked JWT JTIs until natural expiry)
 │   │
 │   ├── schemas/                   Pydantic request/response DTOs
 │   │   ├── auth.py

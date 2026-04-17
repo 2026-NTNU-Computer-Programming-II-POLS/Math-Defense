@@ -21,6 +21,7 @@ def _get_service(db: Session) -> AuthApplicationService:
     return AuthApplicationService(
         user_repo=SqlAlchemyUserRepository(db),
         uow=SqlAlchemyUnitOfWork(db),
+        db=db,
     )
 
 

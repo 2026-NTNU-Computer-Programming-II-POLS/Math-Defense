@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     cors_origins: str | list[str]
     # Active sessions older than this are treated as stale and auto-abandoned.
     session_stale_cutoff_hours: float = 2.0
-    # Cookie settings — secure=True requires HTTPS (works on localhost in modern
-    # browsers). Set COOKIE_SECURE=false in .env for plain-HTTP dev if needed.
+    # secure=True requires HTTPS (modern browsers treat localhost as secure).
+    # Disabling this is only honoured under CI/pytest — see validator below.
     cookie_secure: bool = True
 
     @field_validator("cors_origins", mode="before")
@@ -62,6 +62,20 @@ class Settings(BaseSettings):
             raise ValueError(
                 "DATABASE_URL contains the default password 'changeme'. "
                 "Set a strong password via the DATABASE_URL env var or .env file."
+            )
+        return v
+
+    @field_validator("cookie_secure")
+    @classmethod
+    def reject_insecure_cookie_outside_tests(cls, v: bool) -> bool:
+        # Plain-HTTP auth cookies leak credentials on any shared network. Only
+        # permit COOKIE_SECURE=false when the test harness is active; operators
+        # must front the app with TLS in every other environment.
+        is_test = os.environ.get("CI") or "pytest" in sys.modules
+        if not v and not is_test:
+            raise ValueError(
+                "COOKIE_SECURE=false is only allowed under CI/pytest. "
+                "Deploy behind HTTPS (see nginx-tls.conf) instead of disabling Secure cookies."
             )
         return v
 
