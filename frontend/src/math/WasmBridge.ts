@@ -28,11 +28,12 @@ let _useWasm = true
 
 export async function initWasm(): Promise<boolean> {
   try {
-    // ES module generated with MODULARIZE=1, compiled by emscripten and placed in frontend/public/wasm/.
-    // This file is not managed by the Vite bundler; it must be loaded via a runtime URL to bypass vite:import-analysis
-    // static checks on /public/ (and supports BASE_URL deployment to a sub-path).
-    const wasmUrl = `${import.meta.env.BASE_URL ?? '/'}wasm/math_engine.js`
-    const { default: createMathEngine } = await import(/* @vite-ignore */ wasmUrl)
+    // math_engine.js is loaded via <script> tag in index.html, available as globalThis.createMathEngine
+    const createMathEngine = (globalThis as any).createMathEngine
+    if (!createMathEngine) {
+      console.warn('[WasmBridge] createMathEngine not found in global scope')
+      return false
+    }
     _module = await createMathEngine()
     console.log('[WasmBridge] WASM loaded successfully')
     return true
