@@ -14,12 +14,20 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        // Override via VITE_API_TARGET when backend isn't on localhost — e.g.
+        // running `npm run dev` against a remote dev backend or inside a WSL
+        // setup where the backend container is reachable via its host name.
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:8000',
         changeOrigin: true,
       },
     },
   },
   assetsInclude: ['**/*.wasm'],
+  build: {
+    // Pin explicitly — a future Vite default flip to `true` would leak source
+    // paths (incl. file system layout) into prod bundles.
+    sourcemap: false,
+  },
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.test.ts'],

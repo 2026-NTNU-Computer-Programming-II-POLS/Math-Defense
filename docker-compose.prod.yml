@@ -64,6 +64,18 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    # Without this, `depends_on: frontend: service_healthy` (future scalers, a
+    # load-balancer sidecar, or `docker compose up --wait`) cannot tell a
+    # half-started nginx from a ready one and sends traffic too early.
+    # TCP probe only: an HTTP probe on :8080 would follow the HTTP→HTTPS
+    # redirect to :8443 and then fail the self-signed cert verify. A TCP probe
+    # is sufficient to prove nginx parsed its config and bound its sockets.
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8080 && nc -z localhost 8443"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
 volumes:

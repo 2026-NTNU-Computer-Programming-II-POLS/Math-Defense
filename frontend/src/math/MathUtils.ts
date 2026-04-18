@@ -104,7 +104,12 @@ export function findIntersections(
     if (prevDiff * diff < 0) {
       let lo = x - step
       let hi = x
-      for (let i = 0; i < 20; i++) {
+      // Derive iteration count from step so callers who shrink `step` still
+      // hit the same error floor. Each bisection halves the interval, so
+      // ceil(log2(step / EPS)) iterations guarantee the final midpoint is
+      // within EPS of the true root.
+      const iterations = Math.max(20, Math.ceil(Math.log2(step / EPS)))
+      for (let i = 0; i < iterations; i++) {
         const mid = (lo + hi) / 2
         const midDiff = f1(mid) - f2(mid)
         if (midDiff * (f1(lo) - f2(lo)) < 0) {

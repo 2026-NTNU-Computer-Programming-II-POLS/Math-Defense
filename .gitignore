@@ -23,6 +23,10 @@ share/python-wheels/
 *.egg
 MANIFEST
 .env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
 .venv
 env/
 venv/

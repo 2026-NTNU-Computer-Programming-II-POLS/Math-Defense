@@ -103,7 +103,7 @@ describe('WasmBridge — WASM/JS parity', () => {
 
   it('numericalIntegrate: quadratic over [0, 3]', () => {
     const { wasm, js } = bothBackends(() => numericalIntegrate(1, 0, 0, 0, 3))
-    expect(wasm).toBeCloseTo(js, 3)
+    expect(wasm).toBeCloseTo(js, 5)
   })
 
   it('fourierComposite: 3-element arrays', () => {
@@ -136,6 +136,27 @@ describe('WasmBridge — WASM/JS parity', () => {
     const { wasm, js } = bothBackends(() => calculateTrajectory(1, 0, 0, 0, 3, 0.5))
     expectArrClose(wasm.xs, js.xs)
     expectArrClose(wasm.ys, js.ys)
+  })
+
+  // W-5 regression: the C-side int cast of `floorf(...)` is implementation-defined
+  // for negative floats. Exercise the reverse direction (xEnd < xStart) to pin
+  // the clamp_sample_count helper against the JS fallback.
+  it('calculateTrajectory: reverse direction (xEnd < xStart)', () => {
+    const { wasm, js } = bothBackends(() => calculateTrajectory(1, 0, 0, 3, 0, 0.5))
+    expectArrClose(wasm.xs, js.xs)
+    expectArrClose(wasm.ys, js.ys)
+  })
+
+  // W-4 regression: a default samples=200 is fine for normal play, but if a caller
+  // passed a low sample count with high-frequency waves the result would alias.
+  // Post-fix, both sides auto-bump samples, so identical-wave still scores ~1.
+  it('fourierMatch: under-sampled identical high-freq waves still score ~1 (Nyquist gate)', () => {
+    const freqs = [30, 45, 60]
+    const amps = [1, 0.5, 0.3]
+    const { wasm, js } = bothBackends(() => fourierMatch(freqs, amps, freqs, amps, 20))
+    expect(wasm).toBeGreaterThan(0.95)
+    expect(js).toBeGreaterThan(0.95)
+    expect(wasm).toBeCloseTo(js, 3)
   })
 
   it('lineCircleIntersect: two roots', () => {

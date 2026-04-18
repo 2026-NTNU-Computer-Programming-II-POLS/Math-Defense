@@ -23,27 +23,49 @@ interface WasmModule {
 
 let _module: WasmModule | null = null
 let _useWasm = true
+// Singleton init state so concurrent callers share one load and late callers
+// can await readiness instead of racing with an in-flight `createMathEngine()`.
+let _initPromise: Promise<boolean> | null = null
+let _initResolved = false
 
 // ── Initialization ──
 
 // urlOverride lets the Node-environment parity test (WasmBridge.wasm.test.ts) pass
 // a file:// URL pointing at frontend/public/wasm/math_engine.js. Production callers
 // leave it undefined and get BASE_URL-based resolution as before.
-export async function initWasm(urlOverride?: string): Promise<boolean> {
-  try {
-    // ES module generated with MODULARIZE=1, compiled by emscripten and placed in frontend/public/wasm/.
-    // This file is not managed by the Vite bundler; it must be loaded via a runtime URL to bypass vite:import-analysis
-    // static checks on /public/ (and supports BASE_URL deployment to a sub-path).
-    const wasmUrl = urlOverride ?? `${import.meta.env.BASE_URL}wasm/math_engine.js`
-    const { default: createMathEngine } = await import(/* @vite-ignore */ wasmUrl)
-    _module = await createMathEngine()
-    console.log('[WasmBridge] WASM loaded successfully')
-    return true
-  } catch (e) {
-    console.warn('[WasmBridge] WASM failed to load, using JS fallback:', e)
-  }
-  _module = null
-  return false
+export function initWasm(urlOverride?: string): Promise<boolean> {
+  if (_initPromise) return _initPromise
+  _initPromise = (async () => {
+    try {
+      // ES module generated with MODULARIZE=1, compiled by emscripten and placed in frontend/public/wasm/.
+      // This file is not managed by the Vite bundler; it must be loaded via a runtime URL to bypass vite:import-analysis
+      // static checks on /public/ (and supports BASE_URL deployment to a sub-path).
+      const wasmUrl = urlOverride ?? `${import.meta.env.BASE_URL}wasm/math_engine.js`
+      const { default: createMathEngine } = await import(/* @vite-ignore */ wasmUrl)
+      _module = await createMathEngine()
+      console.log('[WasmBridge] WASM loaded successfully')
+      return true
+    } catch (e) {
+      console.warn('[WasmBridge] WASM failed to load, using JS fallback:', e)
+      _module = null
+      return false
+    } finally {
+      _initResolved = true
+    }
+  })()
+  return _initPromise
+}
+
+// Await readiness without triggering a load. Callers that must ensure WASM has
+// either loaded or definitively failed should `await whenWasmReady()` before
+// invoking math fns; pre-init calls transparently take the JS fallback branch
+// because `_useWasm && _module` is falsy until the promise settles.
+export function whenWasmReady(): Promise<boolean> {
+  return _initPromise ?? Promise.resolve(false)
+}
+
+export function isWasmReady(): boolean {
+  return _initResolved
 }
 
 export function setUseWasm(use: boolean): void {
@@ -133,15 +155,18 @@ export function pointInSector(
       ) === 1
     )
   }
+  // Mirror math_engine.c clamp: widths > 2π or negative are normalised.
+  const TWO_PI = Math.PI * 2
+  const width = Math.max(0, Math.min(TWO_PI, angleWidth))
   const dx = px - cx
   const dy = py - cy
   const dist = Math.sqrt(dx * dx + dy * dy)
   if (dist > radius) return false
   let angle = Math.atan2(dy, dx)
-  if (angle < 0) angle += Math.PI * 2
-  let start = angleStart % (Math.PI * 2)
-  if (start < 0) start += Math.PI * 2
-  const end = start + angleWidth
+  if (angle < 0) angle += TWO_PI
+  let start = angleStart % TWO_PI
+  if (start < 0) start += TWO_PI
+  const end = start + width
   const eps = 1e-6
   if (end > Math.PI * 2) return angle >= start - eps || angle <= end - Math.PI * 2 + eps
   return angle >= start - eps && angle <= end + eps
@@ -158,6 +183,8 @@ export function numericalIntegrate(
       ['number', 'number', 'number', 'number', 'number', 'number'],
       [a, b, c, lo, hi, n])
   }
+  // Matches the C-side guard at math_engine.c:145 — n=0 would make h=Infinity.
+  if (n <= 0) n = 100
   const h = (hi - lo) / n
   let sum = 0
   for (let i = 0; i <= n; i++) {
@@ -219,10 +246,17 @@ export function fourierMatch(
         ['number', 'number', 'number', 'number', 'number'], [f1, a1, f2, a2, samples])
     })
   }
-  const dt = (2 * Math.PI) / samples
+  // Mirror C-side Nyquist gate (math_engine.c fourier_match): oversample at 4×
+  // max-|ω| so high-frequency boss waveforms don't alias and stall the mini-game.
+  const maxFreq = Math.max(
+    Math.abs(f1v[0]), Math.abs(f1v[1]), Math.abs(f1v[2]),
+    Math.abs(f2v[0]), Math.abs(f2v[1]), Math.abs(f2v[2]),
+  )
+  const n = Math.max(samples, Math.floor(4 * maxFreq) + 1)
+  const dt = (2 * Math.PI) / n
   let totalError = 0
   let totalEnergy = 0
-  for (let i = 0; i < samples; i++) {
+  for (let i = 0; i < n; i++) {
     const t = i * dt
     const v1 = a1v[0] * Math.sin(f1v[0] * t) + a1v[1] * Math.sin(f1v[1] * t) + a1v[2] * Math.sin(f1v[2] * t)
     const v2 = a2v[0] * Math.sin(f2v[0] * t) + a2v[1] * Math.sin(f2v[1] * t) + a2v[2] * Math.sin(f2v[2] * t)

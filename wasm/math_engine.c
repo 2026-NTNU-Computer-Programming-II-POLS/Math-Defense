@@ -49,6 +49,16 @@ void matrix_multiply(const float *a, const float *b, float *result) {
  * @param out_y     輸出 y 座標陣列
  * @param count     輸出：實際點數
  */
+/* Convert a float sample count into a safe int in [0, max_n].
+   Isolated so reverse-range behaviour (dir=-1) and the NaN/overflow clamp are
+   covered by a single code path and can be unit-tested independently of the
+   rest of trajectory generation. Returns 0 for NaN or negative inputs. */
+static int clamp_sample_count(float nf, int max_n) {
+    if (!(nf >= 0.0f)) return 0;            /* also traps NaN */
+    if (nf > (float)max_n) return max_n;
+    return (int)nf;
+}
+
 void calculate_trajectory(float a, float b, float c,
                           float x_start, float x_end, float step,
                           float *out_x, float *out_y, int *count) {
@@ -61,9 +71,7 @@ void calculate_trajectory(float a, float b, float c,
        INT_MAX, and casting an out-of-range float to int is undefined behaviour in C
        (the JS fallback is safe via Math.min, so they'd diverge on extreme inputs). */
     float nf = floorf((x_end - x_start) * dir / step) + 1.0f;
-    if (!(nf >= 0.0f)) nf = 0.0f;      /* also traps NaN */
-    if (nf > 1000.0f) nf = 1000.0f;
-    int n = (int)nf;
+    int n = clamp_sample_count(nf, 1000);
 
     for (int i = 0; i < n; i++) {
         float x = x_start + (float)i * step * dir;
@@ -104,6 +112,13 @@ float sector_coverage(float radius, float angle_width) {
  */
 int point_in_sector(float px, float py, float cx, float cy,
                     float radius, float angle_start, float angle_width) {
+    /* Clamp to [0, 2π] for parity with sector_coverage. Widths > 2π would wrap
+       once and falsely exclude valid points; negative widths yield end < start
+       and always return 0. */
+    const float TWO_PI_CLAMP = 2.0f * (float)M_PI;
+    if (angle_width < 0.0f) angle_width = 0.0f;
+    if (angle_width > TWO_PI_CLAMP) angle_width = TWO_PI_CLAMP;
+
     float dx = px - cx;
     float dy = py - cy;
     float dist = sqrtf(dx * dx + dy * dy);
@@ -194,6 +209,22 @@ float fourier_match(const float *freqs1, const float *amps1,
                     int samples) {
     if (samples <= 0) samples = 200;
 
+    /* Nyquist gate: in the [0, 2π] window, dt = 2π/samples, so the discretely
+       representable angular frequency is bounded by samples/2. If either
+       waveform carries a higher ω, aliasing folds its energy onto lower
+       components and the score collapses — in the boss shield mini-game that
+       makes the fight effectively unwinnable. Bump samples to 4×max_ω for a
+       2× oversample margin over the Nyquist rate. */
+    float max_freq = 0.0f;
+    for (int i = 0; i < 3; i++) {
+        float f1 = freqs1[i]; if (f1 < 0.0f) f1 = -f1;
+        float f2 = freqs2[i]; if (f2 < 0.0f) f2 = -f2;
+        if (f1 > max_freq) max_freq = f1;
+        if (f2 > max_freq) max_freq = f2;
+    }
+    int min_samples = (int)(4.0f * max_freq) + 1;
+    if (samples < min_samples) samples = min_samples;
+
     float totalError = 0.0f;
     float totalEnergy = 0.0f;
     float dt = 2.0f * (float)M_PI / (float)samples;
@@ -242,6 +273,11 @@ int line_circle_intersect(float m, float b, float cx, float cy, float r,
 
     if (disc < 0) return 0;
 
+    /* Tangent case: disc ~ 0. The 1e-6 absolute threshold is appropriate for
+       radii ≤ O(100) in game-space units; disc scales like A·r², so for very
+       large r (> 1000) any float roundoff dwarfs 1e-6 and this branch becomes
+       effectively dead — the two-root branch below then produces two nearly
+       coincident points, which downstream hit-detection already deduplicates. */
     if (disc < 1e-6f) {
         out_x[0] = -B / (2.0f * A);
         out_y[0] = m * out_x[0] + b;
