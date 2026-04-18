@@ -1,11 +1,12 @@
 """GameSessionRepository — 抽象介面（Protocol），不依賴 SQLAlchemy"""
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from app.domain.session.aggregate import GameSession
 
 
+@runtime_checkable
 class GameSessionRepository(Protocol):
     def find_by_id(self, session_id: str, user_id: str) -> GameSession | None: ...
 

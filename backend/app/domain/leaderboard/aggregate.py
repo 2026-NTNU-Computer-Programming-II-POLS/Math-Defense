@@ -4,16 +4,18 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, UTC
 
+from app.domain.errors import DomainValueError
 from app.domain.value_objects import Level, Score
 
 
 class LeaderboardEntry:
     """
-    排行榜條目聚合根。
+    Leaderboard entry aggregate root.
 
-    不變量：
-    1. 一個 session_id 只能對應一筆條目（由 Repository 層確保）
-    2. 分數、擊殺數、存活波數不可為負
+    Invariants (enforced in __init__):
+    1. One entry per session_id (guaranteed by the repository layer).
+    2. kills >= 0, waves_survived >= 0.
+    3. score non-negativity is guarded by the Score value object.
     """
 
     def __init__(
@@ -27,6 +29,10 @@ class LeaderboardEntry:
         session_id: str | None = None,
         created_at: datetime | None = None,
     ) -> None:
+        if kills < 0:
+            raise DomainValueError("kills must be non-negative")
+        if waves_survived < 0:
+            raise DomainValueError("waves_survived must be non-negative")
         self.id = id
         self.user_id = user_id
         self.level = level

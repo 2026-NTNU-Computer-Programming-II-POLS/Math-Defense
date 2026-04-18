@@ -255,3 +255,37 @@ class TestStatusTransitions:
         )
         with pytest.raises(SessionNotActiveError):
             session.complete(GameResult(Score(100), 5, 2))
+
+
+# ── Forbidden-transition matrix (direct coverage of _transition_to) ──
+
+class TestForbiddenTransitionMatrix:
+    """Exercise _ALLOWED_TRANSITIONS directly so a future maintainer editing
+    the matrix can't silently weaken it past the parametrised HTTP tests."""
+
+    @pytest.mark.parametrize("from_status", [SessionStatus.COMPLETED, SessionStatus.ABANDONED])
+    @pytest.mark.parametrize("to_status", [SessionStatus.ACTIVE, SessionStatus.COMPLETED, SessionStatus.ABANDONED])
+    def test_terminal_states_reject_transition(self, from_status, to_status):
+        from app.domain.session.aggregate import _ALLOWED_TRANSITIONS
+        # Terminal states have no allowed out-transitions.
+        assert _ALLOWED_TRANSITIONS[from_status] == set()
+        session = GameSession(
+            id="s-1", user_id="u-1", level=Level(1), status=from_status,
+        )
+        with pytest.raises(InvalidStatusTransitionError):
+            session._transition_to(to_status)
+
+    def test_active_to_active_rejected(self):
+        session = GameSession(id="s-1", user_id="u-1", level=Level(1))
+        with pytest.raises(InvalidStatusTransitionError):
+            session._transition_to(SessionStatus.ACTIVE)
+
+    def test_active_to_completed_allowed(self):
+        session = GameSession(id="s-1", user_id="u-1", level=Level(1))
+        session._transition_to(SessionStatus.COMPLETED)
+        assert session.status == SessionStatus.COMPLETED
+
+    def test_active_to_abandoned_allowed(self):
+        session = GameSession(id="s-1", user_id="u-1", level=Level(1))
+        session._transition_to(SessionStatus.ABANDONED)
+        assert session.status == SessionStatus.ABANDONED

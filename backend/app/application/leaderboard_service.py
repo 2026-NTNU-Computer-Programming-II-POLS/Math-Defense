@@ -14,6 +14,7 @@ from app.domain.errors import (
 )
 from app.domain.value_objects import Level, Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
+from app.domain.leaderboard.view import RankedLeaderboardEntry
 from app.utils.integrity import is_constraint_violation
 
 if TYPE_CHECKING:
@@ -41,8 +42,10 @@ class LeaderboardApplicationService:
         level: int | None,
         page: int,
         per_page: int,
-    ) -> tuple[list[dict], int]:
-        return self._leaderboard_repo.query_ranked(level, page, per_page)
+    ) -> tuple[list[RankedLeaderboardEntry], int]:
+        if level is None:
+            return self._leaderboard_repo.query_ranked_global(page, per_page)
+        return self._leaderboard_repo.query_ranked_by_level(level, page, per_page)
 
     def submit_score(
         self,

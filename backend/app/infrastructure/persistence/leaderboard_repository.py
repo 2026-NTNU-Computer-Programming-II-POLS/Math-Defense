@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession, aliased
 
 from app.domain.leaderboard.aggregate import LeaderboardEntry
+from app.domain.leaderboard.view import RankedLeaderboardEntry
 from app.domain.value_objects import Level, Score
 from app.models.leaderboard import LeaderboardEntry as LeaderboardEntryModel
 from app.models.user import User
@@ -35,13 +36,29 @@ class SqlAlchemyLeaderboardRepository:
         self._db.add(row)
         self._db.flush()
 
-    def query_ranked(
+    def query_ranked_global(
+        self,
+        page: int,
+        per_page: int,
+    ) -> tuple[list[RankedLeaderboardEntry], int]:
+        return self._query_ranked(level=None, page=page, per_page=per_page)
+
+    def query_ranked_by_level(
+        self,
+        level: int,
+        page: int,
+        per_page: int,
+    ) -> tuple[list[RankedLeaderboardEntry], int]:
+        return self._query_ranked(level=level, page=page, per_page=per_page)
+
+    def _query_ranked(
         self,
         level: int | None,
         page: int,
         per_page: int,
-    ) -> tuple[list[dict], int]:
-        """Returns (entries_with_rank, total_count).
+    ) -> tuple[list[RankedLeaderboardEntry], int]:
+        """Shared implementation: when level is None the rank is global,
+        otherwise it is scoped to rows of that level.
 
         Rank semantics: DENSE_RANK by score — ties share a rank, next distinct
         score advances by 1. Implementation avoids a window function so the DB
@@ -50,7 +67,6 @@ class SqlAlchemyLeaderboardRepository:
         scores``), which uses the score index and costs O(per_page * log N)
         rather than O(N).
         """
-        # Count query: no User join (B-8) — COUNT doesn't need usernames.
         count_q = self._db.query(func.count(LeaderboardEntryModel.id))
         if level is not None:
             count_q = count_q.filter(LeaderboardEntryModel.level == level)
@@ -90,15 +106,15 @@ class SqlAlchemyLeaderboardRepository:
         )
 
         entries = [
-            {
-                "rank": row.rank,
-                "username": row.username,
-                "level": row.level,
-                "score": row.score,
-                "kills": row.kills,
-                "waves_survived": row.waves_survived,
-                "created_at": row.created_at,
-            }
+            RankedLeaderboardEntry(
+                rank=row.rank,
+                username=row.username,
+                level=row.level,
+                score=row.score,
+                kills=row.kills,
+                waves_survived=row.waves_survived,
+                created_at=row.created_at,
+            )
             for row in rows
         ]
 

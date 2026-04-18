@@ -104,23 +104,27 @@ class SessionApplicationService:
         kills: int,
         waves_survived: int,
     ) -> GameSession:
+        pending_events: list = []
         with self._uow:
             session = self._session_repo.find_by_id(session_id, user_id)
             if not session:
                 raise SessionNotFoundError("Session not found")
-            # Idempotent retry: if the session is already completed, return the
-            # stored state as-is. Clients retrying after a timeout shouldn't have
-            # to special-case 409. (ABANDONED falls through to session.complete
-            # below, which surfaces as 409 — that's a different scenario.)
+            # Idempotent retry: if the session is already completed, return it.
+            # Also catch up any dropped post-commit handlers from a prior run
+            # (e.g. leaderboard insert failed after session commit). The handler
+            # is itself idempotent via find_by_session_id.
             if session.status == SessionStatus.COMPLETED:
-                return session
-            if session.is_stale:
-                session.abandon()
-                self._session_repo.save(session)
-                self._uow.commit()
-                raise SessionStaleError(
-                    "Session timed out (over 2 hours) and was automatically abandoned"
+                catch_up = SessionCompleted(
+                    session_id=session.id,
+                    user_id=session.user_id,
+                    level=int(session.level),
+                    score=session.score,
+                    kills=kills,
+                    waves_survived=waves_survived,
                 )
+                self._dispatch_post_commit([catch_up])
+                return session
+            self._ensure_not_stale_or_abandon(session)
             result = GameResult(
                 score=Score(score),
                 kills=kills,
@@ -129,23 +133,41 @@ class SessionApplicationService:
             session.complete(result)
             self._session_repo.save(session)
 
-            # Snapshot and clear events *before* commit so the aggregate can't
-            # re-emit if anything post-commit raises (logger, telemetry, etc.).
-            # The leaderboard insert below is part of the same UoW, so if commit
-            # fails everything rolls back atomically — the cleared in-memory list
-            # is discarded with the aggregate when this request ends.
+            # Snapshot events before commit so a durable copy survives the
+            # aggregate going out of scope. Do NOT clear yet — clearing belongs
+            # after a successful handler dispatch (D-6), but because dispatch
+            # runs in its own UoW after commit (D-5), the in-memory aggregate is
+            # discarded with the request anyway.
             pending_events = session.collect_events()
-            session.clear_events()
-            for event in pending_events:
-                if isinstance(event, SessionCompleted):
-                    self._handle_session_completed(event)
 
             self._uow.commit()
             logger.info(
                 "Session ended: session=%s user=%s score=%d",
                 session.id, user_id, score,
             )
-            return session
+
+        # Post-commit dispatch: session completion is now durable. Handler runs
+        # in a separate UoW so a leaderboard-insert failure cannot roll back the
+        # already-committed session. Idempotency in _handle_session_completed
+        # makes retries (via end_session catch-up or background sweeper) safe.
+        self._dispatch_post_commit(pending_events)
+        return session
+
+    def _dispatch_post_commit(self, events: list) -> None:
+        for event in events:
+            if not isinstance(event, SessionCompleted):
+                continue
+            try:
+                with self._uow:
+                    self._handle_session_completed(event)
+                    self._uow.commit()
+            except Exception:
+                # Session is already durably completed; log and move on. A
+                # future retry (client resubmit, background catch-up) will
+                # re-dispatch via the idempotent handler.
+                logger.exception(
+                    "post-commit dispatch failed session=%s", event.session_id
+                )
 
     def get_active_for_user(self, user_id: str) -> GameSession | None:
         """Return the caller's active session, if any.
@@ -159,9 +181,7 @@ class SessionApplicationService:
             if session is None:
                 return None
             if session.is_stale:
-                session.abandon()
-                self._session_repo.save(session)
-                self._uow.commit()
+                self._abandon_and_commit(session)
                 return None
             return session
 
@@ -201,14 +221,27 @@ class SessionApplicationService:
         session = self._session_repo.find_by_id(session_id, user_id)
         if not session:
             raise SessionNotFoundError("Session not found")
-        # Force timeout: stale active session is automatically abandoned.
-        # Commit before raising so the surrounding UoW.__exit__ cannot roll the abandon back.
-        if session.is_stale:
-            session.abandon()
-            self._session_repo.save(session)
-            self._uow.commit()
-            raise SessionStaleError("Session timed out (over 2 hours) and was automatically abandoned")
+        self._ensure_not_stale_or_abandon(session)
         return session
+
+    def _ensure_not_stale_or_abandon(self, session: GameSession) -> None:
+        """If the session has timed out, abandon it and raise SessionStaleError.
+
+        Commits before raising so the surrounding UoW.__exit__ cannot roll the
+        abandon back. Shared by _get_session and end_session so the stale-check
+        rule stays in one place.
+        """
+        if not session.is_stale:
+            return
+        self._abandon_and_commit(session)
+        raise SessionStaleError(
+            "Session timed out (over 2 hours) and was automatically abandoned"
+        )
+
+    def _abandon_and_commit(self, session: GameSession) -> None:
+        session.abandon()
+        self._session_repo.save(session)
+        self._uow.commit()
 
 
 def _is_active_session_conflict(err: IntegrityError) -> bool:

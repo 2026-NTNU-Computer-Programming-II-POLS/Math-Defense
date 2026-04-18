@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,6 +17,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import settings
 from app.db.database import engine, SessionLocal
 from app.domain.errors import DomainError
+from app.infrastructure.login_guard import purge_stale as purge_stale_login_attempts
+from app.infrastructure.token_denylist import purge_expired as purge_expired_denied_tokens
 from app.routers import auth, leaderboard, game_session
 from app.limiter import limiter
 from app.seed import ensure_demo_user
@@ -31,6 +34,33 @@ _ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
 # Arbitrary fixed key for the PostgreSQL advisory lock that serialises migrations.
 _MIGRATION_LOCK_ID = 483_921_746
+
+# How often the auth-store janitor runs. Frequent enough that rows don't
+# accumulate noticeably; infrequent enough that concurrent DELETEs don't
+# compete with the login path for row locks.
+_JANITOR_INTERVAL_SECONDS = 600
+
+
+async def _auth_store_janitor() -> None:
+    """Periodically purge expired deny-list and stale login-attempt rows.
+
+    Replaces the previous inline cleanup that `deny()` and `is_locked()` ran
+    on every write/read — a DoS amplifier under logout spam and a TOCTOU
+    source on the read path.
+    """
+    while True:
+        try:
+            await asyncio.sleep(_JANITOR_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            return
+        db = SessionLocal()
+        try:
+            purge_expired_denied_tokens(db)
+            purge_stale_login_attempts(db)
+        except Exception:
+            logger.exception("Auth-store janitor iteration failed")
+        finally:
+            db.close()
 
 
 @asynccontextmanager
@@ -53,7 +83,15 @@ async def lifespan(_app: FastAPI):
         ensure_demo_user(db)
     finally:
         db.close()
-    yield
+    janitor = asyncio.create_task(_auth_store_janitor())
+    try:
+        yield
+    finally:
+        janitor.cancel()
+        try:
+            await janitor
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(

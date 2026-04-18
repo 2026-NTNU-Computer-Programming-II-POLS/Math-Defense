@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, UTC
 
+from sqlalchemy import case, delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session as DbSession
 
 from app.models.login_attempt import LoginAttempt
@@ -24,54 +26,93 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _ensure_utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    return value if value.tzinfo else value.replace(tzinfo=UTC)
-
-
 def is_locked(db: DbSession, username: str) -> bool:
-    """Return True if the account is currently locked out."""
-    row = db.get(LoginAttempt, username)
-    if row is None:
-        return False
-    locked_until = _ensure_utc(row.locked_until)
+    """Return True if the account is currently locked out.
+
+    Pure read. Expired lockouts are simply treated as "not locked"; the next
+    ``record_failure`` atomically resets the window, so there is no need to
+    mutate state from the read path (doing so opened a read-modify-write race
+    on concurrent login attempts).
+    """
+    now = _now()
+    stmt = select(LoginAttempt.locked_until).where(LoginAttempt.username == username)
+    locked_until = db.execute(stmt).scalar_one_or_none()
     if locked_until is None:
         return False
-    if _now() >= locked_until:
-        # Lockout expired — clear it so the next failure starts a fresh window.
-        row.locked_until = None
-        row.failures = 0
-        row.window_started_at = _now()
-        db.commit()
-        return False
-    return True
+    if locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=UTC)
+    return now < locked_until
 
 
 def record_failure(db: DbSession, username: str) -> None:
-    """Record a failed login attempt. Triggers lockout if threshold reached."""
+    """Record a failed login attempt. Triggers lockout if threshold reached.
+
+    Implemented as a single atomic UPSERT so concurrent failed logins cannot
+    coalesce into a single increment (the previous read-modify-write allowed
+    ``MAX_ATTEMPTS × concurrency`` tries through the lockout).
+    """
     now = _now()
-    row = db.get(LoginAttempt, username)
-    if row is None:
-        row = LoginAttempt(username=username, failures=1, window_started_at=now)
-        db.add(row)
-    else:
-        window_start = _ensure_utc(row.window_started_at) or now
-        # Reset the window if the previous one has aged out so old failures
-        # can't accumulate past the intended sliding horizon.
-        if (now - window_start).total_seconds() > WINDOW_SECONDS:
-            row.failures = 1
-            row.window_started_at = now
-        else:
-            row.failures += 1
-        if row.failures >= MAX_ATTEMPTS:
-            row.locked_until = now + timedelta(seconds=LOCKOUT_SECONDS)
+    window_threshold = now - timedelta(seconds=WINDOW_SECONDS)
+    lockout_deadline = now + timedelta(seconds=LOCKOUT_SECONDS)
+
+    # ON CONFLICT DO UPDATE takes a row-level lock, serialising the increment.
+    # The CASE expressions reference the *existing* row's columns.
+    window_expired = LoginAttempt.window_started_at < window_threshold
+    new_failures = case((window_expired, 1), else_=LoginAttempt.failures + 1)
+    new_window = case((window_expired, now), else_=LoginAttempt.window_started_at)
+    # After a reset the count is 1, so no lockout. Otherwise arm the lockout
+    # the moment the post-increment count crosses MAX_ATTEMPTS.
+    new_locked_until = case(
+        (window_expired, None),
+        (LoginAttempt.failures + 1 >= MAX_ATTEMPTS, lockout_deadline),
+        # Clear a lockout whose deadline has already passed so the row doesn't
+        # carry stale state. Matters only if LOCKOUT_SECONDS ever drops below
+        # WINDOW_SECONDS; with equal values the window_expired branch above
+        # always fires first, but we don't want that coupling to be load-bearing.
+        (LoginAttempt.locked_until < now, None),
+        else_=LoginAttempt.locked_until,
+    )
+
+    stmt = pg_insert(LoginAttempt).values(
+        username=username,
+        failures=1,
+        window_started_at=now,
+        locked_until=None,
+    ).on_conflict_do_update(
+        index_elements=["username"],
+        set_={
+            "failures": new_failures,
+            "window_started_at": new_window,
+            "locked_until": new_locked_until,
+        },
+    )
+    db.execute(stmt)
     db.commit()
 
 
 def record_success(db: DbSession, username: str) -> None:
     """Clear failure history on successful login."""
-    row = db.get(LoginAttempt, username)
-    if row is not None:
-        db.delete(row)
+    result = db.execute(delete(LoginAttempt).where(LoginAttempt.username == username))
+    # Skip the commit on the common "clean account" path (no prior failures).
+    if result.rowcount:
         db.commit()
+
+
+def purge_stale(db: DbSession) -> None:
+    """Remove LoginAttempt rows that no longer serve any purpose.
+
+    A row is stale when its window has aged out and any lockout has passed —
+    both branches resolve to "start fresh" the next time the user fails, so
+    keeping the row around just grows the table by one per ever-failed-once
+    username. Intended for the same scheduler that calls ``purge_expired``
+    on the deny-list.
+    """
+    now = _now()
+    window_cutoff = now - timedelta(seconds=WINDOW_SECONDS)
+    db.execute(
+        delete(LoginAttempt).where(
+            LoginAttempt.window_started_at < window_cutoff,
+            (LoginAttempt.locked_until.is_(None)) | (LoginAttempt.locked_until < now),
+        )
+    )
+    db.commit()

@@ -50,6 +50,12 @@ class SqlAlchemySessionRepository:
         return [self._to_domain(r) for r in rows]
 
     def save(self, session: GameSession) -> None:
+        # Normalise tz on the way out so the column never receives a naive
+        # datetime, mirroring _ensure_utc() on load. Keeps the entire round-trip
+        # UTC-aware even if an upstream caller handed us a naive datetime.
+        started_at = _ensure_utc(session.started_at)
+        ended_at = _ensure_utc(session.ended_at)
+
         row = self._db.query(GameSessionModel).filter(
             GameSessionModel.id == session.id
         ).first()
@@ -57,7 +63,7 @@ class SqlAlchemySessionRepository:
             # started_at is an aggregate invariant: it is set once at creation
             # and must never change. Surface future setters that break this
             # instead of silently dropping the mutation on update.
-            if _ensure_utc(row.started_at) != _ensure_utc(session.started_at):
+            if _ensure_utc(row.started_at) != started_at:
                 raise StartedAtMutationError(
                     f"started_at is immutable on GameSession (session={session.id})"
                 )
@@ -66,7 +72,7 @@ class SqlAlchemySessionRepository:
             row.gold = session.gold
             row.hp = session.hp
             row.score = session.score
-            row.ended_at = session.ended_at
+            row.ended_at = ended_at
         else:
             row = GameSessionModel(
                 id=session.id,
@@ -77,8 +83,8 @@ class SqlAlchemySessionRepository:
                 gold=session.gold,
                 hp=session.hp,
                 score=session.score,
-                started_at=session.started_at,
-                ended_at=session.ended_at,
+                started_at=started_at,
+                ended_at=ended_at,
             )
             self._db.add(row)
         self._db.flush()

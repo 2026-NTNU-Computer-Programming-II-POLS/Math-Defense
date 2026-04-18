@@ -40,8 +40,19 @@ def get_leaderboard(
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    entries_data, total = _get_service(db).get_leaderboard(level, page, per_page)
-    entries = [LeaderboardEntryOut(**e) for e in entries_data]
+    ranked, total = _get_service(db).get_leaderboard(level, page, per_page)
+    entries = [
+        LeaderboardEntryOut(
+            rank=r.rank,
+            username=r.username,
+            level=r.level,
+            score=r.score,
+            kills=r.kills,
+            waves_survived=r.waves_survived,
+            created_at=r.created_at,
+        )
+        for r in ranked
+    ]
     return LeaderboardResponse(entries=entries, total=total)
 
 

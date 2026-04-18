@@ -113,8 +113,12 @@ class GameSession:
     ) -> None:
         """Update game progress — only allowed in ACTIVE status.
 
-        Defense-in-depth: clamp each field to its physical range and reject
-        score regressions / large deltas that signal a tampered client.
+        The aggregate is the AUTHORITATIVE invariant guard. Schema-layer bounds
+        (app/schemas/game_session.py) exist only to give HTTP callers a 422 at
+        the edge; do NOT strip the clamps / range checks below on the assumption
+        that the schema already validated — non-HTTP callers (background jobs,
+        tests, future gRPC entrypoints) may reach this method directly.
+        Clamping here is defence-in-depth against a tampered or buggy client.
         """
         self._assert_active("Cannot update a non-active session")
         if current_wave is not None:

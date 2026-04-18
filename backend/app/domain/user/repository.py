@@ -1,11 +1,12 @@
 """UserRepository — abstract interface (Protocol), no SQLAlchemy dependency"""
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from app.domain.user.aggregate import User
 
 
+@runtime_checkable
 class UserRepository(Protocol):
     def find_by_username(self, username: str) -> User | None: ...
 

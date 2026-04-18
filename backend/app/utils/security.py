@@ -16,13 +16,37 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
-    to_encode.update({"exp": expire, "jti": uuid.uuid4().hex})
+    now = datetime.now(UTC)
+    expire = now + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "jti": uuid.uuid4().hex,
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
+    })
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
 def decode_token(token: str) -> dict[str, Any] | None:
+    # Rollout note: tokens issued before `iat`/`iss`/`aud` became required
+    # decode to None here, forcing a one-time re-login. Acceptable because
+    # access_token_expire_minutes is short (30m) — the affected window closes
+    # on its own within one TTL of deploying this change.
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        # Pin header alg explicitly: even though `algorithms=[...]` already
+        # restricts verification, an un-asserted header leaves the door open
+        # if the allow-list is ever broadened (classic alg-confusion re-entry).
+        header = jwt.get_unverified_header(token)
+        if header.get("alg") != settings.algorithm:
+            return None
+        return jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.algorithm],
+            audience=settings.jwt_audience,
+            issuer=settings.jwt_issuer,
+            options={"require": ["exp", "iat", "sub", "jti", "iss", "aud"]},
+        )
     except jwt.InvalidTokenError:
         return None

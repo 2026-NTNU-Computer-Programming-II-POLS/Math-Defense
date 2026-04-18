@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     secret_key: str  # Required — must be set via SECRET_KEY env var or .env file
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30  # 30 minutes
+    # JWT iss/aud — bound into every issued token and required at decode time.
+    # Pinning them closes the cross-service reuse gap if the HMAC secret ever
+    # leaks to a sibling service signing JWTs with the same key.
+    jwt_issuer: str = "math-defense-api"
+    jwt_audience: str = "math-defense-clients"
     # Required — set CORS_ORIGINS env var (comma-separated) to the browser-visible origins.
     # No default: a hard-coded localhost list silently breaks prod deployments behind nginx.
     # Union is load-bearing: pydantic-settings only tolerates JSON-decode failure on
