@@ -70,11 +70,14 @@ frontend/
 │   │   ├── PhaseStateMachine.ts    FSM with transition validation table
 │   │   ├── EventBus.ts             Generic, type-safe pub/sub
 │   │   ├── InputManager.ts         Canvas mouse → game-unit coord events
-│   │   └── Renderer.ts             Canvas-2D drawing primitives
+│   │   ├── Renderer.ts             Canvas-2D drawing primitives
+│   │   └── event-handlers/
+│   │       └── registry.ts         EVENT_HANDLER_REGISTRY — single source of truth listing every EventBus subscription (module / handler / purpose) so reviewers can answer "who reacts to event X?" in one place
 │   │
 │   ├── domain/                     Domain policies (shared across systems)
-│   │   └── combat/
-│   │       └── SplitSlimePolicy.ts Single source for SPLIT_SLIME split rules
+│   │   ├── combat/
+│   │   │   └── SplitSlimePolicy.ts Single source for SPLIT_SLIME split rules
+│   │   └── formatters.ts           Centralised presentation formatters (e.g. formatScore) used by HUD, GameView, LeaderboardView
 │   │
 │   ├── systems/                    ECS systems — pure update logic, no rendering
 │   │   ├── TowerPlacementSystem.ts Click-to-place, grid snap, preview on hover
@@ -207,7 +210,9 @@ Valid transitions:
 
 Type-safe generic pub/sub. All event names and payload shapes live in the `GameEvents` interface in `Game.ts` (includes an index signature so custom event names still type-check). Every subscription returns an `unsubscribe()` function; `useGameLoop` collects these and calls them all on unmount.
 
-Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_START/END`, `WAVE_START/END`, `TOWER_PLACED/SELECTED/PARAMS_SET`, `CAST_SPELL`, `TOWER_ATTACK`, `ENEMY_SPAWNED/KILLED/REACHED_ORIGIN`, `BUFF_PHASE_START/END`, `BUFF_CARD_SELECTED`, `BUFF_RESULT`, `BOSS_SHIELD_START/ATTEMPT/END`, `GOLD_CHANGED`, `HP_CHANGED`, `SCORE_CHANGED`, `CANVAS_CLICK/HOVER`.
+Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_START/END`, `WAVE_START/END`, `TOWER_PLACED/SELECTED/PARAMS_SET`, `CAST_SPELL`, `TOWER_ATTACK`, `ENEMY_SPAWNED/KILLED/REACHED_ORIGIN`, `BUFF_PHASE_START/END`, `BUFF_CARDS_UPDATED`, `BUFF_CARD_SELECTED`, `BUFF_RESULT`, `BOSS_SHIELD_START/ATTEMPT/END`, `GOLD_CHANGED`, `HP_CHANGED`, `SCORE_CHANGED`, `CANVAS_CLICK/HOVER`.
+
+Subscriptions are indexed in `engine/event-handlers/registry.ts` — the registry is typed against the `Events` map, so removing or renaming an event surfaces a compile error at the index site. Any new `eventBus.on(...)` call must add an entry; reviewers use it to audit that every subscription is disposed on unmount / `destroy()`.
 
 ### `InputManager.ts`
 
