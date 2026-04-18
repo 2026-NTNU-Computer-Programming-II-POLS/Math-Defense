@@ -1,27 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { Events } from '@/data/constants'
+import { Events, GamePhase } from '@/data/constants'
 
 const gameStore = useGameStore()
 
 const cards = computed(() => gameStore.buffCards)
 
 // Guard against rapid double-click: once a card is selected, block further
-// selections until BUFF_RESULT fires (normal path) or a 2s failsafe timeout
-// elapses (in case the engine drops the result event). Without this, two
-// fast clicks dispatch two BUFF_CARD_SELECTED events and the player is
-// charged twice.
+// selections until BUFF_RESULT fires (normal path), the buff phase ends
+// (cards cleared / PHASE_CHANGED away), or the component unmounts. No
+// wall-clock failsafe — it would either fire too early (re-enabling clicks
+// on a stale round while the engine is still processing) or too late to
+// matter. The phase watchers below cover every exit route the engine can
+// take, including the "engine dropped BUFF_RESULT" case.
 const selectingCardId = ref<string | null>(null)
-let timeoutHandle: ReturnType<typeof setTimeout> | null = null
 let unsubBuffResult: (() => void) | null = null
+let unsubPhase: (() => void) | null = null
 
 function clearGuard(): void {
   selectingCardId.value = null
-  if (timeoutHandle !== null) {
-    clearTimeout(timeoutHandle)
-    timeoutHandle = null
-  }
 }
 
 onMounted(() => {
@@ -30,11 +28,19 @@ onMounted(() => {
   unsubBuffResult = game.eventBus.on(Events.BUFF_RESULT, () => {
     clearGuard()
   })
+  // Defensive belt-and-braces: if BUFF_RESULT is somehow never fired but the
+  // engine leaves the BUFF_SELECT phase anyway, release the guard so the
+  // next buff round isn't pre-blocked.
+  unsubPhase = game.eventBus.on(Events.PHASE_CHANGED, ({ from }) => {
+    if (from === GamePhase.BUFF_SELECT) clearGuard()
+  })
 })
 
 onUnmounted(() => {
   unsubBuffResult?.()
   unsubBuffResult = null
+  unsubPhase?.()
+  unsubPhase = null
   clearGuard()
 })
 
@@ -49,7 +55,6 @@ function selectCard(cardId: string): void {
   const game = gameStore.getEngine()
   if (!game) return
   selectingCardId.value = cardId
-  timeoutHandle = setTimeout(() => { clearGuard() }, 2000)
   game.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
 }
 
@@ -58,7 +63,6 @@ function skipBuff(): void {
   const game = gameStore.getEngine()
   if (!game) return
   selectingCardId.value = ''
-  timeoutHandle = setTimeout(() => { clearGuard() }, 2000)
   game.eventBus.emit(Events.BUFF_CARD_SELECTED, '')
 }
 </script>

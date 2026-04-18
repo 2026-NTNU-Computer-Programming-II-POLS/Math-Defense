@@ -83,6 +83,7 @@ class SqlAlchemyLeaderboardRepository:
         rank_col = (higher_distinct.correlate(LeaderboardEntryModel).scalar_subquery() + 1).label("rank")
 
         q = self._db.query(
+            LeaderboardEntryModel.id.label("id"),
             LeaderboardEntryModel.level.label("level"),
             LeaderboardEntryModel.score.label("score"),
             LeaderboardEntryModel.kills.label("kills"),
@@ -107,6 +108,7 @@ class SqlAlchemyLeaderboardRepository:
 
         entries = [
             RankedLeaderboardEntry(
+                id=row.id,
                 rank=row.rank,
                 username=row.username,
                 level=row.level,

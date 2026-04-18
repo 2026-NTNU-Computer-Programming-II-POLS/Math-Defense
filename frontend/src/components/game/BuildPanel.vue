@@ -97,12 +97,13 @@ function castSpell(): void {
     towerId: t.id,
     params: { ...localParams.value },
   })
-  uiStore.buildPanelVisible = false
+  // Hide the panel but keep the towerId so a re-open (e.g. clicking the
+  // same tower again) still finds the previous selection in place.
+  uiStore.hideBuildPanel()
 }
 
 function close(): void {
-  uiStore.buildPanelVisible = false
-  uiStore.buildPanelTowerId = null
+  uiStore.closeBuildPanel()
 }
 </script>
 

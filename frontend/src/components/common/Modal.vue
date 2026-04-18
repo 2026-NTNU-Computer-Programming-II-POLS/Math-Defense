@@ -43,8 +43,19 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  previousFocus?.focus?.()
+  // Only restore if the saved target is still in the DOM AND focusable. When
+  // one modal replaces another (e.g. an error modal opens on top of the
+  // original), the saved focus may be a now-detached button — focusing it
+  // dumps focus on <body> and breaks keyboard navigation. Fall back to
+  // letting the browser resolve focus naturally in that case.
+  const target = previousFocus
   previousFocus = null
+  if (!target) return
+  if (!document.contains(target)) return
+  // `focus` exists on HTMLElement; guard for the (rare) case of a non-element
+  // having slipped into document.activeElement.
+  if (typeof target.focus !== 'function') return
+  try { target.focus() } catch { /* detached/disabled — ignore */ }
 })
 </script>
 

@@ -43,6 +43,7 @@ def get_leaderboard(
     ranked, total = _get_service(db).get_leaderboard(level, page, per_page)
     entries = [
         LeaderboardEntryOut(
+            id=r.id,
             rank=r.rank,
             username=r.username,
             level=r.level,

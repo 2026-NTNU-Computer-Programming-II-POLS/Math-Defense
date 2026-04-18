@@ -36,6 +36,9 @@ export const useUiStore = defineStore('ui', () => {
   const modalMessage = ref('')
   // Callback may return a Promise; we await it for rejection-reporting below.
   const modalCallback = ref<(() => unknown) | null>(null)
+  // Sticky modals survive re-entrant side-effects (e.g. a 401-triggered logout
+  // must not silently dismiss a "Sync Failed" modal the user hasn't read yet).
+  const modalSticky = ref(false)
 
   // Tutorial
   const tutorialVisible = ref(false)
@@ -44,11 +47,26 @@ export const useUiStore = defineStore('ui', () => {
   // HUD hint
   const buildHintStep = ref(0)   // 0=select tower  1=click cell  2=set params  3=Cast Spell
 
-  function showModal(title: string, message: string, onClose?: () => unknown): void {
+  function showModal(
+    title: string,
+    message: string,
+    onClose?: () => unknown,
+    opts: { sticky?: boolean } = {},
+  ): void {
     modalTitle.value = title
     modalMessage.value = message
     modalCallback.value = onClose ?? null
+    modalSticky.value = opts.sticky ?? false
     modalVisible.value = true
+  }
+
+  function dismissModal(opts: { force?: boolean } = {}): void {
+    // Callers that just want to clear side-effects (e.g. logout) respect the
+    // sticky flag; only explicit user action or force=true closes a sticky modal.
+    if (modalSticky.value && !opts.force) return
+    modalCallback.value = null
+    modalSticky.value = false
+    modalVisible.value = false
   }
 
   function _showErrorFallback(): void {
@@ -63,6 +81,7 @@ export const useUiStore = defineStore('ui', () => {
     // Clear state first so that if cb throws / rejects we open a fresh error
     // modal on top of a cleared slot instead of re-opening on top of itself.
     modalCallback.value = null
+    modalSticky.value = false
     modalVisible.value = false
     if (!cb) return
     try {
@@ -87,6 +106,32 @@ export const useUiStore = defineStore('ui', () => {
     buildHintStep.value = type ? 1 : 0
   }
 
+  function clearSelectedTower(): void {
+    selectedTowerType.value = null
+  }
+
+  function openBuildPanel(towerId: string): void {
+    buildPanelTowerId.value = towerId
+    buildPanelVisible.value = true
+  }
+
+  function closeBuildPanel(): void {
+    buildPanelVisible.value = false
+    buildPanelTowerId.value = null
+  }
+
+  function hideBuildPanel(): void {
+    buildPanelVisible.value = false
+  }
+
+  function setBossShieldTarget(target: { freqs: number[]; amps: number[] } | null): void {
+    bossShieldTarget.value = target
+  }
+
+  function setBuildHintStep(step: number): void {
+    buildHintStep.value = step
+  }
+
   return {
     selectedTowerType,
     buildPanelVisible, buildPanelTowerId,
@@ -95,6 +140,8 @@ export const useUiStore = defineStore('ui', () => {
     modalVisible, modalTitle, modalMessage, modalCallback,
     tutorialVisible, tutorialStep,
     buildHintStep,
-    showModal, closeModal, selectTower,
+    showModal, closeModal, dismissModal, selectTower,
+    clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
+    setBossShieldTarget, setBuildHintStep,
   }
 })

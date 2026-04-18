@@ -40,9 +40,16 @@ function updatePasswordRules(p: string): void {
   passwordRules.hasDigit = /[0-9]/.test(p)
 }
 
+function clearError(): void {
+  // Stale validation messages (e.g. "password must contain a digit") stick
+  // around across edits otherwise, confusing users who just fixed the issue.
+  if (error.value) error.value = ''
+}
+
 function onPasswordInput(event: Event): void {
   const value = (event.target as HTMLInputElement).value
   password.value = value
+  clearError()
   if (!isLogin.value) updatePasswordRules(value)
 }
 
@@ -98,7 +105,14 @@ async function submit(): Promise<void> {
       <form class="auth-form" @submit.prevent="submit">
         <label class="auth-field">
           <span>玩家名稱</span>
-          <input v-model="username" class="rune-input" type="text" autocomplete="username" required />
+          <input
+            v-model="username"
+            class="rune-input"
+            type="text"
+            autocomplete="username"
+            required
+            @input="clearError"
+          />
         </label>
         <label class="auth-field">
           <span>密碼</span>

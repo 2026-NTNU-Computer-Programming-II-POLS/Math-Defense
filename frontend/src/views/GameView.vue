@@ -5,6 +5,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useGameLoop } from '@/composables/useGameLoop'
 import { GamePhase } from '@/data/constants'
+import { formatScore } from '@/domain/formatters'
 
 import HUD from '@/components/game/HUD.vue'
 import TowerBar from '@/components/game/TowerBar.vue'
@@ -32,13 +33,13 @@ watch(() => gameStore.phase, (phase) => {
   if (phase === GamePhase.LEVEL_END) {
     uiStore.showModal(
       '關卡通關！',
-      `Score: ${gameStore.score.toLocaleString()}  Kills: ${gameStore.kills}`,
+      `Score: ${formatScore(gameStore.score)}  Kills: ${gameStore.kills}`,
       navigateHome,
     )
   } else if (phase === GamePhase.GAME_OVER) {
     uiStore.showModal(
       'Game Over',
-      `已存活 ${gameStore.wave} 波  Score: ${gameStore.score.toLocaleString()}`,
+      `已存活 ${gameStore.wave} 波  Score: ${formatScore(gameStore.score)}`,
       navigateHome,
     )
   }

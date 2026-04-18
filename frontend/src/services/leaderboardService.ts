@@ -1,6 +1,7 @@
 import { api } from './api'
 
 export interface LeaderboardEntry {
+  id: string
   rank: number
   username: string
   level: number

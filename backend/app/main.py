@@ -19,6 +19,7 @@ from app.db.database import engine, SessionLocal
 from app.domain.errors import DomainError
 from app.infrastructure.login_guard import purge_stale as purge_stale_login_attempts
 from app.infrastructure.token_denylist import purge_expired as purge_expired_denied_tokens
+from app.middleware.csrf import CsrfMiddleware
 from app.routers import auth, leaderboard, game_session
 from app.limiter import limiter
 from app.seed import ensure_demo_user
@@ -135,13 +136,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# CSRF — double-submit cookie; opt-in via settings.csrf_enabled.
+app.add_middleware(CsrfMiddleware)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 
 # Routes

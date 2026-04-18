@@ -48,7 +48,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     // Inject all systems (order: placement → combat → movement → wave → buff → economy → renderers)
     const placement = new TowerPlacementSystem()
     placement.getSelectedTowerType = () => uiStore.selectedTowerType as TowerType | null
-    placement.clearSelectedTowerType = () => { uiStore.selectedTowerType = null }
+    placement.clearSelectedTowerType = () => { uiStore.clearSelectedTower() }
     g.addSystem('placement', placement)
     g.addSystem('combat', new CombatSystem())
     g.addSystem('movement', new MovementSystem())
@@ -70,10 +70,10 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     // Fourier target is a visual cue owned by the UI store — mirror it here
     // rather than keeping a copy on GameState.
     unsubs.push(g.eventBus.on(Events.BOSS_SHIELD_START, ({ target }) => {
-      uiStore.bossShieldTarget = target
+      uiStore.setBossShieldTarget(target)
     }))
     unsubs.push(g.eventBus.on(Events.BOSS_SHIELD_END, () => {
-      uiStore.bossShieldTarget = null
+      uiStore.setBossShieldTarget(null)
     }))
 
     // Tower selected → open BuildPanel (engine → Vue UI bridge)
@@ -84,19 +84,16 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
         && 'id' in tower
         && typeof (tower as { id: unknown }).id === 'string'
       ) {
-        uiStore.buildPanelTowerId = (tower as Tower).id
-        uiStore.buildPanelVisible = true
+        uiStore.openBuildPanel((tower as Tower).id)
       } else {
-        uiStore.buildPanelVisible = false
-        uiStore.buildPanelTowerId = null
+        uiStore.closeBuildPanel()
       }
     }))
 
     // Tower placed successfully → select it and open the panel for parameter setup
     unsubs.push(g.eventBus.on(Events.TOWER_PLACED, (tower) => {
-      uiStore.buildPanelTowerId = tower.id
-      uiStore.buildPanelVisible = true
-      uiStore.buildHintStep = 2
+      uiStore.openBuildPanel(tower.id)
+      uiStore.setBuildHintStep(2)
     }))
 
     // Session lifecycle sync (only active when logged in)

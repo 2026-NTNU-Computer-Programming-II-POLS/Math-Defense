@@ -24,6 +24,7 @@ class ScoreSubmission(BaseModel):
 class LeaderboardEntryOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
+    id: str
     rank: int
     username: str
     level: int

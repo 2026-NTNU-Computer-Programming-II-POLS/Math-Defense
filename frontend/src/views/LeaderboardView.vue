@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLeaderboard } from '@/composables/useLeaderboard'
+import { formatScore } from '@/domain/formatters'
 
 const router = useRouter()
 const { entries, total, loading, error, fetch: fetchLb } = useLeaderboard()
@@ -75,11 +76,11 @@ onBeforeUnmount(() => {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="e in entries" :key="`${e.username}-${e.level}-${e.score}-${e.waves_survived}`">
+        <tr v-for="e in entries" :key="e.id">
           <td class="rank">{{ e.rank }}</td>
           <td class="username">{{ e.username }}</td>
           <td>Lv.{{ e.level }}</td>
-          <td class="score">{{ e.score.toLocaleString() }}</td>
+          <td class="score">{{ formatScore(e.score) }}</td>
           <td>{{ e.kills }}</td>
           <td>{{ e.waves_survived }}</td>
         </tr>

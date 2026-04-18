@@ -24,9 +24,17 @@ export const authService = {
     // backend can revoke the token and clear it.
     const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
     const url = base ? `${base}/api/auth/logout` : '/api/auth/logout'
+    const headers: Record<string, string> = {}
+    // Best-effort CSRF echo — same double-submit pattern as api.ts. Skipped
+    // silently if the cookie isn't present (middleware off, or very first hit).
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.split(';').map((c) => c.trim()).find((c) => c.startsWith('csrf_token='))
+      if (match) headers['X-CSRF-Token'] = decodeURIComponent(match.slice('csrf_token='.length))
+    }
     return fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
+      headers,
     }).catch(() => {
       // Best-effort: server unreachable is fine, cookie eventually expires.
     })

@@ -28,6 +28,7 @@ export function useSessionSync() {
   const syncing = ref(false)
   let pendingLevel: number | null = null
   let createGeneration = 0  // guards against rapid level-switch race condition
+  let sessionGeneration = 0  // generation of the currently-live session; stale WAVE_END writes bail
   let consecutiveUpdateFailures = 0
   let alertedForFailures = false
 
@@ -98,6 +99,7 @@ export function useSessionSync() {
       const id = await createSessionWithRetry(pendingLevel, gen)
       if (gen !== createGeneration) return  // another LEVEL_START fired while we awaited
       sessionId.value = id
+      sessionGeneration = gen  // pin the session so WAVE_END can detect stale writes
     }))
 
     // WAVE_END → update session with the frozen snapshot carried by the event.
@@ -109,6 +111,11 @@ export function useSessionSync() {
     unsubs.push(game.eventBus.on(Events.WAVE_END, async (snapshot) => {
       latestSnapshot = snapshot
       if (!sessionId.value) return
+      // Pin the generation of the session we intend to write against. If
+      // createGeneration advances (rapid level switch) between now and when
+      // the update actually flies, we abandon the write so the final-wave
+      // score of the new level isn't attributed to the old sessionId.
+      const writeGen = sessionGeneration
       if (syncing.value) {
         pendingSync = true
         return
@@ -118,6 +125,7 @@ export function useSessionSync() {
         do {
           pendingSync = false
           if (!sessionId.value || !latestSnapshot) break
+          if (writeGen !== sessionGeneration) break
           await sessionService.update(sessionId.value, {
             current_wave: latestSnapshot.wave,
             gold: latestSnapshot.gold,
@@ -153,6 +161,10 @@ export function useSessionSync() {
           uiStore.showModal(
             'Sync Failed',
             'Your progress could not be saved to the server. The leaderboard may not reflect your final score.',
+            undefined,
+            // Sticky so a concurrent logout (e.g. another tab's 401) won't
+            // silently clear this modal before the player can read it.
+            { sticky: true },
           )
         }
       } finally {

@@ -13,6 +13,7 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class RankedLeaderboardEntry:
+    id: str
     rank: int
     username: str
     level: int

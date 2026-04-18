@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # secure=True requires HTTPS (modern browsers treat localhost as secure).
     # Disabling this is only honoured under CI/pytest — see validator below.
     cookie_secure: bool = True
+    # Double-submit CSRF protection. Off under pytest so the existing test
+    # client (which can't easily round-trip cookies into headers) keeps
+    # working; operators should enable in deployed environments as
+    # defence-in-depth on top of the SameSite=Lax auth cookie.
+    csrf_enabled: bool = False
 
     @field_validator("cors_origins", mode="before")
     @classmethod

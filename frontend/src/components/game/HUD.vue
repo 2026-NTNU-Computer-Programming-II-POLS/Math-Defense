@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { GamePhase } from '@/data/constants'
+import { formatScore } from '@/domain/formatters'
 
 const g = useGameStore()
 
@@ -54,7 +55,7 @@ const hpStr   = computed(() => `${g.hp} / ${g.maxHp}`)
     <!-- Score -->
     <div class="hud-item score-item">
       <span class="hud-label">Score</span>
-      <span class="hud-value score">{{ g.score.toLocaleString() }}</span>
+      <span class="hud-value score">{{ formatScore(g.score) }}</span>
     </div>
 
     <!-- Path function -->
