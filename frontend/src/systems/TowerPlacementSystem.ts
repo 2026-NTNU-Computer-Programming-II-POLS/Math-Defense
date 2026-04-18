@@ -36,11 +36,25 @@ export class TowerPlacementSystem {
       }),
 
       game.eventBus.on(Events.CANVAS_HOVER, ({ game: gp }) => {
+        if (game.state.phase !== GamePhase.BUILD) {
+          // Outside BUILD we never render the preview, but stale state would
+          // flash through on the next BUILD frame before the next hover
+          // event arrives. Clear it now so BUILD always starts clean.
+          this._hoveredTower = null
+          return
+        }
         const gx = Math.round(gp.x)
         const gy = Math.round(gp.y)
         this._hoveredTower = game.towers.find(
           (t) => Math.round(t.x) === gx && Math.round(t.y) === gy,
         ) ?? null
+      }),
+
+      // Defensive clear on *any* phase exit: a player who stops hovering on
+      // the last BUILD frame otherwise keeps their preview across WAVE and
+      // back into the next BUILD.
+      game.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
+        if (to !== GamePhase.BUILD) this._hoveredTower = null
       }),
     )
   }

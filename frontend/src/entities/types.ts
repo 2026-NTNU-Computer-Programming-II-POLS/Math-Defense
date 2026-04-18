@@ -66,6 +66,10 @@ export interface Enemy {
   // Stealth
   stealthRanges: [number, number][]
   isStealthed: boolean
+
+  // Depth in the split-slime recursion tree. Root enemies are 0; each split
+  // child inherits parent + 1. Capped inside SplitSlimePolicy.
+  splitDepth: number
 }
 
 // ── Projectile ──
@@ -80,6 +84,8 @@ export interface Projectile {
   color: string
   active: boolean
   ownerId: string
+  /** Seconds since spawn; CombatSystem deactivates stale projectiles. */
+  age: number
 }
 
 // ── Param accessor ──

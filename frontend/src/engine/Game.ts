@@ -160,6 +160,19 @@ export class Game {
   // ── Game flow ──
 
   startLevel(levelIndex: number): void {
+    // startLevel is a "begin from scratch" operation and overrides phase
+    // sequencing. Callers typically fire it from menu / retry / level-end.
+    // A call from the middle of a wave or buff-select is legal (early
+    // restart) but worth surfacing in dev so a stray event-driven call
+    // doesn't quietly reset a game in progress.
+    const expected = new Set<GamePhase>([
+      GamePhase.MENU, GamePhase.LEVEL_SELECT, GamePhase.LEVEL_END,
+      GamePhase.GAME_OVER, GamePhase.BUILD,
+    ])
+    if (!expected.has(this.state.phase) && import.meta.env.DEV) {
+      console.warn(`[Game] startLevel called from unexpected phase: ${this.state.phase}`)
+    }
+
     this.state = createInitialState()
     this.state.level = levelIndex
     this.towers = []
@@ -170,6 +183,9 @@ export class Game {
     // can legally transition into BUILD on retry/replay.
     this.phase.forceTransition(GamePhase.MENU)
     this.setPhase(GamePhase.BUILD)
+    // State and entity lists are fully reset above, so any buff revertId
+    // that targets towers/enemies has nothing to revert — BuffSystem's
+    // LEVEL_START handler only needs to drop its own tracking.
     this.eventBus.emit(Events.LEVEL_START, levelIndex)
   }
 

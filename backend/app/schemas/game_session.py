@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.constraints import (
     GOLD_MAX,
@@ -18,10 +18,14 @@ from app.domain.constraints import (
 
 
 class SessionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     level: int = Field(ge=LEVEL_MIN, le=LEVEL_MAX)
 
 
 class SessionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     current_wave: int | None = Field(default=None, ge=WAVES_MIN, le=WAVES_MAX)
     gold: int | None = Field(default=None, ge=GOLD_MIN, le=GOLD_MAX)
     hp: int | None = Field(default=None, ge=HP_MIN, le=HP_MAX)
@@ -38,12 +42,16 @@ class SessionUpdate(BaseModel):
 
 
 class SessionEnd(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
     kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
     waves_survived: int = Field(ge=WAVES_MIN, le=WAVES_MAX)
 
 
 class SessionOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     level: int
     status: str

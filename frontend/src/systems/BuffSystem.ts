@@ -133,8 +133,17 @@ const effectStrategies: Record<string, EffectFn> = {
 
 function applyEffect(effectId: string, game: Game, buff: ActiveBuff): void {
   const fn = effectStrategies[effectId]
-  if (fn) fn(game, buff)
-  else console.warn(`[BuffSystem] Unknown effectId: ${effectId}`)
+  if (fn) {
+    fn(game, buff)
+    return
+  }
+  // Silent missing-strategy paths leave buffs permanently half-applied: a
+  // typo in buff-defs would apply the forward effect but never revert it.
+  // Throw in dev so authoring mistakes surface at the moment of insertion;
+  // keep a warn in prod to avoid hard-crashing a live game from a data bug.
+  const msg = `[BuffSystem] Unknown effectId: ${effectId}`
+  if (import.meta.env.DEV) throw new Error(msg)
+  console.warn(msg)
 }
 
 // ── BuffSystem ──
@@ -160,6 +169,10 @@ export class BuffSystem {
       game.eventBus.on(Events.WAVE_END, () => this._tickBuffs(game)),
 
       game.eventBus.on(Events.LEVEL_START, () => {
+        // Run reverts in case a consumer emitted LEVEL_START without going
+        // through Game.startLevel() (direct replay flows, tests). When it
+        // *is* Game.startLevel, state/towers have already been rebuilt, so
+        // reverts are effectively no-ops — safe either way.
         for (const buff of this.activeBuffs) {
           if (buff.revertId) applyEffect(buff.revertId, game, buff)
         }
@@ -172,6 +185,22 @@ export class BuffSystem {
   destroy(): void {
     this._unsubs.forEach((fn) => fn())
     this._unsubs = []
+  }
+
+  /**
+   * Force-revert any active buffs that target the given tower id, and drop
+   * them from tracking. Call this the moment a tower leaves `game.towers`
+   * (refund, destroy, etc.) so a later wave-end revert can't either (a)
+   * silently no-op — leaving a phantom bonus tagged to a dead id — or (b)
+   * hit a *new* tower that reuses the id slot.
+   */
+  onTowerRemoved(game: Game, towerId: string): void {
+    for (let i = this.activeBuffs.length - 1; i >= 0; i--) {
+      const buff = this.activeBuffs[i]
+      if (buff._targetTowerId !== towerId) continue
+      if (buff.revertId) applyEffect(buff.revertId, game, buff)
+      this.activeBuffs.splice(i, 1)
+    }
   }
 
   private _drawCards(game?: Game): void {

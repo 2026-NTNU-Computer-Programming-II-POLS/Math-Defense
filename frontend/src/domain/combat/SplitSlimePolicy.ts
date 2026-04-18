@@ -11,8 +11,13 @@ export interface SplitContext {
   onChildCreated: (child: Enemy) => void
 }
 
+/** Hard cap on recursive splitting. Today's children are BASIC_SLIME so this
+ * is defensive: if a future change makes children SPLIT_SLIME, the cap
+ * prevents exponential enemy explosion. */
+export const MAX_SPLIT_DEPTH = 2
+
 export function shouldSplit(enemy: Enemy): boolean {
-  return enemy.type === EnemyType.SPLIT_SLIME
+  return enemy.type === EnemyType.SPLIT_SLIME && enemy.splitDepth < MAX_SPLIT_DEPTH
 }
 
 /**
@@ -52,6 +57,7 @@ export function spawnChildren(
     child.size = Math.round(parent.size * 0.7)
     child.reward = Math.round(parent.reward * 0.3)
     child.color = '#a070d0'
+    child.splitDepth = parent.splitDepth + 1
 
     children.push(child)
     context.onChildCreated(child)

@@ -41,7 +41,10 @@ export function createEnemy(
     _targetX: targetX,
     _direction: targetX > startX ? 1 : -1,
 
-    stealthRanges: (def.stealthRanges as [number, number][]) ?? [],
+    // Clone nested tuples so later mutations of a single enemy's stealth
+    // ranges can't leak back to ENEMY_DEFS and poison sibling enemies.
+    stealthRanges: def.stealthRanges?.map(([a, b]) => [a, b] as [number, number]) ?? [],
     isStealthed: false,
+    splitDepth: 0,
   }
 }

@@ -16,6 +16,10 @@ export class EconomySystem implements GameSystem {
     this._unsubs.push(
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
         if (isShielded(game.state)) return
+        // Once HP has already hit zero, further damage this frame would be
+        // idempotent but still emit extra HP_CHANGED events. Skip cleanly
+        // so "second boss in the same frame" doesn't double-fire listeners.
+        if (game.state.hp <= 0) return
         // Per-enemy damage so a boss reaching origin actually ends the game; basic slimes still cost 1.
         game.changeHp(-(enemy.damage ?? 1))
       }),

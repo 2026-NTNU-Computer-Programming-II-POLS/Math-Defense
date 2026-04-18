@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 # Low-effort passwords that pass the length/letter/digit check but are trivially
@@ -17,6 +17,8 @@ _COMMON_PASSWORDS = frozenset({
 
 
 class RegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str
     password: str
 
@@ -51,6 +53,8 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str
     password: str
 
@@ -72,6 +76,8 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     access_token: str
     token_type: str = "bearer"
     id: str
@@ -79,6 +85,8 @@ class TokenResponse(BaseModel):
 
 
 class AuthMeResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     username: str
     created_at: datetime

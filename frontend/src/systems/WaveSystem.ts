@@ -12,7 +12,6 @@ export class WaveSystem {
   private _spawnQueue: EnemySpawnEntry[] = []
   private _spawnTimer = 0
   private _spawnInterval = 1.0
-  private _allSpawned = false
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
@@ -41,12 +40,16 @@ export class WaveSystem {
     this._spawnQueue = [...waveDef.enemies]
     this._spawnInterval = waveDef.spawnInterval
     this._spawnTimer = this._spawnInterval
-    this._allSpawned = false
   }
 
   update(dt: number, game: Game): void {
     if (game.state.phase !== GamePhase.WAVE) return
 
+    // Spawn phase: if we still have enemies queued, tick the spawn timer and
+    // possibly spawn one this frame — but do NOT evaluate the end-condition
+    // in the same tick. Otherwise the very last spawn (or a SplitSlime child
+    // created from an enemy killed this tick) could race with the check and
+    // leak combat into BUFF_SELECT with enemies still live.
     if (this._spawnQueue.length > 0) {
       this._spawnTimer -= dt
       if (this._spawnTimer <= 0) {
@@ -54,11 +57,11 @@ export class WaveSystem {
         this._spawn(config, game)
         this._spawnTimer = this._spawnInterval
       }
-    } else {
-      this._allSpawned = true
+      return
     }
 
-    if (this._allSpawned && game.enemies.length === 0) {
+    // End phase: only reachable after a tick with no spawn activity.
+    if (game.enemies.length === 0) {
       this._endWave(game)
     }
   }

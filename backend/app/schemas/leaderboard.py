@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.constraints import (
     KILLS_MAX,
@@ -12,6 +12,8 @@ from app.domain.constraints import (
 
 
 class ScoreSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # level and score are intentionally absent — the backend reads them from
     # the authoritative GameSession record to prevent score/level forgery.
     kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
@@ -20,6 +22,8 @@ class ScoreSubmission(BaseModel):
 
 
 class LeaderboardEntryOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     rank: int
     username: str
     level: int
@@ -30,5 +34,7 @@ class LeaderboardEntryOut(BaseModel):
 
 
 class LeaderboardResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     entries: list[LeaderboardEntryOut]
     total: int

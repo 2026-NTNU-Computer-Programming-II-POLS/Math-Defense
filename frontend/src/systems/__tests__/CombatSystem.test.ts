@@ -91,7 +91,7 @@ describe('CombatSystem', () => {
     const { game, system } = setup()
     game.projectiles.push({
       id: 'proj_1', x: 30, y: 0, vx: 10, vy: 0,
-      damage: 10, color: '#fff', active: true, ownerId: 'tower_1',
+      damage: 10, color: '#fff', active: true, ownerId: 'tower_1', age: 0,
     })
 
     system.update(0.5, game)
@@ -104,7 +104,7 @@ describe('CombatSystem', () => {
     game.enemies.push(enemy)
     game.projectiles.push({
       id: 'proj_1', x: 5, y: 5, vx: 0, vy: 0,
-      damage: 30, color: '#fff', active: true, ownerId: 'tower_1',
+      damage: 30, color: '#fff', active: true, ownerId: 'tower_1', age: 0,
     })
 
     system.update(0.016, game)
@@ -118,7 +118,7 @@ describe('CombatSystem', () => {
     game.enemies.push(enemy)
     game.projectiles.push({
       id: 'proj_1', x: 5, y: 5, vx: 0, vy: 0,
-      damage: 30, color: '#fff', active: true, ownerId: 'tower_1',
+      damage: 30, color: '#fff', active: true, ownerId: 'tower_1', age: 0,
     })
 
     system.update(0.016, game)
@@ -131,7 +131,7 @@ describe('CombatSystem', () => {
     game.enemies.push(enemy)
     game.projectiles.push({
       id: 'proj_1', x: 5, y: 5, vx: 0, vy: 0,
-      damage: 50, color: '#fff', active: true, ownerId: 'tower_1',
+      damage: 50, color: '#fff', active: true, ownerId: 'tower_1', age: 0,
     })
 
     let killed = false

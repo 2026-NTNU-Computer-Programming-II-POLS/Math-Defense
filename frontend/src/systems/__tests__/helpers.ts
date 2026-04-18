@@ -71,6 +71,7 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     _direction: -1 as const,
     stealthRanges: [],
     isStealthed: false,
+    splitDepth: 0,
     ...overrides,
   }
 }

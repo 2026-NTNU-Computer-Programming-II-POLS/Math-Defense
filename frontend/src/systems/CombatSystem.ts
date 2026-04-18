@@ -13,6 +13,16 @@ import type { Tower, Enemy, Projectile } from '@/entities/types'
 
 let _projId = 0
 
+/** Upper bound on projectile lifetime (seconds). Anything that escapes the
+ * grid + this budget without hitting an enemy is garbage-collected so a
+ * stray projectile can't live forever. */
+const PROJECTILE_MAX_AGE = 5
+
+/** Minimum distance (game units) between a tower and a shot target before
+ * we compute a unit velocity vector. Prevents NaN/zero-length directions
+ * when a path intersection lands on (or rounds onto) the tower itself. */
+const SHOT_MIN_DISTANCE = 1e-3
+
 function makeProjectile(
   x: number, y: number,
   vx: number, vy: number,
@@ -20,7 +30,7 @@ function makeProjectile(
   color: string,
   ownerId: string,
 ): Projectile {
-  return { id: `proj_${++_projId}`, x, y, vx, vy, damage, color, active: true, ownerId }
+  return { id: `proj_${++_projId}`, x, y, vx, vy, damage, color, active: true, ownerId, age: 0 }
 }
 
 export class CombatSystem {
@@ -126,9 +136,16 @@ export class CombatSystem {
       const proj = game.projectiles[i]
       proj.x += proj.vx * dt
       proj.y += proj.vy * dt
+      proj.age += dt
 
       // deactivate once it leaves the grid bounds
       if (proj.x < GRID_MIN_X - 2 || proj.x > GRID_MAX_X + 5 || proj.y < GRID_MIN_Y - 3 || proj.y > GRID_MAX_Y + 2) {
+        proj.active = false
+      }
+
+      // Safety net: a projectile that somehow never crosses a bound (e.g.
+      // degenerate velocity surviving earlier guards) is aged out here.
+      if (proj.active && proj.age >= PROJECTILE_MAX_AGE) {
         proj.active = false
       }
 
@@ -183,7 +200,9 @@ export class CombatSystem {
       const dx = xi - tower.x
       const dy = yi - tower.y
       const len = Math.sqrt(dx * dx + dy * dy)
-      if (len === 0) continue
+      // Skip intersections that coincide with (or round onto) the tower —
+      // a zero-length direction would make the projectile never move.
+      if (len < SHOT_MIN_DISTANCE) continue
       const speed = 10  // game units per second
       const proj = makeProjectile(
         tower.x, tower.y,

@@ -3,16 +3,18 @@
 Gated on SEED_DEMO_USER=true so production deployments don't silently ship a
 well-known public credential. When the flag is off (default), this is a no-op.
 
-Idempotent — skips creation when the demo user already exists.
-Called from the application lifespan after Alembic migrations.
+Idempotent — uses INSERT ... ON CONFLICT DO NOTHING so concurrent workers
+racing at startup (the advisory lock is released after Alembic finishes, not
+after this seed) cannot produce duplicate-key errors.
 """
 import logging
 import os
+import uuid
+from datetime import datetime, UTC
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.domain.user.aggregate import User
-from app.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from app.utils.security import hash_password
 
 logger = logging.getLogger(__name__)
@@ -31,16 +33,26 @@ def ensure_demo_user(db: Session) -> None:
         logger.debug("SEED_DEMO_USER not set — skipping demo seed")
         return
 
-    repo = SqlAlchemyUserRepository(db)
-    if repo.find_by_username(DEMO_USERNAME):
-        logger.debug("Demo user already exists — skipping seed")
-        return
-
-    user = User.create(
-        username=DEMO_USERNAME,
-        password_hash=hash_password(DEMO_PASSWORD),
+    now = datetime.now(UTC)
+    result = db.execute(
+        text(
+            """
+            INSERT INTO users (id, username, password_hash, created_at, updated_at)
+            VALUES (:id, :username, :password_hash, :created_at, :updated_at)
+            ON CONFLICT (username) DO NOTHING
+            """
+        ),
+        {
+            "id": str(uuid.uuid4()),
+            "username": DEMO_USERNAME,
+            "password_hash": hash_password(DEMO_PASSWORD),
+            "created_at": now,
+            "updated_at": now,
+        },
     )
-    repo.save(user)
     db.commit()
     # Never log the password: log lines land in aggregators and terminal scrollback.
-    logger.info("Seeded demo user: %s", DEMO_USERNAME)
+    if result.rowcount:
+        logger.info("Seeded demo user: %s", DEMO_USERNAME)
+    else:
+        logger.debug("Demo user already exists — skipping seed")
