@@ -34,6 +34,6 @@ export default defineConfig({
     // WasmBridge.test.ts runs under happy-dom and covers the pure-JS fallback.
     // WasmBridge.wasm.test.ts opts into the Node environment via its own
     // `// @vitest-environment node` pragma and loads the real math_engine.js from
-    // frontend/public/wasm/ to assert WASM/JS numeric parity.
+    // frontend/src/math/wasm/ to assert WASM/JS numeric parity.
   },
 })

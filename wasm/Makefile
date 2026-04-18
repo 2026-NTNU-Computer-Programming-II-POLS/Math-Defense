@@ -3,10 +3,12 @@
 
 CC = emcc
 # Anchor paths to the Makefile's own directory so `make -f path/to/Makefile`
-# (without -C) writes to the correct frontend/public/wasm regardless of CWD.
+# (without -C) writes to the correct frontend/src/math/wasm regardless of CWD.
+# Artifacts live under src/ so Vite bundles them as proper module assets —
+# dynamic imports of files in /public/ are rejected by newer Vite versions.
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 SRC = $(MAKEFILE_DIR)math_engine.c
-OUT_DIR = $(MAKEFILE_DIR)../frontend/public/wasm
+OUT_DIR = $(MAKEFILE_DIR)../frontend/src/math/wasm
 OUT = $(OUT_DIR)/math_engine.js
 # Generated TypeScript declaration mirroring EXPORTED_FUNCTIONS. Keeps the
 # WasmBridge name strings in lock-step with the C export list — a rename on

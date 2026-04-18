@@ -102,7 +102,11 @@ frontend/
 │   │   ├── WasmBridge.ts           initWasm, RAII float buffers, JS fallbacks
 │   │   ├── wasm-exports.d.ts       Ambient type decl for the generated math_engine module
 │   │   ├── MathUtils.ts            Coordinate conversion, findIntersections, sector test
-│   │   └── PathEvaluator.ts        Random path generation (5 families) + validation
+│   │   ├── PathEvaluator.ts        Random path generation (5 families) + validation
+│   │   └── wasm/                   Compiled WASM assets (generated — do not edit)
+│   │       ├── math_engine.js
+│   │       ├── math_engine.wasm
+│   │       └── math_engine.d.ts    Module shim so TS accepts the glue import
 │   │
 │   ├── data/                       Static definitions — no functions
 │   │   ├── constants.ts            GamePhase / TowerType / EnemyType / Events (`as const`)
@@ -113,11 +117,6 @@ frontend/
 │   │   └── ui-defs.ts              Panel layout, colour palette
 │   │
 │   └── styles/global.css
-│
-├── public/
-│   └── wasm/                       Compiled WASM (generated — do not edit)
-│       ├── math_engine.js
-│       └── math_engine.wasm
 │
 ├── package.json
 ├── tsconfig.json / tsconfig.app.json / tsconfig.node.json

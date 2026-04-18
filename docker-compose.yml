@@ -48,6 +48,13 @@ services:
       target: dev
     ports:
       - "5173:5173"
+    environment:
+      # Vite's dev-server proxy target for /api. Default in vite.config.ts is
+      # http://localhost:8000, which only works when Vite runs on the host —
+      # inside this container `localhost` is the frontend container itself, so
+      # /api/* would 502 (Bad Gateway). Point it at the backend service name
+      # on the compose network instead.
+      VITE_API_TARGET: http://backend:8000
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules

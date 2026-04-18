@@ -8,6 +8,12 @@
 // `WasmExport` is generated from wasm/Makefile EXPORTED_FUNCTIONS, so a C-side
 // rename is caught by vue-tsc here instead of at runtime.
 import type { WasmExport } from './wasm-exports'
+// Static imports of the co-located glue + binary. Vite treats the .wasm as an
+// asset (?url emits a hashed, serveable URL in prod and a dev-server URL in dev),
+// and the glue is just an ES module — this avoids Vite's public-dir dynamic
+// import restriction that bit a collaborator on a newer Vite minor.
+import createMathEngine from './wasm/math_engine.js'
+import mathEngineWasmUrl from './wasm/math_engine.wasm?url'
 
 type WasmCType = 'number' | 'string' | 'array' | null
 type WasmValueType = 'i8' | 'i16' | 'i32' | 'i64' | 'float' | 'double' | '*'
@@ -31,18 +37,25 @@ let _initResolved = false
 // ── Initialization ──
 
 // urlOverride lets the Node-environment parity test (WasmBridge.wasm.test.ts) pass
-// a file:// URL pointing at frontend/public/wasm/math_engine.js. Production callers
-// leave it undefined and get BASE_URL-based resolution as before.
+// a file:// URL pointing at the glue module on disk. Production callers leave it
+// undefined and use the Vite-bundled static import.
 export function initWasm(urlOverride?: string): Promise<boolean> {
   if (_initPromise) return _initPromise
   _initPromise = (async () => {
     try {
-      // ES module generated with MODULARIZE=1, compiled by emscripten and placed in frontend/public/wasm/.
-      // This file is not managed by the Vite bundler; it must be loaded via a runtime URL to bypass vite:import-analysis
-      // static checks on /public/ (and supports BASE_URL deployment to a sub-path).
-      const wasmUrl = urlOverride ?? `${import.meta.env.BASE_URL}wasm/math_engine.js`
-      const { default: createMathEngine } = await import(/* @vite-ignore */ wasmUrl)
-      _module = await createMathEngine()
+      // Two paths:
+      //   - urlOverride set (Node parity test): dynamic import from a file:// URL so
+      //     emscripten's own script-directory logic resolves math_engine.wasm next to
+      //     the .js on disk.
+      //   - undefined (browser dev/prod): use the statically-imported factory and
+      //     pin the .wasm location via `locateFile`, so Vite's ?url-hashed asset URL
+      //     is honoured regardless of BASE_URL / bundle location.
+      const factory = urlOverride
+        ? (await import(/* @vite-ignore */ urlOverride)).default as typeof createMathEngine
+        : createMathEngine
+      _module = (await factory(
+        urlOverride ? {} : { locateFile: (p: string) => (p.endsWith('.wasm') ? mathEngineWasmUrl : p) },
+      )) as WasmModule
       console.log('[WasmBridge] WASM loaded successfully')
       return true
     } catch (e) {

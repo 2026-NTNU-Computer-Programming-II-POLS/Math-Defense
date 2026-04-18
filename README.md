@@ -126,7 +126,7 @@ Vite proxies `/api/*` to `http://localhost:8000` in development so the browser s
 
 ```bash
 cd wasm
-make               # writes math_engine.js / .wasm into frontend/public/wasm/
+make               # writes math_engine.js / .wasm into frontend/src/math/wasm/
 ```
 
 `npm run build` in the frontend automatically triggers `make` via the `prebuild` script.

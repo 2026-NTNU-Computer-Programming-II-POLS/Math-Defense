@@ -2,8 +2,8 @@
 /**
  * WASM/JS parity suite.
  *
- * The default WasmBridge.test.ts runs under happy-dom where the dynamic import
- * of /public/wasm/math_engine.js cannot resolve, so it only exercises the JS
+ * The default WasmBridge.test.ts runs under happy-dom where the ?url asset
+ * import for the .wasm binary cannot resolve, so it only exercises the JS
  * fallback. This file runs under Node, loads the real ES module via a file://
  * URL (passed through initWasm's urlOverride parameter), and asserts that every
  * bridge function produces the same numeric result on both backends.
@@ -30,7 +30,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url))
 const wasmJsUrl = pathToFileURL(
-  resolve(here, '..', '..', 'public', 'wasm', 'math_engine.js'),
+  resolve(here, 'wasm', 'math_engine.js'),
 ).href
 
 let wasmReady = false
