@@ -6,7 +6,7 @@ REST API server for Math Defense: authentication, game-session lifecycle, and le
 
 | | |
 |---|---|
-| Framework | FastAPI 0.115 |
+| Framework | FastAPI 0.136 |
 | Server | Uvicorn (ASGI) |
 | ORM | SQLAlchemy 2.0 |
 | Migrations | Alembic |
@@ -94,6 +94,7 @@ backend/
 │   ├── test_value_objects.py              (15) — VO invariants
 │   ├── test_coverage_gaps.py              (12) — audit-driven edge cases
 │   └── test_shared_constants_parity.py    (3)  — Python ↔ shared/game-constants.json parity
+│   # 78 tests total
 │
 ├── requirements.txt
 └── Dockerfile
@@ -133,7 +134,7 @@ Use-case orchestration. One method per user intent.
   - `get_leaderboard(level, page, per_page)` — per-level `DENSE_RANK` when `level` is provided, global rank otherwise.
   - `submit_score(...)` — manual fallback if the auto-submit path fails.
 
-All domain errors (`SessionNotFoundError`, `SessionStaleError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `PermissionDeniedError`, `DuplicateSubmissionError`, `UsernameTakenError`, `InvalidCredentialsError`, `InvalidTokenError`, `UserNotFoundError`, `SessionValidationError`) inherit from `DomainError` and carry their own `status_code`. The global handler in `main.py` surfaces them — routers never translate manually. Aggregate invariants that raise plain `ValueError` are mapped to `422` by a second handler. `mappers.py` converts aggregates to Pydantic DTOs so routers stay one-liners.
+All domain errors (`SessionNotFoundError`, `SessionStaleError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `PermissionDeniedError`, `DuplicateSubmissionError`, `UsernameTakenError`, `InvalidCredentialsError`, `AccountLockedError`, `InvalidTokenError`, `UserNotFoundError`, `SessionValidationError`, `DomainValueError`) inherit from `DomainError` and carry their own `status_code`. The global handler in `main.py` surfaces them — routers never translate manually. `DomainValueError` dual-inherits from `ValueError` so existing `except ValueError` clauses keep working; aggregate invariants that raise plain `ValueError` are mapped to `422` by a second handler. `mappers.py` converts aggregates to Pydantic DTOs so routers stay one-liners.
 
 ### Infrastructure
 
@@ -174,18 +175,18 @@ The four events emitted by `GameSession`:
 
 ## API Reference
 
-Base path: `/api`. All session / leaderboard-submit endpoints require `Authorization: Bearer <token>`.
+Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-only cookie (`access_token`, preferred) or a `Authorization: Bearer <token>` header (backward compat). On successful register/login the backend sets the cookie with `HttpOnly`, `Secure` (see `COOKIE_SECURE`), `SameSite=Lax`, `path=/api`.
 
 ### Authentication — `/api/auth`
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/auth/register` | 5/min | Create account, return token |
-| POST | `/api/auth/login` | 10/min | Authenticate, return token |
-| POST | `/api/auth/logout` | — | Revoke current token — adds JTI to deny-list until natural expiry |
-| GET | `/api/auth/me` | — | Current user |
+| POST | `/api/auth/register` | 5/min | Create account, set auth cookie, return token |
+| POST | `/api/auth/login` | 10/min | Authenticate, set auth cookie, return token |
+| POST | `/api/auth/logout` | 30/min | Revoke current token — adds JTI to deny-list until natural expiry; clears cookie |
+| GET | `/api/auth/me` | 30/min | Current user |
 
-Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars with letter + digit. Logout is server-side: the JTI is denied even if the token has not yet expired. Login failures are tracked per-account (`login_guard`): 5 consecutive failures within 5 minutes trigger a 5-minute lockout.
+Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars with letter + digit. Logout is server-side: the JTI is denied even if the token has not yet expired. Login failures are tracked per-account (`login_guard`): 5 consecutive failures within 5 minutes trigger a 5-minute lockout (`AccountLockedError` → `429`).
 
 ### Game Sessions — `/api/sessions`
 
@@ -218,14 +219,14 @@ Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars
 | `404` | `SessionNotFoundError` | Session id does not exist |
 | `409` | `UsernameTakenError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `DuplicateSubmissionError` | Conflict: unique violation, illegal state transition, already-scored session |
 | `410` | `SessionStaleError` | Session > 2h active — auto-abandoned before raise |
-| `422` | `ValueError` from aggregate invariants | Bounds violation, score going backwards, delta > 50 000 |
-| `429` | slowapi `RateLimitExceeded` | Rate limit exceeded |
+| `422` | `DomainValueError` / plain `ValueError` from aggregate invariants | Bounds violation, score going backwards, delta > 50 000 |
+| `429` | `AccountLockedError`, slowapi `RateLimitExceeded` | Per-account login lockout or IP rate limit |
 
 ### Leaderboard — `/api/leaderboard`
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| GET | `/api/leaderboard?level=&page=&per_page=` | — | Ranked entries. `level` gives per-level dense rank; omitting gives global rank |
+| GET | `/api/leaderboard?level=&page=&per_page=` | 30/min | Ranked entries. `level` gives per-level dense rank; omitting gives global rank |
 | POST | `/api/leaderboard` | 10/min | Manual score submission (fallback if auto-create failed) |
 
 Query params: `level` 1–4 optional, `page` default 1, `per_page` default 20 (max 100).
@@ -303,6 +304,7 @@ docker-compose up backend        # from project root
 | `ALGORITHM` | No | JWT algorithm (default `HS256`) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `30` |
 | `SESSION_STALE_CUTOFF_HOURS` | No | Default `2.0`; active sessions older than this are auto-abandoned |
+| `COOKIE_SECURE` | No | Default `true`. Sets `Secure` flag on the auth cookie. Only `false` is honoured under CI/pytest — outside tests, startup aborts so plain-HTTP deployments cannot silently leak cookies. |
 
 > Schema is managed exclusively by Alembic — `lifespan` runs `alembic upgrade head` on boot. There is no `AUTO_CREATE_TABLES` toggle (removed during the PostgreSQL-only migration).
 
@@ -311,7 +313,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # all 86 tests
+pytest                                      # all 78 tests
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 ```
@@ -335,11 +337,14 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter).
 |---|---|
 | `POST /auth/register` | 5/min per IP |
 | `POST /auth/login` | 10/min per IP |
+| `POST /auth/logout` | 30/min |
+| `GET /auth/me` | 30/min |
 | `POST /sessions` | 30/min |
 | `GET /sessions/active` | 60/min |
 | `PATCH /sessions/{id}` | 120/min |
 | `POST /sessions/{id}/end` | 30/min |
 | `POST /sessions/{id}/abandon` | 30/min |
+| `GET /leaderboard` | 30/min |
 | `POST /leaderboard` | 10/min |
 
 Exceeding the limit returns `HTTP 429 Too Many Requests`.

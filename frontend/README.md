@@ -97,6 +97,7 @@ frontend/
 │   │
 │   ├── math/
 │   │   ├── WasmBridge.ts           initWasm, RAII float buffers, JS fallbacks
+│   │   ├── wasm-exports.d.ts       Ambient type decl for the generated math_engine module
 │   │   ├── MathUtils.ts            Coordinate conversion, findIntersections, sector test
 │   │   └── PathEvaluator.ts        Random path generation (5 families) + validation
 │   │
@@ -292,13 +293,17 @@ Mirrors a subset of `GameState` for Vue reactivity:
 | State | Description |
 |---|---|
 | `phase` | Current `GamePhase` |
-| `hp / maxHp / gold / score` | Player resources |
+| `level` | Active level index (1–4) |
+| `hp / maxHp / gold / score / kills` | Player resources and counters |
 | `wave / totalWaves` | Wave progress |
-| `buffCards` | Currently drawn buff-card trio |
-| `bossShieldTarget` | Fourier target (populated by engine on `BOSS_SHIELD_START`) |
+| `buffCards` | Currently drawn buff/curse card trio |
 | `pathExpression` | String expression for the current level path |
 
+Computed: `isBuilding`, `isWave`, `isBuff`, `hpPercent`.
+
 Actions: `bindEngine(g)`, `unbindEngine()`, `syncFromEngine(g)`.
+
+> The boss-shield Fourier target lives in the engine's `GameState`, not the store — the `FourierPanel` reads it through `useGameLoop` / events, so the reactive store stays focused on HUD mirror state.
 
 ### `uiStore`
 
@@ -335,6 +340,9 @@ fourierComposite(t, freqs, amps)
 fourierMatch(f1, a1, f2, a2, samples = 200)
 calculateTrajectory(a, b, c, xStart, xEnd, step)
 lineCircleIntersect(m, b, cx, cy, r)
+
+setUseWasm(use)                          // force JS fallback (used by parity tests)
+benchmark(fn, iterations = 1000)         // ms per iteration; reports WASM vs JS in dev
 ```
 
 **RAII memory management** — `withFloatBuffers<T>(sizes, cb)` allocates via `_malloc`, runs the callback, and `_free`s in a `finally` block. Callers never handle raw pointers.
@@ -368,7 +376,7 @@ npm install
 npm run dev        # Vite dev server at http://localhost:5173
 npm run build      # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
 npm run preview    # Preview the production build
-npm test           # Vitest — 13 test files, 117 tests
+npm test           # Vitest — 14 test files covering engine, systems, composables, math bridge
 npm run test:watch # Vitest in watch mode
 ```
 
@@ -388,12 +396,14 @@ Type-check only (no emit): `npx vue-tsc -b`.
 ```
 src/engine/*.test.ts                EventBus, Game, PhaseStateMachine
 src/composables/useSessionSync.test.ts
-src/math/*.test.ts                  PathEvaluator, WasmBridge (WASM/JS parity)
+src/math/PathEvaluator.test.ts
+src/math/WasmBridge.test.ts         JS-only parity (fallback surface + numerical invariants)
+src/math/WasmBridge.wasm.test.ts    JS ↔ WASM parity under Node (requires math_engine.* built)
 src/systems/__tests__/*.test.ts     BuffSystem (+ duration), CombatSystem, EconomySystem,
                                     MovementSystem, TowerPlacementSystem, WaveSystem
 ```
 
-Vitest is configured with `happy-dom` so systems can be tested without a real browser. `WasmBridge.test.ts` in particular asserts the JS fallback produces the same output as the WASM module for `pointInSector` boundary cases.
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. The two WASM-bridge test files split responsibilities: `WasmBridge.test.ts` pins the JS fallback's behaviour without loading the binary, and `WasmBridge.wasm.test.ts` loads the compiled module under Node to assert numerical parity between the two backends (skipped if the WASM build is absent).
 
 ---
 

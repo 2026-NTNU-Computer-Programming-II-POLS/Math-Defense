@@ -61,7 +61,7 @@ emcc math_engine.c -o ../frontend/public/wasm/math_engine.js \
       _line_circle_intersect,_malloc,_free \
   -sEXPORTED_RUNTIME_METHODS=ccall,cwrap,getValue,setValue \
   -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createMathEngine \
-  -sALLOW_MEMORY_GROWTH=1 -O2
+  -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=268435456 -O2
 ```
 
 Key flags:
@@ -71,6 +71,7 @@ Key flags:
 | `-sMODULARIZE=1 -sEXPORT_ES6=1` | Emit an ES6 module; dynamic `import()` from the bridge |
 | `-sEXPORT_NAME=createMathEngine` | Factory function name used by `WasmBridge.ts` |
 | `-sALLOW_MEMORY_GROWTH=1` | Linear memory can grow at runtime |
+| `-sMAXIMUM_MEMORY=268435456` | Cap linear memory at 256 MiB — prevents a runaway allocation from starving the rest of the tab |
 | `-O2` | Optimisation |
 
 ### Clean

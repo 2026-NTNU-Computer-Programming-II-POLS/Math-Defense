@@ -29,7 +29,8 @@ Math Game/
 ├── emsdk/             Vendored Emscripten SDK for WASM builds
 ├── docker-compose.yml        Dev orchestration: Postgres + backend (hot reload) + frontend (Vite)
 ├── docker-compose.prod.yml   Prod orchestration: images are self-contained, nginx terminates /api
-├── nginx.conf                Production reverse-proxy config (SPA + /api)
+├── nginx.conf                Production reverse-proxy config (HTTP, SPA + /api)
+├── nginx-tls.conf            Production reverse-proxy config with TLS termination
 ├── .env.example              Template for required environment variables
 └── Math_Defense_Spec.md      Full game-design specification
 ```
@@ -57,7 +58,7 @@ Browser
 | Layer | Technology |
 |---|---|
 | Frontend | Vue 3 (Composition API, `<script setup>`), TypeScript 5.9 strict, Pinia, Vue Router, Vite 8, Vitest |
-| Backend | FastAPI 0.115, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
+| Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
 | WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`) |
 | Database | PostgreSQL 16 (Alembic migrations) |
 | Container | Docker, Docker Compose |
@@ -142,6 +143,9 @@ Create `.env` at the project root (see `.env.example`):
 | `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense` |
 | `POSTGRES_PASSWORD` | Yes | Password for the `postgres` service (matches the password embedded in `DATABASE_URL`) |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
+| `COOKIE_SECURE` | No | Default `true`; only `false` is honoured under CI/pytest (see `reject_insecure_cookie_outside_tests` in `backend/app/config.py`) |
+
+> The backend refuses to start when `DATABASE_URL` embeds the literal password `changeme` — replace it in `.env` before first boot.
 
 ---
 
@@ -167,8 +171,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 86 tests (DDD aggregates, routers, coverage gaps, shared-constants parity)
-cd frontend && npm test            # 13 test files, 117 tests (systems, engine, WASM bridge)
+cd backend  && pytest              # 78 tests (DDD aggregates, routers, coverage gaps, shared-constants parity)
+cd frontend && npm test            # 14 test files (systems, engine, WASM bridge + WASM/JS parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
