@@ -1,8 +1,11 @@
 /**
  * lint-chinese-comments.ts — enforce English-only comments.
  *
- * Walks `src/**\/*.{ts,tsx,vue}` and fails if any comment (`//`, `/* */`,
- * or `/** */`) contains a non-ASCII character. Strings, identifiers, and
+ * Walks src ts/tsx/vue sources and fails if any comment (line or block)
+ * contains a CJK character (Unified Ideographs / Hiragana / Katakana /
+ * fullwidth punctuation). Non-CJK Unicode punctuation commonly used in
+ * technical prose (em-dashes, arrows, section signs) is intentionally
+ * allowed. Strings, identifiers, and
  * JSX text are ignored — only comment bodies are checked. This is a
  * deliberately strict rule: if a file legitimately needs non-ASCII in a
  * comment (math symbols, legacy translation notes), opt out with a
@@ -32,7 +35,6 @@ const LEGACY_ALLOWLIST: ReadonlySet<string> = new Set([
   'components/game/IntegralPanel.vue',
   'components/game/MatrixInputPanel.vue',
   'data/tower-defs.ts',
-  'math/PathEvaluator.ts',
   'math/WasmBridge.ts',
   'math/WasmBridge.test.ts',
   'math/WasmBridge.wasm.test.ts',
@@ -46,6 +48,26 @@ const DIRECTIVE_RE = /@allow-non-ascii-comments\s*:/
 
 function normalize(p: string): string {
   return p.replace(/\\/g, '/')
+}
+
+/**
+ * True for code points in the CJK blocks the rule targets.
+ * - U+3000..U+303F: CJK Symbols and Punctuation
+ * - U+3040..U+30FF: Hiragana / Katakana
+ * - U+3400..U+4DBF: CJK Extension A
+ * - U+4E00..U+9FFF: CJK Unified Ideographs
+ * - U+F900..U+FAFF: CJK Compatibility Ideographs
+ * - U+FF00..U+FFEF: Halfwidth/Fullwidth Forms
+ */
+function isCjk(code: number): boolean {
+  return (
+    (code >= 0x3000 && code <= 0x303f)
+    || (code >= 0x3040 && code <= 0x30ff)
+    || (code >= 0x3400 && code <= 0x4dbf)
+    || (code >= 0x4e00 && code <= 0x9fff)
+    || (code >= 0xf900 && code <= 0xfaff)
+    || (code >= 0xff00 && code <= 0xffef)
+  )
 }
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -83,13 +105,13 @@ function findNonAsciiInComments(source: string): Array<{ line: number; char: str
         const c = source[i]!
         if (c === '\n') { advance(1); return }
         const code = c.charCodeAt(0)
-        if (code > 0x7f) hits.push({ line, char: c })
+        if (isCjk(code)) hits.push({ line, char: c })
         advance(1)
       } else {
         if (source[i] === '*' && source[i + 1] === '/') { advance(2); return }
         const c = source[i]!
         const code = c.charCodeAt(0)
-        if (code > 0x7f) hits.push({ line, char: c })
+        if (isCjk(code)) hits.push({ line, char: c })
         advance(1)
       }
     }
@@ -148,11 +170,11 @@ function check(): Violation[] {
 function main(): void {
   const violations = check()
   if (violations.length === 0) {
-    console.log('lint-chinese-comments: OK (no non-ASCII comments outside the legacy allowlist)')
+    console.log('lint-chinese-comments: OK (no CJK comments outside the legacy allowlist)')
     process.exit(0)
   }
   for (const v of violations) {
-    console.error(`lint-chinese-comments: src/${v.file}:${v.line} — non-ASCII char in comment: "${v.sample}" (U+${v.sample.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')})`)
+    console.error(`lint-chinese-comments: src/${v.file}:${v.line} - CJK char in comment: "${v.sample}" (U+${v.sample.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')})`)
   }
   console.error(`lint-chinese-comments: ${violations.length} violation(s)`)
   process.exit(1)

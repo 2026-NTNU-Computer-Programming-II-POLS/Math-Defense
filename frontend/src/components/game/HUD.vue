@@ -3,17 +3,9 @@ import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { GamePhase } from '@/data/constants'
 import { formatScore } from '@/domain/formatters'
-import { SEGMENTED_PATHS_ENABLED } from '@/config/feature-flags'
 import FunctionPanel from './FunctionPanel.vue'
 
 const g = useGameStore()
-
-// Legacy single-line path expression is superseded by <FunctionPanel />
-// when SEGMENTED_PATHS_ENABLED is on. The flag and the legacy markup
-// both retire in Phase 7 of the Piecewise Paths construction plan.
-const showLegacyPath = computed(
-  () => !SEGMENTED_PATHS_ENABLED && !!g.pathExpression,
-)
 
 const phaseLabel = computed(() => {
   switch (g.phase) {
@@ -66,15 +58,9 @@ const hpStr   = computed(() => `${g.hp} / ${g.maxHp}`)
       <span class="hud-label">Score</span>
       <span class="hud-value score">{{ formatScore(g.score) }}</span>
     </div>
-
-    <!-- Path function (legacy; superseded by <FunctionPanel /> when flag is on) -->
-    <div class="hud-item path-item" v-if="showLegacyPath">
-      <span class="hud-label">Path</span>
-      <span class="hud-value path">{{ g.pathExpression }}</span>
-    </div>
   </div>
 
-  <FunctionPanel v-if="SEGMENTED_PATHS_ENABLED" />
+  <FunctionPanel />
 </template>
 
 <style scoped>
@@ -115,7 +101,6 @@ const hpStr   = computed(() => `${g.hp} / ${g.maxHp}`)
 .gold     { color: var(--gold-bright); }
 .hp-low   { color: var(--hp-red); }
 .score    { color: var(--gold); }
-.path     { font-size: 11px; color: #4a82c8; }
 
 .score-item { margin-left: auto; }
 </style>

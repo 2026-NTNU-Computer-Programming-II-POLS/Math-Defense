@@ -4,25 +4,33 @@
  */
 import { ENEMY_DEFS } from '@/data/enemy-defs'
 import type { EnemyType } from '@/data/constants'
+import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { Enemy } from './types'
 
 let _nextId = 0
 
 export function createEnemy(
   type: EnemyType,
-  pathFn: (x: number) => number,
-  startX = 20,
-  targetX = 0,
+  path: SegmentedPath,
+  startX: number = path.startX,
+  targetX: number = path.targetX,
 ): Enemy {
   const def = ENEMY_DEFS[type]
   if (!def) throw new Error(`Unknown enemy type: ${type}`)
 
-  const startY = pathFn(startX)
+  // Clamp to the path's x-range so split-slime children spawned near the
+  // endpoints (parent.x ± 0.3) never hand `evaluateAt` an out-of-range x,
+  // which would throw. The clamped position is close enough that the
+  // visual offset is preserved on the next tick's strategy advance.
+  const lo = Math.min(path.startX, path.targetX)
+  const hi = Math.max(path.startX, path.targetX)
+  const spawnX = Math.min(hi, Math.max(lo, startX))
+  const startY = path.evaluateAt(spawnX)
 
   return {
     id: `enemy_${++_nextId}`,
     type,
-    x: startX,
+    x: spawnX,
     y: startY,
     hp: def.maxHp,
     maxHp: def.maxHp,
@@ -35,8 +43,7 @@ export function createEnemy(
     active: true,
     alive: true,
 
-    pathFn,
-    _pathX: startX,
+    _pathX: spawnX,
     _targetX: targetX,
     _direction: targetX > startX ? 1 : -1,
 

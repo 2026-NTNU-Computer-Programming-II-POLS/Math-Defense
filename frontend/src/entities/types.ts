@@ -58,7 +58,6 @@ export interface Enemy {
   alive: boolean
 
   // Path following (internal state)
-  pathFn: (x: number) => number
   _pathX: number
   _targetX: number
   _direction: 1 | -1

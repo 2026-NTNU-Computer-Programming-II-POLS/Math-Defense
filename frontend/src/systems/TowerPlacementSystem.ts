@@ -2,7 +2,6 @@
  * TowerPlacementSystem — tower placement (Build Phase) and preview
  */
 import { Events, GamePhase, TowerType } from '@/data/constants'
-import { SEGMENTED_PATHS_ENABLED } from '@/config/feature-flags'
 import { createTower } from '@/entities/TowerFactory'
 import { degToRad, findIntersections, gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import type { Game } from '@/engine/Game'
@@ -40,8 +39,8 @@ export class TowerPlacementSystem {
   private readonly _policy: PlacementPolicy
 
   /**
-   * @param policy Rule policy used when `SEGMENTED_PATHS_ENABLED` is on and
-   * a `levelContext` is present. Defaulted for ergonomics; tests inject a
+   * @param policy Rule policy consulted for every placement attempt when a
+   * `levelContext` is present. Defaulted for ergonomics; tests inject a
    * fake to assert delegation without pulling in the real layout service.
    */
   constructor(policy: PlacementPolicy = createPlacementPolicy()) {
@@ -104,38 +103,24 @@ export class TowerPlacementSystem {
     // place a new tower
     const selectedType = this.getSelectedTowerType()
     if (!selectedType) return
+    if (!game.levelContext) return
 
     const tower = createTower(selectedType, gx, gy)
     const cost = game.state.freeTowerNext ? 0 : tower.cost
 
-    // Flag-on: delegate rule predicates to PlacementPolicy. All rule
-    // arithmetic lives inside the policy; this branch contains no
-    // buildable / occupied / gold checks of its own. Tracked as debt and
-    // collapsed into the unconditional path in Phase 7.
-    if (SEGMENTED_PATHS_ENABLED && game.levelContext) {
-      const decision = this._policy.canPlace(gx, gy, {
-        layout: game.levelContext.layout,
-        isOccupied: (ox, oy) =>
-          game.towers.some((t) => Math.round(t.x) === ox && Math.round(t.y) === oy),
-        gold: game.state.gold,
-        cost,
-      })
-      if (!decision.ok) {
-        game.eventBus.emit(Events.PLACEMENT_REJECTED, { gx, gy, reason: decision.reason })
-        return
-      }
-      this._commitPlacement(tower, cost, game)
+    // Rule predicates live inside `PlacementPolicy`; this body contains no
+    // buildable / occupied / gold checks of its own.
+    const decision = this._policy.canPlace(gx, gy, {
+      layout: game.levelContext.layout,
+      isOccupied: (ox, oy) =>
+        game.towers.some((t) => Math.round(t.x) === ox && Math.round(t.y) === oy),
+      gold: game.state.gold,
+      cost,
+    })
+    if (!decision.ok) {
+      game.eventBus.emit(Events.PLACEMENT_REJECTED, { gx, gy, reason: decision.reason })
       return
     }
-
-    // Legacy branch — removed in Phase 7 together with the feature flag.
-    if (game.state.gold < cost) return
-
-    const occupied = game.towers.some(
-      (t) => Math.round(t.x) === gx && Math.round(t.y) === gy,
-    )
-    if (occupied) return
-
     this._commitPlacement(tower, cost, game)
   }
 
@@ -157,11 +142,10 @@ export class TowerPlacementSystem {
       return
     }
     // Placement-cursor legality cue. Uses LevelLayoutService as the single
-    // classifier; no rule predicates inline. Suppressed on the legacy path
-    // (flag off / no levelContext) so main-branch behaviour is unchanged.
+    // classifier; no rule predicates inline. Suppressed when no level is
+    // loaded (`levelContext == null`).
     if (
-      SEGMENTED_PATHS_ENABLED
-      && game.levelContext
+      game.levelContext
       && this._hoveredCell
       && this.getSelectedTowerType() !== null
     ) {
@@ -183,8 +167,13 @@ export class TowerPlacementSystem {
       // each intersection of `shotFn` with the path, not along `shotFn`
       // itself. Overlay the actual trajectories so the preview matches what
       // the player will see when the wave starts.
-      if (tower.type === TowerType.FUNCTION_CANNON && game.pathFunction) {
-        this._drawShotTrajectories(renderer, tower, preview.fn, game.pathFunction)
+      if (tower.type === TowerType.FUNCTION_CANNON && game.levelContext) {
+        const path = game.levelContext.path
+        const pathFn = (x: number) => {
+          const seg = path.findSegmentAt(x)
+          return seg ? seg.evaluate(x) : NaN
+        }
+        this._drawShotTrajectories(renderer, tower, preview.fn, pathFn)
       }
     } else if (preview.type === 'sector') {
       // The sector radius already has rangeBonus baked in by _getPreview.

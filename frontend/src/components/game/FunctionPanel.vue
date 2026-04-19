@@ -46,6 +46,10 @@ function drawPlot(): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  // Phase 8 polish: the 1px axis stroke is pixel-snapped below (round+0.5)
+  // so it lands on a single device row instead of smearing across two; the
+  // curve uses rounded caps/joins (set below) so the polyline stays smooth
+  // without anti-aliasing artefacts at shallow slopes.
   ctx.clearRect(0, 0, PLOT_W, PLOT_H)
 
   const seg = current.value
@@ -77,20 +81,24 @@ function drawPlot(): void {
   // Canvas y grows downward; invert so higher y renders higher on screen.
   const toPxY = (y: number) => PLOT_H - marginY - ((y - yMin) / ySpan) * (PLOT_H - 2 * marginY)
 
-  // Zero axis (if 0 falls inside the Y range)
+  // Zero axis (if 0 falls inside the Y range). The 0.5 y-offset snaps the
+  // 1px stroke onto a single pixel row so it renders as a clean hairline.
   if (yMin <= 0 && yMax >= 0) {
     ctx.strokeStyle = 'rgba(139, 115, 66, 0.5)'
     ctx.lineWidth = 1
-    const zy = toPxY(0)
+    const zy = Math.round(toPxY(0)) + 0.5
     ctx.beginPath()
     ctx.moveTo(marginX, zy)
     ctx.lineTo(PLOT_W - marginX, zy)
     ctx.stroke()
   }
 
-  // Curve
+  // Curve — rounded caps/joins soften the polyline without relying on
+  // imageSmoothing (which was disabled above for axis crispness).
   ctx.strokeStyle = '#4a82c8'
   ctx.lineWidth = 2
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
   ctx.beginPath()
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i]!
@@ -234,6 +242,9 @@ function onUnhover(): void {
 
 .fn-expr {
   font-size: 13px;
+  line-height: 1.25;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
   color: #4a82c8;
   min-height: 18px;
   word-break: break-all;
@@ -252,9 +263,26 @@ function onUnhover(): void {
   margin: 0;
   max-height: 160px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 115, 66, 0.5) transparent;
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+
+.fn-segments::-webkit-scrollbar {
+  width: 6px;
+}
+.fn-segments::-webkit-scrollbar-track {
+  background: transparent;
+}
+.fn-segments::-webkit-scrollbar-thumb {
+  background: rgba(139, 115, 66, 0.45);
+  border-radius: 3px;
+}
+.fn-segments::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 168, 64, 0.7);
 }
 
 .fn-seg {
@@ -263,9 +291,16 @@ function onUnhover(): void {
   gap: 8px;
   padding: 4px 6px;
   font-size: 11px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
   border-radius: 3px;
   cursor: default;
   outline: none;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.fn-seg:focus-visible {
+  box-shadow: inset 0 0 0 1px rgba(255, 215, 0, 0.6);
 }
 
 .fn-seg:hover,

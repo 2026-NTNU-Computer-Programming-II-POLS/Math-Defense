@@ -8,10 +8,7 @@ import { Renderer } from './Renderer'
 import { InputManager } from './InputManager'
 import { PhaseStateMachine } from './PhaseStateMachine'
 import { type GameState, createInitialState } from './GameState'
-import {
-  GamePhase, Events, FIXED_DT,
-  GRID_MIN_X, GRID_MAX_X,
-} from '@/data/constants'
+import { GamePhase, Events, FIXED_DT } from '@/data/constants'
 import type { Tower, Enemy, Projectile } from '@/entities/types'
 import type { BuffDef } from '@/data/buff-defs'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
@@ -110,17 +107,10 @@ export class Game {
   enemies: Enemy[] = []
   projectiles: Projectile[] = []
 
-  // Current path function
-  pathFunction: ((x: number) => number) | null = null
-
   /**
-   * Per-level piecewise-path runtime holder. Phase 3 widens this to the
-   * full `LevelContext` (`path` + `tracker` + `layout` + `dispose`); Phase 2
-   * only needed `path` + `tracker`, and MovementSystem continues to read
-   * through the narrower `MovementLevelContext` view since a full
-   * `LevelContext` is a structural supertype of it. `null` whenever a level
-   * is not loaded or when `SEGMENTED_PATHS_ENABLED` is off — MovementSystem
-   * and TowerPlacementSystem fall back to the legacy pipeline in that case.
+   * Per-level piecewise-path runtime holder. `null` between levels and
+   * during MENU. MovementSystem reads it through the narrower
+   * `MovementLevelContext` view (`path` + `tracker`).
    */
   levelContext: LevelContext | null = null
 
@@ -215,7 +205,6 @@ export class Game {
     this.towers = []
     this.enemies = []
     this.projectiles = []
-    this.pathFunction = null
     this.levelContext = null
     // Reset to MENU first so terminal phases (GAME_OVER) and any in-progress phase
     // can legally transition into BUILD on retry/replay.
@@ -311,14 +300,12 @@ export class Game {
 
     if (this.levelContext && this.state.phase !== GamePhase.MENU) {
       renderer.drawSegmentBoundaries(this.levelContext.path, this.hoveredSegmentId)
-    }
-
-    if (this.pathFunction && this.state.phase !== GamePhase.MENU) {
-      renderer.drawFunction(
-        this.pathFunction,
-        GRID_MIN_X, GRID_MAX_X,
-        'rgba(184, 64, 64, 0.4)', 2,
-      )
+      for (const seg of this.levelContext.path.segments) {
+        const [lo, hi] = seg.xRange
+        if (lo !== hi) {
+          renderer.drawFunction(seg.evaluate, lo, hi, 'rgba(184, 64, 64, 0.4)', 2)
+        }
+      }
     }
 
     for (const system of this._systems.values()) {

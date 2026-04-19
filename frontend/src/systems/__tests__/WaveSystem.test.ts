@@ -29,11 +29,11 @@ vi.mock('@/data/level-defs', () => ({
 
 // Mock EnemyFactory
 vi.mock('@/entities/EnemyFactory', () => ({
-  createEnemy: (type: string, pathFn: (x: number) => number) => ({
+  createEnemy: (type: string, path: { evaluateAt: (x: number) => number }) => ({
     id: `enemy_${Math.random().toString(36).slice(2)}`,
     type,
     x: 20,
-    y: pathFn(20),
+    y: path.evaluateAt(20),
     hp: 100,
     maxHp: 100,
     speed: 2,
@@ -43,7 +43,6 @@ vi.mock('@/entities/EnemyFactory', () => ({
     color: '#b84040',
     active: true,
     alive: true,
-    pathFn,
     _pathX: 20,
     _targetX: 0,
     _direction: -1,
@@ -52,10 +51,27 @@ vi.mock('@/entities/EnemyFactory', () => ({
   }),
 }))
 
+function fakeLevelContext() {
+  return {
+    path: {
+      segments: [],
+      startX: 20,
+      targetX: 0,
+      evaluateAt: (_x: number) => 0,
+      findSegmentAt: (_x: number) => null,
+    },
+    layout: { classify: () => 'forbidden' as const, pathCellCount: 0, buildableCellCount: 0 },
+    tracker: { update: () => {}, dispose: () => {} },
+    dispose: () => {},
+  }
+}
+
 describe('WaveSystem', () => {
   function setup(level = 1) {
     const game = createMockGame({ phase: GamePhase.WAVE, level })
     game.phase.forceTransition(GamePhase.WAVE)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    game.levelContext = fakeLevelContext() as any
     const system = new WaveSystem()
     system.init(game)
     return { game, system }

@@ -9,6 +9,19 @@
  * The palette deliberately mirrors `Colors` in `@/data/constants` so the
  * mages-tower art direction stays consistent when the renderer lays tiles
  * over the stone-floor checkerboard backdrop.
+ *
+ * Phase 8 accessibility pass (see `docs/playtest-notes-piecewise.md`):
+ * the buildable border was retuned from amber (`#c89848`) to blue
+ * (`#4a82c8`) — the same blue already used as the FunctionPanel curve
+ * stroke, so this is palette-cohesive rather than a new colour — so it
+ * remains distinguishable from the path's green border under deuteranopia
+ * and protanopia, where the old green + amber pair converged toward the
+ * same olive hue. The amber `#c89848` is the shared theme accent for
+ * Probability Shrine, Fourier tower, and mid-zone HP bars; reusing it
+ * for buildable borders overloaded the token. The buildable fill was
+ * also lifted to widen the luminance gap against `forbidden`, since tile
+ * fills are the primary legibility signal when the border is occluded
+ * by a tower sprite.
  */
 import type { TileClass } from '@/domain/level/level-layout-service'
 
@@ -48,8 +61,8 @@ export function tileStyleFor(cls: TileClass): TileStyle {
       }
     case 'buildable':
       return {
-        fill: '#2a2536',
-        border: '#c89848',
+        fill: '#2f2a44',
+        border: '#4a82c8',
         borderStyle: 'dotted',
       }
     case 'forbidden':

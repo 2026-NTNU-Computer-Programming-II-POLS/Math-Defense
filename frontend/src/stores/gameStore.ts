@@ -34,9 +34,6 @@ export const useGameStore = defineStore('game', () => {
   const maxHp = ref(20)
   const score = ref(0)
   const kills = ref(0)
-  // pathExpression is a presentation string the HUD displays — useGameLoop
-  // writes it on LEVEL_START, and it does not round-trip through GameState.
-  const pathExpression = ref('')
   const buffCards = ref<(BuffDef & { isCurse: boolean })[]>([])
 
   // Piecewise paths (spec §5.5): segment list is stored in a `shallowRef`
@@ -114,8 +111,6 @@ export const useGameStore = defineStore('game', () => {
         wave.value = 0
         score.value = 0
         kills.value = 0
-        // pathExpression is set by useGameLoop's own LEVEL_START handler after
-        // generatePath runs; don't overwrite with stale/empty engine state here.
       }),
       // BuffSystem emits BUFF_CARDS_UPDATED with a freshly built array each
       // draw. Taking the payload directly (rather than reaching into
@@ -143,8 +138,6 @@ export const useGameStore = defineStore('game', () => {
     maxHp.value = s.maxHp
     score.value = s.score
     kills.value = s.kills
-    // pathExpression is presentation state; it is owned by the store and set
-    // via useGameLoop's LEVEL_START handler, not mirrored from GameState.
   }
 
   function getEngine(): Game | null {
@@ -153,7 +146,7 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     phase, level, wave, totalWaves,
-    gold, hp, maxHp, score, kills, pathExpression, buffCards,
+    gold, hp, maxHp, score, kills, buffCards,
     pathPanel,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, hpPercent,

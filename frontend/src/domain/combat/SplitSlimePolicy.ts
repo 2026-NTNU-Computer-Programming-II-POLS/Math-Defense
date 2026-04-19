@@ -4,10 +4,11 @@
  */
 import { EnemyType } from '@/data/constants'
 import { createEnemy } from '@/entities/EnemyFactory'
+import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { Enemy } from '@/entities/types'
 
 export interface SplitContext {
-  pathFunction: ((x: number) => number) | null
+  path: SegmentedPath | null
   onChildCreated: (child: Enemy) => void
 }
 
@@ -23,7 +24,7 @@ export function shouldSplit(enemy: Enemy): boolean {
 /**
  * Spawn split children from a parent slime.
  * @param parent the parent enemy (dead or reached origin)
- * @param context pathFunction + onChildCreated callback
+ * @param context path + onChildCreated callback
  * @param spawnOffset distance to offset back along the path (use 3 when reaching origin, 0 when killed)
  */
 export function spawnChildren(
@@ -31,13 +32,14 @@ export function spawnChildren(
   context: SplitContext,
   spawnOffset = 0,
 ): Enemy[] {
-  if (!context.pathFunction) {
-    // Invariant: a split-slime is on the map, so a path must have been set on
-    // LEVEL_START. Reaching here means the path was cleared mid-level (e.g.
-    // destroy() firing during a WAVE_END callback). Log so it surfaces in dev
-    // instead of silently producing a dead parent with no children.
+  if (!context.path) {
+    // Invariant: a split-slime is on the map, so a level must have been
+    // loaded on LEVEL_START. Reaching here means the context was cleared
+    // mid-level (e.g. destroy() firing during a WAVE_END callback). Log so
+    // it surfaces in dev instead of silently producing a dead parent with
+    // no children.
     console.warn(
-      `[SplitSlimePolicy] pathFunction is null — parent id=${parent.id} will not split.`,
+      `[SplitSlimePolicy] path is null — parent id=${parent.id} will not split.`,
     )
     return []
   }
@@ -50,7 +52,7 @@ export function spawnChildren(
       : parent.x
     const child = createEnemy(
       EnemyType.BASIC_SLIME,
-      context.pathFunction,
+      context.path,
       baseX + (i === 0 ? -0.3 : 0.3),
       parent._targetX,
     )

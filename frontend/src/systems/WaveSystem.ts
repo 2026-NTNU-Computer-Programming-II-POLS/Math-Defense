@@ -69,13 +69,13 @@ export class WaveSystem {
   }
 
   private _spawn(config: EnemySpawnEntry, game: Game): void {
-    if (!game.pathFunction) {
-      // Path cleared mid-wave — skip this spawn but log so it's visible in dev.
+    if (!game.levelContext) {
+      // Level cleared mid-wave — skip this spawn but log so it's visible in dev.
       // Silent skip would manifest as a wave that "ends" without all enemies appearing.
-      console.warn('[WaveSystem] spawn skipped: pathFunction is null', { type: config.type })
+      console.warn('[WaveSystem] spawn skipped: levelContext is null', { type: config.type })
       return
     }
-    const enemy = createEnemy(config.type, game.pathFunction)
+    const enemy = createEnemy(config.type, game.levelContext.path)
     // curse: enemy speed-up is read by MovementSystem from game.state.enemySpeedMultiplier — no injection needed here
     game.enemies.push(enemy)
     game.eventBus.emit(Events.ENEMY_SPAWNED, enemy)

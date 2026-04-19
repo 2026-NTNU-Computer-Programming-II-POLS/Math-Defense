@@ -3,8 +3,8 @@
  *
  * The only place per-kind path math lives. Each factory takes the
  * corresponding `PathSegmentParams` subtype and returns an `(x) => y`
- * closure. Replacing random-path generators (`math/PathEvaluator.ts`)
- * deletes the last alternate home; see spec §11.2.
+ * closure. The pre-Phase-7 random-path generators were the last alternate
+ * home for this math; they were deleted with Phase 7 cleanup (spec §11.2).
  */
 import type { PathSegmentParams } from '@/data/path-segment-types'
 

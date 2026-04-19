@@ -21,10 +21,31 @@ vi.mock('@/entities/EnemyFactory', () => ({
   createEnemy: () => ({
     id: 'child', type: 'basicSlime', x: 10, y: 5, hp: 40, maxHp: 40,
     speed: 2, speedMultiplier: 1, size: 14, reward: 5, color: '#a070d0',
-    active: true, alive: true, pathFn: (x: number) => x, _pathX: 10,
+    active: true, alive: true, _pathX: 10,
     _targetX: 0, _direction: -1, stealthRanges: [], isStealthed: false,
   }),
 }))
+
+function fakeLevelContext() {
+  return {
+    path: {
+      segments: [],
+      startX: 20,
+      targetX: 0,
+      evaluateAt: (_x: number) => 0,
+      findSegmentAt: (_x: number) => ({
+        id: 's', kind: 'horizontal' as const,
+        xRange: [0, 20] as const,
+        params: { kind: 'horizontal' as const, y: 0 },
+        evaluate: (_x: number) => 0,
+        expr: '', label: '',
+      }),
+    },
+    layout: { classify: () => 'forbidden' as const, pathCellCount: 0, buildableCellCount: 0 },
+    tracker: { update: () => {}, dispose: () => {} },
+    dispose: () => {},
+  }
+}
 
 describe('CombatSystem', () => {
   function setup() {
@@ -58,6 +79,8 @@ describe('CombatSystem', () => {
 
   it('fires function cannon and creates projectile', () => {
     const { game, system } = setup()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    game.levelContext = fakeLevelContext() as any
     const tower = createMockTower({
       type: TowerType.FUNCTION_CANNON,
       cooldownTimer: 0,

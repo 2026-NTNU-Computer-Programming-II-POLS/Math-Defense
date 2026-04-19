@@ -24,7 +24,6 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
     towers: [] as Tower[],
     enemies: [] as Enemy[],
     projectiles: [] as Projectile[],
-    pathFunction: (x: number) => x,
     levelContext: null,
     time: 0,
     changeGold(this: Game, amount: number) {
@@ -66,7 +65,6 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     color: '#b84040',
     active: true,
     alive: true,
-    pathFn: (x: number) => x,
     _pathX: 10,
     _targetX: 0,
     _direction: -1 as const,

@@ -13,12 +13,10 @@ import { EconomySystem } from '@/systems/EconomySystem'
 import { EnemyRenderer } from '@/renderers/EnemyRenderer'
 import { TowerRenderer } from '@/renderers/TowerRenderer'
 import { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
-import { generatePath } from '@/math/PathEvaluator'
 import { initWasm } from '@/math/WasmBridge'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useSessionSync } from '@/composables/useSessionSync'
-import { SEGMENTED_PATHS_ENABLED } from '@/config/feature-flags'
 import { createLevelContext } from '@/engine/level-context'
 import { projectPathPanel } from '@/engine/projections/project-path-panel'
 import { LEVELS } from '@/data/level-defs'
@@ -68,19 +66,9 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     g.addSystem('towerRenderer', new TowerRenderer())
     g.addSystem('projectileRenderer', new ProjectileRenderer())
 
-    // Generate a random path on each level start and sync it to the store.
-    // The expression string is presentation-only and lives on gameStore, not GameState.
-    unsubs.push(g.eventBus.on(Events.LEVEL_START, (levelNum) => {
-      const path = generatePath(levelNum as number)
-      g.pathFunction = path.fn
-      gameStore.pathExpression = path.expr
-    }))
-
-    // Piecewise-paths LevelContext wiring (construction plan Phase 3 + 5).
-    // Flag-gated until Phase 6 flips `SEGMENTED_PATHS_ENABLED`; path
-    // construction, validation, classification, and store projection
-    // live behind `createLevelContext` + `projectPathPanel` so this body
-    // stays a thin orchestrator.
+    // Piecewise-paths LevelContext wiring. Path construction, validation,
+    // classification, and store projection live behind `createLevelContext`
+    // + `projectPathPanel` so this body stays a thin orchestrator.
     let panelUnsubscribe: (() => void) | null = null
     unsubs.push(g.eventBus.on(Events.LEVEL_START, (levelNum) => {
       panelUnsubscribe?.()
@@ -88,7 +76,6 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
       g.levelContext?.dispose()
       g.levelContext = null
       gameStore.clearPathPanel()
-      if (!SEGMENTED_PATHS_ENABLED) return
       const level = LEVELS.find((l) => l.id === (levelNum as number))
       if (!level) return
       g.levelContext = createLevelContext(level, g.eventBus)

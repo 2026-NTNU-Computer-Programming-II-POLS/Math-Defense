@@ -185,7 +185,8 @@ export class CombatSystem {
 
   /** Function Cannon: fires projectiles toward intersections of y = mx+b (or ax²+bx+c) with the enemy path */
   private _functionCannonAttack(tower: Tower, game: Game): void {
-    if (!game.pathFunction) return
+    if (!game.levelContext) return
+    const path = game.levelContext.path
 
     const isUpgraded = tower.level >= 2
 
@@ -194,7 +195,13 @@ export class CombatSystem {
       ? (x: number) => getParam(tower, 'a', 0) * x * x + getParam(tower, 'b_coeff', 1) * x + getParam(tower, 'c', 0)
       : (x: number) => getParam(tower, 'm', 1) * x + getParam(tower, 'b', 0)
 
-    const intersections = findIntersections(shotFn, game.pathFunction, -3, 25)
+    // `evaluateAt` throws outside the path; `findIntersections` sweeps a wide
+    // range (−3..25) and tolerates NaN samples — return NaN outside to skip.
+    const pathFn = (x: number) => {
+      const seg = path.findSegmentAt(x)
+      return seg ? seg.evaluate(x) : NaN
+    }
+    const intersections = findIntersections(shotFn, pathFn, -3, 25)
     for (const xi of intersections) {
       const yi = shotFn(xi)
       const dx = xi - tower.x
@@ -323,7 +330,7 @@ export class CombatSystem {
       // Split slime: delegate to SplitSlimePolicy
       if (shouldSplit(enemy)) {
         spawnChildren(enemy, {
-          pathFunction: game.pathFunction,
+          path: game.levelContext?.path ?? null,
           onChildCreated: (child) => {
             game.enemies.push(child)
             game.eventBus.emit(Events.ENEMY_SPAWNED, child)

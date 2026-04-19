@@ -100,7 +100,7 @@ const effectStrategies: Record<string, EffectFn> = {
 
         if (shouldSplit(enemy)) {
           spawnChildren(enemy, {
-            pathFunction: g.pathFunction,
+            path: g.levelContext?.path ?? null,
             onChildCreated: (child) => {
               g.enemies.push(child)
               g.eventBus.emit(Events.ENEMY_SPAWNED, child)
