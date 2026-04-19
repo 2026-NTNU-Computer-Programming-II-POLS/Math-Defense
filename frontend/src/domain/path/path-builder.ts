@@ -42,6 +42,7 @@ function buildSegmentRuntime(def: PathSegmentDef): PathSegmentRuntime {
     id: def.id,
     kind: def.kind,
     xRange: def.xRange,
+    params: def.params,
     evaluate,
     expr: def.expr ?? defaultExpr(def.params),
     label: def.label ?? def.id,

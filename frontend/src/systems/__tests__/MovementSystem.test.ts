@@ -1,9 +1,22 @@
+/**
+ * Legacy (flag-off) MovementSystem tests.
+ *
+ * The new piecewise-paths pipeline is exercised in
+ * `MovementSystem.segmented.test.ts`, where the feature flag is mocked to
+ * `true`. Keeping the two suites in separate files lets us hoist a
+ * file-scoped `vi.mock('@/config/feature-flags')` in the segmented file
+ * without affecting the defaults here.
+ */
 import { describe, it, expect } from 'vitest'
 import { MovementSystem } from '../MovementSystem'
 import { GamePhase, Events } from '@/data/constants'
+import { SEGMENTED_PATHS_ENABLED } from '@/config/feature-flags'
 import { createMockGame, createMockEnemy } from './helpers'
 
-describe('MovementSystem', () => {
+// Legacy-branch coverage only makes sense while the flag defaults to off.
+// When Phase 6 flips the default, the legacy branch (and these tests)
+// are removed in Phase 7. Skip defensively rather than silently pass.
+describe.skipIf(SEGMENTED_PATHS_ENABLED)('MovementSystem (legacy pipeline)', () => {
   function setup() {
     const game = createMockGame({ phase: GamePhase.WAVE })
     game.phase.forceTransition(GamePhase.WAVE)

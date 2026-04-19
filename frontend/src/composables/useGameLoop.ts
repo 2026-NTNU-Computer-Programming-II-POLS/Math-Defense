@@ -2,7 +2,7 @@
  * useGameLoop — game loop lifecycle management composable
  * Starts/stops the game engine in Vue component's onMounted/onUnmounted hooks.
  */
-import { onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import { Game } from '@/engine/Game'
 import { BuffSystem } from '@/systems/BuffSystem'
 import { WaveSystem } from '@/systems/WaveSystem'
@@ -18,6 +18,10 @@ import { initWasm } from '@/math/WasmBridge'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useSessionSync } from '@/composables/useSessionSync'
+import { SEGMENTED_PATHS_ENABLED } from '@/config/feature-flags'
+import { createLevelContext } from '@/engine/level-context'
+import { projectPathPanel } from '@/engine/projections/project-path-panel'
+import { LEVELS } from '@/data/level-defs'
 import { Events, type TowerType } from '@/data/constants'
 import type { Tower } from '@/entities/types'
 
@@ -51,7 +55,12 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     placement.clearSelectedTowerType = () => { uiStore.clearSelectedTower() }
     g.addSystem('placement', placement)
     g.addSystem('combat', new CombatSystem())
-    g.addSystem('movement', new MovementSystem())
+    // Inject the lead-enemy-x sink so MovementSystem never imports Pinia
+    // directly (P5-T9 / SoC matrix §2). Callback is a no-op when the flag
+    // is off since MovementSystem only invokes it on the segmented branch.
+    const movement = new MovementSystem()
+    movement.setLeadEnemyX = (x: number) => { gameStore.setLeadEnemyX(x) }
+    g.addSystem('movement', movement)
     g.addSystem('wave', new WaveSystem())
     g.addSystem('buff', new BuffSystem())
     g.addSystem('economy', new EconomySystem())
@@ -66,6 +75,43 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
       g.pathFunction = path.fn
       gameStore.pathExpression = path.expr
     }))
+
+    // Piecewise-paths LevelContext wiring (construction plan Phase 3 + 5).
+    // Flag-gated until Phase 6 flips `SEGMENTED_PATHS_ENABLED`; path
+    // construction, validation, classification, and store projection
+    // live behind `createLevelContext` + `projectPathPanel` so this body
+    // stays a thin orchestrator.
+    let panelUnsubscribe: (() => void) | null = null
+    unsubs.push(g.eventBus.on(Events.LEVEL_START, (levelNum) => {
+      panelUnsubscribe?.()
+      panelUnsubscribe = null
+      g.levelContext?.dispose()
+      g.levelContext = null
+      gameStore.clearPathPanel()
+      if (!SEGMENTED_PATHS_ENABLED) return
+      const level = LEVELS.find((l) => l.id === (levelNum as number))
+      if (!level) return
+      g.levelContext = createLevelContext(level, g.eventBus)
+      panelUnsubscribe = projectPathPanel(g.levelContext, g.eventBus, gameStore)
+    }))
+
+    unsubs.push(g.eventBus.on(Events.LEVEL_END, () => {
+      panelUnsubscribe?.()
+      panelUnsubscribe = null
+      g.levelContext?.dispose()
+      g.levelContext = null
+      gameStore.clearPathPanel()
+    }))
+
+    // Mirror `uiStore.hoveredSegmentId` onto `game.hoveredSegmentId`. The
+    // Renderer reads the latter (engine-layer, no Pinia import), and the
+    // Function Panel writes the former — the composable is the one place
+    // that bridges presentation → engine (§2 SoC matrix).
+    unsubs.push(watch(
+      () => uiStore.hoveredSegmentId,
+      (id) => { g.hoveredSegmentId = id },
+      { immediate: true },
+    ))
 
     // Fourier target is a visual cue owned by the UI store — mirror it here
     // rather than keeping a copy on GameState.
@@ -116,3 +162,4 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
 
   return { game, ready }
 }
+

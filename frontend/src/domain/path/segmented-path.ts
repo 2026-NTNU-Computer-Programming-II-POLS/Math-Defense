@@ -6,13 +6,23 @@
  * `buildLevelPath` from a `PathLayout` and is never persisted — closures
  * cannot cross a serialization boundary (see spec §2.3 rule 6).
  */
-import type { PathSegmentKind } from '@/data/path-segment-types'
+import type { PathSegmentKind, PathSegmentParams } from '@/data/path-segment-types'
 
-/** One runtime segment: the declarative data plus a resolved math closure. */
+/**
+ * One runtime segment: the declarative data plus a resolved math closure.
+ *
+ * `params` is forwarded verbatim from the source `PathSegmentDef` so that
+ * per-kind movement strategies (see `domain/movement/`) can read kind-specific
+ * configuration (e.g. the vertical strategy needs `yStart`, `yEnd`,
+ * `durationSec`) without re-resolving the declarative layer. `evaluate`
+ * remains the single x-indexed closure — strategies read `params` for
+ * non-`x` kinematics only.
+ */
 export interface PathSegmentRuntime {
   readonly id: string
   readonly kind: PathSegmentKind
   readonly xRange: readonly [number, number]
+  readonly params: PathSegmentParams
   readonly evaluate: (x: number) => number
   readonly expr: string
   readonly label: string

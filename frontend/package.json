@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "arch-check": "tsx scripts/arch-check.ts",
     "check-debt-ledger": "tsx scripts/check-debt-ledger.ts",
-    "ci": "npm run arch-check && npm run check-debt-ledger && vitest run"
+    "validate-levels": "tsx --tsconfig ./tsconfig.app.json scripts/validate-levels.ts",
+    "lint-chinese-comments": "tsx scripts/lint-chinese-comments.ts",
+    "ci": "npm run arch-check && npm run check-debt-ledger && npm run validate-levels && npm run lint-chinese-comments && vitest run"
   },
   "dependencies": {
     "pinia": "^3.0.4",

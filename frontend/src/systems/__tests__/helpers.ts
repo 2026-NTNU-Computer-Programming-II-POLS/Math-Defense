@@ -25,6 +25,7 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
     enemies: [] as Enemy[],
     projectiles: [] as Projectile[],
     pathFunction: (x: number) => x,
+    levelContext: null,
     time: 0,
     changeGold(this: Game, amount: number) {
       this.state.gold = Math.max(0, this.state.gold + amount)

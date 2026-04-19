@@ -67,5 +67,13 @@ jobs:
       # and the build step is only used here to drive vue-tsc type-checking.
       - name: Type-check
         run: npx vue-tsc -b
+      - name: Arch check
+        run: npm run arch-check
+      - name: Debt ledger
+        run: npm run check-debt-ledger
+      - name: Validate levels
+        run: npm run validate-levels
+      - name: Lint non-ASCII comments
+        run: npm run lint-chinese-comments
       - name: Unit tests
-        run: npm test
+        run: npx vitest run

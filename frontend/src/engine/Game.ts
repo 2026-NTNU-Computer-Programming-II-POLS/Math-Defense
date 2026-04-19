@@ -14,6 +14,10 @@ import {
 } from '@/data/constants'
 import type { Tower, Enemy, Projectile } from '@/entities/types'
 import type { BuffDef } from '@/data/buff-defs'
+import type { SegmentedPath } from '@/domain/path/segmented-path'
+import type { PathProgressTracker, SegmentChangedPayload } from '@/domain/path/path-progress-tracker'
+import type { PlacementRejectionReason } from '@/domain/level/placement-policy'
+import type { LevelContext } from './level-context'
 
 // ── Type-safe event map ──
 
@@ -65,9 +69,22 @@ export interface GameEvents {
   [Events.SCORE_CHANGED]:        number
   [Events.CANVAS_CLICK]:         CoordPayload
   [Events.CANVAS_HOVER]:         CoordPayload
+  [Events.SEGMENT_CHANGED]:      SegmentChangedPayload
+  [Events.PLACEMENT_REJECTED]:   { gx: number; gy: number; reason: PlacementRejectionReason }
 }
 
 export type GameEventBus = EventBus<GameEvents>
+
+/**
+ * Narrow view of the per-level runtime that `MovementSystem` needs.
+ * Phase 3's `LevelContext` supersets this; typed here as its own name so
+ * the Phase-2 surface stays minimal and the Phase-3 widening is a single-
+ * line replacement (see P3-T7 in the Piecewise Paths construction plan).
+ */
+export interface MovementLevelContext {
+  readonly path: SegmentedPath
+  readonly tracker: PathProgressTracker
+}
 
 // ── System interface ──
 
@@ -95,6 +112,26 @@ export class Game {
 
   // Current path function
   pathFunction: ((x: number) => number) | null = null
+
+  /**
+   * Per-level piecewise-path runtime holder. Phase 3 widens this to the
+   * full `LevelContext` (`path` + `tracker` + `layout` + `dispose`); Phase 2
+   * only needed `path` + `tracker`, and MovementSystem continues to read
+   * through the narrower `MovementLevelContext` view since a full
+   * `LevelContext` is a structural supertype of it. `null` whenever a level
+   * is not loaded or when `SEGMENTED_PATHS_ENABLED` is off — MovementSystem
+   * and TowerPlacementSystem fall back to the legacy pipeline in that case.
+   */
+  levelContext: LevelContext | null = null
+
+  /**
+   * Id of the path segment the HUD Function Panel is currently hovering
+   * over. The Renderer reads this in `drawSegmentBoundaries` to tint the
+   * matching `xRange`; Phase 5's Function Panel writes it (indirectly,
+   * through the UI store / a composable sync). Kept on `Game` to avoid an
+   * engine → presentation import, per the SoC matrix in §2 of the plan.
+   */
+  hoveredSegmentId: string | null = null
 
   // Game time in seconds (used for animation)
   time = 0
@@ -179,6 +216,7 @@ export class Game {
     this.enemies = []
     this.projectiles = []
     this.pathFunction = null
+    this.levelContext = null
     // Reset to MENU first so terminal phases (GAME_OVER) and any in-progress phase
     // can legally transition into BUILD on retry/replay.
     this.phase.forceTransition(GamePhase.MENU)
@@ -227,6 +265,10 @@ export class Game {
       system.destroy?.()
     }
     this._systems.clear()
+    // Detach the per-level tracker before clearing the event bus so the
+    // tracker's sink doesn't fire a final emission into a cleared bus.
+    this.levelContext?.dispose()
+    this.levelContext = null
     this.input.destroy()
     this.eventBus.clear()
   }
@@ -260,8 +302,16 @@ export class Game {
   private _render(): void {
     const { renderer } = this
     renderer.clear()
-    renderer.drawGrid()
+    // Pass the layout so the renderer paints each cell by its classified
+    // TileClass instead of the legacy stone checkerboard. When no level is
+    // active (MENU, or flag-off legacy path) drawGrid falls back to the
+    // checkerboard itself — we do not branch on phase here.
+    renderer.drawGrid(this.levelContext?.layout ?? null)
     renderer.drawOrigin(this.time)
+
+    if (this.levelContext && this.state.phase !== GamePhase.MENU) {
+      renderer.drawSegmentBoundaries(this.levelContext.path, this.hoveredSegmentId)
+    }
 
     if (this.pathFunction && this.state.phase !== GamePhase.MENU) {
       renderer.drawFunction(

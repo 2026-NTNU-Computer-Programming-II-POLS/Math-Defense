@@ -15,4 +15,4 @@
  * Do not gate production-critical code paths on this flag outside the
  * migration window.
  */
-export const SEGMENTED_PATHS_ENABLED: boolean = false
+export const SEGMENTED_PATHS_ENABLED: boolean = true

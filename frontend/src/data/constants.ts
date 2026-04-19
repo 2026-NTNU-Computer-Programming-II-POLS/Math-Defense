@@ -96,6 +96,10 @@ export const Events = Object.freeze({
 
   CANVAS_CLICK:         'canvasClick',
   CANVAS_HOVER:         'canvasHover',
+
+  // Piecewise-paths migration (construction plan Phase 3)
+  SEGMENT_CHANGED:      'segmentChanged',
+  PLACEMENT_REJECTED:   'placementRejected',
 } as const)
 
 // ── Color palette ──

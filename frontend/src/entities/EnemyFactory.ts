@@ -11,13 +11,12 @@ let _nextId = 0
 export function createEnemy(
   type: EnemyType,
   pathFn: (x: number) => number,
-  overrides: Partial<{ startX: number; targetX: number }> = {},
+  startX = 20,
+  targetX = 0,
 ): Enemy {
   const def = ENEMY_DEFS[type]
   if (!def) throw new Error(`Unknown enemy type: ${type}`)
 
-  const startX = overrides.startX ?? 20
-  const targetX = overrides.targetX ?? 0
   const startY = pathFn(startX)
 
   return {

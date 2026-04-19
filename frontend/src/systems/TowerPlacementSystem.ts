@@ -2,9 +2,14 @@
  * TowerPlacementSystem — tower placement (Build Phase) and preview
  */
 import { Events, GamePhase, TowerType } from '@/data/constants'
+import { SEGMENTED_PATHS_ENABLED } from '@/config/feature-flags'
 import { createTower } from '@/entities/TowerFactory'
 import { degToRad, findIntersections, gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import type { Game } from '@/engine/Game'
+import {
+  createPlacementPolicy,
+  type PlacementPolicy,
+} from '@/domain/level/placement-policy'
 import { getParam } from '@/entities/types'
 import type { Tower, TowerPreview } from '@/entities/types'
 
@@ -24,7 +29,24 @@ export class TowerPlacementSystem {
 
   /** The placed tower currently under the mouse cursor (used for preview) */
   private _hoveredTower: Tower | null = null
+  /**
+   * Grid cell currently under the cursor. Rendered as a legality-coloured
+   * placement cursor when the flag is on, a level is active, and a tower
+   * type is selected. The cursor reads its class from
+   * `LevelLayoutService.classify` — no rule predicates live in this file.
+   */
+  private _hoveredCell: { gx: number; gy: number } | null = null
   private _unsubs: (() => void)[] = []
+  private readonly _policy: PlacementPolicy
+
+  /**
+   * @param policy Rule policy used when `SEGMENTED_PATHS_ENABLED` is on and
+   * a `levelContext` is present. Defaulted for ergonomics; tests inject a
+   * fake to assert delegation without pulling in the real layout service.
+   */
+  constructor(policy: PlacementPolicy = createPlacementPolicy()) {
+    this._policy = policy
+  }
 
   init(game: Game): void {
     // Clear any prior subscriptions so HMR / re-init doesn't double-subscribe.
@@ -41,6 +63,7 @@ export class TowerPlacementSystem {
           // flash through on the next BUILD frame before the next hover
           // event arrives. Clear it now so BUILD always starts clean.
           this._hoveredTower = null
+          this._hoveredCell = null
           return
         }
         const gx = Math.round(gp.x)
@@ -48,13 +71,17 @@ export class TowerPlacementSystem {
         this._hoveredTower = game.towers.find(
           (t) => Math.round(t.x) === gx && Math.round(t.y) === gy,
         ) ?? null
+        this._hoveredCell = { gx, gy }
       }),
 
       // Defensive clear on *any* phase exit: a player who stops hovering on
       // the last BUILD frame otherwise keeps their preview across WAVE and
       // back into the next BUILD.
       game.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
-        if (to !== GamePhase.BUILD) this._hoveredTower = null
+        if (to !== GamePhase.BUILD) {
+          this._hoveredTower = null
+          this._hoveredCell = null
+        }
       }),
     )
   }
@@ -80,6 +107,28 @@ export class TowerPlacementSystem {
 
     const tower = createTower(selectedType, gx, gy)
     const cost = game.state.freeTowerNext ? 0 : tower.cost
+
+    // Flag-on: delegate rule predicates to PlacementPolicy. All rule
+    // arithmetic lives inside the policy; this branch contains no
+    // buildable / occupied / gold checks of its own. Tracked as debt and
+    // collapsed into the unconditional path in Phase 7.
+    if (SEGMENTED_PATHS_ENABLED && game.levelContext) {
+      const decision = this._policy.canPlace(gx, gy, {
+        layout: game.levelContext.layout,
+        isOccupied: (ox, oy) =>
+          game.towers.some((t) => Math.round(t.x) === ox && Math.round(t.y) === oy),
+        gold: game.state.gold,
+        cost,
+      })
+      if (!decision.ok) {
+        game.eventBus.emit(Events.PLACEMENT_REJECTED, { gx, gy, reason: decision.reason })
+        return
+      }
+      this._commitPlacement(tower, cost, game)
+      return
+    }
+
+    // Legacy branch — removed in Phase 7 together with the feature flag.
     if (game.state.gold < cost) return
 
     const occupied = game.towers.some(
@@ -87,6 +136,10 @@ export class TowerPlacementSystem {
     )
     if (occupied) return
 
+    this._commitPlacement(tower, cost, game)
+  }
+
+  private _commitPlacement(tower: Tower, cost: number, game: Game): void {
     game.towers.push(tower)
     game.changeGold(-cost)
     if (game.state.freeTowerNext) game.state.freeTowerNext = false
@@ -101,6 +154,20 @@ export class TowerPlacementSystem {
     if (game.state.phase !== GamePhase.BUILD) return
     if (this._hoveredTower) {
       this._drawPreview(renderer, this._hoveredTower, game)
+      return
+    }
+    // Placement-cursor legality cue. Uses LevelLayoutService as the single
+    // classifier; no rule predicates inline. Suppressed on the legacy path
+    // (flag off / no levelContext) so main-branch behaviour is unchanged.
+    if (
+      SEGMENTED_PATHS_ENABLED
+      && game.levelContext
+      && this._hoveredCell
+      && this.getSelectedTowerType() !== null
+    ) {
+      const { gx, gy } = this._hoveredCell
+      const cls = game.levelContext.layout.classify(gx, gy)
+      renderer.drawPlacementCursor(gx, gy, cls)
     }
   }
 

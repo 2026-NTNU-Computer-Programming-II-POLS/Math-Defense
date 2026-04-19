@@ -47,6 +47,12 @@ export const useUiStore = defineStore('ui', () => {
   // HUD hint
   const buildHintStep = ref(0)   // 0=select tower  1=click cell  2=set params  3=Cast Spell
 
+  // Piecewise paths Phase 5: Function Panel ↔ Renderer hover sync.
+  // Panel writes via `setHoveredSegmentId`; `useGameLoop` mirrors the
+  // value onto `game.hoveredSegmentId` so the Renderer (engine layer)
+  // reads it without pulling in Pinia.
+  const hoveredSegmentId = ref<string | null>(null)
+
   function showModal(
     title: string,
     message: string,
@@ -132,6 +138,10 @@ export const useUiStore = defineStore('ui', () => {
     buildHintStep.value = step
   }
 
+  function setHoveredSegmentId(id: string | null): void {
+    hoveredSegmentId.value = id
+  }
+
   return {
     selectedTowerType,
     buildPanelVisible, buildPanelTowerId,
@@ -140,8 +150,10 @@ export const useUiStore = defineStore('ui', () => {
     modalVisible, modalTitle, modalMessage, modalCallback,
     tutorialVisible, tutorialStep,
     buildHintStep,
+    hoveredSegmentId,
     showModal, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
     setBossShieldTarget, setBuildHintStep,
+    setHoveredSegmentId,
   }
 })

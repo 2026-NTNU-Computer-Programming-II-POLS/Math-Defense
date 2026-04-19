@@ -1,6 +1,8 @@
 /**
  * WaveSystem — wave management (TypeScript)
- * Enemies are described as pure data (type + overrides); the EnemyFactory handles instantiation.
+ * Enemies are described as pure `{ type }` data; EnemyFactory handles
+ * instantiation. Per-enemy start/target x comes from defaults today; a
+ * future "spawn-at-segment" hook plugs in here without touching callers.
  */
 import { Events, GamePhase } from '@/data/constants'
 import { LEVELS } from '@/data/level-defs'
@@ -73,7 +75,7 @@ export class WaveSystem {
       console.warn('[WaveSystem] spawn skipped: pathFunction is null', { type: config.type })
       return
     }
-    const enemy = createEnemy(config.type, game.pathFunction, config.overrides)
+    const enemy = createEnemy(config.type, game.pathFunction)
     // curse: enemy speed-up is read by MovementSystem from game.state.enemySpeedMultiplier — no injection needed here
     game.enemies.push(enemy)
     game.eventBus.emit(Events.ENEMY_SPAWNED, enemy)

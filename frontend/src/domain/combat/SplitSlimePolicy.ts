@@ -48,10 +48,12 @@ export function spawnChildren(
     const baseX = spawnOffset > 0
       ? parent.x - parent._direction * spawnOffset
       : parent.x
-    const child = createEnemy(EnemyType.BASIC_SLIME, context.pathFunction, {
-      startX: baseX + (i === 0 ? -0.3 : 0.3),
-      targetX: parent._targetX,
-    })
+    const child = createEnemy(
+      EnemyType.BASIC_SLIME,
+      context.pathFunction,
+      baseX + (i === 0 ? -0.3 : 0.3),
+      parent._targetX,
+    )
     child.hp = Math.round(parent.maxHp * 0.4)
     child.maxHp = child.hp
     child.size = Math.round(parent.size * 0.7)

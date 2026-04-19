@@ -119,6 +119,16 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   CANVAS_HOVER: [
     { module: 'systems/TowerPlacementSystem', handler: 'anonymous', purpose: 'Update placement preview' },
   ],
+
+  // ── Piecewise paths (construction plan Phase 3) ──
+  // SEGMENT_CHANGED: emitted by PathProgressTracker via LevelContext's sink.
+  // Presentation-layer projection `projectPathPanel` (added Phase 5) will
+  // subscribe to keep `gameStore.pathPanel.currentSegmentId` in sync.
+  SEGMENT_CHANGED:    [],
+  // PLACEMENT_REJECTED: emitted by TowerPlacementSystem when PlacementPolicy
+  // denies a click. Dev-only console warning lives in useGameLoop; the
+  // user-facing UI feedback hookup lands alongside the Function Panel.
+  PLACEMENT_REJECTED: [],
 })
 
 /**

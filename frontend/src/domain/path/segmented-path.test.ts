@@ -11,6 +11,7 @@ function stub(
     id,
     kind: 'horizontal',
     xRange,
+    params: { kind: 'horizontal', y: 0 },
     evaluate,
     expr: id,
     label: id,

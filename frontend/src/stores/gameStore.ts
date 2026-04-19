@@ -3,7 +3,7 @@
  * Bridges the engine EventBus → Vue reactivity so Vue components can read game state.
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, reactive, shallowRef, computed } from 'vue'
 // buffCards intentionally uses `ref` (not shallowRef) so future in-place
 // mutations (e.g. `buffCards.value[0].probability = 0.7`) still trigger UI
 // updates. The performance cost is negligible for a 3-element array.
@@ -11,6 +11,17 @@ import { GamePhase } from '@/data/constants'
 import type { Game } from '@/engine/Game'
 import { Events } from '@/data/constants'
 import type { BuffDef } from '@/data/buff-defs'
+// `PathSegmentView` is authored in the engine projection (the producer)
+// and re-exported here so components that only know about the store can
+// pull the type without reaching into `@/engine/`.
+import type { PathSegmentView } from '@/engine/projections/project-path-panel'
+export type { PathSegmentView } from '@/engine/projections/project-path-panel'
+
+export interface PathPanelState {
+  readonly segments: ReadonlyArray<PathSegmentView>
+  readonly currentSegmentId: string | null
+  readonly leadEnemyX: number
+}
 
 export const useGameStore = defineStore('game', () => {
   // ── State (mirrored from Game.state) ──
@@ -27,6 +38,40 @@ export const useGameStore = defineStore('game', () => {
   // writes it on LEVEL_START, and it does not round-trip through GameState.
   const pathExpression = ref('')
   const buffCards = ref<(BuffDef & { isCurse: boolean })[]>([])
+
+  // Piecewise paths (spec §5.5): segment list is stored in a `shallowRef`
+  // so assigning a new array triggers reactivity without Vue recursively
+  // proxying every `PathSegmentView` on every projection pass (§13 risk
+  // row). `currentSegmentId` and `leadEnemyX` are primitive-valued refs
+  // — plain `ref` is correct for those.
+  const _pathPanelSegments = shallowRef<ReadonlyArray<PathSegmentView>>([])
+  const _pathPanelCurrentId = ref<string | null>(null)
+  const _pathPanelLeadX = ref(0)
+
+  // Expose the grouped shape components read as `gameStore.pathPanel.*`.
+  // Getters forward to the underlying refs so the outer object is a stable
+  // reference; reactive() wraps the getter descriptors so reads are
+  // dependency-tracked without copying values.
+  const pathPanel = reactive<PathPanelState>({
+    get segments() { return _pathPanelSegments.value },
+    get currentSegmentId() { return _pathPanelCurrentId.value },
+    get leadEnemyX() { return _pathPanelLeadX.value },
+  })
+
+  function setPathPanelSegments(views: ReadonlyArray<PathSegmentView>): void {
+    _pathPanelSegments.value = views
+  }
+  function setCurrentSegment(id: string | null): void {
+    _pathPanelCurrentId.value = id
+  }
+  function setLeadEnemyX(x: number): void {
+    _pathPanelLeadX.value = x
+  }
+  function clearPathPanel(): void {
+    _pathPanelSegments.value = []
+    _pathPanelCurrentId.value = null
+    _pathPanelLeadX.value = 0
+  }
 
   // ── Computed ──
   const isBuilding = computed(() => phase.value === GamePhase.BUILD)
@@ -109,6 +154,8 @@ export const useGameStore = defineStore('game', () => {
   return {
     phase, level, wave, totalWaves,
     gold, hp, maxHp, score, kills, pathExpression, buffCards,
+    pathPanel,
+    setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, hpPercent,
     bindEngine, unbindEngine, syncFromEngine, getEngine,
   }
