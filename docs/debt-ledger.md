@@ -13,6 +13,7 @@
 | Item | Introduced | Scheduled removal | Owner | Phase that closes |
 |---|---|---|---|---|
 | `SEGMENTED_PATHS_ENABLED` flag | Phase 1 (Piecewise Paths) | ship-date + 14d | Feature owner | Phase 7 |
+| `arch-check` allowlist: HUD.vue → @/domain/formatters | Phase 1 (Piecewise Paths) | Phase 5 | Feature owner | Phase 5 |
 
 ## Retired entries
 
