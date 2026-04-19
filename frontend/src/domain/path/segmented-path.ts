@@ -37,16 +37,22 @@ export interface SegmentedPath {
  *
  * Boundary semantics (spec §14.1): when `x` sits on an interior boundary
  * shared by two adjacent segments, `findSegmentAt` returns the right-hand
- * one. Implementation: scan segments right-to-left and return the first
- * whose inclusive `xRange` contains `x`.
+ * (higher-x) one. Implementation: scan segments right-to-left and return
+ * the first whose inclusive `xRange` contains `x`.
  *
- * `startX` and `targetX` are taken from the outer edges of the first and
- * last segments' `xRange`s. The path runs from `startX` (rightmost: enemy
- * spawn) toward `targetX` (leftmost: origin) in the game's coordinate
- * system, but this module makes no direction assumption: `startX` is
- * whatever the first segment's `xRange[0]` is, and `targetX` is the last
- * segment's `xRange[1]`. Authors order segments in traversal order; the
- * level definition owns direction.
+ * `startX` and `targetX` match the game's existing convention
+ * (`EnemyFactory`: `startX = 20`, `targetX = 0`):
+ *   - `startX` is the enemy **spawn** x — the rightmost edge of the path.
+ *   - `targetX` is the enemy **goal** x — the leftmost edge of the path.
+ *
+ * Segments are authored in ascending x order (spec §10.4: Level 1 runs
+ * `[-3, 8]` → `[8, 17]` → `[17, 25]`), so:
+ *   - `startX = segments[last].xRange[1]`
+ *   - `targetX = segments[0].xRange[0]`
+ *
+ * The enemy travels from `startX` toward `targetX`, which in this game
+ * means decreasing x. Reversing game direction would require revisiting
+ * these assignments (and `findSegmentAt`'s right-hand convention).
  */
 export function createSegmentedPath(
   runtimes: ReadonlyArray<PathSegmentRuntime>,
@@ -55,8 +61,8 @@ export function createSegmentedPath(
     throw new Error('createSegmentedPath requires at least one segment.')
   }
   const segments = Object.freeze(runtimes.slice()) as ReadonlyArray<PathSegmentRuntime>
-  const startX = segments[0]!.xRange[0]
-  const targetX = segments[segments.length - 1]!.xRange[1]
+  const startX = segments[segments.length - 1]!.xRange[1]
+  const targetX = segments[0]!.xRange[0]
 
   function findSegmentAt(x: number): PathSegmentRuntime | null {
     for (let i = segments.length - 1; i >= 0; i--) {

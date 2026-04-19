@@ -30,6 +30,7 @@ export interface LevelPathSource {
   readonly path: PathLayout
 }
 
+/** Turn a level's `PathLayout` into an immutable runtime `SegmentedPath`. */
 export function buildLevelPath(level: LevelPathSource): SegmentedPath {
   const runtimes = level.path.segments.map(buildSegmentRuntime)
   return createSegmentedPath(runtimes)

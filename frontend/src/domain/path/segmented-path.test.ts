@@ -22,13 +22,16 @@ describe('createSegmentedPath', () => {
     expect(() => createSegmentedPath([])).toThrow()
   })
 
-  it('exposes startX/targetX from the outer xRange of the first/last segment', () => {
+  it('exposes startX (spawn=rightmost) and targetX (goal=leftmost) per game convention', () => {
     const path = createSegmentedPath([
       stub('a', [-3, 5]),
       stub('b', [5, 12]),
     ])
-    expect(path.startX).toBe(-3)
-    expect(path.targetX).toBe(12)
+    // Segments are authored in ascending x order; startX is the spawn
+    // side (highest x = last.xRange[1]) and targetX is the goal side
+    // (lowest x = first.xRange[0]).
+    expect(path.startX).toBe(12)
+    expect(path.targetX).toBe(-3)
   })
 
   it('findSegmentAt returns the enclosing segment for in-range x', () => {

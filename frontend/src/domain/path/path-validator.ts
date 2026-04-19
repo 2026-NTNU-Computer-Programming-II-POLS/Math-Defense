@@ -57,6 +57,7 @@ const CONTIGUITY_EPS = 1e-9
 /** Grid sample step when searching for out-of-world y values. */
 const SAMPLE_STEP = 1
 
+/** Return every structural error in a level's path and buildable cells. */
 export function validateLevelPath(level: ValidatableLevel): PathValidationError[] {
   const errors: PathValidationError[] = []
   const segments = level.path.segments
@@ -161,7 +162,9 @@ function derivePathCells(segments: ReadonlyArray<PathSegmentDef>): Set<string> {
     }
     const fn = makeNonVerticalEvaluator(s.params)
     const [lo, hi] = s.xRange
-    for (let gx = Math.ceil(lo); gx <= Math.floor(hi); gx += SAMPLE_STEP) {
+    const loGx = Math.max(Math.ceil(lo), GRID_MIN_X)
+    const hiGx = Math.min(Math.floor(hi), GRID_MAX_X - 1)
+    for (let gx = loGx; gx <= hiGx; gx += SAMPLE_STEP) {
       cells.add(cellKey(gx, Math.round(fn(gx))))
     }
   }

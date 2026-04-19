@@ -17,8 +17,10 @@ describe('buildLevelPath', () => {
     for (const x of [0, 1.5, 3, 5]) {
       expect(path.evaluateAt(x)).toBe(7)
     }
-    expect(path.startX).toBe(0)
-    expect(path.targetX).toBe(5)
+    // Spawn side = rightmost x (xRange[1] of last segment); goal side =
+    // leftmost (xRange[0] of first). See createSegmentedPath JSDoc.
+    expect(path.startX).toBe(5)
+    expect(path.targetX).toBe(0)
   })
 
   it('produces a linear segment whose evaluate matches slope*x + intercept', () => {
@@ -70,7 +72,7 @@ describe('buildLevelPath', () => {
     expect(path.segments[0]!.expr).toContain('x = 5')
   })
 
-  it('sets startX/targetX from the outer xRange of first and last segments', () => {
+  it('sets startX to the rightmost edge and targetX to the leftmost across segments', () => {
     const path = buildLevelPath(layout([
       {
         id: 'a', kind: 'linear', xRange: [-3, 2],
@@ -81,8 +83,8 @@ describe('buildLevelPath', () => {
         params: { kind: 'linear', slope: -1, intercept: 4 },
       },
     ]))
-    expect(path.startX).toBe(-3)
-    expect(path.targetX).toBe(10)
+    expect(path.startX).toBe(10)
+    expect(path.targetX).toBe(-3)
     expect(path.segments).toHaveLength(2)
   })
 
