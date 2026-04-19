@@ -34,6 +34,10 @@ export const useGameStore = defineStore('game', () => {
   const maxHp = ref(20)
   const score = ref(0)
   const kills = ref(0)
+  // Live enemy count for the HUD wave-progress indicator (U-4). Maintained
+  // by subscribing to ENEMY_SPAWNED / ENEMY_KILLED / ENEMY_REACHED_ORIGIN /
+  // WAVE_START so we never reach into engine internals from the UI.
+  const enemiesAlive = ref(0)
   const buffCards = ref<(BuffDef & { isCurse: boolean })[]>([])
 
   // Piecewise paths (spec §5.5): segment list is stored in a `shallowRef`
@@ -101,16 +105,27 @@ export const useGameStore = defineStore('game', () => {
       game.eventBus.on(Events.WAVE_START, (w) => {
         wave.value = w
         totalWaves.value = game.state.totalWaves
+        enemiesAlive.value = game.enemies.length
       }),
       // Kill count is owned by EconomySystem (game.state.kills++); the store
       // mirrors it via syncFromEngine so there is a single source of truth.
       // Do NOT increment kills.value here — it would double-count.
-      game.eventBus.on(Events.ENEMY_KILLED, () => { kills.value = game.state.kills }),
+      game.eventBus.on(Events.ENEMY_KILLED, () => {
+        kills.value = game.state.kills
+        enemiesAlive.value = game.enemies.length
+      }),
+      game.eventBus.on(Events.ENEMY_SPAWNED, () => {
+        enemiesAlive.value = game.enemies.length
+      }),
+      game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, () => {
+        enemiesAlive.value = game.enemies.length
+      }),
       game.eventBus.on(Events.LEVEL_START, (l) => {
         level.value = l
         wave.value = 0
         score.value = 0
         kills.value = 0
+        enemiesAlive.value = 0
       }),
       // BuffSystem emits BUFF_CARDS_UPDATED with a freshly built array each
       // draw. Taking the payload directly (rather than reaching into
@@ -146,7 +161,7 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     phase, level, wave, totalWaves,
-    gold, hp, maxHp, score, kills, buffCards,
+    gold, hp, maxHp, score, kills, enemiesAlive, buffCards,
     pathPanel,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, hpPercent,

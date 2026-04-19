@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events, GamePhase } from '@/data/constants'
 
@@ -9,20 +9,78 @@ const cards = computed(() => gameStore.buffCards)
 
 // Guard against rapid double-click: once a card is selected, block further
 // selections until BUFF_RESULT fires (normal path), the buff phase ends
-// (cards cleared / PHASE_CHANGED away), or the component unmounts. No
-// wall-clock failsafe — it would either fire too early (re-enabling clicks
-// on a stale round while the engine is still processing) or too late to
-// matter. The phase watchers below cover every exit route the engine can
-// take, including the "engine dropped BUFF_RESULT" case.
+// (cards cleared / PHASE_CHANGED away), or the component unmounts. A 10s
+// wall-clock failsafe releases the lock if the engine ever drops both the
+// BUFF_RESULT event and the PHASE_CHANGED exit — 10s is long enough that
+// a still-processing engine has comfortably finished, so re-enabling at
+// that point can only un-wedge a genuinely stuck panel.
+const GUARD_FAILSAFE_MS = 10_000
 const selectingCardId = ref<string | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
+let previousFocus: HTMLElement | null = null
 let unsubBuffResult: (() => void) | null = null
 let unsubPhase: (() => void) | null = null
+let guardTimer: number | null = null
 
 function clearGuard(): void {
   selectingCardId.value = null
+  if (guardTimer !== null) {
+    window.clearTimeout(guardTimer)
+    guardTimer = null
+  }
 }
 
-onMounted(() => {
+function armGuardFailsafe(): void {
+  if (guardTimer !== null) window.clearTimeout(guardTimer)
+  guardTimer = window.setTimeout(() => {
+    guardTimer = null
+    if (selectingCardId.value !== null) clearGuard()
+  }, GUARD_FAILSAFE_MS)
+}
+
+function trapFocus(event: KeyboardEvent): void {
+  if (event.key !== 'Tab') return
+  const box = panelRef.value
+  if (!box) return
+  const focusables = box.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )
+  if (focusables.length === 0) return
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (event.shiftKey && active === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  trapFocus(event)
+  onHotkey(event)
+}
+
+function onHotkey(event: KeyboardEvent): void {
+  // 1/2/3 shortcuts — pick the Nth card (A-7). Ignore if user is typing.
+  const target = event.target as HTMLElement | null
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+  const idx = ['1', '2', '3'].indexOf(event.key)
+  if (idx === -1) return
+  const card = cards.value[idx]
+  if (!card) return
+  event.preventDefault()
+  selectCard(card.id)
+}
+
+onMounted(async () => {
+  previousFocus = document.activeElement as HTMLElement | null
+  await nextTick()
+  const first = panelRef.value?.querySelector<HTMLButtonElement>('button:not([disabled])')
+  first?.focus()
+
   const game = gameStore.getEngine()
   if (!game) return
   unsubBuffResult = game.eventBus.on(Events.BUFF_RESULT, () => {
@@ -42,6 +100,12 @@ onUnmounted(() => {
   unsubPhase?.()
   unsubPhase = null
   clearGuard()
+  // Restore pre-panel focus (A-7)
+  const target = previousFocus
+  previousFocus = null
+  if (target && document.contains(target) && typeof target.focus === 'function') {
+    try { target.focus() } catch { /* detached — ignore */ }
+  }
 })
 
 // If the panel closes (e.g. buff phase ends) before BUFF_RESULT fires, reset
@@ -55,6 +119,7 @@ function selectCard(cardId: string): void {
   const game = gameStore.getEngine()
   if (!game) return
   selectingCardId.value = cardId
+  armGuardFailsafe()
   game.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
 }
 
@@ -63,21 +128,34 @@ function skipBuff(): void {
   const game = gameStore.getEngine()
   if (!game) return
   selectingCardId.value = ''
+  armGuardFailsafe()
   game.eventBus.emit(Events.BUFF_CARD_SELECTED, '')
 }
 </script>
 
 <template>
-  <div class="buff-overlay">
-    <div class="buff-panel rune-panel">
+  <div
+    class="buff-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Buff card selection"
+    @keydown="onKeydown"
+  >
+    <div ref="panelRef" class="buff-panel rune-panel" tabindex="-1">
       <h3 class="buff-title">⊕ 機率神殿 — 選擇命運</h3>
 
-      <div class="card-list">
+      <p v-if="cards.length === 0" class="empty-state">
+        No buff cards available this round — skip to continue.
+      </p>
+
+      <div v-else class="card-list">
         <button
-          v-for="card in cards"
+          v-for="(card, i) in cards"
           :key="card.id"
           :class="['buff-card', { curse: card.isCurse }]"
           :disabled="selectingCardId !== null"
+          :aria-label="`Option ${i + 1}: ${card.name}. ${card.description}. ${card.isCurse ? 'Curse' : 'Buff'}. Press ${i + 1} to choose.`"
+          :aria-keyshortcuts="String(i + 1)"
           @click="selectCard(card.id)"
         >
           <div class="card-name" :class="{ 'curse-name': card.isCurse }">
@@ -89,7 +167,7 @@ function skipBuff(): void {
               + {{ (card as { goldReward?: number }).goldReward ?? 0 }} 金
             </span>
             <span v-else class="card-cost">
-              {{ card.cost > 0 ? `⬡ ${card.cost}` : '免費' }}
+              {{ card.cost > 0 ? `⬡ ${card.cost}` : 'Free' }}
             </span>
             <span class="card-prob">
               {{ card.isCurse ? '100%' : `${Math.round(card.probability * 100)}%` }}
@@ -102,7 +180,7 @@ function skipBuff(): void {
         class="btn skip-btn"
         :disabled="selectingCardId !== null"
         @click="skipBuff"
-      >跳過 (Skip)</button>
+      >Skip</button>
     </div>
   </div>
 </template>
@@ -115,7 +193,7 @@ function skipBuff(): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 40;
+  z-index: var(--z-overlay);
 }
 
 .buff-panel {
@@ -155,6 +233,12 @@ function skipBuff(): void {
   background: rgba(212,168,64,0.08);
 }
 
+/* Keyboard focus indicator (A-8) */
+.buff-card:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
 .buff-card.curse {
   border-color: rgba(184,64,64,0.4);
 }
@@ -172,9 +256,11 @@ function skipBuff(): void {
 
 .curse-name { color: var(--enemy-red); }
 
+/* T-2 + T-3: bump size to 12px and lift contrast from #9a8a70 (≈4.2:1) to
+   #c9b895 on the panel background so small body text clears WCAG AA. */
 .card-desc {
-  font-size: 10px;
-  color: #9a8a70;
+  font-size: 12px;
+  color: #c9b895;
   line-height: 1.5;
   flex: 1;
 }
@@ -188,6 +274,14 @@ function skipBuff(): void {
 .card-cost  { font-size: 11px; color: var(--gold-bright); }
 .card-reward { font-size: 11px; color: var(--hp-green); }
 .card-prob  { font-size: 10px; color: var(--axis); }
+
+.empty-state {
+  font-size: 12px;
+  color: var(--axis);
+  text-align: center;
+  letter-spacing: 1px;
+  padding: 12px 0;
+}
 
 .skip-btn {
   align-self: center;

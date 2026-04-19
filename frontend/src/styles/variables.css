@@ -26,4 +26,18 @@
 
   --font-mono:     'Courier New', Courier, monospace;
   --font-main:     var(--font-mono);
+
+  /* Z-index ladder — single source of truth. Higher value = on top.
+     hints      : passive in-canvas helpers (FunctionPanel, BuildHint)
+     chrome     : persistent HUD surfaces (HUD bar, TowerBar)
+     action     : primary action buttons above chrome (Start Wave)
+     floating   : transient per-interaction panels (BuildPanel)
+     overlay    : full-screen dimmers for modal states (Buff, LevelSelect)
+     modal      : the dialog itself, always on top of its overlay (Modal) */
+  --z-hints:        15;
+  --z-chrome:       20;
+  --z-action:       25;
+  --z-floating:     30;
+  --z-overlay:      40;
+  --z-modal:        50;
 }

@@ -76,7 +76,7 @@ onBeforeUnmount(() => {
     >
       <h3 :id="titleId" class="modal-title">{{ uiStore.modalTitle }}</h3>
       <p class="modal-message">{{ uiStore.modalMessage }}</p>
-      <button ref="okBtnRef" class="btn modal-ok" @click="close">確認</button>
+      <button ref="okBtnRef" class="btn modal-ok" @click="close">OK</button>
     </div>
   </div>
 </template>
@@ -89,7 +89,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-modal);
 }
 
 .modal-box {

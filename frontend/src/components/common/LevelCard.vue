@@ -45,7 +45,7 @@ const LEVELS: LevelInfo[] = [
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 40;
+  z-index: var(--z-overlay);
 }
 
 .level-select {

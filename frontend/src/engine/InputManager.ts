@@ -53,9 +53,24 @@ export class InputManager {
     // gameToCanvasX/Y work in CSS pixels. Mouse coordinates must stay in
     // CSS pixels too — multiplying by canvas.width/rect.width scales them
     // into device pixels and misplaces towers/clicks on HiDPI displays.
+    //
+    // The outer shell may apply `transform: scale(S)` for responsive layout
+    // (audit C-5). `getBoundingClientRect` reports the *visual* rect after
+    // that transform, while `clientWidth`/`clientHeight` stay in the canvas's
+    // own CSS pixels (1280×720). Ratio converts scaled-pixel offsets back
+    // into the authored CSS-pixel space the game logic expects.
     const rect = this.canvas.getBoundingClientRect()
-    this.mousePixel.x = e.clientX - rect.left
-    this.mousePixel.y = e.clientY - rect.top
+    // `offsetWidth/Height` are the canvas's own border-box in layout pixels
+    // (immune to transform); `rect.width/height` are the same box after the
+    // ancestor scale. Their ratio IS the outer transform scale, so dividing
+    // the visual offset by it inverts the scale exactly — and at scale=1 the
+    // division is a no-op, matching the pre-C5 behaviour bit-for-bit.
+    const ow = this.canvas.offsetWidth
+    const oh = this.canvas.offsetHeight
+    const scaleX = rect.width === 0 || ow === 0 ? 1 : rect.width / ow
+    const scaleY = rect.height === 0 || oh === 0 ? 1 : rect.height / oh
+    this.mousePixel.x = (e.clientX - rect.left) / scaleX
+    this.mousePixel.y = (e.clientY - rect.top) / scaleY
     const gp = canvasToGame(this.mousePixel.x, this.mousePixel.y)
     this.mouseGame.x = gp.x
     this.mouseGame.y = gp.y

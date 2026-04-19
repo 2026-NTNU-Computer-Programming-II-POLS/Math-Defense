@@ -22,13 +22,34 @@ export class Renderer {
     if (!ctx) throw new Error('Failed to get 2D context')
     this.ctx = ctx
 
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = CANVAS_WIDTH * dpr
-    canvas.height = CANVAS_HEIGHT * dpr
-    canvas.style.width = `${CANVAS_WIDTH}px`
-    canvas.style.height = `${CANVAS_HEIGHT}px`
-    ctx.scale(dpr, dpr)
-    ctx.imageSmoothingEnabled = false
+    this._applyDpr()
+  }
+
+  /** Build the backing buffer at the current devicePixelRatio. */
+  private _applyDpr(): void {
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1
+    this.canvas.width = CANVAS_WIDTH * dpr
+    this.canvas.height = CANVAS_HEIGHT * dpr
+    this.canvas.style.width = `${CANVAS_WIDTH}px`
+    this.canvas.style.height = `${CANVAS_HEIGHT}px`
+    // `setTransform` (rather than a second `scale`) keeps the transform
+    // stack idempotent across repeated calls — consecutive resyncs would
+    // otherwise compound the scale on each monitor hop. Test doubles that
+    // omit `setTransform` fall through to `scale`, which is fine under
+    // construction but inaccurate after a subsequent resync (acceptable for
+    // unit tests — browsers always have setTransform).
+    if (typeof this.ctx.setTransform === 'function') {
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    } else {
+      this.ctx.scale(dpr, dpr)
+    }
+    this.ctx.imageSmoothingEnabled = false
+  }
+
+  /** K-1: rebuild the backing store when DPR changes (monitor switch).
+   * CSS size stays pinned to 1280×720; only the pixel buffer is resized. */
+  resyncDpr(): void {
+    this._applyDpr()
   }
 
   clear(): void {

@@ -12,6 +12,13 @@ export default defineConfig({
     },
   },
   server: {
+    fs: {
+      // @shared resolves to ../shared (the repo-root shared/ directory).
+      // Locally this is under the repo root that Vite auto-allows; inside the
+      // Docker dev container it's mounted at /shared, which lives outside the
+      // /app workspace, so allow it explicitly.
+      allow: [resolve(__dirname, '..')],
+    },
     proxy: {
       '/api': {
         // Override via VITE_API_TARGET when backend isn't on localhost — e.g.

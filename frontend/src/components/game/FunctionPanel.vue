@@ -7,7 +7,7 @@
  * `projectPathPanel` in the engine layer; segment math is prebaked into
  * `PathSegmentView` records so this file never reaches into `SegmentedPath`.
  */
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -24,6 +24,10 @@ const current = computed(() =>
 )
 
 const visible = computed(() => segments.value.length > 0)
+// When BuildPanel is open it docks to the same right rail; collapse the
+// function panel into a single-line strip so the two never fight for the
+// mid-column vertical band (audit C-2).
+const compact = computed(() => uiStore.buildPanelVisible)
 
 const PLOT_W = 200
 const PLOT_H = 120
@@ -138,10 +142,30 @@ function drawPlot(): void {
 // segments populate (panel was hidden via `v-if`), the canvas is only
 // attached after Vue flushes the render, so pre-flush watchers would see
 // a stale null ref.
+//
+// leadX updates can fire more often than frame rate when the store batches
+// store pushes, so coalesce redraws through rAF — at most one repaint per
+// frame regardless of how many ticks land in between.
+let leadRafId: number | null = null
+function scheduleLeadRedraw(): void {
+  if (leadRafId !== null) return
+  leadRafId = requestAnimationFrame(() => {
+    leadRafId = null
+    drawPlot()
+  })
+}
+
 onMounted(drawPlot)
 watch(currentId, () => drawPlot(), { flush: 'post' })
-watch(leadX, () => drawPlot(), { flush: 'post' })
+watch(leadX, () => scheduleLeadRedraw(), { flush: 'post' })
 watch(visible, (v) => { if (v) drawPlot() }, { flush: 'post' })
+
+onBeforeUnmount(() => {
+  if (leadRafId !== null) {
+    cancelAnimationFrame(leadRafId)
+    leadRafId = null
+  }
+})
 
 function segmentStatus(id: string): 'active' | 'past' | 'upcoming' {
   const curId = currentId.value
@@ -168,7 +192,11 @@ function onUnhover(): void {
 </script>
 
 <template>
-  <aside v-if="visible" class="fn-panel" aria-label="Path function panel">
+  <aside
+    v-if="visible"
+    :class="['fn-panel', { 'fn-panel-compact': compact }]"
+    aria-label="Path function panel"
+  >
     <header class="fn-header">
       <span class="fn-title">Function</span>
       <span class="fn-current-label">{{ current?.label ?? '—' }}</span>
@@ -215,7 +243,7 @@ function onUnhover(): void {
   padding: 10px 12px;
   font-family: var(--font-mono, monospace);
   color: #e8dcc8;
-  z-index: 15;
+  z-index: var(--z-hints);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -228,7 +256,7 @@ function onUnhover(): void {
 }
 
 .fn-title {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--axis, #8b7342);
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -247,7 +275,12 @@ function onUnhover(): void {
   font-variant-numeric: tabular-nums;
   color: #4a82c8;
   min-height: 18px;
-  word-break: break-all;
+  /* T-4: `break-all` splits tokens like `sin(` mid-token. A monospace
+     expression reads best as a single line that scrolls on overflow; fall
+     back to word-level breaking for very long identifiers. */
+  overflow-x: auto;
+  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 
 .fn-plot {
@@ -337,10 +370,44 @@ function onUnhover(): void {
   white-space: nowrap;
 }
 
-/* Narrow-viewport collapse (spec §9.4 / P5-T8): on screens under 1200px
-   the panel flattens into a single strip pinned to the top-right of the
-   canvas. CSS-only — no reactive state switch. */
-@media (max-width: 1200px) {
+/* Reactive collapse when BuildPanel is open — shares the narrow-strip
+   presentation below so the two panels never fight for the right rail
+   (audit C-2). */
+.fn-panel-compact {
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  max-width: calc(100% - 32px);
+  top: 52px;
+  padding: 6px 10px;
+  gap: 12px;
+}
+.fn-panel-compact .fn-plot,
+.fn-panel-compact .fn-segments {
+  display: none;
+}
+.fn-panel-compact .fn-expr {
+  min-height: 0;
+}
+
+/* Tablet band (R-2): 600–1200px keeps the vertical layout with plot +
+   segments visible, just narrower so the panel stops fighting the canvas
+   for horizontal space. */
+@media (max-width: 1200px) and (min-width: 601px) {
+  .fn-panel {
+    width: 200px;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .fn-segments {
+    max-height: 110px;
+  }
+}
+
+/* Phone band (R-2, spec §9.4 / P5-T8): below 600px the panel flattens
+   into a single strip pinned to the top of the canvas so it doesn't
+   swallow half the playfield. */
+@media (max-width: 600px) {
   .fn-panel {
     flex-direction: row;
     align-items: center;

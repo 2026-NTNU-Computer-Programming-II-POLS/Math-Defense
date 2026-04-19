@@ -7,6 +7,14 @@
   padding: 0;
 }
 
+/* T-1: anchor browser text-zoom to a known root size so users can scale
+   UI text from the browser. Components still author in px today (a fuller
+   rem migration is tracked separately), but pinning `html` keeps that
+   migration incremental without regressing today's pixel layout. */
+html {
+  font-size: 16px;
+}
+
 html, body, #app {
   width: 100%;
   height: 100%;
@@ -27,7 +35,9 @@ body {
 .btn {
   font-family: var(--font-mono);
   font-size: 12px;
-  padding: 8px 16px;
+  /* ≥44px hit target per WCAG / Apple / Google guidance (A-3) */
+  padding: 12px 20px;
+  min-height: 44px;
   border: 1px solid var(--gold);
   background: transparent;
   color: var(--gold);
@@ -40,6 +50,12 @@ body {
 .btn:hover {
   background: var(--gold);
   color: var(--stone-dark);
+}
+
+/* Visible keyboard focus for all .btn instances */
+.btn:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
 }
 
 .btn:disabled {

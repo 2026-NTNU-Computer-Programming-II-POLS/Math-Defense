@@ -105,15 +105,58 @@ function castSpell(): void {
 function close(): void {
   uiStore.closeBuildPanel()
 }
+
+// U-2: refund a misclicked tower. Removes from game.towers, refunds cost,
+// and asks BuffSystem to drop any active buffs tagged to the id so they
+// can't silently hit a recycled slot. Gated to BUILD so a stale open panel
+// can't be exploited for mid-wave refunds.
+const canRefund = computed(() => gameStore.isBuilding)
+
+function refundTower(): void {
+  if (!canRefund.value) return
+  const game = gameStore.getEngine()
+  const t = tower.value
+  if (!game || !t) return
+  const idx = game.towers.findIndex((x) => x.id === t.id)
+  if (idx < 0) return
+  game.towers.splice(idx, 1)
+  game.changeGold(t.cost)
+  const buff = game.getSystem<{ onTowerRemoved?: (g: typeof game, id: string) => void }>('buff')
+  buff?.onTowerRemoved?.(game, t.id)
+  uiStore.closeBuildPanel()
+}
 </script>
 
 <template>
-  <div v-if="tower && towerDef" class="build-panel rune-panel">
+  <!-- Unknown tower type: surface an explicit error so a legacy/renamed type
+       can't silently swallow the panel on click. -->
+  <div v-if="tower && !towerDef" class="build-panel rune-panel">
+    <header class="panel-header">
+      <span class="panel-title unknown-title">Unknown Tower</span>
+      <button class="close-btn" aria-label="Close panel" @click="close">
+        <span aria-hidden="true">✕</span>
+      </button>
+    </header>
+    <p class="unknown-body">
+      No definition for tower type <code>{{ tower.type }}</code>.
+      This is a bug — refund to remove it.
+    </p>
+    <div class="panel-actions">
+      <button
+        v-if="canRefund"
+        class="btn refund-btn"
+        aria-label="Refund Tower"
+        @click="refundTower"
+      >⟲ Refund</button>
+    </div>
+  </div>
+
+  <div v-else-if="tower && towerDef" class="build-panel rune-panel">
     <header class="panel-header">
       <span class="panel-title" :style="{ color: towerDef.color }">
         {{ towerDef.nameEn }}
       </span>
-      <button class="close-btn" aria-label="關閉面板" @click="close">
+      <button class="close-btn" aria-label="Close panel" @click="close">
         <span aria-hidden="true">✕</span>
       </button>
     </header>
@@ -155,11 +198,21 @@ function close(): void {
         <span class="param-math">{{ field.mathLabel }}</span>
       </label>
     </div>
-    <p v-else class="no-params">此塔無需設定參數</p>
+    <p v-else class="no-params">No parameters required</p>
 
-    <button class="btn cast-btn" aria-label="施放法術 Cast Spell" @click="castSpell">
-      <span aria-hidden="true">✦</span> Cast Spell
-    </button>
+    <div class="panel-actions">
+      <button
+        v-if="canRefund"
+        class="btn refund-btn"
+        aria-label="Refund Tower"
+        @click="refundTower"
+      >
+        ⟲ Refund
+      </button>
+      <button class="btn cast-btn" aria-label="Cast Spell" @click="castSpell">
+        <span aria-hidden="true">✦</span> Cast Spell
+      </button>
+    </div>
   </div>
 </template>
 
@@ -167,12 +220,40 @@ function close(): void {
 .build-panel {
   position: absolute;
   right: 16px;
-  bottom: 64px;
+  bottom: calc(var(--tower-bar-height, 64px) + 12px);
   width: 270px;
-  z-index: 30;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100% - var(--tower-bar-height, 64px) - 96px);
+  overflow-y: auto;
+  z-index: var(--z-floating);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* U-5: placement confirmation cue — pop the panel in so the player sees
+     the state change after a silent click. Respect reduced-motion. */
+  animation: build-panel-pop 0.22s ease-out;
+  transform-origin: bottom right;
+}
+
+@keyframes build-panel-pop {
+  0%   { opacity: 0; transform: scale(0.92) translateY(8px); }
+  60%  { opacity: 1; transform: scale(1.015); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-panel { animation: none; }
+}
+
+/* Narrow viewports (R-1): pin to both edges so the panel never clips
+   off the right side on phones. */
+@media (max-width: 360px) {
+  .build-panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
 }
 
 .panel-header {
@@ -182,6 +263,16 @@ function close(): void {
 }
 
 .panel-title { font-size: 12px; letter-spacing: 2px; }
+.unknown-title { color: var(--hp-red); }
+.unknown-body {
+  font-size: 11px;
+  color: #e8dcc8;
+  line-height: 1.5;
+}
+.unknown-body code {
+  color: var(--hp-red);
+  font-family: var(--font-mono);
+}
 
 .close-btn {
   background: none;
@@ -189,9 +280,21 @@ function close(): void {
   color: var(--axis);
   cursor: pointer;
   font-size: 14px;
+  /* ≥44px hit target for touch (A-3) */
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.math-concept { font-size: 10px; color: var(--axis); letter-spacing: 1px; }
+/* Visible focus indicator for keyboard users (A-2) */
+.close-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.math-concept { font-size: 11px; color: var(--axis); letter-spacing: 1px; }
 
 .param-list { display: flex; flex-direction: column; gap: 8px; }
 
@@ -202,10 +305,21 @@ function close(): void {
   font-size: 11px;
 }
 
-.param-label { flex: 1; color: #e8dcc8; font-size: 10px; }
-.rune-input  { width: 70px; }
+.param-label { flex: 1; color: #e8dcc8; font-size: 11px; }
+/* T-5: width is defined once in global.css (.rune-input); no scoped override. */
 .param-math  { width: 24px; text-align: center; color: var(--gold); font-style: italic; font-size: 13px; }
-.no-params   { font-size: 10px; color: var(--axis); }
+.no-params   { font-size: 11px; color: var(--axis); }
 
-.cast-btn { width: 100%; letter-spacing: 4px; font-size: 12px; }
+.panel-actions { display: flex; gap: 8px; }
+.refund-btn {
+  flex: 0 0 auto;
+  letter-spacing: 2px;
+  font-size: 11px;
+  padding: 8px 12px;
+  min-height: 36px;
+  border-color: var(--hp-red);
+  color: var(--hp-red);
+}
+.refund-btn:hover { background: var(--hp-red); color: var(--stone-dark); }
+.cast-btn { flex: 1; letter-spacing: 4px; font-size: 12px; }
 </style>

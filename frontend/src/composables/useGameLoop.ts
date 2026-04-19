@@ -26,27 +26,61 @@ import type { Tower } from '@/entities/types'
 export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   const game = ref<Game | null>(null)
   const ready = ref(false)
+  // K-3: surface a user-facing error when init throws so GameView can render a
+  // retry Modal. `initWasm` itself never rejects (it falls back to JS), but the
+  // rest of the boot path (canvas 2D ctx acquisition, system wiring) can.
+  const loadError = ref<string | null>(null)
   const gameStore = useGameStore()
   const uiStore = useUiStore()
   const { bind: bindSession } = useSessionSync()
   const unsubs: (() => void)[] = []
 
-  onMounted(async () => {
-    await initWasm()
+  async function boot(): Promise<void> {
+    loadError.value = null
+    try {
+      await initWasm()
+      const canvas = canvasRef.value
+      if (!canvas) {
+        loadError.value = 'Canvas element not mounted'
+        return
+      }
+      await wireEngine(canvas)
+    } catch (err) {
+      console.error('[useGameLoop] Init failed:', err)
+      loadError.value = err instanceof Error ? err.message : String(err)
+    }
+  }
 
-    const canvas = canvasRef.value
-    if (!canvas) return
+  function retry(): void {
+    // Reset flags and re-run the boot path. The HMR-defensive teardown below
+    // handles any half-constructed engine from the failed attempt.
+    ready.value = false
+    void boot()
+  }
 
-    // HMR defensive: if a prior Game survived without an unmount (e.g. Vite
-    // re-fired onMounted), tear it down before creating a new one. InputManager
-    // listeners would otherwise accumulate on the canvas/window.
+  async function wireEngine(canvas: HTMLCanvasElement): Promise<void> {
+
+    // HMR defensive + K-3 retry: if a prior Game survived without an unmount
+    // (Vite re-fired onMounted) or a previous wireEngine threw after
+    // constructing Game but before `game.value = g`, tear it down before
+    // creating a new one. InputManager listeners would otherwise accumulate
+    // on the canvas/window. Also flush stale `unsubs` from the failed pass —
+    // their handlers target a destroyed eventBus (no-op), but the array
+    // itself must start empty so onUnmounted only drops live subscriptions.
     if (game.value) {
       game.value.destroy()
       game.value = null
     }
+    unsubs.splice(0).forEach((fn) => fn())
 
     const g = new Game(canvas)
 
+    // K-3: everything after `new Game(canvas)` runs inside a try/catch so a
+    // system-wiring failure can't leave the canvas holding InputManager
+    // listeners on an orphaned Game (game.value is only assigned at the very
+    // end). On throw: destroy the in-flight engine, drop any unsubs that
+    // were already pushed, then rethrow so boot()'s catch records loadError.
+    try {
     // Inject all systems (order: placement → combat → movement → wave → buff → economy → renderers)
     const placement = new TowerPlacementSystem()
     placement.getSelectedTowerType = () => uiStore.selectedTowerType as TowerType | null
@@ -136,9 +170,55 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     game.value = g
     ready.value = true
     g.start()
+    } catch (err) {
+      // Tear down the in-flight Game (destroy removes InputManager listeners
+      // and clears the eventBus) before surfacing the error to boot().
+      try { g.destroy() } catch { /* ignore cascading teardown failures */ }
+      unsubs.splice(0).forEach((fn) => { try { fn() } catch { /* ignore */ } })
+      throw err
+    }
+  }
+
+  // K-1: re-sync the canvas backing store when DPR changes (monitor switch)
+  // or the window is resized. The CSS size stays pinned to 1280×720 — only
+  // the pixel buffer + ctx transform are rebuilt so pixel art stays crisp
+  // on hi-DPR displays without redoing layout math.
+  let dprMql: MediaQueryList | null = null
+  let dprMqlListener: ((ev: MediaQueryListEvent) => void) | null = null
+  function resyncDpr(): void {
+    const g = game.value
+    if (!g) return
+    // Renderer.resyncDpr is called if present; legacy Renderers without it
+    // simply stay at construction-time DPR (harmless — buffer just isn't
+    // refreshed on monitor hop).
+    const r = (g as unknown as { renderer?: { resyncDpr?: () => void } }).renderer
+    r?.resyncDpr?.()
+  }
+  function armDprWatch(): void {
+    // matchMedia with resolution:<dpr>dppx fires when DPR actually changes
+    // (e.g., drag to another monitor). The listener is re-armed because
+    // each change produces a brand-new DPR value.
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    dprMql?.removeEventListener?.('change', dprMqlListener!)
+    dprMql = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+    dprMqlListener = () => { resyncDpr(); armDprWatch() }
+    dprMql.addEventListener?.('change', dprMqlListener)
+  }
+  function onWindowResize(): void {
+    resyncDpr()
+  }
+
+  onMounted(() => {
+    void boot()
+    armDprWatch()
+    window.addEventListener('resize', onWindowResize)
   })
 
   onUnmounted(() => {
+    window.removeEventListener('resize', onWindowResize)
+    if (dprMql && dprMqlListener) dprMql.removeEventListener?.('change', dprMqlListener)
+    dprMql = null
+    dprMqlListener = null
     unsubs.forEach((fn) => fn())  // 1. Remove composable-level event listeners
     gameStore.unbindEngine()      // 2. Unbind store from engine
     if (game.value) {
@@ -147,6 +227,6 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
     }
   })
 
-  return { game, ready }
+  return { game, ready, loadError, retry }
 }
 
