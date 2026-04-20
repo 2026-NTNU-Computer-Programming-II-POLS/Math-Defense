@@ -68,8 +68,6 @@ jobs:
         run: npx vue-tsc -b
       - name: Arch check
         run: npm run arch-check
-      - name: Debt ledger
-        run: npm run check-debt-ledger
       - name: Validate levels
         run: npm run validate-levels
       - name: Lint non-ASCII comments

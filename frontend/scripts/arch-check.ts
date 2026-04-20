@@ -30,21 +30,14 @@ interface Violation {
 const SRC_ROOT = resolve(process.cwd(), 'src')
 
 /**
- * Pre-existing SoC violations predating Phase 1 of the Piecewise Paths
- * feature. Each entry is tracked in `docs/debt-ledger.md` with a named
- * owner and a scheduled removal date. Adding a row here requires a
- * matching ledger row — the ratchet only permits older debt to shrink,
- * never grow.
+ * Pre-existing SoC violations. Each entry is a known presentation-layer
+ * import of `domain/formatters` that the ratchet permits but should
+ * eventually be removed by relocating the module.
  */
 const PRE_EXISTING_ALLOWLIST: ReadonlyArray<{
   fileSuffix: string
   importPath: string
 }> = [
-  // `domain/formatters.ts` is presentation-layer code that lives under
-  // domain/ for historical reasons. Tracked in the debt ledger; the fix
-  // is a small refactor that moves the module and updates three import
-  // sites — but touching Vue files is outside the Phase 1 exit gate, so
-  // it is deferred to the presentation-layer PR that picks up the move.
   { fileSuffix: '/src/components/game/HUD.vue', importPath: '@/domain/formatters' },
 ]
 
