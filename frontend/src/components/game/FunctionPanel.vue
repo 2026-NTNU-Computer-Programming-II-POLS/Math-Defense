@@ -139,6 +139,7 @@ const { canvasRef, draw, redraw } = useCanvasPlot({
   height: PLOT_H,
   draw: drawPlot,
 })
+void canvasRef // template-only ref — vue-tsc TS6133 doesn't track destructured composable refs
 
 watch(currentId, () => draw(), { flush: 'post' })
 watch(leadX, () => redraw(), { flush: 'post' })

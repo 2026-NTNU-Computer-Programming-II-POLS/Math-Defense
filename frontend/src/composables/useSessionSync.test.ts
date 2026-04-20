@@ -31,23 +31,23 @@ import { useSessionSync } from './useSessionSync'
 import { Events, GamePhase } from '@/data/constants'
 import { EventBus } from '@/engine/EventBus'
 import { ApiError } from '@/services/api'
-import type { Game } from '@/engine/Game'
+import type { Game, GameEvents } from '@/engine/Game'
 
 // Minimal Game stub matching what useSessionSync.bind() actually touches.
 // The object is typed as `Partial<Game>` so the shape is checked at the
 // boundary; the call site casts the same-shape value to the full Game once
 // (no per-test `as any`).
 type GameStub = Partial<Game> & {
-  eventBus: EventBus<Record<string, unknown>>
+  eventBus: EventBus<GameEvents>
   state: Pick<Game['state'], 'score' | 'kills' | 'wave'>
 }
-function makeGameStub(): Game & { eventBus: EventBus<Record<string, unknown>> } {
-  const eventBus = new EventBus<Record<string, unknown>>()
+function makeGameStub(): Game & { eventBus: EventBus<GameEvents> } {
+  const eventBus = new EventBus<GameEvents>()
   const stub: GameStub = {
     eventBus,
     state: { score: 1234, kills: 7, wave: 5 } as Game['state'],
   }
-  return stub as unknown as Game & { eventBus: EventBus<Record<string, unknown>> }
+  return stub as unknown as Game & { eventBus: EventBus<GameEvents> }
 }
 
 function flushPromises(): Promise<void> {

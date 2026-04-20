@@ -133,6 +133,7 @@ const { canvasRef, redraw } = useCanvasPlot({
   draw: drawPlot,
   dpr: false,
 })
+void canvasRef // template-only ref — vue-tsc TS6133 doesn't track destructured composable refs
 // FourierPanel pattern: capture `stop` from watch(), tear down on unmount.
 // Replaces the previous `mounted` ref guard (which could flip stale on a
 // re-mounted keep-alive instance).
