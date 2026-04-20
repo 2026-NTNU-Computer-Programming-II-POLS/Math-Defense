@@ -265,7 +265,10 @@ export function fourierMatch(
     Math.abs(f1v[0]), Math.abs(f1v[1]), Math.abs(f1v[2]),
     Math.abs(f2v[0]), Math.abs(f2v[1]), Math.abs(f2v[2]),
   )
-  const n = Math.max(samples, Math.floor(4 * maxFreq) + 1)
+  // Hard upper bound of 10_000 iterations protects against pathological
+  // inputs (e.g. a freq array seeded with `Infinity` from a malformed boss
+  // target) that would otherwise spin the loop forever.
+  const n = Math.min(10000, Math.max(samples, Math.floor(4 * maxFreq) + 1))
   const dt = (2 * Math.PI) / n
   let totalError = 0
   let totalEnergy = 0

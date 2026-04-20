@@ -25,6 +25,13 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    # Pin container UID/GID to the typical Linux host dev user so files written
+    # through the ./backend bind-mount below are owned by the host user instead
+    # of root. The Dockerfile's `useradd --system app` picks a UID from the
+    # system range (<1000), which would leave bind-mount files owned by a UID
+    # the host user can't edit without sudo. Override here in dev only; the
+    # image itself still drops privileges for prod (see backend/Dockerfile).
+    user: "1000:1000"
     volumes:
       - ./backend:/app
       # shared_constants.py resolves /app/../shared → /shared at runtime.

@@ -7,9 +7,10 @@
  * `projectPathPanel` in the engine layer; segment math is prebaked into
  * `PathSegmentView` records so this file never reaches into `SegmentedPath`.
  */
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
+import { useCanvasPlot } from '@/composables/useCanvasPlot'
 
 const gameStore = useGameStore()
 const uiStore = useUiStore()
@@ -31,25 +32,12 @@ const compact = computed(() => uiStore.buildPanelVisible)
 
 const PLOT_W = 200
 const PLOT_H = 120
-const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 // Panel never evaluates segment math itself — the projection pre-samples
 // points on the domain closure (see `projectPathPanel`), so `seg.samples`
 // is the authoritative shape data and this SFC stays pure presentation.
 
-function drawPlot(): void {
-  const canvas = canvasRef.value
-  if (!canvas) return
-  const dpr = window.devicePixelRatio || 1
-  if (canvas.width !== PLOT_W * dpr) {
-    canvas.width = PLOT_W * dpr
-    canvas.height = PLOT_H * dpr
-    canvas.style.width = `${PLOT_W}px`
-    canvas.style.height = `${PLOT_H}px`
-  }
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+function drawPlot(ctx: CanvasRenderingContext2D): void {
   // Phase 8 polish: the 1px axis stroke is pixel-snapped below (round+0.5)
   // so it lands on a single device row instead of smearing across two; the
   // curve uses rounded caps/joins (set below) so the polyline stays smooth
@@ -138,34 +126,23 @@ function drawPlot(): void {
   }
 }
 
-// `flush: 'post'` — drawPlot needs the canvas in the DOM. The first time
+// `flush: 'post'` — draw needs the canvas in the DOM. The first time
 // segments populate (panel was hidden via `v-if`), the canvas is only
 // attached after Vue flushes the render, so pre-flush watchers would see
 // a stale null ref.
 //
 // leadX updates can fire more often than frame rate when the store batches
 // store pushes, so coalesce redraws through rAF — at most one repaint per
-// frame regardless of how many ticks land in between.
-let leadRafId: number | null = null
-function scheduleLeadRedraw(): void {
-  if (leadRafId !== null) return
-  leadRafId = requestAnimationFrame(() => {
-    leadRafId = null
-    drawPlot()
-  })
-}
-
-onMounted(drawPlot)
-watch(currentId, () => drawPlot(), { flush: 'post' })
-watch(leadX, () => scheduleLeadRedraw(), { flush: 'post' })
-watch(visible, (v) => { if (v) drawPlot() }, { flush: 'post' })
-
-onBeforeUnmount(() => {
-  if (leadRafId !== null) {
-    cancelAnimationFrame(leadRafId)
-    leadRafId = null
-  }
+// frame regardless of how many ticks land in between (useCanvasPlot.redraw).
+const { canvasRef, draw, redraw } = useCanvasPlot({
+  width: PLOT_W,
+  height: PLOT_H,
+  draw: drawPlot,
 })
+
+watch(currentId, () => draw(), { flush: 'post' })
+watch(leadX, () => redraw(), { flush: 'post' })
+watch(visible, (v) => { if (v) draw() }, { flush: 'post' })
 
 function segmentStatus(id: string): 'active' | 'past' | 'upcoming' {
   const curId = currentId.value

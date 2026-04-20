@@ -33,16 +33,19 @@ import { EventBus } from '@/engine/EventBus'
 import { ApiError } from '@/services/api'
 import type { Game } from '@/engine/Game'
 
-// Minimal Game stub matching what useSessionSync.bind() actually touches
-function makeGameStub() {
+// Minimal Game stub matching what useSessionSync.bind() actually touches.
+// The object is typed as `Partial<Game>` so the shape is checked at the
+// boundary; the call site casts the same-shape value to the full Game once
+// (no per-test `as any`).
+type GameStub = Partial<Game> & {
+  eventBus: EventBus<Record<string, unknown>>
+  state: Pick<Game['state'], 'score' | 'kills' | 'wave'>
+}
+function makeGameStub(): Game & { eventBus: EventBus<Record<string, unknown>> } {
   const eventBus = new EventBus<Record<string, unknown>>()
-  const stub = {
+  const stub: GameStub = {
     eventBus,
-    state: {
-      score: 1234,
-      kills: 7,
-      wave: 5,
-    },
+    state: { score: 1234, kills: 7, wave: 5 } as Game['state'],
   }
   return stub as unknown as Game & { eventBus: EventBus<Record<string, unknown>> }
 }
@@ -63,6 +66,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.mocked(sessionService.getActive).mockResolvedValue(null)
     // Successful create returns a session id
     vi.mocked(sessionService.create).mockResolvedValue({
+      schema_version: 1,
       id: 'sess-abc',
       level: 1,
       status: 'active',
@@ -79,6 +83,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.mocked(sessionService.end)
       .mockRejectedValueOnce(new Error('network blip'))
       .mockResolvedValueOnce({
+        schema_version: 1,
         id: 'sess-abc',
         level: 1,
         status: 'completed',
@@ -168,6 +173,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.mocked(sessionService.end)
       .mockRejectedValueOnce(new Error('network blip'))
       .mockResolvedValueOnce({
+        schema_version: 1,
         id: 'sess-abc',
         level: 1,
         status: 'completed',
@@ -203,6 +209,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
 
   it('happy path: single end call succeeds first time and clears sessionId', async () => {
     vi.mocked(sessionService.end).mockResolvedValueOnce({
+      schema_version: 1,
       id: 'sess-abc',
       level: 1,
       status: 'completed',

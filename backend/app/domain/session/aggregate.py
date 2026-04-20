@@ -4,7 +4,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, UTC
 
-from app.config import settings
 from app.domain.constraints import (
     GOLD_MAX, HP_MAX, MAX_SCORE_DELTA, MAX_WAVE, SCORE_MAX,
     LEVEL_MAX_SCORES, LEVEL_MAX_KILLS, LEVEL_MAX_WAVES,
@@ -20,9 +19,22 @@ from app.domain.session.events import (
 from app.shared_constants import INITIAL_GOLD, INITIAL_HP
 
 
+DEFAULT_STALE_CUTOFF_HOURS = 2.0
+
+# Module-level knob so the domain does not import app.config. The bootstrap
+# code (see app.main) calls ``set_stale_cutoff_hours`` at startup to forward
+# the operator-configured value; tests mutate it directly in isolation.
+_stale_cutoff_hours: float = DEFAULT_STALE_CUTOFF_HOURS
+
+
+def set_stale_cutoff_hours(hours: float) -> None:
+    """Override the global stale-session cutoff. Called from app bootstrap."""
+    global _stale_cutoff_hours
+    _stale_cutoff_hours = hours
+
+
 def _stale_cutoff() -> timedelta:
-    # Read at call time so tests / runtime overrides of the setting take effect.
-    return timedelta(hours=settings.session_stale_cutoff_hours)
+    return timedelta(hours=_stale_cutoff_hours)
 
 # Bounds live in domain.constraints; the aggregate enforces game rules
 # (hp can't exceed maxHp, score can't decrease, wave can't jump past the max).
@@ -212,4 +224,6 @@ __all__ = [
     "GameSession",
     "SessionNotActiveError",
     "InvalidStatusTransitionError",
+    "set_stale_cutoff_hours",
+    "DEFAULT_STALE_CUTOFF_HOURS",
 ]

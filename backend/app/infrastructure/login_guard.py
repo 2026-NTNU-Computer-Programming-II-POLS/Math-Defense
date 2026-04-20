@@ -50,6 +50,10 @@ def record_failure(db: DbSession, username: str) -> None:
     Implemented as a single atomic UPSERT so concurrent failed logins cannot
     coalesce into a single increment (the previous read-modify-write allowed
     ``MAX_ATTEMPTS × concurrency`` tries through the lockout).
+
+    Does NOT commit. The enclosing Unit of Work owns the transaction boundary
+    so a mid-login failure can't auto-commit past the Application layer's
+    rollback path.
     """
     now = _now()
     window_threshold = now - timedelta(seconds=WINDOW_SECONDS)
@@ -87,15 +91,11 @@ def record_failure(db: DbSession, username: str) -> None:
         },
     )
     db.execute(stmt)
-    db.commit()
 
 
 def record_success(db: DbSession, username: str) -> None:
-    """Clear failure history on successful login."""
-    result = db.execute(delete(LoginAttempt).where(LoginAttempt.username == username))
-    # Skip the commit on the common "clean account" path (no prior failures).
-    if result.rowcount:
-        db.commit()
+    """Clear failure history on successful login. UoW owns the commit."""
+    db.execute(delete(LoginAttempt).where(LoginAttempt.username == username))
 
 
 def purge_stale(db: DbSession) -> None:

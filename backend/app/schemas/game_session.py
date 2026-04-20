@@ -49,9 +49,17 @@ class SessionEnd(BaseModel):
     waves_survived: int = Field(ge=WAVES_MIN, le=WAVES_MAX)
 
 
+SESSION_OUT_SCHEMA_VERSION = 1
+
+
 class SessionOut(BaseModel):
+    # `schema_version` is a forward-compat handle: when the session DTO shape
+    # changes (e.g. new required field, renamed column), bump this constant so
+    # the frontend can branch on it and migrate cached payloads instead of
+    # silently deserializing stale shapes.
     model_config = ConfigDict(extra="ignore")
 
+    schema_version: int = SESSION_OUT_SCHEMA_VERSION
     id: str
     level: int
     status: str

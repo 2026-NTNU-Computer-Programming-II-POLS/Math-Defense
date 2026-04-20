@@ -46,14 +46,26 @@ export function spawnChildren(
 
   const children: Enemy[] = []
 
+  // Clamp each child to the *parent's* segment xRange rather than the full
+  // path range. At an exact segment boundary, ±0.3 can land inside a
+  // neighbouring segment whose kinematics would then resolve on the next
+  // MovementSystem tick — dropping the child onto the wrong strategy.
+  const parentSegment = context.path.findSegmentAt(parent.x)
+  const [segLo, segHi] = parentSegment?.xRange ?? [
+    Math.min(context.path.startX, context.path.targetX),
+    Math.max(context.path.startX, context.path.targetX),
+  ]
+
   for (let i = 0; i < 2; i++) {
     const baseX = spawnOffset > 0
       ? parent.x - parent._direction * spawnOffset
       : parent.x
+    const rawX = baseX + (i === 0 ? -0.3 : 0.3)
+    const clampedX = Math.min(segHi, Math.max(segLo, rawX))
     const child = createEnemy(
       EnemyType.BASIC_SLIME,
       context.path,
-      baseX + (i === 0 ? -0.3 : 0.3),
+      clampedX,
       parent._targetX,
     )
     child.hp = Math.round(parent.maxHp * 0.4)

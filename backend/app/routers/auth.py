@@ -5,12 +5,10 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.application.auth_service import AuthApplicationService
 from app.config import settings
 from app.db.database import get_db
 from app.domain.user.aggregate import User
-from app.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
-from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from app.factories import build_auth_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.schemas.auth import AuthMeResponse, LoginRequest, RegisterRequest, TokenResponse
@@ -23,14 +21,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def _anon(username: str) -> str:
     """Stable, short fingerprint of a username so logs stay correlatable without leaking it."""
     return hashlib.sha256(username.encode("utf-8")).hexdigest()[:10]
-
-
-def _get_service(db: Session) -> AuthApplicationService:
-    return AuthApplicationService(
-        user_repo=SqlAlchemyUserRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
-        db=db,
-    )
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -60,7 +50,7 @@ def _clear_auth_cookie(response: Response) -> None:
 @limiter.limit("5/minute")
 def register(request: Request, response: Response, req: RegisterRequest, db: Session = Depends(get_db)):
     # UsernameTakenError → 409 via the global DomainError handler.
-    user, token = _get_service(db).register(req.username, req.password)
+    user, token = build_auth_service(db).register(req.username, req.password)
     logger.info("User registered: id=%s", user.id)
     _set_auth_cookie(response, token)
     return TokenResponse(access_token=token, id=user.id, username=user.username)
@@ -70,7 +60,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
 @limiter.limit("10/minute")
 def login(request: Request, response: Response, req: LoginRequest, db: Session = Depends(get_db)):
     # InvalidCredentialsError → 401 via the global DomainError handler.
-    user, token = _get_service(db).login(req.username, req.password)
+    user, token = build_auth_service(db).login(req.username, req.password)
     logger.info("User logged in: id=%s", user.id)
     _set_auth_cookie(response, token)
     return TokenResponse(access_token=token, id=user.id, username=user.username)
@@ -90,7 +80,7 @@ def logout(
         token = credentials.credentials
     if token:
         try:
-            _get_service(db).logout_token(token)
+            build_auth_service(db).logout_token(token)
         except Exception:
             # Token revocation is best-effort. An expired or invalid token is
             # harmless — the important part is clearing the cookie below. If we

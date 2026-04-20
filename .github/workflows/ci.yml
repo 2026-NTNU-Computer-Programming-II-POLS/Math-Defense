@@ -62,7 +62,6 @@ jobs:
       - run: npm ci --no-fund
       - name: Audit npm dependencies
         run: npm audit --audit-level=high
-        continue-on-error: true
       # Skip the `prebuild` WASM compile — emsdk isn't available on the runner
       # and the build step is only used here to drive vue-tsc type-checking.
       - name: Type-check

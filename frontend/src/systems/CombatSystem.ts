@@ -159,7 +159,11 @@ export class CombatSystem {
         // hit than before. A generous threshold is the intended game feel.
         for (const enemy of [...game.enemies]) {
           if (!enemy.alive || enemy.isStealthed) continue
-          const hitRadius = Math.max(0.5, (enemy.size / 2 + 3) / UNIT_PX)
+          // Pre-scale `(size/2 + 3) / UNIT_PX` clamped to 0.5 absorbed the 3 px
+          // padding whenever size < 14 px, so small enemies had no bonus forgiveness
+          // over the floor. Distribute the padding post-scale: floor the scaled
+          // half-size at 0.5 game units, then add the padding separately.
+          const hitRadius = Math.max(0.5, enemy.size / 2 / UNIT_PX) + 3 / UNIT_PX
           if (distance(proj.x, proj.y, enemy.x, enemy.y) < hitRadius) {
             this._dealDamage(enemy, proj.damage, game)
             proj.active = false

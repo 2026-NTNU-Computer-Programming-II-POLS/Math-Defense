@@ -9,25 +9,14 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.application.mappers import session_to_out
-from app.application.session_service import SessionApplicationService
 from app.db.database import get_db
 from app.domain.user.aggregate import User
-from app.infrastructure.persistence.leaderboard_repository import SqlAlchemyLeaderboardRepository
-from app.infrastructure.persistence.session_repository import SqlAlchemySessionRepository
-from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from app.factories import build_session_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user
 from app.schemas.game_session import SessionCreate, SessionEnd, SessionOut, SessionUpdate
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
-
-
-def _get_service(db: Session) -> SessionApplicationService:
-    return SessionApplicationService(
-        session_repo=SqlAlchemySessionRepository(db),
-        leaderboard_repo=SqlAlchemyLeaderboardRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
-    )
 
 
 @router.post("", response_model=SessionOut, status_code=201)
@@ -38,7 +27,7 @@ def create_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).create_session(current_user.id, req.level)
+    session = build_session_service(db).create_session(current_user.id, req.level)
     return session_to_out(session)
 
 
@@ -51,7 +40,7 @@ def get_active_session(
 ):
     # Lets the frontend adopt/clean an orphaned active session after a reload
     # or a rapid LEVEL_START race where the session id was lost client-side.
-    session = _get_service(db).get_active_for_user(current_user.id)
+    session = build_session_service(db).get_active_for_user(current_user.id)
     return session_to_out(session) if session else None
 
 
@@ -64,7 +53,7 @@ def update_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).update_session(
+    session = build_session_service(db).update_session(
         str(session_id),
         current_user.id,
         current_wave=req.current_wave,
@@ -83,7 +72,7 @@ def abandon_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).abandon_session(str(session_id), current_user.id)
+    session = build_session_service(db).abandon_session(str(session_id), current_user.id)
     return session_to_out(session)
 
 
@@ -96,7 +85,7 @@ def end_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).end_session(
+    session = build_session_service(db).end_session(
         str(session_id),
         current_user.id,
         score=req.score,

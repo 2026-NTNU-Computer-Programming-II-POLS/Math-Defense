@@ -79,7 +79,7 @@ backend/
 │   ├── db/database.py             Engine, Base, get_db() session factory
 │   ├── middleware/
 │   │   ├── auth.py                get_current_user() dependency (JWT → User aggregate); AUTH_COOKIE_NAME
-│   │   └── csrf.py                CsrfMiddleware — double-submit cookie; opt-in via settings.csrf_enabled
+│   │   └── csrf.py                CsrfMiddleware — double-submit cookie; on by default, opt-out only under pytest/CI
 │   └── utils/
 │       ├── security.py            hash_password, verify_password, create_access_token, decode_token
 │       └── integrity.py           is_constraint_violation() — matches PG constraint name on IntegrityError.orig.diag
@@ -308,7 +308,7 @@ docker-compose up backend        # from project root
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `30` |
 | `SESSION_STALE_CUTOFF_HOURS` | No | Default `2.0`; active sessions older than this are auto-abandoned |
 | `COOKIE_SECURE` | No | Default `true`. Sets `Secure` flag on the auth cookie. Only `false` is honoured under CI/pytest — outside tests, startup aborts so plain-HTTP deployments cannot silently leak cookies. |
-| `CSRF_ENABLED` | No | Default `false`. When `true`, `CsrfMiddleware` enforces a double-submit cookie (`csrf_token` cookie + `X-CSRF-Token` header) on unsafe methods whenever the auth cookie is present. Off by default because the auth cookie already carries `SameSite=Lax`. |
+| `CSRF_ENABLED` | No | Default `true` outside the pytest/CI harness. `CsrfMiddleware` enforces a double-submit cookie (`csrf_token` cookie + `X-CSRF-Token` header) on unsafe methods whenever the auth cookie is present. Only `false` is honoured under CI/pytest; deployed environments that set it to `false` abort at startup. |
 
 > Schema is managed exclusively by Alembic — `lifespan` runs `alembic upgrade head` on boot. There is no `AUTO_CREATE_TABLES` toggle (removed during the PostgreSQL-only migration).
 

@@ -5,9 +5,10 @@ non-HttpOnly `csrf_token` cookie that the browser JS reads and echoes back
 in an `X-CSRF-Token` header on every state-changing request; a match is
 required when the auth cookie is present.
 
-Disabled by default (see Settings.csrf_enabled) so it is opt-in per
-environment — the existing auth cookie already carries SameSite=Lax, which
-blocks the classic cross-site POST CSRF path on modern browsers.
+Enabled by default outside the pytest/CI harness (see Settings.csrf_enabled).
+SameSite=Lax on the auth cookie already blocks the classic cross-site POST
+path on modern browsers; this adds defence-in-depth against older browsers
+and the GET-based mutation quirks SameSite doesn't cover.
 """
 from __future__ import annotations
 
@@ -29,6 +30,17 @@ _UNSAFE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 _EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register", "/api/auth/logout"}
 
 
+def _mint_csrf_cookie(response) -> None:
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=secrets.token_urlsafe(32),
+        httponly=False,  # JS must read this one
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+
+
 class CsrfMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if (
@@ -40,19 +52,21 @@ class CsrfMiddleware(BaseHTTPMiddleware):
             cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
             header_token = request.headers.get(CSRF_HEADER_NAME)
             if not cookie_token or not header_token or not secrets.compare_digest(cookie_token, header_token):
-                return JSONResponse(status_code=403, content={"detail": "CSRF token missing or invalid"})
+                response = JSONResponse(status_code=403, content={"detail": "CSRF token missing or invalid"})
+                # Mint even on rejection: otherwise the client stays stuck in a
+                # 403 loop after a cookie expiry / rotation because no later
+                # response ever refreshes the token (its next mutation is
+                # rejected before reaching the mint branch below).
+                if cookie_token is None:
+                    _mint_csrf_cookie(response)
+                return response
 
         response = await call_next(request)
 
         # Mint a token if the client doesn't have one yet — the SPA reads it
-        # from document.cookie on the next mutating request.
+        # from document.cookie on the next mutating request. Runs for every
+        # method, including safe GETs, so a freshly loaded SPA obtains a
+        # token from its first page fetch.
         if settings.csrf_enabled and request.cookies.get(CSRF_COOKIE_NAME) is None:
-            response.set_cookie(
-                key=CSRF_COOKIE_NAME,
-                value=secrets.token_urlsafe(32),
-                httponly=False,  # JS must read this one
-                secure=settings.cookie_secure,
-                samesite="lax",
-                path="/",
-            )
+            _mint_csrf_cookie(response)
         return response

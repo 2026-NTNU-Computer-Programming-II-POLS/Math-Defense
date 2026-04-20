@@ -121,8 +121,7 @@ function refundTower(): void {
   if (idx < 0) return
   game.towers.splice(idx, 1)
   game.changeGold(t.cost)
-  const buff = game.getSystem<{ onTowerRemoved?: (g: typeof game, id: string) => void }>('buff')
-  buff?.onTowerRemoved?.(game, t.id)
+  game.getSystem('buff')?.onTowerRemoved(game, t.id)
   uiStore.closeBuildPanel()
 }
 </script>

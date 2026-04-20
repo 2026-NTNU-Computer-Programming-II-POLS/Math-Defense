@@ -186,13 +186,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   let dprMql: MediaQueryList | null = null
   let dprMqlListener: ((ev: MediaQueryListEvent) => void) | null = null
   function resyncDpr(): void {
-    const g = game.value
-    if (!g) return
-    // Renderer.resyncDpr is called if present; legacy Renderers without it
-    // simply stay at construction-time DPR (harmless — buffer just isn't
-    // refreshed on monitor hop).
-    const r = (g as unknown as { renderer?: { resyncDpr?: () => void } }).renderer
-    r?.resyncDpr?.()
+    game.value?.renderer.resyncDpr()
   }
   function armDprWatch(): void {
     // matchMedia with resolution:<dpr>dppx fires when DPR actually changes

@@ -15,6 +15,15 @@ import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { PathProgressTracker, SegmentChangedPayload } from '@/domain/path/path-progress-tracker'
 import type { PlacementRejectionReason } from '@/domain/level/placement-policy'
 import type { LevelContext } from './level-context'
+import type { BuffSystem } from '@/systems/BuffSystem'
+import type { CombatSystem } from '@/systems/CombatSystem'
+import type { MovementSystem } from '@/systems/MovementSystem'
+import type { WaveSystem } from '@/systems/WaveSystem'
+import type { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
+import type { EconomySystem } from '@/systems/EconomySystem'
+import type { EnemyRenderer } from '@/renderers/EnemyRenderer'
+import type { TowerRenderer } from '@/renderers/TowerRenderer'
+import type { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
 
 // ── Type-safe event map ──
 
@@ -92,6 +101,24 @@ export interface GameSystem {
   destroy?(): void
 }
 
+/**
+ * Static key→type map for `addSystem`/`getSystem`. Every system registered
+ * in {@link useGameLoop.wireEngine} has an entry here so `getSystem('buff')`
+ * returns a `BuffSystem | undefined` without a caller-supplied cast. Extend
+ * this map (not each call site) when a new system is introduced.
+ */
+export interface SystemMap {
+  placement: TowerPlacementSystem
+  combat: CombatSystem
+  movement: MovementSystem
+  wave: WaveSystem
+  buff: BuffSystem
+  economy: EconomySystem
+  enemyRenderer: EnemyRenderer
+  towerRenderer: TowerRenderer
+  projectileRenderer: ProjectileRenderer
+}
+
 // ── Game ──
 
 export class Game {
@@ -150,13 +177,17 @@ export class Game {
 
   // ── System management ──
 
+  addSystem<K extends keyof SystemMap>(name: K, system: SystemMap[K]): void
+  addSystem(name: string, system: GameSystem): void
   addSystem(name: string, system: GameSystem): void {
     this._systems.set(name, system)
     system.init?.(this)
   }
 
-  getSystem<T extends GameSystem>(name: string): T | undefined {
-    return this._systems.get(name) as T | undefined
+  getSystem<K extends keyof SystemMap>(name: K): SystemMap[K] | undefined
+  getSystem<T extends GameSystem>(name: string): T | undefined
+  getSystem(name: string): GameSystem | undefined {
+    return this._systems.get(name)
   }
 
   // ── State operations ──
@@ -262,6 +293,19 @@ export class Game {
     this.eventBus.clear()
   }
 
+  /**
+   * Fixed-timestep game loop.
+   *
+   * The 0.1 s clamp on `frameTime` caps the maximum simulation time any one
+   * RAF frame can advance. When the browser tab is backgrounded, throttled,
+   * or the main thread stalls, `performance.now() - _lastTime` can grow
+   * arbitrarily large; without the clamp, the `while` loop below would run
+   * hundreds of `_update` ticks back-to-back on resume (a "spiral of death")
+   * and enemies would visibly teleport across the map. Trade-off: the sim
+   * silently loses time beyond 100 ms per frame, so a 500 ms stall resumes
+   * 400 ms behind wall-clock — acceptable for a casual game where
+   * consistency trumps real-time fidelity.
+   */
   private _loop(): void {
     if (!this._running) return
     const now = performance.now()

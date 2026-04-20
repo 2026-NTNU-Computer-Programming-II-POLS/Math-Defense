@@ -1,6 +1,7 @@
 import { api } from './api'
 
 export interface SessionOut {
+  schema_version: 1
   id: string
   level: number
   status: string

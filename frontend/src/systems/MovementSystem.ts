@@ -74,7 +74,16 @@ export class MovementSystem {
     path: SegmentedPath,
   ): void {
     const segment = path.findSegmentAt(enemy.x)
-    if (!segment) return
+    if (!segment) {
+      // Out-of-path enemy: without this the enemy would freeze on the map
+      // forever (no damage, no kill credit). Mark dead so it is cleaned up.
+      console.warn(
+        `[MovementSystem] Enemy ${enemy.id} at x=${enemy.x} outside path [${path.targetX}, ${path.startX}]; marking dead.`,
+      )
+      enemy.alive = false
+      enemy.active = false
+      return
+    }
     const strategy = getStrategy(segment.kind)
     const prev = this._states.get(enemy.id) ?? { x: enemy.x, y: enemy.y, t: 0 }
     const effectiveSpeed =
@@ -90,6 +99,10 @@ export class MovementSystem {
   }
 
   private _applyPostAdvance(enemy: Enemy, game: Game): void {
+    // Dead enemies (e.g. an out-of-path enemy just marked dead in
+    // `_advanceSegmented`) must not re-emit ENEMY_REACHED_ORIGIN or damage
+    // the player — the outer update loop cleans them up next.
+    if (!enemy.alive) return
     enemy.isStealthed = enemy.stealthRanges.some(
       ([min, max]) => enemy.x >= min && enemy.x <= max,
     )

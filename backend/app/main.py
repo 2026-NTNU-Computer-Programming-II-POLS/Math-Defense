@@ -6,6 +6,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -17,6 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import settings
 from app.db.database import engine, SessionLocal
 from app.domain.errors import DomainError
+from app.domain.session.aggregate import set_stale_cutoff_hours
 from app.infrastructure.login_guard import purge_stale as purge_stale_login_attempts
 from app.infrastructure.token_denylist import purge_expired as purge_expired_denied_tokens
 from app.middleware.csrf import CsrfMiddleware
@@ -29,6 +31,11 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Forward the operator-configured stale cutoff into the domain layer. The
+# aggregate deliberately does not import app.config so the domain stays
+# test-isolated; this is the one place we bridge the two.
+set_stale_cutoff_hours(settings.session_stale_cutoff_hours)
 
 # backend/app/main.py -> backend/app -> backend -> backend/alembic.ini
 _ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
@@ -113,12 +120,31 @@ async def _domain_error_handler(_request: Request, exc: DomainError) -> JSONResp
     return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
 
 
+@app.exception_handler(RequestValidationError)
+async def _request_validation_handler(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    # Pydantic field-level errors must surface with field names so the
+    # frontend can map them back to inputs. Routing them through the generic
+    # ValueError handler below would erase that structure (E1).
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+
 @app.exception_handler(ValueError)
 async def _value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
     # Domain invariants now raise DomainValueError (a DomainError subclass)
     # and are handled above. Plain ValueErrors from libraries or Python internals
     # get a generic message to avoid leaking stack/internal details.
     return JSONResponse(status_code=422, content={"detail": "Unprocessable request"})
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    # Catch-all so Starlette's default 500 (which can include frame info under
+    # some configs) never escapes. Log with traceback server-side; return a
+    # fixed body client-side (E3).
+    logger.exception("Unhandled exception: %s", exc.__class__.__name__)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 # Security headers — defence-in-depth for direct backend access (dev docker-compose
@@ -136,7 +162,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CSRF — double-submit cookie; opt-in via settings.csrf_enabled.
+# CSRF — double-submit cookie; on by default, opt-out only under pytest/CI.
 app.add_middleware(CsrfMiddleware)
 
 # CORS

@@ -35,6 +35,9 @@ export class WaveSystem {
     const levelDef = LEVELS.find((l) => l.id === game.state.level)
     if (!levelDef) return
 
+    // Convention: `waveIndex` is 1-indexed (wave 1 is the first wave). The
+    // Game state's `wave` counter and the WAVE_START event payload both use
+    // 1-indexing, so `levelDef.waves` (0-indexed array) is offset by 1 here.
     const waveDef = levelDef.waves[waveIndex - 1]
     if (!waveDef) return
 

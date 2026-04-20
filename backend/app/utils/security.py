@@ -5,13 +5,31 @@ import bcrypt
 import jwt
 from app.config import settings
 
+_BCRYPT_MAX_BYTES = 72
+
+
+def _encode_or_raise(password: str) -> bytes:
+    # bcrypt silently truncates inputs >72 bytes, which would otherwise make
+    # `correctpass + <anything>` verify as correctpass. Schema validators
+    # already reject over-length passwords at the HTTP edge, but non-HTTP
+    # callers (tests, scripts) can still reach these helpers; raise here so
+    # truncation is never silently applied regardless of entry point.
+    encoded = password.encode("utf-8")
+    if len(encoded) > _BCRYPT_MAX_BYTES:
+        raise ValueError(f"password exceeds bcrypt's {_BCRYPT_MAX_BYTES}-byte limit")
+    return encoded
+
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+    return bcrypt.hashpw(_encode_or_raise(password), bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    try:
+        encoded = _encode_or_raise(plain)
+    except ValueError:
+        return False
+    return bcrypt.checkpw(encoded, hashed.encode("utf-8"))
 
 
 def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:

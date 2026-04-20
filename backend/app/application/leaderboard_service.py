@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
+from app.domain.constraints import LEVEL_MAX_KILLS, LEVEL_MAX_WAVES
 from app.domain.errors import (
     DuplicateSubmissionError,
     PermissionDeniedError,
@@ -68,10 +69,27 @@ class LeaderboardApplicationService:
             if session.status != SessionStatus.COMPLETED:
                 raise SessionValidationError("Session is not completed")
 
-            # Cross-validate client-reported waves against server-tracked progress
+            # Cross-validate client-reported ancillary stats against server
+            # state. `score` and `level` are taken directly from the session
+            # below; `kills`/`waves_survived` aren't persisted on the session
+            # (they live only on the SessionCompleted event), so we re-apply
+            # the same per-level ceilings the aggregate enforced at complete()
+            # time. This closes the A1/V1 forgery path where a client posts
+            # inflated ancillary stats on an otherwise legitimate session.
+            level_int = int(session.level)
             if session.current_wave > 0 and waves_survived > session.current_wave:
                 raise SessionValidationError(
                     "waves_survived exceeds server-tracked wave count"
+                )
+            wave_cap = LEVEL_MAX_WAVES.get(level_int)
+            if wave_cap is not None and waves_survived > wave_cap:
+                raise SessionValidationError(
+                    "waves_survived exceeds level maximum"
+                )
+            kill_cap = LEVEL_MAX_KILLS.get(level_int)
+            if kill_cap is not None and kills > kill_cap:
+                raise SessionValidationError(
+                    "kills exceed level maximum"
                 )
 
             # Domain rule: duplicate submission check

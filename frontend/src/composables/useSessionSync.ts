@@ -9,7 +9,7 @@ import { useUiStore } from '@/stores/uiStore'
 import { sessionService } from '@/services/sessionService'
 import { ApiError } from '@/services/api'
 import { Events, GamePhase } from '@/data/constants'
-import type { Game } from '@/engine/Game'
+import type { Game, WaveEndSnapshot } from '@/engine/Game'
 
 const MAX_CREATE_RETRIES = 2
 const RETRY_DELAY_MS = 1000
@@ -106,36 +106,39 @@ export function useSessionSync() {
     // Reading from the payload (rather than game.state) ensures the values
     // sent to the server reflect wave-end exactly, even if another listener
     // mutates resources before this handler runs.
-    let pendingSync = false
-    let latestSnapshot: { wave: number; gold: number; hp: number; score: number } | null = null
+    //
+    // The queue holds at most one snapshot — the newest pending wave-end —
+    // because older unsent snapshots would be overwritten on the server by
+    // the next update anyway. Using an explicit ref (rather than mutable
+    // closure vars) makes the "coalesce into latest" semantics visible and
+    // lets a drained entry be nulled atomically under rapid level switches.
+    type PendingWrite = { snapshot: WaveEndSnapshot; gen: number }
+    const pending = ref<PendingWrite | null>(null)
     unsubs.push(game.eventBus.on(Events.WAVE_END, async (snapshot) => {
-      latestSnapshot = snapshot
       if (!sessionId.value) return
       // Pin the generation of the session we intend to write against. If
       // createGeneration advances (rapid level switch) between now and when
       // the update actually flies, we abandon the write so the final-wave
       // score of the new level isn't attributed to the old sessionId.
-      const writeGen = sessionGeneration
-      if (syncing.value) {
-        pendingSync = true
-        return
-      }
+      pending.value = { snapshot, gen: sessionGeneration }
+      if (syncing.value) return
       syncing.value = true
       try {
-        do {
-          pendingSync = false
-          if (!sessionId.value || !latestSnapshot) break
-          if (writeGen !== sessionGeneration) break
+        while (pending.value) {
+          const job = pending.value
+          pending.value = null
+          if (!sessionId.value) break
+          if (job.gen !== sessionGeneration) break
           await sessionService.update(sessionId.value, {
-            current_wave: latestSnapshot.wave,
-            gold: latestSnapshot.gold,
-            hp: latestSnapshot.hp,
-            score: latestSnapshot.score,
+            current_wave: job.snapshot.wave,
+            gold: job.snapshot.gold,
+            hp: job.snapshot.hp,
+            score: job.snapshot.score,
           })
           // success → reset the failure counter and alert latch
           consecutiveUpdateFailures = 0
           alertedForFailures = false
-        } while (pendingSync)
+        }
       } catch (e) {
         console.warn('[SessionSync] Failed to update session:', e)
         // 401 means the access token was rejected; api.ts has already cleared
@@ -169,7 +172,7 @@ export function useSessionSync() {
         }
       } finally {
         syncing.value = false
-        pendingSync = false
+        pending.value = null
       }
     }))
 

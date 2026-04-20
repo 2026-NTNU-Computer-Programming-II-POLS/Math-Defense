@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { CombatSystem } from '../CombatSystem'
 import { GamePhase, Events, TowerType } from '@/data/constants'
 import { createMockGame, createMockEnemy, createMockTower } from './helpers'
+import type { LevelContext } from '@/engine/level-context'
 
 // Mock MathUtils
 vi.mock('@/math/MathUtils', () => ({
@@ -26,7 +27,7 @@ vi.mock('@/entities/EnemyFactory', () => ({
   }),
 }))
 
-function fakeLevelContext() {
+function fakeLevelContext(): LevelContext {
   return {
     path: {
       segments: [],
@@ -79,8 +80,7 @@ describe('CombatSystem', () => {
 
   it('fires function cannon and creates projectile', () => {
     const { game, system } = setup()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    game.levelContext = fakeLevelContext() as any
+    game.levelContext = fakeLevelContext()
     const tower = createMockTower({
       type: TowerType.FUNCTION_CANNON,
       cooldownTimer: 0,

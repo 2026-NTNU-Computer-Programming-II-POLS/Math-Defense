@@ -14,8 +14,6 @@ from app.domain.errors import (
     UsernameTakenError,
 )
 from app.domain.user.aggregate import User
-from app.infrastructure.login_guard import is_locked, record_failure, record_success
-from app.infrastructure.token_denylist import deny as deny_token, is_denied as is_token_denied
 from app.utils.security import (
     hash_password,
     verify_password,
@@ -24,8 +22,10 @@ from app.utils.security import (
 )
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session as DbSession
-
+    from app.domain.auth.repository import (
+        LoginAttemptRepository,
+        TokenDenylistRepository,
+    )
     from app.domain.user.repository import UserRepository
     from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
@@ -42,12 +42,14 @@ class AuthApplicationService:
     def __init__(
         self,
         user_repo: UserRepository,
+        login_attempt_repo: LoginAttemptRepository,
+        token_denylist_repo: TokenDenylistRepository,
         uow: SqlAlchemyUnitOfWork,
-        db: DbSession,
     ) -> None:
         self._user_repo = user_repo
+        self._login_attempts = login_attempt_repo
+        self._token_denylist = token_denylist_repo
         self._uow = uow
-        self._db = db
 
     def register(self, username: str, password: str) -> tuple[User, str]:
         """Create a new user and issue an access token. Returns (user, token)."""
@@ -73,24 +75,28 @@ class AuthApplicationService:
 
     def login(self, username: str, password: str) -> tuple[User, str]:
         """Authenticate credentials and issue an access token."""
-        if is_locked(self._db, username):
-            raise AccountLockedError(
-                "Account temporarily locked due to too many failed attempts. "
-                "Try again in a few minutes."
-            )
+        with self._uow:
+            if self._login_attempts.is_locked(username):
+                raise AccountLockedError(
+                    "Account temporarily locked due to too many failed attempts. "
+                    "Try again in a few minutes."
+                )
 
-        user = self._user_repo.find_by_username(username)
-        # Always run one bcrypt verify so the "user not found" and "wrong
-        # password" branches take the same wall-clock time. Without this,
-        # an attacker can enumerate valid usernames via response timing.
-        if user is None:
-            verify_password(password, _DUMMY_PASSWORD_HASH)
-            record_failure(self._db, username)
-            raise InvalidCredentialsError("Invalid username or password")
-        if not verify_password(password, user.password_hash):
-            record_failure(self._db, username)
-            raise InvalidCredentialsError("Invalid username or password")
-        record_success(self._db, username)
+            user = self._user_repo.find_by_username(username)
+            # Always run one bcrypt verify so the "user not found" and "wrong
+            # password" branches take the same wall-clock time. Without this,
+            # an attacker can enumerate valid usernames via response timing.
+            if user is None:
+                verify_password(password, _DUMMY_PASSWORD_HASH)
+                self._login_attempts.record_failure(username)
+                self._uow.commit()
+                raise InvalidCredentialsError("Invalid username or password")
+            if not verify_password(password, user.password_hash):
+                self._login_attempts.record_failure(username)
+                self._uow.commit()
+                raise InvalidCredentialsError("Invalid username or password")
+            self._login_attempts.clear(username)
+            self._uow.commit()
         token = create_access_token({"sub": user.id})
         return user, token
 
@@ -100,7 +106,7 @@ class AuthApplicationService:
         if payload is None:
             raise InvalidTokenError("Token is invalid or expired")
         jti = payload.get("jti")
-        if jti and is_token_denied(self._db, jti):
+        if jti and self._token_denylist.is_denied(jti):
             raise InvalidTokenError("Token has been revoked")
         user_id = payload.get("sub")
         if not user_id:
@@ -117,5 +123,8 @@ class AuthApplicationService:
             return  # already expired, nothing to revoke
         jti = payload.get("jti")
         exp = payload.get("exp", 0)
-        if jti:
-            deny_token(self._db, jti, float(exp))
+        if not jti:
+            return
+        with self._uow:
+            self._token_denylist.deny(jti, float(exp))
+            self._uow.commit()

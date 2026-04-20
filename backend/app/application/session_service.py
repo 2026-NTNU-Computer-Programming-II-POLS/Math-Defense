@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.domain.errors import SessionNotFoundError, SessionStaleError
 from app.domain.value_objects import Level, Score, GameResult, SessionStatus
@@ -161,10 +161,12 @@ class SessionApplicationService:
                 with self._uow:
                     self._handle_session_completed(event)
                     self._uow.commit()
-            except Exception:
-                # Session is already durably completed; log and move on. A
-                # future retry (client resubmit, background catch-up) will
-                # re-dispatch via the idempotent handler.
+            except SQLAlchemyError:
+                # Session is already durably committed; DB-layer failure in
+                # the handler is the recoverable case — log and let a future
+                # retry (client resubmit, background catch-up) re-dispatch
+                # via the idempotent handler. Non-DB exceptions (bugs) are
+                # re-raised so they surface instead of silently vanishing.
                 logger.exception(
                     "post-commit dispatch failed session=%s", event.session_id
                 )

@@ -32,10 +32,10 @@ def deny(db: DbSession, jti: str, expires_at: float) -> None:
     """
     expiry_dt = datetime.fromtimestamp(expires_at, tz=UTC)
     # Idempotent: logging out a token whose JTI is already denied must not error.
+    # No commit here — the enclosing Unit of Work is the transaction boundary.
     stmt = pg_insert(DeniedToken).values(jti=jti, expires_at=expiry_dt)
     stmt = stmt.on_conflict_do_nothing(index_elements=["jti"])
     db.execute(stmt)
-    db.commit()
 
 
 def is_denied(db: DbSession, jti: str) -> bool:

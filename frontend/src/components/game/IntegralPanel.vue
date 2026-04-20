@@ -4,8 +4,9 @@
  * Live-renders the f(x) = ax² + bx + c curve and [a,b] integral region,
  * and displays the area computed by numericalIntegrate() as the damage value.
  */
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, watch, onUnmounted } from 'vue'
 import { numericalIntegrate } from '@/math/WasmBridge'
+import { useCanvasPlot } from '@/composables/useCanvasPlot'
 
 const props = defineProps<{
   params: Record<string, number>
@@ -15,10 +16,8 @@ const emit = defineEmits<{
   (e: 'update', key: string, value: number): void
 }>()
 
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-// Component-scoped so a second instance (e.g. kept-alive) can't flip the
-// surviving instance's flag via module-level state.
-const mounted = ref(true)
+const CANVAS_W = 240
+const CANVAS_H = 130
 
 const coeffA = computed(() => props.params.a ?? -0.5)
 const coeffB = computed(() => props.params.b ?? 3)
@@ -34,15 +33,9 @@ function f(x: number): number {
   return coeffA.value * x * x + coeffB.value * x + coeffC.value
 }
 
-function draw() {
-  if (!mounted.value) return
-  const canvas = canvasRef.value
-  if (!canvas) return
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  const W = canvas.width
-  const H = canvas.height
+function drawPlot(ctx: CanvasRenderingContext2D) {
+  const W = CANVAS_W
+  const H = CANVAS_H
   const pad = 10
   const plotW = W - pad * 2
   const plotH = H - pad * 2
@@ -130,9 +123,21 @@ function draw() {
   ctx.fillText(`b=${hi}`, lbX, H - 1)
 }
 
-watch([coeffA, coeffB, coeffC, intA, intB], draw)
-onMounted(draw)
-onUnmounted(() => { mounted.value = false })
+// dpr: false keeps the stylesheet's `width: 100%` responsive sizing intact.
+// `useCanvasPlot` only pins inline style dimensions when DPR scaling would
+// otherwise blow up the backing store — opting out matches the original
+// IntegralPanel behaviour (fixed 240×130 bitmap, CSS scales the display).
+const { canvasRef, redraw } = useCanvasPlot({
+  width: CANVAS_W,
+  height: CANVAS_H,
+  draw: drawPlot,
+  dpr: false,
+})
+// FourierPanel pattern: capture `stop` from watch(), tear down on unmount.
+// Replaces the previous `mounted` ref guard (which could flip stale on a
+// re-mounted keep-alive instance).
+const stopWatch = watch([coeffA, coeffB, coeffC, intA, intB], redraw)
+onUnmounted(stopWatch)
 
 const paramFields = [
   { key: 'a', label: 'a (x\u00B2)', min: -5, max: 5, step: 0.1 },
@@ -156,7 +161,7 @@ function onInput(key: string, event: Event) {
   <div class="integral-panel">
     <div class="integral-label">Integral Cannon: \u222B<sub>a</sub><sup>b</sup> f(x) dx</div>
 
-    <canvas ref="canvasRef" class="integral-canvas" width="240" height="130" />
+    <canvas ref="canvasRef" class="integral-canvas" :width="CANVAS_W" :height="CANVAS_H" />
 
     <div class="coeff-row">
       <label v-for="pf in paramFields" :key="pf.key" class="coeff-field">

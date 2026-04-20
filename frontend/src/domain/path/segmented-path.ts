@@ -87,7 +87,7 @@ export function createSegmentedPath(
     const s = findSegmentAt(x)
     if (!s) {
       throw new RangeError(
-        `SegmentedPath.evaluateAt: x=${x} is outside [${startX}, ${targetX}].`,
+        `SegmentedPath.evaluateAt: x=${x} is outside [${targetX}, ${startX}].`,
       )
     }
     return s.evaluate(x)

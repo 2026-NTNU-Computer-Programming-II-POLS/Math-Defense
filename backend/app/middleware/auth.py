@@ -2,12 +2,10 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.application.auth_service import AuthApplicationService
 from app.db.database import get_db
 from app.domain.errors import InvalidTokenError
 from app.domain.user.aggregate import User
-from app.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
-from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from app.factories import build_auth_service
 
 AUTH_COOKIE_NAME = "access_token"
 
@@ -15,14 +13,6 @@ AUTH_COOKIE_NAME = "access_token"
 bearer_scheme = HTTPBearer(auto_error=False)
 
 _REQUEST_CACHE_ATTR = "_auth_current_user"
-
-
-def _get_service(db: Session) -> AuthApplicationService:
-    return AuthApplicationService(
-        user_repo=SqlAlchemyUserRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
-        db=db,
-    )
 
 
 def get_current_user(
@@ -39,14 +29,17 @@ def get_current_user(
         return cached
 
     # Prefer HTTP-only cookie; fall back to Bearer header for backward compat.
+    # Explicitly re-check the scheme: HTTPBearer accepts the header as-is when
+    # auto_error=False, so a client sending `Authorization: Basic ...` would
+    # otherwise leak its payload into the JWT decode path.
     token = request.cookies.get(AUTH_COOKIE_NAME)
-    if not token and credentials:
+    if not token and credentials and credentials.scheme.lower() == "bearer":
         token = credentials.credentials
     if not token:
         raise InvalidTokenError("Not authenticated")
 
     # InvalidTokenError / UserNotFoundError (both DomainError subclasses) are
     # mapped to 401 by the global handler in main.py.
-    user = _get_service(db).authenticate_token(token)
+    user = build_auth_service(db).authenticate_token(token)
     setattr(request.state, _REQUEST_CACHE_ATTR, user)
     return user
