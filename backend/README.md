@@ -90,6 +90,8 @@ backend/
 ├── tests/
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py                       (5)
+│   ├── test_auth_lockout.py               (3)  — per-account lockout window
+│   ├── test_token_denylist.py             (3)  — JWT JTI revocation after logout
 │   ├── test_game_session.py               (11)
 │   ├── test_leaderboard.py                (6)
 │   ├── test_session_aggregate.py          (30) — pure aggregate unit tests
@@ -97,7 +99,7 @@ backend/
 │   ├── test_coverage_gaps.py              (12) — audit-driven edge cases
 │   ├── test_domain_invariants.py          (9)  — cross-aggregate invariant tests
 │   └── test_shared_constants_parity.py    (3)  — Python ↔ shared/game-constants.json parity
-│   # 91 tests total
+│   # 97 tests total
 │
 ├── requirements.txt
 └── Dockerfile
@@ -317,7 +319,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # all 91 tests
+pytest                                      # all 97 tests
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 ```

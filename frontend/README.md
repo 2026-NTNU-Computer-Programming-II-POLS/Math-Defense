@@ -38,9 +38,11 @@ frontend/
 │   │   └── game/
 │   │       ├── HUD.vue             HP / gold / wave / score bar
 │   │       ├── TowerBar.vue        Tower info / selection bar
+│   │       ├── StartWaveButton.vue Player-paced "Start Wave" control shown during BUILD
 │   │       ├── BuildPanel.vue      Tower purchase + parameter routing
 │   │       ├── BuildHint.vue       First-time placement hints
 │   │       ├── BuffCardPanel.vue   Buff-card selection overlay
+│   │       ├── FunctionPanel.vue       Quadratic a/b/c input → Function Cannon
 │   │       ├── MatrixInputPanel.vue    2×2 matrix input → Matrix Link
 │   │       ├── IntegralPanel.vue       [a,b] interval + visualisation → Integral Cannon
 │   │       └── FourierPanel.vue        3-sine composite sliders → Fourier Shield
@@ -71,12 +73,34 @@ frontend/
 │   │   ├── EventBus.ts             Generic, type-safe pub/sub
 │   │   ├── InputManager.ts         Canvas mouse → game-unit coord events
 │   │   ├── Renderer.ts             Canvas-2D drawing primitives
-│   │   └── event-handlers/
-│   │       └── registry.ts         EVENT_HANDLER_REGISTRY — single source of truth listing every EventBus subscription (module / handler / purpose) so reviewers can answer "who reacts to event X?" in one place
+│   │   ├── level-context.ts        Per-level runtime context (path handle, movement strategy, tile style)
+│   │   ├── event-handlers/
+│   │   │   └── registry.ts         EVENT_HANDLER_REGISTRY — single source of truth listing every EventBus subscription (module / handler / purpose) so reviewers can answer "who reacts to event X?" in one place
+│   │   ├── projections/
+│   │   │   └── project-path-panel.ts   Path-panel viewport projection (world → screen pixels)
+│   │   └── render-helpers/
+│   │       └── tile-style.ts           Tile-appearance lookup shared by grid + placement preview
 │   │
 │   ├── domain/                     Domain policies (shared across systems)
 │   │   ├── combat/
 │   │   │   └── SplitSlimePolicy.ts Single source for SPLIT_SLIME split rules
+│   │   ├── level/
+│   │   │   ├── level-layout-service.ts Builds the SegmentedPath + placement rules for a level definition
+│   │   │   └── placement-policy.ts     Grid-cell → can-place decision shared by preview and click handler
+│   │   ├── movement/               Piecewise-path movement strategies (one per segment family)
+│   │   │   ├── movement-strategy.ts          Strategy interface (advance + positionAt)
+│   │   │   ├── movement-strategy-registry.ts Maps segment kind → strategy instance
+│   │   │   ├── horizontal-movement-strategy.ts
+│   │   │   ├── vertical-movement-strategy.ts
+│   │   │   ├── linear-movement-strategy.ts
+│   │   │   ├── quadratic-movement-strategy.ts
+│   │   │   └── trig-movement-strategy.ts
+│   │   ├── path/                   Piecewise path construction + progress tracking
+│   │   │   ├── segmented-path.ts         Immutable ordered segment list + total arc length
+│   │   │   ├── segment-factories.ts      Factories for each segment kind
+│   │   │   ├── path-builder.ts           Random generator producing 1–N connected segments
+│   │   │   ├── path-progress-tracker.ts  Scalar progress (0–1) ↔ (segment, localT) with arc-length correction
+│   │   │   └── path-validator.ts         Enforces grid-bounds + coverage rules
 │   │   └── formatters.ts           Centralised presentation formatters (e.g. formatScore) used by HUD, GameView, LeaderboardView
 │   │
 │   ├── systems/                    ECS systems — pure update logic, no rendering
@@ -102,7 +126,6 @@ frontend/
 │   │   ├── WasmBridge.ts           initWasm, RAII float buffers, JS fallbacks
 │   │   ├── wasm-exports.d.ts       Ambient type decl for the generated math_engine module
 │   │   ├── MathUtils.ts            Coordinate conversion, findIntersections, sector test
-│   │   ├── PathEvaluator.ts        Random path generation (5 families) + validation
 │   │   └── wasm/                   Compiled WASM assets (generated — do not edit)
 │   │       ├── math_engine.js
 │   │       ├── math_engine.wasm
@@ -231,7 +254,7 @@ Emits `CANVAS_CLICK` and `CANVAS_HOVER` on the EventBus so systems never reach i
 |---|---|
 | `TowerPlacementSystem` | Handles `CANVAS_CLICK` during `BUILD`; validates grid cell + gold; creates a tower via `TowerFactory`; emits `TOWER_PLACED`. Accepts **injected callbacks** `getSelectedTowerType` / `clearSelectedTowerType` instead of reaching into a Pinia store. |
 | `CombatSystem` | Per-tower cooldown; picks target in range; dispatches by tower type (Function Cannon → `calculateTrajectory`, Radar Sweep → `pointInSector`, Integral Cannon → `numericalIntegrate`, Matrix Link → `matrixMultiply`). Triggers boss-shield mini-game via `Events.BOSS_SHIELD_START`. |
-| `MovementSystem` | Advances enemies along `pathFunction` with arc-length correction; reads `state.enemySpeedMultiplier`; emits `ENEMY_REACHED_ORIGIN`. Uses `SplitSlimePolicy` for split-on-death children. |
+| `MovementSystem` | Advances enemies along the level's `SegmentedPath` via the matching movement strategy (arc-length correction baked into `PathProgressTracker`); reads `state.enemySpeedMultiplier`; emits `ENEMY_REACHED_ORIGIN`. Uses `SplitSlimePolicy` for split-on-death children. |
 | `WaveSystem` | Reads wave schedule from `level-defs.ts`; spawns via `EnemyFactory` at configured intervals; detects clear and emits `WAVE_END`. |
 | `BuffSystem` | Strategy-map (`effectId` → handler) lookup; manages active buff durations across `WAVE_END` ticks; handles curse cards too. |
 | `EconomySystem` | Single place that awards gold on `ENEMY_KILLED` and deals damage on `ENEMY_REACHED_ORIGIN`. Previously inlined in `Game._setupEventHandlers`; factored out for testability. Includes Boss-dragon `GAME_OVER` trigger (damage = 99). |
@@ -251,7 +274,7 @@ onMounted:
   await initWasm()
   g = new Game(canvas)
   inject systems (placement has UI callbacks injected)
-  subscribe to LEVEL_START   → generatePath + sync pathExpression to gameStore
+  subscribe to LEVEL_START   → build SegmentedPath (domain/path) + sync pathExpression to gameStore
   subscribe to TOWER_PLACED  → open BuildPanel, advance BuildHint
   subscribe to TOWER_SELECTED → open/close BuildPanel
   useSessionSync().bind(g)   → backend session lifecycle
@@ -380,7 +403,7 @@ npm install
 npm run dev        # Vite dev server at http://localhost:5173
 npm run build      # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
 npm run preview    # Preview the production build
-npm test           # Vitest — 14 test files covering engine, systems, composables, math bridge
+npm test           # Vitest — 29 test files covering engine, systems, domain policies, movement strategies, path pipeline, composables, math bridge
 npm run test:watch # Vitest in watch mode
 ```
 
@@ -398,13 +421,26 @@ Type-check only (no emit): `npx vue-tsc -b`.
 ## Testing
 
 ```
-src/engine/*.test.ts                EventBus, Game, PhaseStateMachine
+src/engine/EventBus.test.ts
+src/engine/Game.test.ts
+src/engine/PhaseStateMachine.test.ts
+src/engine/Renderer.test.ts
+src/engine/level-context.test.ts
+src/engine/projections/project-path-panel.test.ts
+src/engine/render-helpers/tile-style.test.ts
+src/domain/level/level-layout-service.test.ts
+src/domain/level/placement-policy.test.ts
+src/domain/movement/*.test.ts             horizontal / vertical / linear / quadratic / trig strategies
+src/domain/path/path-builder.test.ts
+src/domain/path/path-progress-tracker.test.ts
+src/domain/path/path-validator.test.ts
+src/domain/path/segmented-path.test.ts
 src/composables/useSessionSync.test.ts
-src/math/PathEvaluator.test.ts
-src/math/WasmBridge.test.ts         JS-only parity (fallback surface + numerical invariants)
-src/math/WasmBridge.wasm.test.ts    JS ↔ WASM parity under Node (requires math_engine.* built)
-src/systems/__tests__/*.test.ts     BuffSystem (+ duration), CombatSystem, EconomySystem,
-                                    MovementSystem, TowerPlacementSystem, WaveSystem
+src/components/game/FunctionPanel.test.ts
+src/math/WasmBridge.test.ts                JS-only parity (fallback surface + numerical invariants)
+src/math/WasmBridge.wasm.test.ts           JS ↔ WASM parity under Node (requires math_engine.* built)
+src/systems/__tests__/*.test.ts            BuffSystem (+ duration), CombatSystem, EconomySystem,
+                                           MovementSystem, TowerPlacementSystem, WaveSystem
 ```
 
 Vitest is configured with `happy-dom` so systems can be tested without a real browser. The two WASM-bridge test files split responsibilities: `WasmBridge.test.ts` pins the JS fallback's behaviour without loading the binary, and `WasmBridge.wasm.test.ts` loads the compiled module under Node to assert numerical parity between the two backends (skipped if the WASM build is absent).

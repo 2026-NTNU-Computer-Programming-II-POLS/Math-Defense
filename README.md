@@ -171,8 +171,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 91 tests (DDD aggregates, routers, coverage gaps, domain invariants, shared-constants parity)
-cd frontend && npm test            # 14 test files (systems, engine, WASM bridge + WASM/JS parity)
+cd backend  && pytest              # 97 tests (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity)
+cd frontend && npm test            # 29 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
