@@ -123,15 +123,10 @@ function drawPlot(ctx: CanvasRenderingContext2D) {
   ctx.fillText(`b=${hi}`, lbX, H - 1)
 }
 
-// dpr: false keeps the stylesheet's `width: 100%` responsive sizing intact.
-// `useCanvasPlot` only pins inline style dimensions when DPR scaling would
-// otherwise blow up the backing store — opting out matches the original
-// IntegralPanel behaviour (fixed 240×130 bitmap, CSS scales the display).
 const { canvasRef, redraw } = useCanvasPlot({
   width: CANVAS_W,
   height: CANVAS_H,
   draw: drawPlot,
-  dpr: false,
 })
 void canvasRef // template-only ref — vue-tsc TS6133 doesn't track destructured composable refs
 // FourierPanel pattern: capture `stop` from watch(), tear down on unmount.

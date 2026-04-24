@@ -103,7 +103,12 @@ onUnmounted(() => {
   // Restore pre-panel focus (A-7)
   const target = previousFocus
   previousFocus = null
-  if (target && document.contains(target) && typeof target.focus === 'function') {
+  const focusable = target
+    && document.contains(target)
+    && (target as HTMLElement).offsetParent !== null
+    && !(target as HTMLInputElement).disabled
+    && typeof target.focus === 'function'
+  if (focusable) {
     try { target.focus() } catch { /* detached — ignore */ }
   }
 })

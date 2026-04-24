@@ -79,7 +79,7 @@ function canAfford(cost: number): boolean {
           { unaffordable: !canAfford(def.cost) },
           { shaking: shakingType === def.type },
         ]"
-        :title="`${def.description} — ${def.mathConcept} · 費用：${def.cost} 金`"
+        :data-tooltip="`${def.description} — ${def.mathConcept} · 費用：${def.cost} 金`"
         :aria-label="`${def.nameEn}, ${def.mathConcept}, cost ${def.cost} gold${canAfford(def.cost) ? '' : ', unaffordable'}`"
         :aria-pressed="uiStore.selectedTowerType === def.type"
         :aria-disabled="!canAfford(def.cost)"
@@ -188,4 +188,32 @@ function canAfford(cost: number): boolean {
 .tower-name { font-size: 11px; color: #e8dcc8; letter-spacing: 1px; }
 .tower-cost { font-size: 12px; color: var(--gold); }
 .cost-red   { color: var(--hp-red); }
+
+/* Custom tooltip replacing native title (FE-11) */
+.tower-btn[data-tooltip] { position: relative; }
+.tower-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 10px;
+  background: rgba(20, 16, 28, 0.96);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  color: #e8dcc8;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: calc(var(--z-chrome) + 1);
+}
+.tower-btn[data-tooltip]:hover::after,
+.tower-btn[data-tooltip]:focus-visible::after {
+  opacity: 1;
+}
 </style>

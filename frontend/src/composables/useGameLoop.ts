@@ -52,9 +52,12 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
   }
 
   function retry(): void {
-    // Reset flags and re-run the boot path. The HMR-defensive teardown below
-    // handles any half-constructed engine from the failed attempt.
     ready.value = false
+    if (game.value) {
+      try { game.value.destroy() } catch { /* ignore */ }
+      game.value = null
+    }
+    unsubs.splice(0).forEach((fn) => { try { fn() } catch { /* ignore */ } })
     void boot()
   }
 
@@ -111,7 +114,10 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
       g.levelContext = null
       gameStore.clearPathPanel()
       const level = LEVELS.find((l) => l.id === (levelNum as number))
-      if (!level) return
+      if (!level) {
+        uiStore.showModal('Level failed to load (K-3)', `Unknown level id: ${levelNum}`)
+        return
+      }
       g.levelContext = createLevelContext(level, g.eventBus)
       panelUnsubscribe = projectPathPanel(g.levelContext, g.eventBus, gameStore)
     }))
@@ -150,6 +156,10 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>) {
         && typeof tower === 'object'
         && 'id' in tower
         && typeof (tower as { id: unknown }).id === 'string'
+        && 'type' in tower
+        && typeof (tower as { type: unknown }).type === 'string'
+        && 'params' in tower
+        && typeof (tower as { params: unknown }).params === 'object'
       ) {
         uiStore.openBuildPanel((tower as Tower).id)
       } else {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -40,7 +40,7 @@ function announce(msg: string): void {
   // Reassigning with the same value won't re-announce — toggle via empty string
   // tick before setting, so consecutive identical messages still fire.
   liveMessage.value = ''
-  requestAnimationFrame(() => { liveMessage.value = msg })
+  void nextTick(() => { liveMessage.value = msg })
 }
 
 watch(() => gameStore.phase, (phase) => {

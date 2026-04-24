@@ -61,14 +61,12 @@ async def _auth_store_janitor() -> None:
             await asyncio.sleep(_JANITOR_INTERVAL_SECONDS)
         except asyncio.CancelledError:
             return
-        db = SessionLocal()
         try:
-            purge_expired_denied_tokens(db)
-            purge_stale_login_attempts(db)
+            with SessionLocal() as db:
+                purge_expired_denied_tokens(db)
+                purge_stale_login_attempts(db)
         except Exception:
             logger.exception("Auth-store janitor iteration failed")
-        finally:
-            db.close()
 
 
 @asynccontextmanager

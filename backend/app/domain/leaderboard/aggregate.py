@@ -21,7 +21,7 @@ class LeaderboardEntry:
     def __init__(
         self,
         id: str,
-        user_id: str,
+        user_id: str | None,
         level: Level,
         score: Score,
         kills: int,

@@ -31,6 +31,7 @@ export function useSessionSync() {
   let sessionGeneration = 0  // generation of the currently-live session; stale WAVE_END writes bail
   let consecutiveUpdateFailures = 0
   let alertedForFailures = false
+  let lastSyncedWave = -1
 
   async function createSessionWithRetry(levelNum: number, gen: number): Promise<string | null> {
     for (let attempt = 0; attempt <= MAX_CREATE_RETRIES; attempt++) {
@@ -100,6 +101,7 @@ export function useSessionSync() {
       if (gen !== createGeneration) return  // another LEVEL_START fired while we awaited
       sessionId.value = id
       sessionGeneration = gen  // pin the session so WAVE_END can detect stale writes
+      lastSyncedWave = -1    // new session — reset dedup counter
     }))
 
     // WAVE_END → update session with the frozen snapshot carried by the event.
@@ -129,13 +131,14 @@ export function useSessionSync() {
           pending.value = null
           if (!sessionId.value) break
           if (job.gen !== sessionGeneration) break
+          if (job.snapshot.wave === lastSyncedWave) continue
           await sessionService.update(sessionId.value, {
             current_wave: job.snapshot.wave,
             gold: job.snapshot.gold,
             hp: job.snapshot.hp,
             score: job.snapshot.score,
           })
-          // success → reset the failure counter and alert latch
+          lastSyncedWave = job.snapshot.wave
           consecutiveUpdateFailures = 0
           alertedForFailures = false
         }

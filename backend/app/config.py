@@ -64,10 +64,15 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
         origins = [origin.strip() for origin in v.split(",") if origin.strip()] if isinstance(v, str) else list(v)
+        from urllib.parse import urlparse
         for origin in origins:
             if not re.match(r'^https?://', origin):
                 raise ValueError(
                     f"Invalid CORS origin '{origin}': must start with http:// or https://"
+                )
+            if not urlparse(origin).hostname:
+                raise ValueError(
+                    f"Invalid CORS origin '{origin}': host component must not be empty"
                 )
         return origins
 

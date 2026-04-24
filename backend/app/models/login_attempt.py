@@ -6,13 +6,16 @@ Rows are keyed by username; `failures` is the count in the current window and
 deadline when the account becomes usable again (NULL = not locked).
 """
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime
+from sqlalchemy import String, Integer, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
 
 class LoginAttempt(Base):
     __tablename__ = "login_attempts"
+    __table_args__ = (
+        Index("ix_login_attempts_locked_until", "locked_until"),
+    )
 
     username: Mapped[str] = mapped_column(String(50), primary_key=True)
     failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

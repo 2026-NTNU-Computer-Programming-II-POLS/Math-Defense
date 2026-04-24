@@ -72,7 +72,15 @@ watch(tower, (t) => {
     result[field.key] = typeof v === 'number' && Number.isFinite(v) ? v : field.default
   }
   localParams.value = result
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
+
+watch(bossTarget, (target) => {
+  if (!target || tower.value?.type !== TowerType.FOURIER_SHIELD) return
+  const fourierFields = TOWER_PARAM_FIELDS[TowerType.FOURIER_SHIELD] ?? []
+  for (const field of fourierFields) {
+    localParams.value[field.key] = field.default
+  }
+})
 
 function updateParam(key: string, value: number): void {
   localParams.value[key] = value
