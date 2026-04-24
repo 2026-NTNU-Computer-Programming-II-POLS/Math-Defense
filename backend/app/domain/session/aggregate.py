@@ -68,6 +68,8 @@ class GameSession:
         gold: int = INITIAL_GOLD,
         hp: int = INITIAL_HP,
         score: int = 0,
+        kills: int = 0,
+        waves_survived: int = 0,
         started_at: datetime | None = None,
         ended_at: datetime | None = None,
     ) -> None:
@@ -79,6 +81,8 @@ class GameSession:
         self.gold = gold
         self.hp = hp
         self.score = score
+        self.kills = kills
+        self.waves_survived = waves_survived
         self.started_at = started_at or datetime.now(UTC)
         self.ended_at = ended_at
         self._events: list = []
@@ -165,7 +169,7 @@ class GameSession:
         level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
         if result.score.value > level_cap:
             raise DomainValueError("final score exceeds level maximum")
-        kill_cap = LEVEL_MAX_KILLS.get(int(self.level), result.kills + 1)
+        kill_cap = LEVEL_MAX_KILLS.get(int(self.level), 0)
         if result.kills > kill_cap:
             raise DomainValueError("kills exceed level maximum")
         wave_cap = LEVEL_MAX_WAVES.get(int(self.level), MAX_WAVE)
@@ -174,6 +178,8 @@ class GameSession:
 
         self._transition_to(SessionStatus.COMPLETED)
         self.score = result.score.value
+        self.kills = result.kills
+        self.waves_survived = result.waves_survived
         self.ended_at = datetime.now(UTC)
         self._events.append(
             SessionCompleted(

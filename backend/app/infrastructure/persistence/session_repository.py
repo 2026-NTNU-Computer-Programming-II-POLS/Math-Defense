@@ -72,6 +72,8 @@ class SqlAlchemySessionRepository:
             row.gold = session.gold
             row.hp = session.hp
             row.score = session.score
+            row.kills = session.kills
+            row.waves_survived = session.waves_survived
             row.ended_at = ended_at
         else:
             row = GameSessionModel(
@@ -83,6 +85,8 @@ class SqlAlchemySessionRepository:
                 gold=session.gold,
                 hp=session.hp,
                 score=session.score,
+                kills=session.kills,
+                waves_survived=session.waves_survived,
                 started_at=started_at,
                 ended_at=ended_at,
             )
@@ -104,6 +108,8 @@ class SqlAlchemySessionRepository:
             gold=row.gold,
             hp=row.hp,
             score=row.score,
+            kills=row.kills,
+            waves_survived=row.waves_survived,
             started_at=_ensure_utc(row.started_at),
             ended_at=_ensure_utc(row.ended_at),
         )

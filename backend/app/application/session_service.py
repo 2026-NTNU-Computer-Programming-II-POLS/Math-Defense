@@ -119,8 +119,8 @@ class SessionApplicationService:
                     user_id=session.user_id,
                     level=int(session.level),
                     score=session.score,
-                    kills=kills,
-                    waves_survived=waves_survived,
+                    kills=session.kills,
+                    waves_survived=session.waves_survived,
                 )
                 self._dispatch_post_commit([catch_up])
                 return session

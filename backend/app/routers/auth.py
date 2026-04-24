@@ -11,7 +11,7 @@ from app.domain.user.aggregate import User
 from app.factories import build_auth_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
-from app.schemas.auth import AuthMeResponse, LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import AuthMeResponse, ChangePasswordRequest, LoginRequest, RegisterRequest, TokenResponse
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
     user, token = build_auth_service(db).register(req.username, req.password)
     logger.info("User registered: id=%s", user.id)
     _set_auth_cookie(response, token)
-    return TokenResponse(access_token=token, id=user.id, username=user.username)
+    return TokenResponse(id=user.id, username=user.username)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -63,7 +63,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     user, token = build_auth_service(db).login(req.username, req.password)
     logger.info("User logged in: id=%s", user.id)
     _set_auth_cookie(response, token)
-    return TokenResponse(access_token=token, id=user.id, username=user.username)
+    return TokenResponse(id=user.id, username=user.username)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -88,6 +88,19 @@ def logout(
             # would call logout again, creating an infinite loop.
             pass
     _clear_auth_cookie(response)
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
+def change_password(
+    request: Request,
+    req: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # InvalidCredentialsError → 401 via the global DomainError handler.
+    build_auth_service(db).change_password(current_user.id, req.current_password, req.new_password)
+    logger.info("Password changed: id=%s", current_user.id)
 
 
 @router.get("/me", response_model=AuthMeResponse)

@@ -116,6 +116,18 @@ class AuthApplicationService:
             raise UserNotFoundError("User not found")
         return user
 
+    def change_password(self, user_id: str, current_password: str, new_password: str) -> None:
+        """Verify current password and replace it with the new one."""
+        with self._uow:
+            user = self._user_repo.find_by_id(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found")
+            if not verify_password(current_password, user.password_hash):
+                raise InvalidCredentialsError("Current password is incorrect")
+            user.password_hash = hash_password(new_password)
+            self._user_repo.save(user)
+            self._uow.commit()
+
     def logout_token(self, token: str) -> None:
         """Revoke a token by adding its JTI to the deny-list."""
         payload = decode_token(token)

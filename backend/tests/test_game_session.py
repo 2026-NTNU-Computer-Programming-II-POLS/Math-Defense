@@ -1,6 +1,6 @@
 def _register_and_token(client, username="player1"):
     res = client.post("/api/auth/register", json={"username": username, "password": "secret123"})
-    return res.json()["access_token"]
+    return res.cookies.get("access_token")
 
 
 def _create_session(client, token, level=1):

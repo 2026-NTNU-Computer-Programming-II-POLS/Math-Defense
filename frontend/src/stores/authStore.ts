@@ -19,7 +19,7 @@ export interface User {
 // expiry (cookie is HTTP-only, so the frontend can't read the exp claim
 // directly). Short enough that an expired session is caught well before
 // the user attempts a mutating action; long enough not to burden the API.
-const TOKEN_PROBE_INTERVAL_MS = 60_000
+const TOKEN_PROBE_INTERVAL_MS = 15_000
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)

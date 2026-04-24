@@ -77,7 +77,7 @@ class LeaderboardApplicationService:
             # time. This closes the A1/V1 forgery path where a client posts
             # inflated ancillary stats on an otherwise legitimate session.
             level_int = int(session.level)
-            if session.current_wave > 0 and waves_survived > session.current_wave:
+            if waves_survived > session.current_wave:
                 raise SessionValidationError(
                     "waves_survived exceeds server-tracked wave count"
                 )

@@ -34,6 +34,13 @@ class LeaderboardEntryOut(BaseModel):
     created_at: datetime
 
 
+class ScoreSubmissionResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    score: int
+
+
 class LeaderboardResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 

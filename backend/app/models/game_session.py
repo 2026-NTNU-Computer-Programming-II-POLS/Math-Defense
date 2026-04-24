@@ -33,5 +33,7 @@ class GameSession(Base):
     gold: Mapped[int] = mapped_column(Integer, default=200)
     hp: Mapped[int] = mapped_column(Integer, default=20)
     score: Mapped[int] = mapped_column(Integer, default=0)
+    kills: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    waves_survived: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

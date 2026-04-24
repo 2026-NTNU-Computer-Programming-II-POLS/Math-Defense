@@ -78,10 +78,41 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    access_token: str
     token_type: str = "bearer"
     id: str
     username: str
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str
+
+    @field_validator("current_password")
+    @classmethod
+    def current_password_max_length(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password is too long")
+        return v
+
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_valid(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password is too long")
+        if not re.search(r'[a-zA-Z]', v):
+            raise ValueError("Password must contain at least one letter")
+        if not re.search(r'[0-9]', v):
+            raise ValueError("Password must contain at least one digit")
+        if re.search(r'(.)\1{4,}', v):
+            raise ValueError("Password must not contain five or more of the same character in a row")
+        if v.lower() in _COMMON_PASSWORDS:
+            raise ValueError("Password is too common; choose something less guessable")
+        return v
 
 
 class AuthMeResponse(BaseModel):

@@ -13,6 +13,7 @@ from app.schemas.leaderboard import (
     LeaderboardEntryOut,
     LeaderboardResponse,
     ScoreSubmission,
+    ScoreSubmissionResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 
 
+# Intentionally unauthenticated: the leaderboard is a public feature.
+# Username enumeration risk is accepted by design; scores are server-side
+# authoritative so exposure of the list provides no exploitable attack surface.
 @router.get("", response_model=LeaderboardResponse)
 @limiter.limit("30/minute")
 def get_leaderboard(
@@ -46,7 +50,7 @@ def get_leaderboard(
     return LeaderboardResponse(entries=entries, total=total)
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=ScoreSubmissionResponse)
 @limiter.limit("10/minute")
 def submit_score(
     request: Request,

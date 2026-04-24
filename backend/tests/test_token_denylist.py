@@ -17,7 +17,7 @@ def _register_and_token(client) -> str:
         json={"username": "logoutme", "password": "secret123"},
     )
     assert res.status_code == 201
-    return res.json()["access_token"]
+    return res.cookies.get("access_token")
 
 
 def test_logout_token_is_idempotent(client, db_session):
