@@ -308,11 +308,14 @@ class TestUserDeletionCascade:
 
         db = session_factory()
         try:
-            # game_sessions: ON DELETE CASCADE → rows gone
+            # game_sessions: ON DELETE CASCADE → row gone
             assert db.query(GameSessionModel).filter(GameSessionModel.id == sid).count() == 0
-            # leaderboard.user_id is also CASCADE → entry gone too
-            # (model declares ondelete="CASCADE" on user_id)
-            assert db.query(LeaderboardEntryModel).count() == 0
+            # leaderboard.user_id: ON DELETE SET NULL → entry survives anonymised
+            # leaderboard.session_id: ON DELETE SET NULL → nulled when game session was cascade-deleted
+            lb = db.query(LeaderboardEntryModel).all()
+            assert len(lb) == 1
+            assert lb[0].user_id is None
+            assert lb[0].session_id is None
         finally:
             db.close()
 
