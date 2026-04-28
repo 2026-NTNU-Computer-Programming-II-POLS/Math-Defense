@@ -24,10 +24,7 @@ body {
   background: #0d0a12;
   color: #e8dcc8;
   font-family: var(--font-main);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+  margin: 0;
   overflow: hidden;
 }
 

@@ -70,6 +70,7 @@ class GameSession:
         score: int = 0,
         kills: int = 0,
         waves_survived: int = 0,
+        initial_answer: bool = False,
         started_at: datetime | None = None,
         ended_at: datetime | None = None,
     ) -> None:
@@ -83,17 +84,26 @@ class GameSession:
         self.score = score
         self.kills = kills
         self.waves_survived = waves_survived
+        self.initial_answer = initial_answer
+        self.kill_value: int | None = None
+        self.cost_total: int | None = None
+        self.time_total: float | None = None
+        self.health_origin: int | None = None
+        self.health_final: int | None = None
+        self.time_exclude_prepare: list[float] | None = None
+        self.total_score: float | None = None
         self.started_at = started_at or datetime.now(UTC)
         self.ended_at = ended_at
         self._events: list = []
 
     @classmethod
-    def create(cls, user_id: str, level: Level) -> GameSession:
+    def create(cls, user_id: str, level: Level, initial_answer: bool = False) -> GameSession:
         """Factory method — creates a new ACTIVE session"""
         session = cls(
             id=str(uuid.uuid4()),
             user_id=user_id,
             level=level,
+            initial_answer=initial_answer,
         )
         session._events.append(
             SessionCreated(session_id=session.id, user_id=user_id, level=int(level))
@@ -101,6 +111,10 @@ class GameSession:
         return session
 
     # ── Status queries ──
+
+    @property
+    def star_rating(self) -> Level:
+        return self.level
 
     @property
     def is_active(self) -> bool:
@@ -126,6 +140,8 @@ class GameSession:
         gold: int | None = None,
         hp: int | None = None,
         score: int | None = None,
+        kill_value: int | None = None,
+        cost_total: int | None = None,
     ) -> None:
         """Update game progress — only allowed in ACTIVE status.
 
@@ -154,6 +170,10 @@ class GameSession:
             if score > level_cap:
                 raise DomainValueError("score exceeds level maximum")
             self.score = score
+        if kill_value is not None:
+            self.kill_value = max(0, kill_value)
+        if cost_total is not None:
+            self.cost_total = max(0, cost_total)
         self._events.append(SessionUpdated(session_id=self.id))
 
     def complete(self, result: GameResult) -> None:
@@ -191,6 +211,37 @@ class GameSession:
                 waves_survived=result.waves_survived,
             )
         )
+
+    def record_scoring_context(
+        self,
+        *,
+        kill_value: int | None = None,
+        cost_total: int | None = None,
+        time_total: float | None = None,
+        health_origin: int | None = None,
+        health_final: int | None = None,
+        time_exclude_prepare: list[float] | None = None,
+        total_score: float | None = None,
+    ) -> None:
+        """Record V2 scoring metadata after completion.
+
+        These analytics fields are write-once supplements to the core
+        GameResult; they do not participate in state-transition invariants.
+        """
+        if kill_value is not None:
+            self.kill_value = max(0, kill_value)
+        if cost_total is not None:
+            self.cost_total = max(0, cost_total)
+        if time_total is not None:
+            self.time_total = max(0.0, time_total)
+        if health_origin is not None:
+            self.health_origin = max(0, min(health_origin, HP_MAX))
+        if health_final is not None:
+            self.health_final = max(0, min(health_final, HP_MAX))
+        if time_exclude_prepare is not None:
+            self.time_exclude_prepare = [max(0.0, t) for t in time_exclude_prepare]
+        if total_score is not None:
+            self.total_score = max(0.0, total_score)
 
     def abandon(self) -> None:
         """Abandon session — idempotent (no-op if already ended)"""

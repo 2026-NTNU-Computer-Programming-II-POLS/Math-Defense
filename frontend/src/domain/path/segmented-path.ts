@@ -24,6 +24,7 @@ export interface PathSegmentRuntime {
   readonly xRange: readonly [number, number]
   readonly params: PathSegmentParams
   readonly evaluate: (x: number) => number
+  readonly evaluateDerivative: (x: number) => number
   readonly expr: string
   readonly label: string
 }

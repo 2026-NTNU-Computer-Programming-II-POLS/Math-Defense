@@ -11,11 +11,14 @@ from app.domain.value_objects import Level, Score, GameResult, SessionStatus
 from app.domain.session.aggregate import GameSession
 from app.domain.session.events import SessionCompleted
 from app.domain.leaderboard.aggregate import LeaderboardEntry
+from app.domain.scoring.score_calculator import recompute_total_score
 from app.utils.integrity import is_constraint_violation
 
 if TYPE_CHECKING:
+    from app.application.achievement_service import AchievementApplicationService
     from app.domain.session.repository import GameSessionRepository
     from app.domain.leaderboard.repository import LeaderboardRepository
+    from app.domain.territory.repository import TerritoryRepository
     from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -36,26 +39,30 @@ class SessionApplicationService:
         session_repo: GameSessionRepository,
         leaderboard_repo: LeaderboardRepository,
         uow: SqlAlchemyUnitOfWork,
+        achievement_svc: AchievementApplicationService | None = None,
+        territory_repo: TerritoryRepository | None = None,
     ) -> None:
         self._session_repo = session_repo
         self._leaderboard_repo = leaderboard_repo
         self._uow = uow
+        self._achievement_svc = achievement_svc
+        self._territory_repo = territory_repo
 
-    def create_session(self, user_id: str, level: int) -> GameSession:
+    def create_session(self, user_id: str, level: int, initial_answer: bool = False) -> GameSession:
         # Under PG, find_active_by_user holds a row lock via with_for_update, so the
         # race between concurrent creates is closed. The retry here is defence-in-depth
         # for the case where no row exists yet (FOR UPDATE has nothing to lock) and
         # two inserts both reach the unique partial index simultaneously.
         for attempt in range(2):
             try:
-                return self._create_session_once(user_id, level)
+                return self._create_session_once(user_id, level, initial_answer)
             except IntegrityError as e:
                 if attempt == 1 or not _is_active_session_conflict(e):
                     raise
                 logger.info("create_session race: retrying after abandoning concurrent active session user=%s", user_id)
         raise RuntimeError("unreachable")
 
-    def _create_session_once(self, user_id: str, level: int) -> GameSession:
+    def _create_session_once(self, user_id: str, level: int, initial_answer: bool = False) -> GameSession:
         with self._uow:
             # 1. Abandon stale sessions
             stale = self._session_repo.find_stale_sessions(user_id)
@@ -70,7 +77,7 @@ class SessionApplicationService:
                 self._session_repo.save(existing)
 
             # 3. Create new session
-            session = GameSession.create(user_id, Level(level))
+            session = GameSession.create(user_id, Level(level), initial_answer=initial_answer)
             self._session_repo.save(session)
             self._uow.commit()
             return session
@@ -83,6 +90,8 @@ class SessionApplicationService:
         gold: int | None = None,
         hp: int | None = None,
         score: int | None = None,
+        kill_value: int | None = None,
+        cost_total: int | None = None,
     ) -> GameSession:
         with self._uow:
             session = self._get_session(session_id, user_id)
@@ -91,6 +100,8 @@ class SessionApplicationService:
                 gold=gold,
                 hp=hp,
                 score=score,
+                kill_value=kill_value,
+                cost_total=cost_total,
             )
             self._session_repo.save(session)
             self._uow.commit()
@@ -103,6 +114,13 @@ class SessionApplicationService:
         score: int,
         kills: int,
         waves_survived: int,
+        kill_value: int | None = None,
+        cost_total: int | None = None,
+        time_total: float | None = None,
+        health_origin: int | None = None,
+        health_final: int | None = None,
+        time_exclude_prepare: list[float] | None = None,
+        total_score: float | None = None,
     ) -> GameSession:
         pending_events: list = []
         with self._uow:
@@ -131,6 +149,15 @@ class SessionApplicationService:
                 waves_survived=waves_survived,
             )
             session.complete(result)
+            session.record_scoring_context(
+                kill_value=kill_value,
+                cost_total=cost_total,
+                time_total=time_total,
+                health_origin=health_origin,
+                health_final=health_final,
+                time_exclude_prepare=time_exclude_prepare,
+                total_score=total_score,
+            )
             self._session_repo.save(session)
 
             # Snapshot events before commit so a durable copy survives the
@@ -146,14 +173,23 @@ class SessionApplicationService:
                 session.id, user_id, score,
             )
 
+        # Score verification runs after commit so a logging failure cannot
+        # roll back an already-persisted session.
+        self._verify_score(session, total_score)
+
         # Post-commit dispatch: session completion is now durable. Handler runs
         # in a separate UoW so a leaderboard-insert failure cannot roll back the
         # already-committed session. Idempotency in _handle_session_completed
         # makes retries (via end_session catch-up or background sweeper) safe.
-        self._dispatch_post_commit(pending_events)
+        newly_unlocked = self._dispatch_post_commit(pending_events)
+        session._newly_unlocked_achievements = [
+            {"id": a.achievement_id, "talent_points": a.talent_points}
+            for a in newly_unlocked
+        ]
         return session
 
-    def _dispatch_post_commit(self, events: list) -> None:
+    def _dispatch_post_commit(self, events: list) -> list:
+        newly_unlocked: list = []
         for event in events:
             if not isinstance(event, SessionCompleted):
                 continue
@@ -162,14 +198,49 @@ class SessionApplicationService:
                     self._handle_session_completed(event)
                     self._uow.commit()
             except SQLAlchemyError:
-                # Session is already durably committed; DB-layer failure in
-                # the handler is the recoverable case — log and let a future
-                # retry (client resubmit, background catch-up) re-dispatch
-                # via the idempotent handler. Non-DB exceptions (bugs) are
-                # re-raised so they surface instead of silently vanishing.
                 logger.exception(
                     "post-commit dispatch failed session=%s", event.session_id
                 )
+            try:
+                unlocked = self._check_achievements(event)
+                newly_unlocked.extend(unlocked)
+            except Exception:
+                logger.exception(
+                    "achievement check failed session=%s", event.session_id
+                )
+        return newly_unlocked
+
+    def _check_achievements(self, event: SessionCompleted) -> list:
+        if not self._achievement_svc:
+            return []
+        session = self._session_repo.find_by_id(event.session_id, event.user_id)
+        hp_lost = 0
+        gold_remaining = 0
+        if session:
+            from app.shared_constants import INITIAL_HP
+            origin_hp = session.health_origin if session.health_origin is not None else INITIAL_HP
+            final_hp = session.health_final if session.health_final is not None else session.hp
+            hp_lost = max(0, origin_hp - final_hp)
+            gold_remaining = session.gold
+        territories_held = 0
+        territory_max_star = 0
+        if self._territory_repo:
+            territories_held = self._territory_repo.count_territories_by_student(event.user_id)
+            territory_max_star = self._territory_repo.find_max_star_for_student(event.user_id)
+        with self._uow:
+            result = self._achievement_svc.check_and_unlock(
+                user_id=event.user_id,
+                session_score=event.score,
+                session_kills=event.kills,
+                session_waves=event.waves_survived,
+                session_star=event.level,
+                session_hp_lost=hp_lost,
+                session_gold_remaining=gold_remaining,
+                territories_held=territories_held,
+                territory_max_star=territory_max_star,
+            )
+            self._uow.commit()
+        return result
 
     def get_active_for_user(self, user_id: str) -> GameSession | None:
         """Return the caller's active session, if any.
@@ -239,6 +310,30 @@ class SessionApplicationService:
         raise SessionStaleError(
             "Session timed out (over 2 hours) and was automatically abandoned"
         )
+
+    def _verify_score(self, session: GameSession, submitted_total_score: float | None) -> None:
+        if submitted_total_score is None:
+            return
+        try:
+            recomputed = recompute_total_score(
+                kill_value=session.kill_value,
+                time_total=session.time_total,
+                time_exclude_prepare=session.time_exclude_prepare,
+                cost_total=session.cost_total,
+                health_origin=session.health_origin,
+                health_final=session.health_final,
+                initial_answer=session.initial_answer,
+            )
+            if recomputed is None:
+                return
+            tolerance = max(0.01, abs(recomputed) * 0.05)
+            if abs(recomputed - submitted_total_score) > tolerance:
+                logger.warning(
+                    "total_score mismatch session=%s submitted=%.4f recomputed=%.4f",
+                    session.id, submitted_total_score, recomputed,
+                )
+        except Exception:
+            logger.exception("_verify_score failed for session=%s", session.id)
 
     def _abandon_and_commit(self, session: GameSession) -> None:
         session.abandon()

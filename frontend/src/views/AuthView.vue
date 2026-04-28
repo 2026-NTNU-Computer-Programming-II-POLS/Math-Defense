@@ -7,27 +7,19 @@ const router = useRouter()
 const route = useRoute()
 const { loading, error, login, register } = useAuth()
 
-// Default to register mode so first-time visitors land on the right form.
-// Switch to login when arriving from a protected-route redirect (?next=…)
-// or when the caller explicitly requests it (?mode=login).
 const isLogin = ref(
   route.query.mode === 'login' || (!route.query.mode && !!route.query.next),
 )
-const username = ref('')
+const email = ref('')
 const password = ref('')
+const playerName = ref('')
+const role = ref('student')
 
 const title = computed(() => isLogin.value ? '登入' : '註冊')
 
-// Mirror backend constraints (backend/app/schemas/auth.py):
-//   username: 3-50 chars, [a-zA-Z0-9_-] only
-//   password: 8-128 chars, must contain at least one letter and one digit
-const USERNAME_MIN = 3
-const USERNAME_MAX = 50
-const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/
 const PASSWORD_MIN = 8
 const PASSWORD_MAX = 128
 
-// Real-time password rule checks shown during registration
 const passwordRules = reactive({
   length: false,
   hasLetter: false,
@@ -41,8 +33,6 @@ function updatePasswordRules(p: string): void {
 }
 
 function clearError(): void {
-  // Stale validation messages (e.g. "password must contain a digit") stick
-  // around across edits otherwise, confusing users who just fixed the issue.
   if (error.value) error.value = ''
 }
 
@@ -59,38 +49,36 @@ function toggleMode(): void {
   if (!isLogin.value) updatePasswordRules(password.value)
 }
 
-function validate(u: string, p: string): string {
-  if (!u) return '請輸入玩家名稱'
-  if (!p) return '請輸入密碼'
+function validate(): string {
+  if (!email.value) return '請輸入電子信箱'
+  if (!password.value) return '請輸入密碼'
   if (isLogin.value) return ''
-  if (u.length < USERNAME_MIN || u.length > USERNAME_MAX) {
-    return `玩家名稱需 ${USERNAME_MIN}-${USERNAME_MAX} 字`
-  }
-  if (!USERNAME_PATTERN.test(u)) {
-    return '玩家名稱僅能包含英數、底線、連字號'
-  }
-  if (p.length < PASSWORD_MIN || p.length > PASSWORD_MAX) {
+  if (!playerName.value.trim()) return '請輸入玩家名稱'
+  if (playerName.value.trim().length > 50) return '玩家名稱不可超過 50 字'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) return '請輸入有效的電子信箱'
+  if (password.value.length < PASSWORD_MIN || password.value.length > PASSWORD_MAX) {
     return `密碼需 ${PASSWORD_MIN}-${PASSWORD_MAX} 字`
   }
-  if (!/[a-zA-Z]/.test(p) || !/[0-9]/.test(p)) {
+  if (!/[a-zA-Z]/.test(password.value) || !/[0-9]/.test(password.value)) {
     return '密碼需同時包含英文字母與數字'
   }
   return ''
 }
 
 async function submit(): Promise<void> {
-  const u = username.value.trim()
+  const e = email.value.trim()
   const p = password.value
-  username.value = u
-  const msg = validate(u, p)
+  email.value = e
+  const msg = validate()
   if (msg) {
     error.value = msg
     return
   }
-  const ok = isLogin.value ? await login(u, p) : await register(u, p)
+  const ok = isLogin.value
+    ? await login(e, p)
+    : await register(e, p, playerName.value.trim(), role.value)
   if (ok) {
     const raw = typeof route.query.next === 'string' ? route.query.next : ''
-    // Only allow relative paths to prevent open-redirect attacks
     const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
     router.push(next)
   }
@@ -104,16 +92,39 @@ async function submit(): Promise<void> {
 
       <form class="auth-form" @submit.prevent="submit">
         <label class="auth-field">
-          <span>玩家名稱</span>
+          <span>電子信箱</span>
           <input
-            v-model="username"
+            v-model="email"
             class="rune-input"
-            type="text"
-            autocomplete="username"
+            type="email"
+            autocomplete="email"
             required
             @input="clearError"
           />
         </label>
+
+        <template v-if="!isLogin">
+          <label class="auth-field">
+            <span>玩家名稱</span>
+            <input
+              v-model="playerName"
+              class="rune-input"
+              type="text"
+              autocomplete="nickname"
+              required
+              @input="clearError"
+            />
+          </label>
+
+          <label class="auth-field">
+            <span>身份</span>
+            <select v-model="role" class="rune-input">
+              <option value="student">學生</option>
+              <option value="teacher">教師</option>
+            </select>
+          </label>
+        </template>
+
         <label class="auth-field">
           <span>密碼</span>
           <input
@@ -144,7 +155,7 @@ async function submit(): Promise<void> {
       </button>
 
       <p v-if="isLogin" class="demo-hint">
-        體驗帳號：<code>demo</code> / <code>Demo1234</code>
+        體驗帳號：<code>demo@mathdefense.local</code> / <code>Demo1234</code>
       </p>
 
       <button class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
@@ -161,7 +172,7 @@ async function submit(): Promise<void> {
 }
 
 .auth-panel {
-  width: 320px;
+  width: 360px;
   display: flex;
   flex-direction: column;
   gap: 20px;

@@ -2,10 +2,9 @@ import re
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.domain.user.constraints import EMAIL_MAX_LENGTH, PLAYER_NAME_MIN_LENGTH, PLAYER_NAME_MAX_LENGTH
 
-# Low-effort passwords that pass the length/letter/digit check but are trivially
-# brute-forced. The list is small on purpose: a curated top-N beats a multi-MB
-# wordlist that still lets `Summer2026` through. Compared case-insensitively.
+
 _COMMON_PASSWORDS = frozenset({
     "password1", "password12", "password123", "passw0rd", "p@ssw0rd",
     "qwerty123", "qwerty1234", "abc12345", "abcd1234", "123456789", "1234567890",
@@ -15,61 +14,80 @@ _COMMON_PASSWORDS = frozenset({
     "test1234", "hello123", "changeme1", "trustno1", "starwars1",
 })
 
+_VALID_ROLES = frozenset({"admin", "teacher", "student"})
+
+
+def _validate_password_strength(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if len(v.encode("utf-8")) > 72:
+        raise ValueError("Password is too long")
+    if not re.search(r'[a-zA-Z]', v):
+        raise ValueError("Password must contain at least one letter")
+    if not re.search(r'[0-9]', v):
+        raise ValueError("Password must contain at least one digit")
+    if re.search(r'(.)\1{4,}', v):
+        raise ValueError("Password must not contain five or more of the same character in a row")
+    if v.lower() in _COMMON_PASSWORDS:
+        raise ValueError("Password is too common; choose something less guessable")
+    return v
+
 
 class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    username: str
+    email: str
     password: str
+    player_name: str
+    role: str = "student"
 
-    @field_validator("username")
+    @field_validator("email")
     @classmethod
-    def username_valid(cls, v: str) -> str:
-        if len(v) < 3 or len(v) > 50:
-            raise ValueError("Username must be 3 to 50 characters long")
-        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
-            raise ValueError("Username may only contain letters, digits, underscore, and hyphen")
+    def email_valid(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not v or len(v) > EMAIL_MAX_LENGTH:
+            raise ValueError(f"Email must be 1-{EMAIL_MAX_LENGTH} characters")
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
+            raise ValueError("Invalid email format")
+        return v
+
+    @field_validator("player_name")
+    @classmethod
+    def player_name_valid(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < PLAYER_NAME_MIN_LENGTH or len(v) > PLAYER_NAME_MAX_LENGTH:
+            raise ValueError(f"Player name must be {PLAYER_NAME_MIN_LENGTH}-{PLAYER_NAME_MAX_LENGTH} characters")
+        return v
+
+    @field_validator("role")
+    @classmethod
+    def role_valid(cls, v: str) -> str:
+        if v not in _VALID_ROLES:
+            raise ValueError(f"Role must be one of: {', '.join(sorted(_VALID_ROLES))}")
         return v
 
     @field_validator("password")
     @classmethod
     def password_valid(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        # bcrypt silently truncates at 72 *bytes*; check encoded length so
-        # multi-byte Unicode passwords don't slip past the limit.
-        if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password is too long")
-        if not re.search(r'[a-zA-Z]', v):
-            raise ValueError("Password must contain at least one letter")
-        if not re.search(r'[0-9]', v):
-            raise ValueError("Password must contain at least one digit")
-        # Reject five-or-more-in-a-row repeats (e.g. `aaaaaaaa1`, `11111abc`).
-        if re.search(r'(.)\1{4,}', v):
-            raise ValueError("Password must not contain five or more of the same character in a row")
-        if v.lower() in _COMMON_PASSWORDS:
-            raise ValueError("Password is too common; choose something less guessable")
-        return v
+        return _validate_password_strength(v)
 
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    username: str
+    email: str
     password: str
 
-    @field_validator("username")
+    @field_validator("email")
     @classmethod
-    def username_max_length(cls, v: str) -> str:
-        if len(v) > 50:
-            raise ValueError("Username must not exceed 50 characters")
-        return v
+    def email_max_length(cls, v: str) -> str:
+        if len(v) > 255:
+            raise ValueError("Email must not exceed 255 characters")
+        return v.strip().lower()
 
     @field_validator("password")
     @classmethod
     def password_max_length(cls, v: str) -> str:
-        # bcrypt silently truncates at 72 *bytes*; check encoded length so
-        # multi-byte Unicode passwords don't cause CPU-bound DoS.
         if len(v.encode("utf-8")) > 72:
             raise ValueError("Password is too long")
         return v
@@ -80,7 +98,10 @@ class TokenResponse(BaseModel):
 
     token_type: str = "bearer"
     id: str
-    username: str
+    email: str
+    player_name: str
+    role: str
+    avatar_url: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):
@@ -100,24 +121,38 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def new_password_valid(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password is too long")
-        if not re.search(r'[a-zA-Z]', v):
-            raise ValueError("Password must contain at least one letter")
-        if not re.search(r'[0-9]', v):
-            raise ValueError("Password must contain at least one digit")
-        if re.search(r'(.)\1{4,}', v):
-            raise ValueError("Password must not contain five or more of the same character in a row")
-        if v.lower() in _COMMON_PASSWORDS:
-            raise ValueError("Password is too common; choose something less guessable")
-        return v
+        return _validate_password_strength(v)
 
 
 class AuthMeResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str
-    username: str
+    email: str
+    player_name: str
+    role: str
     created_at: datetime
+    avatar_url: str | None = None
+
+
+_ALLOWED_AVATAR_URLS = frozenset({
+    '/avatars/wizard.svg',
+    '/avatars/knight.svg',
+    '/avatars/archer.svg',
+    '/avatars/mage.svg',
+    '/avatars/scholar.svg',
+    '/avatars/alchemist.svg',
+})
+
+
+class AvatarUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    avatar_url: str | None
+
+    @field_validator("avatar_url")
+    @classmethod
+    def avatar_url_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in _ALLOWED_AVATAR_URLS:
+            raise ValueError("Invalid avatar URL")
+        return v

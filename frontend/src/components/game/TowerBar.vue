@@ -68,7 +68,7 @@ function canAfford(cost: number): boolean {
 
 <template>
   <div ref="barRef" class="tower-bar">
-    <div class="bar-label">魔法塔</div>
+    <div class="bar-label">Towers</div>
     <div class="tower-list">
       <button
         v-for="def in availableTowers"

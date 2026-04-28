@@ -96,16 +96,6 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   BUFF_RESULT:      [],
   BUFF_PHASE_END:   [],
 
-  // ── Boss shield ──
-  BOSS_SHIELD_START: [
-    { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Sync shield target to UI store' },
-  ],
-  BOSS_SHIELD_ATTEMPT: [
-    { module: 'systems/CombatSystem', handler: 'anonymous', purpose: 'Evaluate match + break shield' },
-  ],
-  BOSS_SHIELD_END: [
-    { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Clear shield UI state' },
-  ],
 
   // ── Resource mirrors ──
   GOLD_CHANGED:  [{ module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror gold to reactive store' }],

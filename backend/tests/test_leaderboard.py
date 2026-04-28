@@ -1,5 +1,8 @@
-def _register_and_token(client, username="player1"):
-    res = client.post("/api/auth/register", json={"username": username, "password": "secret123"})
+def _register_and_token(client, name="player1"):
+    res = client.post("/api/auth/register", json={
+        "email": f"{name}@test.local", "password": "secret123",
+        "player_name": name, "role": "student",
+    })
     return res.cookies.get("access_token")
 
 
@@ -11,7 +14,7 @@ def _create_completed_session(client, token, level=1, score=500, kills=30, waves
     """Create and complete a session, returning its session_id"""
     session_res = client.post(
         "/api/sessions",
-        json={"level": level},
+        json={"star_rating": level},
         headers=_auth_headers(token),
     )
     session_id = session_res.json()["id"]
@@ -57,7 +60,7 @@ def test_submit_score_for_active_session_rejected(client):
     token = _register_and_token(client, "active_submit")
     session_res = client.post(
         "/api/sessions",
-        json={"level": 1},
+        json={"star_rating": 1},
         headers=_auth_headers(token),
     )
     session_id = session_res.json()["id"]
@@ -75,7 +78,7 @@ def test_submit_score_for_abandoned_session_rejected(client):
     token = _register_and_token(client, "abandoned_submit")
     session_res = client.post(
         "/api/sessions",
-        json={"level": 1},
+        json={"star_rating": 1},
         headers=_auth_headers(token),
     )
     session_id = session_res.json()["id"]

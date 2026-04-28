@@ -13,9 +13,10 @@ const ALLOWED_TRANSITIONS: Transition = Object.freeze({
   [GamePhase.MENU]:        Object.freeze([GamePhase.LEVEL_SELECT, GamePhase.BUILD]),
   [GamePhase.LEVEL_SELECT]:Object.freeze([GamePhase.BUILD, GamePhase.MENU]),
   [GamePhase.BUILD]:       Object.freeze([GamePhase.WAVE, GamePhase.GAME_OVER, GamePhase.MENU]),
-  [GamePhase.WAVE]:        Object.freeze([GamePhase.BUFF_SELECT, GamePhase.LEVEL_END, GamePhase.GAME_OVER, GamePhase.BOSS_SHIELD]),
+  [GamePhase.WAVE]:        Object.freeze([GamePhase.BUFF_SELECT, GamePhase.MONTY_HALL, GamePhase.BUILD, GamePhase.LEVEL_END, GamePhase.GAME_OVER, GamePhase.CHAIN_RULE]),
   [GamePhase.BUFF_SELECT]: Object.freeze([GamePhase.BUILD]),
-  [GamePhase.BOSS_SHIELD]: Object.freeze([GamePhase.WAVE, GamePhase.GAME_OVER]),
+  [GamePhase.MONTY_HALL]:  Object.freeze([GamePhase.BUILD, GamePhase.GAME_OVER]),
+  [GamePhase.CHAIN_RULE]:  Object.freeze([GamePhase.WAVE, GamePhase.GAME_OVER]),
   [GamePhase.LEVEL_END]:   Object.freeze([GamePhase.LEVEL_SELECT, GamePhase.MENU, GamePhase.BUILD]),
   [GamePhase.GAME_OVER]:   Object.freeze([GamePhase.MENU, GamePhase.LEVEL_SELECT, GamePhase.BUILD]),
 })

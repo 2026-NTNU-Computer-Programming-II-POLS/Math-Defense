@@ -2,9 +2,9 @@
  * Per-kind pure closure factories.
  *
  * The only place per-kind path math lives. Each factory takes the
- * corresponding `PathSegmentParams` subtype and returns an `(x) => y`
- * closure. The pre-Phase-7 random-path generators were the last alternate
- * home for this math; they were deleted with Phase 7 cleanup (spec §11.2).
+ * corresponding `PathSegmentParams` subtype and returns a
+ * `SegmentClosures` pair: `evaluate(x)` for position and
+ * `evaluateDerivative(x)` for arc-length speed correction.
  */
 import type { PathSegmentParams } from '@/data/path-segment-types'
 
@@ -14,22 +14,36 @@ type QuadraticParams = Extract<PathSegmentParams, { kind: 'quadratic' }>
 type TrigonometricParams = Extract<PathSegmentParams, { kind: 'trigonometric' }>
 type VerticalParams = Extract<PathSegmentParams, { kind: 'vertical' }>
 
+export interface SegmentClosures {
+  evaluate: (x: number) => number
+  evaluateDerivative: (x: number) => number
+}
+
 /** Constant height: `y = c`. */
-export function makeHorizontal(params: HorizontalParams): (x: number) => number {
+export function makeHorizontal(params: HorizontalParams): SegmentClosures {
   const { y } = params
-  return (_x: number) => y
+  return {
+    evaluate: (_x: number) => y,
+    evaluateDerivative: (_x: number) => 0,
+  }
 }
 
 /** Straight line: `y = slope * x + intercept`. */
-export function makeLinear(params: LinearParams): (x: number) => number {
+export function makeLinear(params: LinearParams): SegmentClosures {
   const { slope, intercept } = params
-  return (x: number) => slope * x + intercept
+  return {
+    evaluate: (x: number) => slope * x + intercept,
+    evaluateDerivative: (_x: number) => slope,
+  }
 }
 
 /** Parabola: `y = a*x^2 + b*x + c`. */
-export function makeQuadratic(params: QuadraticParams): (x: number) => number {
+export function makeQuadratic(params: QuadraticParams): SegmentClosures {
   const { a, b, c } = params
-  return (x: number) => a * x * x + b * x + c
+  return {
+    evaluate: (x: number) => a * x * x + b * x + c,
+    evaluateDerivative: (x: number) => 2 * a * x + b,
+  }
 }
 
 /**
@@ -37,9 +51,12 @@ export function makeQuadratic(params: QuadraticParams): (x: number) => number {
  */
 export function makeTrigonometric(
   params: TrigonometricParams,
-): (x: number) => number {
+): SegmentClosures {
   const { amplitude, frequency, phase, offset } = params
-  return (x: number) => amplitude * Math.sin(frequency * x + phase) + offset
+  return {
+    evaluate: (x: number) => amplitude * Math.sin(frequency * x + phase) + offset,
+    evaluateDerivative: (x: number) => amplitude * frequency * Math.cos(frequency * x + phase),
+  }
 }
 
 /**
@@ -52,7 +69,10 @@ export function makeTrigonometric(
  * sees a well-defined value. Enemy kinematics during traversal do not
  * call this closure.
  */
-export function makeVertical(params: VerticalParams): (x: number) => number {
+export function makeVertical(params: VerticalParams): SegmentClosures {
   const { yEnd } = params
-  return (_x: number) => yEnd
+  return {
+    evaluate: (_x: number) => yEnd,
+    evaluateDerivative: (_x: number) => 0,
+  }
 }

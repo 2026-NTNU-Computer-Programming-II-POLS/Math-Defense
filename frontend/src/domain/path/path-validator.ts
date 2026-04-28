@@ -139,10 +139,10 @@ function reportFirstOutOfWorld(s: PathSegmentDef): number | null {
 
 function makeNonVerticalEvaluator(params: PathSegmentParams): (x: number) => number {
   switch (params.kind) {
-    case 'horizontal':    return makeHorizontal(params)
-    case 'linear':        return makeLinear(params)
-    case 'quadratic':     return makeQuadratic(params)
-    case 'trigonometric': return makeTrigonometric(params)
+    case 'horizontal':    return makeHorizontal(params).evaluate
+    case 'linear':        return makeLinear(params).evaluate
+    case 'quadratic':     return makeQuadratic(params).evaluate
+    case 'trigonometric': return makeTrigonometric(params).evaluate
     case 'vertical':
       throw new Error('makeNonVerticalEvaluator: vertical kind passed to non-vertical sampler.')
   }

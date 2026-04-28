@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore, type UserRole } from '@/stores/authStore'
 import { authService } from '@/services/authService'
 
 export function useAuth() {
@@ -7,44 +7,69 @@ export function useAuth() {
   const loading = ref(false)
   const error = ref('')
 
-  async function login(username: string, password: string): Promise<boolean> {
+  async function login(email: string, password: string): Promise<boolean> {
     loading.value = true
     error.value = ''
     try {
-      // The backend sets the HTTP-only auth cookie in its response.
-      const res = await authService.login(username, password)
+      const res = await authService.login(email, password)
       try {
         const me = await authService.me()
-        authStore.setUser({ id: me.id, username: me.username })
+        authStore.setUser({
+          id: me.id,
+          email: me.email,
+          player_name: me.player_name,
+          role: me.role as UserRole,
+          avatar_url: me.avatar_url ?? null,
+        })
       } catch {
-        // /me failed but login succeeded — use known data from login response
-        authStore.setUser({ id: res.id ?? '', username: res.username ?? username })
+        authStore.setUser({
+          id: res.id ?? '',
+          email: res.email ?? email,
+          player_name: res.player_name ?? '',
+          role: (res.role as UserRole) ?? 'student',
+          avatar_url: res.avatar_url ?? null,
+        })
       }
       return true
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '登入失敗'
+      error.value = e instanceof Error ? e.message : 'Login failed'
       return false
     } finally {
       loading.value = false
     }
   }
 
-  async function register(username: string, password: string): Promise<boolean> {
+  async function register(
+    email: string,
+    password: string,
+    playerName: string,
+    role: string = 'student',
+  ): Promise<boolean> {
     loading.value = true
     error.value = ''
     try {
-      // The backend sets the HTTP-only auth cookie in its response.
-      const res = await authService.register(username, password)
+      const res = await authService.register(email, password, playerName, role)
       try {
         const me = await authService.me()
-        authStore.setUser({ id: me.id, username: me.username })
+        authStore.setUser({
+          id: me.id,
+          email: me.email,
+          player_name: me.player_name,
+          role: me.role as UserRole,
+          avatar_url: me.avatar_url ?? null,
+        })
       } catch {
-        // /me failed but register succeeded — use known data from register response
-        authStore.setUser({ id: res.id ?? '', username: res.username ?? username })
+        authStore.setUser({
+          id: res.id ?? '',
+          email: res.email ?? email,
+          player_name: res.player_name ?? playerName,
+          role: (res.role as UserRole) ?? 'student',
+          avatar_url: res.avatar_url ?? null,
+        })
       }
       return true
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '註冊失敗'
+      error.value = e instanceof Error ? e.message : 'Registration failed'
       return false
     } finally {
       loading.value = false

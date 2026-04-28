@@ -3,7 +3,7 @@
  * Manages panel visibility, selected tower, and other UI-only state.
  */
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { ref } from 'vue'
 import type { TowerType } from '@/data/constants'
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -25,10 +25,6 @@ export const useUiStore = defineStore('ui', () => {
 
   // Buff Card Panel
   const buffPanelVisible = ref(false)
-
-  // Boss Shield Fourier target — visual cue only, driven by BOSS_SHIELD_START.
-  // shallowRef: replaced whole rather than mutated, so deep reactivity is waste.
-  const bossShieldTarget = shallowRef<{ freqs: number[]; amps: number[] } | null>(null)
 
   // Modal (replaces alert)
   const modalVisible = ref(false)
@@ -130,10 +126,6 @@ export const useUiStore = defineStore('ui', () => {
     buildPanelVisible.value = false
   }
 
-  function setBossShieldTarget(target: { freqs: number[]; amps: number[] } | null): void {
-    bossShieldTarget.value = target
-  }
-
   function setBuildHintStep(step: number): void {
     buildHintStep.value = step
   }
@@ -146,14 +138,13 @@ export const useUiStore = defineStore('ui', () => {
     selectedTowerType,
     buildPanelVisible, buildPanelTowerId,
     buffPanelVisible,
-    bossShieldTarget,
     modalVisible, modalTitle, modalMessage, modalCallback,
     tutorialVisible, tutorialStep,
     buildHintStep,
     hoveredSegmentId,
     showModal, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
-    setBossShieldTarget, setBuildHintStep,
+    setBuildHintStep,
     setHoveredSegmentId,
   }
 })

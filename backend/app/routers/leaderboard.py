@@ -29,16 +29,17 @@ router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 def get_leaderboard(
     request: Request,
     level: int | None = Query(None, ge=1, le=4),
+    class_id: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    ranked, total = build_leaderboard_service(db).get_leaderboard(level, page, per_page)
+    ranked, total = build_leaderboard_service(db).get_leaderboard(level, page, per_page, class_id=class_id)
     entries = [
         LeaderboardEntryOut(
             id=r.id,
             rank=r.rank,
-            username=r.username,
+            player_name=r.player_name,
             level=r.level,
             score=r.score,
             kills=r.kills,

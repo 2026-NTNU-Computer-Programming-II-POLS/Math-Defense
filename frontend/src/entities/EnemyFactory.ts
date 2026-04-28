@@ -1,7 +1,3 @@
-/**
- * EnemyFactory — enemy factory (pure TypeScript, no Vue dependency)
- * Builds Enemy objects from ENEMY_DEFS data; movement logic is handled by MovementSystem.
- */
 import { ENEMY_DEFS } from '@/data/enemy-defs'
 import type { EnemyType } from '@/data/constants'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
@@ -18,10 +14,6 @@ export function createEnemy(
   const def = ENEMY_DEFS[type]
   if (!def) throw new Error(`Unknown enemy type: ${type}`)
 
-  // Clamp to the path's x-range so split-slime children spawned near the
-  // endpoints (parent.x ± 0.3) never hand `evaluateAt` an out-of-range x,
-  // which would throw. The clamped position is close enough that the
-  // visual offset is preserved on the next tick's strategy advance.
   const lo = Math.min(path.startX, path.targetX)
   const hi = Math.max(path.startX, path.targetX)
   const spawnX = Math.min(hi, Math.max(lo, startX))
@@ -47,10 +39,30 @@ export function createEnemy(
     _targetX: targetX,
     _direction: targetX > startX ? 1 : -1,
 
-    // Clone nested tuples so later mutations of a single enemy's stealth
-    // ranges can't leak back to ENEMY_DEFS and poison sibling enemies.
-    stealthRanges: def.stealthRanges?.map(([a, b]) => [a, b] as [number, number]) ?? [],
-    isStealthed: false,
+    killValue: def.killValue,
+
+    shield: def.shieldHp ?? 0,
+    shieldMax: def.shieldHp ?? 0,
+
     splitDepth: 0,
+    splitCount: def.split?.count ?? 0,
+    splitChildType: def.split?.childType ?? null,
+    splitChildScale: def.split?.childScale ?? 1,
+
+    helperRadius: def.helper?.radius ?? 0,
+    helperHealPerSec: def.helper?.healPerSec ?? 0,
+    helperSpeedBuff: def.helper?.speedBuff ?? 0,
+
+    minionTimer: 0,
+    minionInterval: def.minion?.interval ?? 0,
+    minionType: def.minion?.type ?? null,
+
+    chainRuleTriggered: false,
+    chainRuleAnsweredCorrectly: null,
+
+    slowFactor: 0,
+    speedBoost: 0,
+    dotDamage: 0,
+    dotTimer: 0,
   }
 }

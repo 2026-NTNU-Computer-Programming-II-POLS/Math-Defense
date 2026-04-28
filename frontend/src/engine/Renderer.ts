@@ -180,21 +180,43 @@ export class Renderer {
    * `LevelLayoutService.classify`. Intentionally NOT a rule check; the
    * caller passes in the already-classified value.
    */
+  /**
+   * Highlight the grid-line intersection at lattice point (gx, gy). Towers
+   * sit on intersections, not inside cells, so the cursor is a ring centered
+   * on the point — not a cell-sized rectangle.
+   */
   drawPlacementCursor(gx: number, gy: number, cls: TileClass): void {
     const { ctx } = this
     const px = gameToCanvasX(gx)
-    const py = gameToCanvasY(gy + 1)
-    const style = tileStyleFor(cls)
-    ctx.save()
-    ctx.globalAlpha = 0.55
-    this._applyTileStyle(px, py, style)
-    ctx.restore()
+    const py = gameToCanvasY(gy)
+    const color = cls === 'buildable' ? '#6adf8a' : '#b84040'
+    const radius = UNIT_PX * 0.42
 
     ctx.save()
-    ctx.strokeStyle = cls === 'buildable' ? '#6adf8a' : '#b84040'
+    // Soft fill to make legal/illegal status pop without obscuring the grid.
+    ctx.globalAlpha = 0.25
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(px, py, radius, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = color
     ctx.lineWidth = 2
     ctx.setLineDash([])
-    ctx.strokeRect(px + 1, py + 1, UNIT_PX - 2, UNIT_PX - 2)
+    ctx.beginPath()
+    ctx.arc(px, py, radius, 0, Math.PI * 2)
+    ctx.stroke()
+
+    // Crosshair at the exact lattice point — the bullseye where the tower
+    // will land.
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(px - radius * 0.4, py)
+    ctx.lineTo(px + radius * 0.4, py)
+    ctx.moveTo(px, py - radius * 0.4)
+    ctx.lineTo(px, py + radius * 0.4)
+    ctx.stroke()
     ctx.restore()
   }
 
@@ -288,6 +310,41 @@ export class Renderer {
       ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r)
       ctx.stroke()
     }
+    ctx.restore()
+  }
+
+  /**
+   * Highlight the disclosure region — a rectangle that is guaranteed to
+   * contain exactly one common intersection of all level curves (= P*, the
+   * tower-defense goal). Player sees only the rectangle, not the precise
+   * point.
+   */
+  drawDisclosureRegion(region: {
+    readonly xMin: number
+    readonly xMax: number
+    readonly yMin: number
+    readonly yMax: number
+  }): void {
+    const { ctx } = this
+    const px = gameToCanvasX(region.xMin)
+    const py = gameToCanvasY(region.yMax)
+    const w = (region.xMax - region.xMin) * UNIT_PX
+    const h = (region.yMax - region.yMin) * UNIT_PX
+
+    ctx.save()
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.12)'
+    ctx.fillRect(px, py, w, h)
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([6, 4])
+    ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1)
+
+    ctx.setLineDash([])
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.95)'
+    ctx.font = 'bold 11px monospace'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    ctx.fillText('Goal here', px + 4, py + 4)
     ctx.restore()
   }
 

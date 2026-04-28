@@ -8,12 +8,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.domain.errors import (
     AccountLockedError,
+    DomainValueError,
     InvalidCredentialsError,
     InvalidTokenError,
     UserNotFoundError,
-    UsernameTakenError,
 )
 from app.domain.user.aggregate import User
+from app.domain.user.value_objects import Email, Role
 from app.utils.security import (
     hash_password,
     verify_password,
@@ -31,9 +32,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Precomputed bcrypt hash of an unreachable password. Used to equalise login
-# latency between "user not found" and "user found, wrong password" so an
-# attacker can't enumerate valid usernames by timing the response.
 _DUMMY_PASSWORD_HASH = hash_password("__timing_equaliser__")
 
 
@@ -51,53 +49,65 @@ class AuthApplicationService:
         self._token_denylist = token_denylist_repo
         self._uow = uow
 
-    def register(self, username: str, password: str) -> tuple[User, str]:
+    def register(
+        self,
+        email: str,
+        password: str,
+        player_name: str,
+        role: str = "student",
+    ) -> tuple[User, str]:
         """Create a new user and issue an access token. Returns (user, token)."""
-        # Hash BEFORE the duplicate check so the "username taken" and "username
-        # free" branches take the same wall-clock time. Without this, bcrypt
-        # (~250ms) only runs on the free branch, letting an attacker enumerate
-        # registered usernames by timing the response.
+        try:
+            email_vo = Email(email)
+        except ValueError as e:
+            raise DomainValueError(str(e)) from e
+
+        try:
+            role_enum = Role(role)
+        except ValueError:
+            raise DomainValueError(f"Invalid role: {role}. Must be one of: admin, teacher, student")
+
         password_hash = hash_password(password)
         with self._uow:
-            if self._user_repo.find_by_username(username):
-                raise UsernameTakenError("Username already taken")
-            user = User.create(username=username, password_hash=password_hash)
+            if self._user_repo.find_by_email(email_vo.value):
+                raise DomainValueError("Email already registered")
+            user = User.create(
+                email=email_vo.value,
+                player_name=player_name,
+                role=role_enum,
+                password_hash=password_hash,
+            )
             self._user_repo.save(user)
             try:
                 self._uow.commit()
             except IntegrityError as e:
-                # Concurrent duplicate registration: the unique constraint on
-                # users.username serialises the race even when the read above
-                # missed the other transaction's pending insert.
-                raise UsernameTakenError("Username already taken") from e
-        token = create_access_token({"sub": user.id})
+                raise DomainValueError("Email already registered") from e
+        token = create_access_token({"sub": user.id, "role": user.role.value})
         return user, token
 
-    def login(self, username: str, password: str) -> tuple[User, str]:
+    def login(self, email: str, password: str) -> tuple[User, str]:
         """Authenticate credentials and issue an access token."""
+        email_lower = email.strip().lower()
         with self._uow:
-            if self._login_attempts.is_locked(username):
+            if self._login_attempts.is_locked(email_lower):
                 raise AccountLockedError(
                     "Account temporarily locked due to too many failed attempts. "
                     "Try again in a few minutes."
                 )
 
-            user = self._user_repo.find_by_username(username)
-            # Always run one bcrypt verify so the "user not found" and "wrong
-            # password" branches take the same wall-clock time. Without this,
-            # an attacker can enumerate valid usernames via response timing.
+            user = self._user_repo.find_by_email(email_lower)
             if user is None:
                 verify_password(password, _DUMMY_PASSWORD_HASH)
-                self._login_attempts.record_failure(username)
+                self._login_attempts.record_failure(email_lower)
                 self._uow.commit()
-                raise InvalidCredentialsError("Invalid username or password")
+                raise InvalidCredentialsError("Invalid email or password")
             if not verify_password(password, user.password_hash):
-                self._login_attempts.record_failure(username)
+                self._login_attempts.record_failure(email_lower)
                 self._uow.commit()
-                raise InvalidCredentialsError("Invalid username or password")
-            self._login_attempts.clear(username)
+                raise InvalidCredentialsError("Invalid email or password")
+            self._login_attempts.clear(email_lower)
             self._uow.commit()
-        token = create_access_token({"sub": user.id})
+        token = create_access_token({"sub": user.id, "role": user.role.value})
         return user, token
 
     def authenticate_token(self, token: str) -> User:
@@ -128,11 +138,22 @@ class AuthApplicationService:
             self._user_repo.save(user)
             self._uow.commit()
 
+    def update_avatar(self, user_id: str, avatar_url: str | None) -> User:
+        """Persist the user's chosen avatar URL."""
+        with self._uow:
+            user = self._user_repo.find_by_id(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found")
+            user.avatar_url = avatar_url
+            self._user_repo.save(user)
+            self._uow.commit()
+        return user
+
     def logout_token(self, token: str) -> None:
         """Revoke a token by adding its JTI to the deny-list."""
         payload = decode_token(token)
         if payload is None:
-            return  # already expired, nothing to revoke
+            return
         jti = payload.get("jti")
         exp = payload.get("exp", 0)
         if not jti:

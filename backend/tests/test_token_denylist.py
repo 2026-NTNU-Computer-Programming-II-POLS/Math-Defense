@@ -14,7 +14,7 @@ from app.models.denied_token import DeniedToken
 def _register_and_token(client) -> str:
     res = client.post(
         "/api/auth/register",
-        json={"username": "logoutme", "password": "secret123"},
+        json={"email": "logoutme@test.local", "password": "secret123", "player_name": "logoutme", "role": "student"},
     )
     assert res.status_code == 201
     return res.cookies.get("access_token")
@@ -25,7 +25,7 @@ def test_logout_token_is_idempotent(client, db_session):
     service = build_auth_service(db_session)
 
     service.logout_token(token)
-    service.logout_token(token)  # must not raise or duplicate the row
+    service.logout_token(token)
 
     count = db_session.query(DeniedToken).count()
     assert count == 1
@@ -36,7 +36,6 @@ def test_revoked_token_is_rejected(client, db_session):
     service = build_auth_service(db_session)
     service.logout_token(token)
 
-    # The JTI is now on the deny-list; /me must reject the token.
     res = client.get(
         "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
     )

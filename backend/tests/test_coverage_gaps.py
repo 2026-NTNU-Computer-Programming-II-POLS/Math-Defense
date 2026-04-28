@@ -34,10 +34,10 @@ from app.models.leaderboard import LeaderboardEntry as LeaderboardEntryModel
 from app.models.user import User as UserModel
 
 
-def _register_and_token(client, username):
+def _register_and_token(client, name):
     res = client.post(
         "/api/auth/register",
-        json={"username": username, "password": "secret123"},
+        json={"email": f"{name}@test.local", "password": "secret123", "player_name": name, "role": "student"},
     )
     return res.cookies.get("access_token")
 
@@ -72,7 +72,7 @@ class TestGetSessionStalePath:
 
         token = _register_and_token(client, "stale_persists")
         sid = client.post(
-            "/api/sessions", json={"level": 1}, headers=_auth(token),
+            "/api/sessions", json={"star_rating": 1}, headers=_auth(token),
         ).json()["id"]
 
         # Backdate the session so is_stale becomes True
@@ -127,7 +127,7 @@ class TestPerLevelRank:
 
         def play(token, level, score):
             sid = client.post(
-                "/api/sessions", json={"level": level}, headers=_auth(token),
+                "/api/sessions", json={"star_rating": level}, headers=_auth(token),
             ).json()["id"]
             client.post(
                 f"/api/sessions/{sid}/end",
@@ -161,7 +161,7 @@ class TestPerLevelRank:
         t2 = _register_and_token(client, "global_u2")
 
         def play(token, level, score):
-            sid = client.post("/api/sessions", json={"level": level}, headers=_auth(token)).json()["id"]
+            sid = client.post("/api/sessions", json={"star_rating": level}, headers=_auth(token)).json()["id"]
             client.post(
                 f"/api/sessions/{sid}/end",
                 json={"score": score, "kills": 1, "waves_survived": 1},
@@ -201,7 +201,7 @@ class TestRateLimiterPresence:
             for _ in range(35):
                 res = client.post(
                     "/api/sessions",
-                    json={"level": 1},
+                    json={"star_rating": 1},
                     headers=_auth(token),
                 )
                 statuses.add(res.status_code)
@@ -219,7 +219,7 @@ class TestAbuseCases:
     def test_negative_hp_rejected_at_schema(self, client):
         """Pydantic should bounce hp < 0 before it reaches the aggregate."""
         token = _register_and_token(client, "abuse_neg_hp")
-        sid = client.post("/api/sessions", json={"level": 1}, headers=_auth(token)).json()["id"]
+        sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
         res = client.patch(
             f"/api/sessions/{sid}",
             json={"hp": -5},
@@ -237,7 +237,7 @@ class TestAbuseCases:
 
     def test_score_delta_above_cap_rejected_via_patch(self, client):
         token = _register_and_token(client, "abuse_score_delta")
-        sid = client.post("/api/sessions", json={"level": 1}, headers=_auth(token)).json()["id"]
+        sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
 
         # First small bump succeeds
         ok = client.patch(
@@ -257,7 +257,7 @@ class TestAbuseCases:
 
     def test_score_must_not_decrease(self, client):
         token = _register_and_token(client, "abuse_score_dec")
-        sid = client.post("/api/sessions", json={"level": 1}, headers=_auth(token)).json()["id"]
+        sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
         client.patch(f"/api/sessions/{sid}", json={"score": 1000}, headers=_auth(token))
         res = client.patch(
             f"/api/sessions/{sid}",
@@ -268,7 +268,7 @@ class TestAbuseCases:
 
     def test_end_score_below_in_flight_rejected(self, client):
         token = _register_and_token(client, "abuse_end_lt_score")
-        sid = client.post("/api/sessions", json={"level": 1}, headers=_auth(token)).json()["id"]
+        sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
         client.patch(f"/api/sessions/{sid}", json={"score": 5_000}, headers=_auth(token))
         res = client.post(
             f"/api/sessions/{sid}/end",
@@ -284,7 +284,7 @@ class TestUserDeletionCascade:
     def test_deleting_user_cascades_sessions_and_nulls_leaderboard_session_id(self, client, session_factory):
         token = _register_and_token(client, "cascade_user")
 
-        sid = client.post("/api/sessions", json={"level": 1}, headers=_auth(token)).json()["id"]
+        sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
         client.post(
             f"/api/sessions/{sid}/end",
             json={"score": 333, "kills": 1, "waves_survived": 1},
@@ -294,7 +294,7 @@ class TestUserDeletionCascade:
         # Sanity: rows exist before deletion
         db = session_factory()
         try:
-            user = db.query(UserModel).filter(UserModel.username == "cascade_user").one()
+            user = db.query(UserModel).filter(UserModel.email == "cascade_user@test.local").one()
             assert db.query(GameSessionModel).filter(GameSessionModel.user_id == user.id).count() == 1
             lb_before = db.query(LeaderboardEntryModel).filter(LeaderboardEntryModel.user_id == user.id).all()
             assert len(lb_before) == 1
@@ -326,7 +326,10 @@ class TestUserDeletionCascade:
 @pytest.fixture
 def matrix_db(db_session):
     """PG session seeded with the user we hang parametrised sessions off."""
-    db_session.add(UserModel(id="u-matrix", username="u_matrix", password_hash="x"))
+    db_session.add(UserModel(
+        id="u-matrix", username="u_matrix", email="u_matrix@test.local",
+        player_name="u_matrix", role="student", password_hash="x",
+    ))
     db_session.commit()
     return db_session
 
@@ -335,7 +338,7 @@ def _seed_session(db, status: SessionStatus) -> str:
     row = GameSessionModel(
         id=f"s-{status.value}",
         user_id="u-matrix",
-        level=1,
+        star_rating=1,
         status=status.value,
         score=10,  # so a follow-up update can target a higher score
         ended_at=None if status == SessionStatus.ACTIVE else datetime.now(UTC),

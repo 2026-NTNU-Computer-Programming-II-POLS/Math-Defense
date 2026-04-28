@@ -10,6 +10,7 @@ function stub(id: string, xRange: [number, number]): PathSegmentRuntime {
     xRange,
     params: { kind: 'horizontal', y: 0 },
     evaluate: () => 0,
+    evaluateDerivative: () => 0,
     expr: id,
     label: id,
   }

@@ -9,9 +9,10 @@ from app.schemas.game_session import SessionOut
 
 
 def session_to_out(session: GameSession) -> SessionOut:
+    achievements = getattr(session, "_newly_unlocked_achievements", [])
     return SessionOut(
         id=session.id,
-        level=int(session.level),
+        star_rating=int(session.level),
         status=session.status.value,
         current_wave=session.current_wave,
         gold=session.gold,
@@ -19,4 +20,5 @@ def session_to_out(session: GameSession) -> SessionOut:
         score=session.score,
         started_at=session.started_at,
         ended_at=session.ended_at,
+        newly_unlocked_achievements=achievements,
     )

@@ -76,3 +76,21 @@ class PermissionDeniedError(DomainError):
 
 class DuplicateSubmissionError(DomainError):
     status_code = 409
+
+
+# ── Talent ──
+
+class InsufficientTalentPointsError(DomainError):
+    status_code = 400
+
+
+class PrerequisiteNotMetError(DomainError):
+    status_code = 400
+
+
+class MaxLevelReachedError(DomainError):
+    status_code = 400
+
+
+class TalentNodeNotFoundError(DomainError):
+    status_code = 404

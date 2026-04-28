@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, nextTick, onBeforeMount, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -12,23 +12,46 @@ import TowerBar from '@/components/game/TowerBar.vue'
 import BuildPanel from '@/components/game/BuildPanel.vue'
 import BuildHint from '@/components/game/BuildHint.vue'
 import BuffCardPanel from '@/components/game/BuffCardPanel.vue'
+import ShopPanel from '@/components/game/ShopPanel.vue'
+import MontyHallPanel from '@/components/game/MontyHallPanel.vue'
+import ScoreResultView from '@/views/ScoreResultView.vue'
+import ChainRulePanel from '@/components/game/ChainRulePanel.vue'
 import StartWaveButton from '@/components/game/StartWaveButton.vue'
-import LevelSelect from '@/components/common/LevelCard.vue'
 import Modal from '@/components/common/Modal.vue'
+import AchievementToast from '@/components/game/AchievementToast.vue'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const uiStore = useUiStore()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { game, ready, loadError, retry } = useGameLoop(canvasRef)
 
-// listen for level-end / GAME_OVER → show modal
+// Read generated level + IA result forwarded via history state from InitialAnswerView.
+const _rawLevel = history.state?.level as string | undefined
+const _rawIa = history.state?.iaResult as string | undefined
+const _generatedLevel = _rawLevel
+  ? (() => { try { return JSON.parse(_rawLevel) } catch { return null } })()
+  : null
+const _iaResult = (_rawIa === 'correct' || _rawIa === 'wrong' || _rawIa === 'paid' || _rawIa === 'ignored')
+  ? _rawIa
+  : null
+
+const { game, ready, loadError, retry, newlyUnlockedAchievements } = useGameLoop(canvasRef, {
+  generatedLevel: _generatedLevel,
+  iaResult: _iaResult,
+})
+
 function navigateHome(): void {
   router.push('/').catch((err) => {
     console.warn('[GameView] Navigation failed:', err)
   })
 }
+
+onBeforeMount(() => {
+  if (!_generatedLevel) {
+    router.replace({ name: 'level-select' })
+  }
+})
 
 // Screen-reader live announcement (A-6). Phase transitions and HP drops are
 // conveyed visually only; mirror them into a polite aria-live region so
@@ -48,7 +71,7 @@ watch(() => gameStore.phase, (phase) => {
     case GamePhase.BUILD:       announce(`Build phase, wave ${gameStore.wave + 1} ready`); break
     case GamePhase.WAVE:        announce(`Wave ${gameStore.wave} started`); break
     case GamePhase.BUFF_SELECT: announce('Buff selection'); break
-    case GamePhase.BOSS_SHIELD: announce('Boss battle'); break
+    case GamePhase.CHAIN_RULE:  announce('Chain rule challenge'); break
     case GamePhase.LEVEL_END:   announce('Victory'); break
     case GamePhase.GAME_OVER:   announce('Game over'); break
   }
@@ -122,10 +145,6 @@ watch(() => gameStore.phase, (phase) => {
   }
 })
 
-function selectLevel(levelId: number): void {
-  game.value?.startLevel(levelId)
-}
-
 // Responsive scaling (audit C-5). The engine/canvas are authored against a
 // fixed 1280×720 world, so rather than redoing layout math everywhere, we
 // uniformly scale the whole view via CSS transform. Internal coordinates,
@@ -133,14 +152,19 @@ function selectLevel(levelId: number): void {
 // `Renderer` all stay untouched.
 const shellRef = ref<HTMLDivElement | null>(null)
 const scale = ref(1)
+const offsetX = ref(0)
+const offsetY = ref(0)
 
 function recomputeScale(): void {
   const shell = shellRef.value
   if (!shell) return
-  const sx = shell.clientWidth / 1280
-  const sy = shell.clientHeight / 720
-  // Never upscale beyond 1 on huge displays — pixel art stays crisp.
-  scale.value = Math.min(1, sx, sy)
+  const W = shell.clientWidth
+  const H = shell.clientHeight
+  const pad = 2
+  const s = Math.min(1, (W - pad * 2) / 1280, (H - pad * 2) / 720)
+  scale.value = s
+  offsetX.value = Math.floor((W - 1280 * s) / 2)
+  offsetY.value = Math.floor((H - 720 * s) / 2)
 }
 
 let ro: ResizeObserver | null = null
@@ -166,6 +190,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="shellRef" class="game-shell">
+    <AchievementToast :achievements="newlyUnlockedAchievements" />
+
     <!-- R-5: on portrait phones the 1280×720 world scales down to an
          unusably small strip. Ask the user to rotate — the rest of the
          game stays rendered underneath so landscape resumes instantly. -->
@@ -189,7 +215,7 @@ onBeforeUnmount(() => {
     </div>
     <div
       class="game-view"
-      :style="{ transform: `scale(${scale})` }"
+      :style="{ transform: `scale(${scale})`, left: `${offsetX}px`, top: `${offsetY}px` }"
     >
     <canvas
       ref="canvasRef"
@@ -207,21 +233,28 @@ onBeforeUnmount(() => {
       <HUD />
       <BuildHint />
 
-      <!-- Level select -->
-      <LevelSelect
-        v-if="gameStore.phase === GamePhase.MENU || gameStore.phase === GamePhase.LEVEL_SELECT"
-        @select="selectLevel"
-      />
-
       <!-- Build Phase -->
       <template v-if="gameStore.isBuilding">
         <TowerBar />
         <BuildPanel v-if="uiStore.buildPanelVisible" />
+        <ShopPanel />
         <StartWaveButton />
       </template>
 
-      <!-- Buff Select -->
+      <!-- Buff Select (V1 compat) -->
       <BuffCardPanel v-if="gameStore.isBuff" />
+
+      <!-- Monty Hall Event -->
+      <MontyHallPanel v-if="gameStore.isMontyHall" />
+
+      <!-- Score Result (Victory) -->
+      <ScoreResultView
+        v-if="gameStore.phase === GamePhase.LEVEL_END"
+        @close="navigateHome"
+      />
+
+      <!-- Chain Rule Challenge (Boss Type-B) -->
+      <ChainRulePanel />
 
       <!-- Modal -->
       <Modal v-if="uiStore.modalVisible" />
@@ -247,22 +280,17 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .game-shell {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
   overflow: hidden;
   background: #0b0a12;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .game-view {
-  position: relative;
+  position: absolute;
   width: 1280px;
   height: 720px;
-  flex: 0 0 auto;
-  transform-origin: center center;
+  transform-origin: top left;
 }
 
 .game-canvas {

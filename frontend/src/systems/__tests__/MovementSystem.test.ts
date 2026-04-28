@@ -32,7 +32,7 @@ function makeSegment(
       : kind === 'trigonometric'
       ? { kind: 'trigonometric' as const, amplitude: 0, frequency: 0, phase: 0, offset: 0 }
       : { kind: 'vertical' as const, x: xRange[0], yStart: 0, yEnd: 0, durationSec: 1 }
-  return { id, kind, xRange, params, evaluate, expr: id, label: id }
+  return { id, kind, xRange, params, evaluate, evaluateDerivative: () => 0, expr: id, label: id }
 }
 
 function sceneWithTwoSegments() {

@@ -3,30 +3,42 @@ import { api } from './api'
 export interface TokenResponse {
   token_type: string
   id: string
-  username: string
+  email: string
+  player_name: string
+  role: string
+  avatar_url: string | null
+}
+
+export interface MeResponse {
+  id: string
+  email: string
+  player_name: string
+  role: string
+  avatar_url: string | null
 }
 
 export const authService = {
-  register(username: string, password: string) {
-    return api.post<TokenResponse>('/api/auth/register', { username, password })
+  register(email: string, password: string, playerName: string, role: string = 'student') {
+    return api.post<TokenResponse>('/api/auth/register', {
+      email,
+      password,
+      player_name: playerName,
+      role,
+    })
   },
-  login(username: string, password: string) {
-    return api.post<TokenResponse>('/api/auth/login', { username, password })
+  login(email: string, password: string) {
+    return api.post<TokenResponse>('/api/auth/login', { email, password })
   },
   me() {
-    return api.get<{ id: string; username: string }>('/api/auth/me')
+    return api.get<MeResponse>('/api/auth/me')
+  },
+  updateAvatar(avatarUrl: string | null) {
+    return api.put<MeResponse>('/api/auth/profile/avatar', { avatar_url: avatarUrl })
   },
   logout() {
-    // Bypass the api wrapper so the 401 interceptor (which itself calls
-    // logout()) can never re-enter this path and create an infinite loop.
-    // credentials: 'include' sends the HTTP-only auth cookie even when the
-    // frontend and backend are on different origins (the normal prod topology),
-    // so the backend can revoke the token and clear it.
     const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
     const url = base ? `${base}/api/auth/logout` : '/api/auth/logout'
     const headers: Record<string, string> = {}
-    // Best-effort CSRF echo — same double-submit pattern as api.ts. Skipped
-    // silently if the cookie isn't present (middleware off, or very first hit).
     if (typeof document !== 'undefined') {
       const match = document.cookie.split(';').map((c) => c.trim()).find((c) => c.startsWith('csrf_token='))
       if (match) headers['X-CSRF-Token'] = decodeURIComponent(match.slice('csrf_token='.length))
@@ -35,8 +47,6 @@ export const authService = {
       method: 'POST',
       credentials: 'include',
       headers,
-    }).catch(() => {
-      // Best-effort: server unreachable is fine, cookie eventually expires.
-    })
+    }).catch(() => {})
   },
 }

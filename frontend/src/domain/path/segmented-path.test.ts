@@ -13,6 +13,7 @@ function stub(
     xRange,
     params: { kind: 'horizontal', y: 0 },
     evaluate,
+    evaluateDerivative: () => 0,
     expr: id,
     label: id,
   }

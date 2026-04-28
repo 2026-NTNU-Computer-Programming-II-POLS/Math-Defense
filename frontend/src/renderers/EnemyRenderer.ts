@@ -1,10 +1,7 @@
-/**
- * EnemyRenderer — renders enemies (reads Enemy data, writes to Canvas only)
- * Entities no longer have render methods; this system handles all drawing.
- */
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import { UNIT_PX } from '@/data/constants'
 
 export class EnemyRenderer {
   update(_dt: number, _game: Game): void {}
@@ -19,25 +16,44 @@ export class EnemyRenderer {
       const py = gameToCanvasY(enemy.y)
       const half = enemy.size / 2
 
-      // stealth effect
-      ctx.globalAlpha = enemy.isStealthed ? 0.15 : 1.0
+      if (enemy.helperRadius > 0) {
+        ctx.save()
+        const auraRadius = enemy.helperRadius * UNIT_PX
+        ctx.globalAlpha = 0.12
+        ctx.fillStyle = '#48c878'
+        ctx.beginPath()
+        ctx.arc(px, py, auraRadius, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.globalAlpha = 0.4
+        ctx.strokeStyle = '#48c878'
+        ctx.lineWidth = 1
+        ctx.stroke()
+        ctx.restore()
+      }
 
-      // enemy body (pixel-art square)
       ctx.fillStyle = enemy.color
       ctx.fillRect(px - half, py - half, enemy.size, enemy.size)
 
-      // eyes
       const eyeSize = Math.max(2, enemy.size / 6)
       ctx.fillStyle = '#fff'
       ctx.fillRect(px - half + enemy.size * 0.25 - eyeSize / 2, py - half + enemy.size * 0.3 - eyeSize / 2, eyeSize, eyeSize)
       ctx.fillRect(px - half + enemy.size * 0.75 - eyeSize / 2, py - half + enemy.size * 0.3 - eyeSize / 2, eyeSize, eyeSize)
 
-      ctx.globalAlpha = 1.0
+      let barY = -(half + 6)
 
-      // health bar (shown only when HP is below maximum)
+      if (enemy.shieldMax > 0) {
+        const shieldRatio = enemy.shield / enemy.shieldMax
+        const barPx = px - half
+        const barPy = py + barY
+        ctx.fillStyle = '#333'
+        ctx.fillRect(barPx, barPy, enemy.size, 4)
+        ctx.fillStyle = '#4488ee'
+        ctx.fillRect(barPx, barPy, enemy.size * shieldRatio, 4)
+        barY -= 6
+      }
+
       if (enemy.hp < enemy.maxHp) {
-        const hpRatio = enemy.hp / enemy.maxHp
-        renderer.drawHealthBar(enemy.x, enemy.y, enemy.size, hpRatio, -(half + 6))
+        renderer.drawHealthBar(enemy.x, enemy.y, enemy.size, enemy.hp / enemy.maxHp, barY)
       }
     }
   }

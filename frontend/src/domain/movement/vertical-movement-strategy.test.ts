@@ -9,6 +9,7 @@ function segment(durationSec = 2): PathSegmentRuntime {
     xRange: [5, 5],
     params: { kind: 'vertical', x: 5, yStart: 2, yEnd: 8, durationSec },
     evaluate: () => 8,
+    evaluateDerivative: () => 0,
     expr: 'x = 5',
     label: 'v',
   }

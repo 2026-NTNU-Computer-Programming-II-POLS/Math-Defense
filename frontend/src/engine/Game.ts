@@ -9,19 +9,36 @@ import { InputManager } from './InputManager'
 import { PhaseStateMachine } from './PhaseStateMachine'
 import { type GameState, createInitialState } from './GameState'
 import { GamePhase, Events, FIXED_DT } from '@/data/constants'
-import type { Tower, Enemy, Projectile } from '@/entities/types'
+import type { Tower, Enemy, Projectile, Pet, LimitResult } from '@/entities/types'
 import type { BuffDef } from '@/data/buff-defs'
+import type { SpellDef } from '@/data/spell-defs'
+import type { MontyHallReward } from '@/data/monty-hall-defs'
+import type { ActiveBuffEntry } from './GameState'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { PathProgressTracker, SegmentChangedPayload } from '@/domain/path/path-progress-tracker'
 import type { PlacementRejectionReason } from '@/domain/level/placement-policy'
+import type { ChainRuleQuestion } from '@/math/chain-rule-generator'
 import type { LevelContext } from './level-context'
+import { isGeneratedLevelContext, type GeneratedLevelContext } from './generated-level-context'
+import type { GeneratedLevel } from '@/math/curve-types'
+import type { WaveDef } from '@/data/level-defs'
 import type { BuffSystem } from '@/systems/BuffSystem'
 import type { CombatSystem } from '@/systems/CombatSystem'
 import type { MovementSystem } from '@/systems/MovementSystem'
 import type { WaveSystem } from '@/systems/WaveSystem'
 import type { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
 import type { EconomySystem } from '@/systems/EconomySystem'
+import type { MagicTowerSystem } from '@/systems/MagicTowerSystem'
+import type { RadarTowerSystem } from '@/systems/RadarTowerSystem'
+import type { MatrixTowerSystem } from '@/systems/MatrixTowerSystem'
+import type { LimitTowerSystem } from '@/systems/LimitTowerSystem'
+import type { CalculusTowerSystem, PetCombatSystem } from '@/systems/CalculusTowerSystem'
+import type { TowerUpgradeSystem } from '@/systems/TowerUpgradeSystem'
+import type { EnemyAbilitySystem } from '@/systems/EnemyAbilitySystem'
+import type { SpellSystem } from '@/systems/SpellSystem'
+import type { MontyHallSystem } from '@/systems/MontyHallSystem'
 import type { EnemyRenderer } from '@/renderers/EnemyRenderer'
+import type { SpellEffectRenderer } from '@/renderers/SpellEffectRenderer'
 import type { TowerRenderer } from '@/renderers/TowerRenderer'
 import type { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
 
@@ -43,6 +60,8 @@ export interface WaveEndSnapshot {
   readonly gold: number
   readonly hp: number
   readonly score: number
+  readonly killValue: number
+  readonly costTotal: number
 }
 
 export interface GameEvents {
@@ -67,9 +86,6 @@ export interface GameEvents {
   [Events.BUFF_CARD_SELECTED]:   string
   [Events.BUFF_RESULT]:          { success: boolean; cardId: string; skipped: boolean; insufficientGold?: boolean }
   [Events.BUFF_PHASE_END]:       void
-  [Events.BOSS_SHIELD_START]:    { target: { freqs: number[]; amps: number[] } }
-  [Events.BOSS_SHIELD_ATTEMPT]:  { match: number }
-  [Events.BOSS_SHIELD_END]:      void
   [Events.GOLD_CHANGED]:         number
   [Events.HP_CHANGED]:           number
   [Events.SCORE_CHANGED]:        number
@@ -77,6 +93,39 @@ export interface GameEvents {
   [Events.CANVAS_HOVER]:         CoordPayload
   [Events.SEGMENT_CHANGED]:      SegmentChangedPayload
   [Events.PLACEMENT_REJECTED]:   { gx: number; gy: number; reason: PlacementRejectionReason }
+
+  [Events.MAGIC_FUNCTION_SELECTED]: { towerId: string; index: number }
+  [Events.MAGIC_MODE_CHANGED]:   { towerId: string; mode: 'debuff' | 'buff' }
+  [Events.RADAR_ARC_CHANGED]:    { towerId: string; arcStart: number; arcEnd: number; restrict: boolean }
+  [Events.MATRIX_PAIR_CHANGED]:  { towerId: string; pairId: string }
+  [Events.LIMIT_ANSWER]:         { towerId: string; answer: LimitResult }
+  [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: 'derivative' | 'integral' }
+  [Events.TOWER_UPGRADE]:        { towerId: string }
+  [Events.TOWER_REFUND]:         { towerId: string }
+  [Events.PET_SPAWNED]:          Pet
+  [Events.PET_KILLED]:           Pet
+
+  [Events.CHAIN_RULE_START]:     ChainRuleQuestion
+  [Events.CHAIN_RULE_ANSWER]:    { correct: boolean }
+  [Events.CHAIN_RULE_END]:       { correct: boolean; bossId: string }
+  [Events.BOSS_SPLIT]:           { bossId: string; children: string[]; fPrimeOfG: string; gPrime: string }
+
+  // V2 Phase 4
+  [Events.SPELL_CAST]:           { spellId: string; x: number; y: number; targetId?: string }
+  [Events.SPELL_EFFECT]:         { spellId: string; x: number; y: number; radius?: number }
+  [Events.SPELL_COOLDOWN_READY]: string
+
+  [Events.MONTY_HALL_TRIGGER]:        { doorCount: number; thresholdIndex: number }
+  [Events.MONTY_HALL_DOOR_SELECTED]:  number
+  [Events.MONTY_HALL_SWITCH_DECISION]:boolean
+  [Events.MONTY_HALL_RESULT]:         { won: boolean; reward: MontyHallReward | null }
+
+  [Events.SHOP_PURCHASE]:        { itemId: string; cost: number }
+
+  [Events.KILL_VALUE_CHANGED]:   number
+  [Events.COST_TOTAL_CHANGED]:   number
+
+  [Events.ACTIVE_BUFFS_CHANGED]: ReadonlyArray<ActiveBuffEntry>
 }
 
 export type GameEventBus = EventBus<GameEvents>
@@ -86,10 +135,16 @@ export type GameEventBus = EventBus<GameEvents>
  * Phase 3's `LevelContext` supersets this; typed here as its own name so
  * the Phase-2 surface stays minimal and the Phase-3 widening is a single-
  * line replacement (see P3-T7 in the Piecewise Paths construction plan).
+ *
+ * `endpoint` is optional: V2 generated levels expose the curves' shared
+ * intersection point P*; V1 piecewise levels omit it and the system falls
+ * back to the origin (0, 0). MovementSystem reads the field structurally
+ * so it never has to discriminate context flavors.
  */
 export interface MovementLevelContext {
   readonly path: SegmentedPath
   readonly tracker: PathProgressTracker
+  readonly endpoint?: { readonly x: number; readonly y: number }
 }
 
 // ── System interface ──
@@ -114,9 +169,20 @@ export interface SystemMap {
   wave: WaveSystem
   buff: BuffSystem
   economy: EconomySystem
+  magicTower: MagicTowerSystem
+  radarTower: RadarTowerSystem
+  matrixTower: MatrixTowerSystem
+  limitTower: LimitTowerSystem
+  calculusTower: CalculusTowerSystem
+  petCombat: PetCombatSystem
+  towerUpgrade: TowerUpgradeSystem
+  enemyAbility: EnemyAbilitySystem
+  spell: SpellSystem
+  montyHall: MontyHallSystem
   enemyRenderer: EnemyRenderer
   towerRenderer: TowerRenderer
   projectileRenderer: ProjectileRenderer
+  spellEffectRenderer: SpellEffectRenderer
 }
 
 // ── Game ──
@@ -133,13 +199,19 @@ export class Game {
   towers: Tower[] = []
   enemies: Enemy[] = []
   projectiles: Projectile[] = []
+  pets: Pet[] = []
 
   /**
-   * Per-level piecewise-path runtime holder. `null` between levels and
-   * during MENU. MovementSystem reads it through the narrower
-   * `MovementLevelContext` view (`path` + `tracker`).
+   * Per-level runtime holder. `null` between levels and during MENU.
+   * May be a V1 `LevelContext` (piecewise) or V2 `GeneratedLevelContext` (curves).
    */
-  levelContext: LevelContext | null = null
+  levelContext: LevelContext | GeneratedLevelContext | null = null
+
+  /** Active generated level data; non-null during V2 generated levels. */
+  generatedLevel: GeneratedLevel | null = null
+
+  /** Wave definitions for the active level. Set by useGameLoop before startLevel(). */
+  currentWaves: ReadonlyArray<WaveDef> | null = null
 
   /**
    * Id of the path segment the HUD Function Panel is currently hovering
@@ -149,6 +221,8 @@ export class Game {
    * engine → presentation import, per the SoC matrix in §2 of the plan.
    */
   hoveredSegmentId: string | null = null
+
+  towerModifierProvider: ((towerType: string) => Record<string, number>) | null = null
 
   // Game time in seconds (used for animation)
   time = 0
@@ -208,6 +282,20 @@ export class Game {
     this.eventBus.emit(Events.SCORE_CHANGED, this.state.score)
   }
 
+  addCost(amount: number): void {
+    this.state.costTotal += amount
+    this.eventBus.emit(Events.COST_TOTAL_CHANGED, this.state.costTotal)
+  }
+
+  addKillValue(value: number): void {
+    this.state.cumulativeKillValue += value
+    this.eventBus.emit(Events.KILL_VALUE_CHANGED, this.state.cumulativeKillValue)
+  }
+
+  assignEnemyPath(enemyId: string, path: SegmentedPath): void {
+    this.getSystem('movement')?.registerEnemyPath(enemyId, path)
+  }
+
   setPhase(to: GamePhase): void {
     const from = this.state.phase
     if (!this.phase.transition(to)) return
@@ -236,6 +324,7 @@ export class Game {
     this.towers = []
     this.enemies = []
     this.projectiles = []
+    this.pets = []
     this.levelContext = null
     // Reset to MENU first so terminal phases (GAME_OVER) and any in-progress phase
     // can legally transition into BUILD on retry/replay.
@@ -343,11 +432,25 @@ export class Game {
     renderer.drawOrigin(this.time)
 
     if (this.levelContext && this.state.phase !== GamePhase.MENU) {
-      renderer.drawSegmentBoundaries(this.levelContext.path, this.hoveredSegmentId)
-      for (const seg of this.levelContext.path.segments) {
-        const [lo, hi] = seg.xRange
-        if (lo !== hi) {
-          renderer.drawFunction(seg.evaluate, lo, hi, 'rgba(184, 64, 64, 0.4)', 2)
+      const genCtx = isGeneratedLevelContext(this.levelContext) ? this.levelContext : null
+
+      if (genCtx) {
+        renderer.drawDisclosureRegion(genCtx.region)
+        if (this.state.pathsVisible) {
+          for (const path of genCtx.paths) {
+            for (const seg of path.segments) {
+              const [lo, hi] = seg.xRange
+              renderer.drawFunction(seg.evaluate, lo, hi, 'rgba(184, 64, 64, 0.4)', 2)
+            }
+          }
+        }
+      } else {
+        renderer.drawSegmentBoundaries(this.levelContext.path, this.hoveredSegmentId)
+        for (const seg of this.levelContext.path.segments) {
+          const [lo, hi] = seg.xRange
+          if (lo !== hi) {
+            renderer.drawFunction(seg.evaluate, lo, hi, 'rgba(184, 64, 64, 0.4)', 2)
+          }
         }
       }
     }

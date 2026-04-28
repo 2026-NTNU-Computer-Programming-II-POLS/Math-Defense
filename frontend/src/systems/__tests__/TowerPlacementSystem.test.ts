@@ -1,13 +1,3 @@
-/**
- * TowerPlacementSystem tests.
- *
- * Exercises delegation to `PlacementPolicy`. Rule-level correctness of the
- * policy itself is covered in `domain/level/placement-policy.test.ts`; this
- * file asserts only that the system (a) routes the decision to the policy,
- * (b) emits `PLACEMENT_REJECTED` with the policy's reason on denial, and
- * (c) still performs the post-placement bookkeeping (gold, TOWER_PLACED) on
- * accept.
- */
 import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('@/entities/TowerFactory', () => ({
@@ -17,33 +7,23 @@ vi.mock('@/entities/TowerFactory', () => ({
     active: true, configured: false, disabled: false, level: 1,
     effectiveDamage: 20, effectiveRange: 5, cooldown: 1.5, cooldownTimer: 0,
     damageBonus: 1, rangeBonus: 1, baseDamage: 20, baseRange: 5,
-    color: '#4a82c8',
+    talentMods: {}, magicBuff: 1,
+    color: '#a855f7',
   }),
 }))
-vi.mock('@/math/MathUtils', () => ({
-  degToRad: (deg: number) => (deg * Math.PI) / 180,
+
+vi.mock('@/domain/placement/legal-positions', () => ({
+  computeLegalPositions: () => ({
+    has: (gx: number, gy: number) => gx === 5 && gy === 5,
+    positions: [[5, 5]],
+  }),
 }))
 
 import { TowerPlacementSystem } from '../TowerPlacementSystem'
 import { GamePhase, Events, TowerType } from '@/data/constants'
-import type {
-  PlacementContext,
-  PlacementDecision,
-  PlacementPolicy,
-} from '@/domain/level/placement-policy'
 import type { LevelContext } from '@/engine/level-context'
 import type { LevelLayoutService } from '@/domain/level/level-layout-service'
 import { createMockGame } from './helpers'
-
-function fakePolicy(decision: PlacementDecision): {
-  policy: PlacementPolicy
-  canPlace: ReturnType<typeof vi.fn>
-} {
-  const canPlace = vi.fn<(gx: number, gy: number, ctx: PlacementContext) => PlacementDecision>(
-    () => decision,
-  )
-  return { policy: { canPlace }, canPlace }
-}
 
 function fakeLevelContext(): LevelContext {
   const layout: LevelLayoutService = {
@@ -59,52 +39,21 @@ function fakeLevelContext(): LevelContext {
   }
 }
 
-function setup(decision: PlacementDecision) {
+function setup() {
   const game = createMockGame({ phase: GamePhase.BUILD, gold: 200 })
   game.phase.forceTransition(GamePhase.BUILD)
   game.levelContext = fakeLevelContext()
-  const { policy, canPlace } = fakePolicy(decision)
-  const system = new TowerPlacementSystem(policy)
+  const system = new TowerPlacementSystem()
   system.init(game)
-  system.getSelectedTowerType = () => TowerType.FUNCTION_CANNON
+  system.getSelectedTowerType = () => TowerType.MAGIC
   system.clearSelectedTowerType = () => { system.getSelectedTowerType = () => null }
-  return { game, system, canPlace }
+  game.eventBus.emit(Events.LEVEL_START, 1)
+  return { game, system }
 }
 
 describe('TowerPlacementSystem', () => {
-  it('delegates to PlacementPolicy with gx, gy, and composed context', () => {
-    const { game, canPlace } = setup({ ok: true })
-    game.eventBus.emit(Events.CANVAS_CLICK, {
-      pixel: { x: 0, y: 0 },
-      game: { x: 5, y: 5 },
-    })
-    expect(canPlace).toHaveBeenCalledTimes(1)
-    const [gx, gy, ctx] = canPlace.mock.calls[0]!
-    expect(gx).toBe(5)
-    expect(gy).toBe(5)
-    expect(ctx.gold).toBe(200)
-    expect(ctx.cost).toBe(50)
-    expect(typeof ctx.isOccupied).toBe('function')
-    expect(ctx.layout).toBe(game.levelContext!.layout)
-  })
-
-  it('emits PLACEMENT_REJECTED with the policy reason on denial', () => {
-    const { game } = setup({ ok: false, reason: 'not-buildable' })
-    const rejections: unknown[] = []
-    game.eventBus.on(Events.PLACEMENT_REJECTED, (p) => rejections.push(p))
-
-    game.eventBus.emit(Events.CANVAS_CLICK, {
-      pixel: { x: 0, y: 0 },
-      game: { x: 5, y: 5 },
-    })
-
-    expect(game.towers.length).toBe(0)
-    expect(game.state.gold).toBe(200)
-    expect(rejections).toEqual([{ gx: 5, gy: 5, reason: 'not-buildable' }])
-  })
-
-  it('emits TOWER_PLACED and deducts gold on acceptance', () => {
-    const { game } = setup({ ok: true })
+  it('places tower on legal position and deducts gold', () => {
+    const { game } = setup()
     let placed = false
     game.eventBus.on(Events.TOWER_PLACED, () => { placed = true })
 
@@ -118,8 +67,8 @@ describe('TowerPlacementSystem', () => {
     expect(game.state.gold).toBe(150)
   })
 
-  it('surfaces "occupied" rejection from the policy', () => {
-    const { game } = setup({ ok: false, reason: 'occupied' })
+  it('rejects placement on illegal position', () => {
+    const { game } = setup()
     const rejections: unknown[] = []
     game.eventBus.on(Events.PLACEMENT_REJECTED, (p) => rejections.push(p))
 
@@ -128,6 +77,41 @@ describe('TowerPlacementSystem', () => {
       game: { x: 3, y: 3 },
     })
 
-    expect(rejections).toEqual([{ gx: 3, gy: 3, reason: 'occupied' }])
+    expect(game.towers.length).toBe(0)
+    expect(rejections).toEqual([{ gx: 3, gy: 3, reason: 'not-buildable' }])
+  })
+
+  it('selects existing tower when clicking occupied position', () => {
+    const { game } = setup()
+
+    game.eventBus.emit(Events.CANVAS_CLICK, {
+      pixel: { x: 0, y: 0 },
+      game: { x: 5, y: 5 },
+    })
+    expect(game.towers.length).toBe(1)
+
+    let selected = false
+    game.eventBus.on(Events.TOWER_SELECTED, () => { selected = true })
+
+    game.eventBus.emit(Events.CANVAS_CLICK, {
+      pixel: { x: 0, y: 0 },
+      game: { x: 5, y: 5 },
+    })
+
+    expect(selected).toBe(true)
+  })
+
+  it('rejects placement when gold is insufficient', () => {
+    const { game } = setup()
+    game.state.gold = 10
+    const rejections: unknown[] = []
+    game.eventBus.on(Events.PLACEMENT_REJECTED, (p) => rejections.push(p))
+
+    game.eventBus.emit(Events.CANVAS_CLICK, {
+      pixel: { x: 0, y: 0 },
+      game: { x: 5, y: 5 },
+    })
+
+    expect(rejections).toEqual([{ gx: 5, gy: 5, reason: 'insufficient-gold' }])
   })
 })

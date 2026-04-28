@@ -56,13 +56,6 @@ describe('PhaseStateMachine', () => {
     expect(sm.transition(GamePhase.GAME_OVER)).toBe(true)
   })
 
-  it('WAVE → BOSS_SHIELD → WAVE is valid', () => {
-    const sm = new PhaseStateMachine()
-    sm.forceTransition(GamePhase.WAVE)
-    expect(sm.transition(GamePhase.BOSS_SHIELD)).toBe(true)
-    expect(sm.transition(GamePhase.WAVE)).toBe(true)
-  })
-
   it('GAME_OVER → MENU is valid (restart)', () => {
     const sm = new PhaseStateMachine()
     sm.forceTransition(GamePhase.GAME_OVER)

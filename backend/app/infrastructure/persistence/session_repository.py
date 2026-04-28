@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
 from app.domain.session.aggregate import GameSession, _stale_cutoff
+from app.domain.session.repository import CumulativeStats
 from app.domain.value_objects import SessionStatus, Level
 from app.models.game_session import GameSession as GameSessionModel
 
@@ -74,12 +76,20 @@ class SqlAlchemySessionRepository:
             row.score = session.score
             row.kills = session.kills
             row.waves_survived = session.waves_survived
+            row.kill_value = session.kill_value
+            row.cost_total = session.cost_total
+            row.time_total = session.time_total
+            row.health_origin = session.health_origin
+            row.health_final = session.health_final
+            row.time_exclude_prepare = session.time_exclude_prepare
+            row.total_score = session.total_score
             row.ended_at = ended_at
         else:
             row = GameSessionModel(
                 id=session.id,
                 user_id=session.user_id,
-                level=int(session.level),
+                star_rating=int(session.level),
+                initial_answer=session.initial_answer,
                 status=session.status.value,
                 current_wave=session.current_wave,
                 gold=session.gold,
@@ -87,6 +97,13 @@ class SqlAlchemySessionRepository:
                 score=session.score,
                 kills=session.kills,
                 waves_survived=session.waves_survived,
+                kill_value=session.kill_value,
+                cost_total=session.cost_total,
+                time_total=session.time_total,
+                health_origin=session.health_origin,
+                health_final=session.health_final,
+                time_exclude_prepare=session.time_exclude_prepare,
+                total_score=session.total_score,
                 started_at=started_at,
                 ended_at=ended_at,
             )
@@ -97,12 +114,40 @@ class SqlAlchemySessionRepository:
         for s in sessions:
             self.save(s)
 
+    def get_cumulative_stats(self, user_id: str) -> CumulativeStats:
+        completed = SessionStatus.COMPLETED.value
+        row = self._db.query(
+            func.coalesce(func.sum(GameSessionModel.kills), 0).label("total_kills"),
+            func.coalesce(func.sum(GameSessionModel.score), 0).label("total_score"),
+            func.coalesce(func.sum(GameSessionModel.waves_survived), 0).label("total_waves"),
+            func.count(GameSessionModel.id).label("total_sessions"),
+        ).filter(
+            GameSessionModel.user_id == user_id,
+            GameSessionModel.status == completed,
+        ).one()
+
+        stars_played = {
+            r[0] for r in
+            self._db.query(GameSessionModel.star_rating)
+            .filter(GameSessionModel.user_id == user_id, GameSessionModel.status == completed)
+            .distinct()
+            .all()
+        }
+
+        return CumulativeStats(
+            total_kills=row.total_kills,
+            total_score=row.total_score,
+            total_waves=row.total_waves,
+            total_sessions=row.total_sessions,
+            stars_played=stars_played,
+        )
+
     @staticmethod
     def _to_domain(row: GameSessionModel) -> GameSession:
-        return GameSession(
+        session = GameSession(
             id=row.id,
             user_id=row.user_id,
-            level=Level(row.level),
+            level=Level(row.star_rating),
             status=SessionStatus(row.status),
             current_wave=row.current_wave,
             gold=row.gold,
@@ -110,9 +155,18 @@ class SqlAlchemySessionRepository:
             score=row.score,
             kills=row.kills,
             waves_survived=row.waves_survived,
+            initial_answer=bool(row.initial_answer),
             started_at=_ensure_utc(row.started_at),
             ended_at=_ensure_utc(row.ended_at),
         )
+        session.kill_value = row.kill_value
+        session.cost_total = row.cost_total
+        session.time_total = row.time_total
+        session.health_origin = row.health_origin
+        session.health_final = row.health_final
+        session.time_exclude_prepare = row.time_exclude_prepare
+        session.total_score = row.total_score
+        return session
 
 
 class StartedAtMutationError(RuntimeError):

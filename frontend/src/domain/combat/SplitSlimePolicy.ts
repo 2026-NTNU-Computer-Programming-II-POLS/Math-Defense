@@ -1,8 +1,3 @@
-/**
- * SplitSlimePolicy — centralizes split-slime child spawning logic
- * Eliminates duplicated code between CombatSystem and MovementSystem.
- */
-import { EnemyType } from '@/data/constants'
 import { createEnemy } from '@/entities/EnemyFactory'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { Enemy } from '@/entities/types'
@@ -12,66 +7,53 @@ export interface SplitContext {
   onChildCreated: (child: Enemy) => void
 }
 
-/** Hard cap on recursive splitting. Today's children are BASIC_SLIME so this
- * is defensive: if a future change makes children SPLIT_SLIME, the cap
- * prevents exponential enemy explosion. */
 export const MAX_SPLIT_DEPTH = 2
 
 export function shouldSplit(enemy: Enemy): boolean {
-  return enemy.type === EnemyType.SPLIT_SLIME && enemy.splitDepth < MAX_SPLIT_DEPTH
+  return enemy.splitCount > 0 && enemy.splitChildType !== null && enemy.splitDepth < MAX_SPLIT_DEPTH
 }
 
-/**
- * Spawn split children from a parent slime.
- * @param parent the parent enemy (dead or reached origin)
- * @param context path + onChildCreated callback
- * @param spawnOffset distance to offset back along the path (use 3 when reaching origin, 0 when killed)
- */
 export function spawnChildren(
   parent: Enemy,
   context: SplitContext,
   spawnOffset = 0,
 ): Enemy[] {
   if (!context.path) {
-    // Invariant: a split-slime is on the map, so a level must have been
-    // loaded on LEVEL_START. Reaching here means the context was cleared
-    // mid-level (e.g. destroy() firing during a WAVE_END callback). Log so
-    // it surfaces in dev instead of silently producing a dead parent with
-    // no children.
     console.warn(
-      `[SplitSlimePolicy] path is null — parent id=${parent.id} will not split.`,
+      `[SplitPolicy] path is null — parent id=${parent.id} will not split.`,
     )
     return []
   }
 
   const children: Enemy[] = []
+  const childType = parent.splitChildType!
+  const count = parent.splitCount
 
-  // Clamp each child to the *parent's* segment xRange rather than the full
-  // path range. At an exact segment boundary, ±0.3 can land inside a
-  // neighbouring segment whose kinematics would then resolve on the next
-  // MovementSystem tick — dropping the child onto the wrong strategy.
   const parentSegment = context.path.findSegmentAt(parent.x)
   const [segLo, segHi] = parentSegment?.xRange ?? [
     Math.min(context.path.startX, context.path.targetX),
     Math.max(context.path.startX, context.path.targetX),
   ]
 
-  for (let i = 0; i < 2; i++) {
+  const spread = 0.3
+  for (let i = 0; i < count; i++) {
     const baseX = spawnOffset > 0
       ? parent.x - parent._direction * spawnOffset
       : parent.x
-    const rawX = baseX + (i === 0 ? -0.3 : 0.3)
+    const offset = count === 1 ? 0 : (i / (count - 1) - 0.5) * 2 * spread
+    const rawX = baseX + offset
     const clampedX = Math.min(segHi, Math.max(segLo, rawX))
     const child = createEnemy(
-      EnemyType.BASIC_SLIME,
+      childType,
       context.path,
       clampedX,
       parent._targetX,
     )
-    child.hp = Math.round(parent.maxHp * 0.4)
+    child.hp = Math.round(parent.maxHp * parent.splitChildScale)
     child.maxHp = child.hp
     child.size = Math.round(parent.size * 0.7)
     child.reward = Math.round(parent.reward * 0.3)
+    child.killValue = Math.round(parent.killValue * 0.2)
     child.color = '#a070d0'
     child.splitDepth = parent.splitDepth + 1
 

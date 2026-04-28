@@ -15,7 +15,7 @@ from datetime import datetime
 class RankedLeaderboardEntry:
     id: str
     rank: int
-    username: str
+    player_name: str
     level: int
     score: int
     kills: int

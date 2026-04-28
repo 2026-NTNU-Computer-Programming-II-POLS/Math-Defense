@@ -20,6 +20,7 @@ function makeSegment(id: string, lo: number, hi: number): PathSegmentRuntime {
     xRange: [lo, hi],
     params: { kind: 'linear', slope: 0, intercept: 0 },
     evaluate: () => 0,
+    evaluateDerivative: () => 0,
     expr: `expr:${id}`,
     label: `label:${id}`,
   }
@@ -102,6 +103,7 @@ describe('projectPathPanel', () => {
       xRange: [8, 8],
       params: { kind: 'vertical', x: 8, yStart: 2, yEnd: 6, durationSec: 1 },
       evaluate: () => 2,
+      evaluateDerivative: () => 0,
       expr: 'vertical',
       label: 'V',
     }

@@ -1,15 +1,20 @@
-/**
- * GameState — strongly-typed game state
- * All buff flags and game values are explicitly declared here.
- * No more dynamic properties like game._shieldActive.
- */
 import { GamePhase } from '@/data/constants'
 import { INITIAL_HP, INITIAL_GOLD } from '@/data/constants'
+
+export interface ActiveBuffEntry {
+  id: string
+  name: string
+  effectId: string
+  revertId?: string
+  remainingTime: number   // seconds remaining
+  totalDuration: number   // original duration in seconds
+}
 
 export interface GameState {
   // Flow
   phase: GamePhase
   level: number
+  starRating: number
   wave: number
   totalWaves: number
 
@@ -19,25 +24,41 @@ export interface GameState {
   maxHp: number
   score: number
   kills: number
+  cumulativeKillValue: number
 
-  // Buff flags (explicitly declared; no longer dynamically injected)
+  // V2 Economy tracking
+  costTotal: number
+  healthOrigin: number
+
+  // V2 Timing
+  timeTotal: number                 // seconds since level start
+  timeExcludePrepare: number[]      // duration of each preparation phase
+  prepPhaseStart: number            // timestamp when current prep phase started (0 if not in prep)
+
+  // V2 Initial Answer
+  initialAnswer: 0 | 1
+  pathsVisible: boolean
+
+  // V2 Monty Hall
+  montyHallNextIndex: number        // index into threshold array
+  montyHallPending: boolean         // true when a threshold was crossed and event should fire between waves
+
+  // Buff flags
   shieldActive: boolean
   goldMultiplier: number
   freeTowerNext: boolean
-  enemySpeedMultiplier: number     // Curse: enemy speed multiplier (default 1.0)
+  freeTowerCharges: number
+  enemySpeedMultiplier: number
+  enemyVulnerability: number        // damage multiplier on enemies (default 1.0)
 
-  // Boss Shield state (centrally managed; not scattered in CombatSystem).
-  // The Fourier target waveform is delivered via the BOSS_SHIELD_START event
-  // payload and mirrored into uiStore — it is presentation, not simulation.
-  bossShieldTriggered: boolean
-  bossShieldTimer: number
+  // Active buffs (time-based)
+  activeBuffs: ActiveBuffEntry[]
+
+  // Spell cooldowns
+  spellCooldowns: Record<string, number>  // spellId → remaining cooldown seconds
+
 }
 
-/**
- * Whether the Shield buff is currently absorbing damage.
- * Declared as a selector so EconomySystem (and any future damage sources)
- * can read shield state without coupling to BuffSystem's internal flag name.
- */
 export function isShielded(state: GameState): boolean {
   return state.shieldActive
 }
@@ -46,6 +67,7 @@ export function createInitialState(): GameState {
   return {
     phase: GamePhase.MENU,
     level: 1,
+    starRating: 1,
     wave: 0,
     totalWaves: 0,
     gold: INITIAL_GOLD,
@@ -53,11 +75,23 @@ export function createInitialState(): GameState {
     maxHp: INITIAL_HP,
     score: 0,
     kills: 0,
+    cumulativeKillValue: 0,
+    costTotal: 0,
+    healthOrigin: INITIAL_HP,
+    timeTotal: 0,
+    timeExcludePrepare: [],
+    prepPhaseStart: 0,
+    initialAnswer: 0,
+    pathsVisible: false,
+    montyHallNextIndex: 0,
+    montyHallPending: false,
     shieldActive: false,
     goldMultiplier: 1,
     freeTowerNext: false,
+    freeTowerCharges: 0,
     enemySpeedMultiplier: 1,
-    bossShieldTriggered: false,
-    bossShieldTimer: 0,
+    enemyVulnerability: 1,
+    activeBuffs: [],
+    spellCooldowns: {},
   }
 }

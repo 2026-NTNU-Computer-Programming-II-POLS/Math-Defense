@@ -10,10 +10,7 @@
  */
 import type { PathSegmentKind } from '@/data/path-segment-types'
 import type { MovementStrategy } from './movement-strategy'
-import { horizontalMovementStrategy } from './horizontal-movement-strategy'
-import { linearMovementStrategy } from './linear-movement-strategy'
-import { quadraticMovementStrategy } from './quadratic-movement-strategy'
-import { trigMovementStrategy } from './trig-movement-strategy'
+import { xDrivenMovementStrategy } from './x-driven-movement-strategy'
 import { verticalMovementStrategy } from './vertical-movement-strategy'
 
 const _registry = new Map<PathSegmentKind, MovementStrategy>()
@@ -40,11 +37,12 @@ export function resetStrategyRegistry(): void {
 }
 
 function _populateDefaults(): void {
-  _registry.set('horizontal', horizontalMovementStrategy)
-  _registry.set('linear', linearMovementStrategy)
-  _registry.set('quadratic', quadraticMovementStrategy)
-  _registry.set('trigonometric', trigMovementStrategy)
+  _registry.set('horizontal', xDrivenMovementStrategy)
+  _registry.set('linear', xDrivenMovementStrategy)
+  _registry.set('quadratic', xDrivenMovementStrategy)
+  _registry.set('trigonometric', xDrivenMovementStrategy)
   _registry.set('vertical', verticalMovementStrategy)
+  _registry.set('curve', xDrivenMovementStrategy)
 }
 
 _populateDefaults()

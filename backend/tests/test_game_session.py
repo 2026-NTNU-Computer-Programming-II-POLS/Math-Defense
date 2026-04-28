@@ -1,12 +1,15 @@
-def _register_and_token(client, username="player1"):
-    res = client.post("/api/auth/register", json={"username": username, "password": "secret123"})
+def _register_and_token(client, name="player1"):
+    res = client.post("/api/auth/register", json={
+        "email": f"{name}@test.local", "password": "secret123",
+        "player_name": name, "role": "student",
+    })
     return res.cookies.get("access_token")
 
 
 def _create_session(client, token, level=1):
     return client.post(
         "/api/sessions",
-        json={"level": level},
+        json={"star_rating": level},
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -23,7 +26,7 @@ def test_create_session(client):
     assert res.status_code == 201
     data = res.json()
     assert data["status"] == "active"
-    assert data["level"] == 1
+    assert data["star_rating"] == 1
     assert data["current_wave"] == 0
     assert data["score"] == 0
 
@@ -32,7 +35,7 @@ def test_create_session_invalid_level(client):
     token = _register_and_token(client, "sess_invalid_level")
     res = client.post(
         "/api/sessions",
-        json={"level": 5},
+        json={"star_rating": 6},
         headers=_auth_headers(token),
     )
     assert res.status_code == 422
@@ -49,7 +52,7 @@ def test_create_session_abandons_existing(client):
 
 
 def test_create_session_requires_auth(client):
-    res = client.post("/api/sessions", json={"level": 1})
+    res = client.post("/api/sessions", json={"star_rating": 1})
     assert res.status_code in (401, 403)
 
 

@@ -29,3 +29,12 @@ class LeaderboardRepository(Protocol):
     ) -> tuple[list[RankedLeaderboardEntry], int]:
         """Per-level DENSE_RANK restricted to the given level."""
         ...
+
+    def query_ranked_by_class(
+        self,
+        class_id: str,
+        page: int,
+        per_page: int,
+    ) -> tuple[list[RankedLeaderboardEntry], int]:
+        """Class-scoped ranking — best score per student in the class."""
+        ...

@@ -13,6 +13,7 @@ export type PathSegmentKind =
   | 'quadratic'
   | 'trigonometric'
   | 'vertical'
+  | 'curve'
 
 /**
  * Kind-specific parameters. Discriminated on `kind`, so a consumer that
@@ -30,6 +31,7 @@ export type PathSegmentParams =
       readonly yEnd: number
       readonly durationSec: number
     }
+  | { readonly kind: 'curve' }
 
 /**
  * One piecewise segment.

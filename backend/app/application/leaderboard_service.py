@@ -43,7 +43,10 @@ class LeaderboardApplicationService:
         level: int | None,
         page: int,
         per_page: int,
+        class_id: str | None = None,
     ) -> tuple[list[RankedLeaderboardEntry], int]:
+        if class_id is not None:
+            return self._leaderboard_repo.query_ranked_by_class(class_id, page, per_page)
         if level is None:
             return self._leaderboard_repo.query_ranked_global(page, per_page)
         return self._leaderboard_repo.query_ranked_by_level(level, page, per_page)

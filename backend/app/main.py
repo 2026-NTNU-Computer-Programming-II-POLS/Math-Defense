@@ -20,9 +20,10 @@ from app.db.database import engine, SessionLocal
 from app.domain.errors import DomainError
 from app.domain.session.aggregate import set_stale_cutoff_hours
 from app.infrastructure.login_guard import purge_stale as purge_stale_login_attempts
+from app.infrastructure.scheduler import territory_settlement_task
 from app.infrastructure.token_denylist import purge_expired as purge_expired_denied_tokens
 from app.middleware.csrf import CsrfMiddleware
-from app.routers import auth, leaderboard, game_session
+from app.routers import achievement, admin, auth, class_, leaderboard, game_session, talent, territory
 from app.limiter import limiter
 from app.seed import ensure_demo_user
 
@@ -90,12 +91,18 @@ async def lifespan(_app: FastAPI):
     finally:
         db.close()
     janitor = asyncio.create_task(_auth_store_janitor())
+    settlement = asyncio.create_task(territory_settlement_task())
     try:
         yield
     finally:
         janitor.cancel()
+        settlement.cancel()
         try:
             await janitor
+        except asyncio.CancelledError:
+            pass
+        try:
+            await settlement
         except asyncio.CancelledError:
             pass
 
@@ -174,8 +181,13 @@ app.add_middleware(
 
 # Routes
 app.include_router(auth.router)
+app.include_router(class_.router)
+app.include_router(admin.router)
 app.include_router(leaderboard.router)
 app.include_router(game_session.router)
+app.include_router(achievement.router)
+app.include_router(talent.router)
+app.include_router(territory.router)
 
 
 @app.get("/")

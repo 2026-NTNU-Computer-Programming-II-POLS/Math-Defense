@@ -1,34 +1,53 @@
-/**
- * EconomySystem — game economy rules
- * Extracted from Game._setupEventHandlers to keep Game.ts free of business logic.
- */
 import { Events } from '@/data/constants'
 import type { Game, GameSystem } from '@/engine/Game'
 import { isShielded } from '@/engine/GameState'
 import type { Renderer } from '@/engine/Renderer'
+import gameConstants from '@shared/game-constants.json'
+
+const economy = gameConstants.economy as {
+  startingGoldByStar: Record<string, number>
+  waveCompletionBonus: { base: number; perStar: number }
+  bossCorrectAnswerBonus: number
+}
 
 export class EconomySystem implements GameSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
-    // Clear any prior subscriptions so HMR / re-init doesn't double-subscribe.
     this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
         if (isShielded(game.state)) return
-        // Once HP has already hit zero, further damage this frame would be
-        // idempotent but still emit extra HP_CHANGED events. Skip cleanly
-        // so "second boss in the same frame" doesn't double-fire listeners.
         if (game.state.hp <= 0) return
-        // Per-enemy damage so a boss reaching origin actually ends the game; basic slimes still cost 1.
         game.changeHp(-(enemy.damage ?? 1))
       }),
 
       game.eventBus.on(Events.ENEMY_KILLED, (enemy) => {
         game.state.kills++
-        game.addScore(10)
+        game.addKillValue(enemy.killValue)
+        game.addScore(enemy.killValue)
         const reward = (enemy.reward || 15) * game.state.goldMultiplier
         game.changeGold(reward)
+      }),
+
+      game.eventBus.on(Events.WAVE_END, () => {
+        const star = game.state.starRating
+        const bonus = economy.waveCompletionBonus.base + economy.waveCompletionBonus.perStar * star
+        game.changeGold(bonus)
+      }),
+
+      game.eventBus.on(Events.CHAIN_RULE_END, ({ correct }) => {
+        if (correct) {
+          game.changeGold(economy.bossCorrectAnswerBonus)
+        }
+      }),
+
+      game.eventBus.on(Events.LEVEL_START, () => {
+        const star = game.state.starRating
+        const startingGold = economy.startingGoldByStar[String(star)] ?? 200
+        game.state.gold = startingGold
+        game.state.healthOrigin = game.state.hp
+        game.eventBus.emit(Events.GOLD_CHANGED, game.state.gold)
       }),
     )
   }
@@ -38,6 +57,9 @@ export class EconomySystem implements GameSystem {
     this._unsubs = []
   }
 
-  update(_dt: number, _game: Game): void {}
+  update(_dt: number, game: Game): void {
+    game.state.timeTotal = game.time
+  }
+
   render(_renderer: Renderer, _game: Game): void {}
 }

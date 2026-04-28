@@ -26,7 +26,7 @@ class LeaderboardEntryOut(BaseModel):
 
     id: str
     rank: int
-    username: str
+    player_name: str
     level: int
     score: int
     kills: int

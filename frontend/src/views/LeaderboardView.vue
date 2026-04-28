@@ -78,7 +78,7 @@ onBeforeUnmount(() => {
       <tbody>
         <tr v-for="e in entries" :key="e.id">
           <td class="rank">{{ e.rank }}</td>
-          <td class="username">{{ e.username }}</td>
+          <td class="player-name">{{ e.player_name }}</td>
           <td>Lv.{{ e.level }}</td>
           <td class="score">{{ formatScore(e.score) }}</td>
           <td>{{ e.kills }}</td>
@@ -101,6 +101,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .leaderboard-view {
   width: 800px;
+  max-width: 100%;
+  margin: 0 auto;
   padding: 32px;
   display: flex;
   flex-direction: column;
@@ -140,7 +142,7 @@ th, td {
 th { color: var(--axis); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
 
 .rank     { color: var(--gold); font-size: 14px; }
-.username { color: #e8dcc8; }
+.player-name { color: #e8dcc8; }
 .score    { color: var(--gold-bright); font-weight: bold; }
 .lb-loading, .lb-error, .empty { text-align: center; color: var(--axis); padding: 32px; }
 .lb-error { color: var(--enemy-red); }

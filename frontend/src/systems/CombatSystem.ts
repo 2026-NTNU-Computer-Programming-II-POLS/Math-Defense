@@ -1,79 +1,19 @@
-/**
- * CombatSystem — tower attacks + projectiles + collision detection
- * Merges the attack logic from the old TowerSystem with CollisionSystem.
- * Entities have no update/render methods; this System owns all combat logic.
- */
-import { Events, GamePhase, TowerType, EnemyType, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y, UNIT_PX } from '@/data/constants'
-import { distance, findIntersections, degToRad, mulberry32, stringHash } from '@/math/MathUtils'
-import { pointInSector as wasmPointInSector } from '@/math/WasmBridge'
+import { Events, GamePhase, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y, UNIT_PX } from '@/data/constants'
+import { distance } from '@/math/MathUtils'
 import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
 import type { Game } from '@/engine/Game'
-import { getParam } from '@/entities/types'
-import type { Tower, Enemy, Projectile } from '@/entities/types'
+import type { Enemy } from '@/entities/types'
 
-let _projId = 0
-
-/** Upper bound on projectile lifetime (seconds). Anything that escapes the
- * grid + this budget without hitting an enemy is garbage-collected so a
- * stray projectile can't live forever. */
 const PROJECTILE_MAX_AGE = 5
 
-/** Minimum distance (game units) between a tower and a shot target before
- * we compute a unit velocity vector. Prevents NaN/zero-length directions
- * when a path intersection lands on (or rounds onto) the tower itself. */
-const SHOT_MIN_DISTANCE = 1e-3
-
-function makeProjectile(
-  x: number, y: number,
-  vx: number, vy: number,
-  damage: number,
-  color: string,
-  ownerId: string,
-): Projectile {
-  return { id: `proj_${++_projId}`, x, y, vx, vy, damage, color, active: true, ownerId, age: 0 }
-}
-
 export class CombatSystem {
-  private static readonly BOSS_SHIELD_DURATION = 5 // seconds
   private _unsubs: (() => void)[] = []
-  private _pendingShieldAttempt: { match: number } | null = null
 
   init(game: Game): void {
-    // Prevent duplicate listeners if init() is called without destroy()
     this.destroy()
-
     this._unsubs.push(
-      game.eventBus.on(Events.TOWER_PARAMS_SET, ({ towerId, params }) => {
-        const tower = game.towers.find((t) => t.id === towerId)
-        if (!tower) return
-        for (const [k, v] of Object.entries(params)) {
-          tower.params[k] = v
-        }
-        tower.configured = true
-        game.eventBus.emit(Events.CAST_SPELL, tower)
-      }),
-
       game.eventBus.on(Events.WAVE_START, () => {
-        for (const tower of game.towers) {
-          tower.cooldownTimer = 0
-        }
-      }),
-
-      game.eventBus.on(Events.LEVEL_START, () => {
-        game.state.bossShieldTriggered = false
-        game.state.bossShieldTimer = 0
-      }),
-
-      // Allow external shield-breaking (for BOSS_SHIELD UI)
-      game.eventBus.on(Events.BOSS_SHIELD_ATTEMPT, ({ match }) => {
-        if (game.state.bossShieldTimer <= 0) {
-          // Shield not active yet — queue attempt for when it starts
-          this._pendingShieldAttempt = { match }
-          return
-        }
-        if (match >= 70) {
-          this._breakBossShield(game)
-        }
+        for (const tower of game.towers) tower.cooldownTimer = 0
       }),
     )
   }
@@ -81,88 +21,68 @@ export class CombatSystem {
   destroy(): void {
     this._unsubs.forEach((fn) => fn())
     this._unsubs = []
-    this._pendingShieldAttempt = null
   }
 
   update(dt: number, game: Game): void {
     if (game.state.phase !== GamePhase.WAVE) return
 
-    // Boss shield: when boss dragon reaches x <= 8, grant temporary immunity
-    if (!game.state.bossShieldTriggered) {
-      const boss = game.enemies.find(
-        (e) => e.type === EnemyType.BOSS_DRAGON && e.alive && e.x <= 8,
-      )
-      if (boss) {
-        game.state.bossShieldTriggered = true
-        game.state.bossShieldTimer = CombatSystem.BOSS_SHIELD_DURATION
-        // Target waveform is derived deterministically from the boss id, so the
-        // Fourier panel sees the same target across re-renders. It travels with
-        // the event rather than living on GameState because it's presentation.
-        const target = CombatSystem._makeBossTarget(boss.id)
-        boss.isStealthed = true
-        game.eventBus.emit(Events.BOSS_SHIELD_START, { target })
+    this._tickDoT(dt, game)
+    this._tickProjectiles(dt, game)
+  }
 
-        // Process queued shield attempt from before shield was active
-        if (this._pendingShieldAttempt) {
-          const { match } = this._pendingShieldAttempt
-          this._pendingShieldAttempt = null
-          if (match >= 70) {
-            this._breakBossShield(game)
-          }
+  private _tickDoT(dt: number, game: Game): void {
+    for (const enemy of game.enemies) {
+      if (!enemy.alive) continue
+      if (enemy.dotTimer > 0) {
+        enemy.dotTimer -= dt
+        const dotDmg = enemy.dotDamage * dt
+        if (enemy.shield > 0) {
+          const absorbed = Math.min(enemy.shield, dotDmg)
+          enemy.shield -= absorbed
+          enemy.hp -= dotDmg - absorbed
+        } else {
+          enemy.hp -= dotDmg
+        }
+        if (enemy.hp <= 0) {
+          enemy.hp = 0
+          enemy.alive = false
+          enemy.active = false
+          game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+        }
+        if (enemy.dotTimer <= 0) {
+          enemy.dotDamage = 0
         }
       }
-    }
-
-    // Tick boss shield timer (auto-break after duration)
-    if (game.state.bossShieldTimer > 0) {
-      game.state.bossShieldTimer -= dt
-      if (game.state.bossShieldTimer <= 0) {
-        this._breakBossShield(game)
+      const baseMul = 1 + enemy.speedBoost
+      if (enemy.slowFactor > 0) {
+        enemy.speedMultiplier = baseMul * (1 - enemy.slowFactor)
+        enemy.slowFactor = 0
+      } else {
+        enemy.speedMultiplier = baseMul
       }
+      enemy.speedBoost = 0
     }
+  }
 
-    // tower attacks
-    for (const tower of game.towers) {
-      if (tower.disabled || !tower.configured) continue
-      tower.cooldownTimer -= dt
-      if (tower.cooldownTimer <= 0) {
-        this._attackWith(tower, game)
-        tower.cooldownTimer = tower.cooldown
-      }
-    }
-
-    // update projectiles
+  private _tickProjectiles(dt: number, game: Game): void {
     for (let i = game.projectiles.length - 1; i >= 0; i--) {
       const proj = game.projectiles[i]
       proj.x += proj.vx * dt
       proj.y += proj.vy * dt
       proj.age += dt
 
-      // deactivate once it leaves the grid bounds
-      if (proj.x < GRID_MIN_X - 2 || proj.x > GRID_MAX_X + 5 || proj.y < GRID_MIN_Y - 3 || proj.y > GRID_MAX_Y + 2) {
+      if (proj.x < GRID_MIN_X - 2 || proj.x > GRID_MAX_X + 5 ||
+          proj.y < GRID_MIN_Y - 3 || proj.y > GRID_MAX_Y + 2) {
         proj.active = false
       }
 
-      // Safety net: a projectile that somehow never crosses a bound (e.g.
-      // degenerate velocity surviving earlier guards) is aged out here.
       if (proj.active && proj.age >= PROJECTILE_MAX_AGE) {
         proj.active = false
       }
 
-      // Collision detection — snapshot enemies because _dealDamage may push split-slime children
-      // into game.enemies via ENEMY_KILLED, and forward iteration over a mutated array
-      // can skip newly added entries or revisit older ones.
       if (proj.active) {
-        // Hit threshold grows for large enemies (e.g. the 40 px boss) so their
-        // sprite isn't larger than the collision circle, but is floored at the
-        // original 0.5 game units so small/fast enemies don't become harder to
-        // hit than before. A generous threshold is the intended game feel.
         for (const enemy of [...game.enemies]) {
-          if (!enemy.alive || enemy.isStealthed) continue
-          // Pre-scale `(size/2 + 3) / UNIT_PX` clamped to 0.5 absorbed the 3 px
-          // padding whenever size < 14 px, so small enemies had no bonus forgiveness
-          // over the floor. Distribute the padding post-scale: floor the scaled
-          // half-size at 0.5 game units, then add the padding separately.
+          if (!enemy.alive) continue
           const hitRadius = Math.max(0.5, enemy.size / 2 / UNIT_PX) + 3 / UNIT_PX
           if (distance(proj.x, proj.y, enemy.x, enemy.y) < hitRadius) {
             this._dealDamage(enemy, proj.damage, game)
@@ -176,165 +96,29 @@ export class CombatSystem {
     }
   }
 
-  private _attackWith(tower: Tower, game: Game): void {
-    switch (tower.type) {
-      case TowerType.FUNCTION_CANNON:   this._functionCannonAttack(tower, game); break
-      case TowerType.RADAR_SWEEP:       this._radarSweepAttack(tower, game); break
-      case TowerType.INTEGRAL_CANNON:   this._integralCannonAttack(tower, game); break
-      case TowerType.MATRIX_LINK:       this._matrixLinkAttack(tower, game); break
-      case TowerType.PROBABILITY_SHRINE: /* no attack — handled by BuffSystem */ break
-      case TowerType.FOURIER_SHIELD:    /* boss battle only */ break
-    }
-  }
-
-  /** Function Cannon: fires projectiles toward intersections of y = mx+b (or ax²+bx+c) with the enemy path */
-  private _functionCannonAttack(tower: Tower, game: Game): void {
-    if (!game.levelContext) return
-    const path = game.levelContext.path
-
-    const isUpgraded = tower.level >= 2
-
-    // linear mode: y = mx + b; upgraded mode: y = ax² + bx + c (keys: a, b_coeff, c)
-    const shotFn = isUpgraded
-      ? (x: number) => getParam(tower, 'a', 0) * x * x + getParam(tower, 'b_coeff', 1) * x + getParam(tower, 'c', 0)
-      : (x: number) => getParam(tower, 'm', 1) * x + getParam(tower, 'b', 0)
-
-    // `evaluateAt` throws outside the path; `findIntersections` sweeps a wide
-    // range (−3..25) and tolerates NaN samples — return NaN outside to skip.
-    const pathFn = (x: number) => {
-      const seg = path.findSegmentAt(x)
-      return seg ? seg.evaluate(x) : NaN
-    }
-    const intersections = findIntersections(shotFn, pathFn, -3, 25)
-    for (const xi of intersections) {
-      const yi = shotFn(xi)
-      const dx = xi - tower.x
-      const dy = yi - tower.y
-      const len = Math.sqrt(dx * dx + dy * dy)
-      // Skip intersections that coincide with (or round onto) the tower —
-      // a zero-length direction would make the projectile never move.
-      if (len < SHOT_MIN_DISTANCE) continue
-      const speed = 10  // game units per second
-      const proj = makeProjectile(
-        tower.x, tower.y,
-        (dx / len) * speed, (dy / len) * speed,
-        tower.effectiveDamage,
-        tower.color,
-        tower.id,
-      )
-      game.projectiles.push(proj)
-    }
-  }
-
-  /** Radar Sweep: sector-area tower, damages each enemy inside the sector per fire */
-  private _radarSweepAttack(tower: Tower, game: Game): void {
-    const theta = getParam(tower, 'theta', 0)
-    const deltaTheta = getParam(tower, 'deltaTheta', 60)
-    // rangeBonus applies to the sector radius so RANDOM_TOWER_RANGE buffs
-    // affect Radar the same way they affect Matrix Link.
-    const r = getParam(tower, 'r', 4) * tower.rangeBonus
-    const startAngle = degToRad(theta)
-    const sweepAngle = degToRad(deltaTheta)
-
-    for (const enemy of game.enemies) {
-      if (!enemy.alive || enemy.isStealthed) continue
-      // wasmPointInSector already includes a JS fallback; no need to call isPointInSector separately
-      const inSector = wasmPointInSector(
-        enemy.x, enemy.y,
-        tower.x, tower.y,
-        r, startAngle, sweepAngle,
-      )
-
-      if (inSector) {
-        // effectiveDamage is damage-per-fire (same semantic as every other
-        // tower). Previous `* tower.cooldown` was a damage-to-DPS conversion
-        // that made Radar's damage formula diverge from the rest.
-        this._dealDamage(enemy, tower.effectiveDamage, game)
-      }
-    }
-  }
-
-  /** Integral Cannon: enemies covered by the integral area under the curve take damage */
-  private _integralCannonAttack(tower: Tower, game: Game): void {
-    const a = getParam(tower, 'a', -0.5)
-    const b = getParam(tower, 'b', 3)
-    const c = getParam(tower, 'c', 2)
-    // Scale the integration window by rangeBonus around its midpoint so
-    // range buffs widen (and curses narrow) the damage zone symmetrically.
-    const rawA = getParam(tower, 'intA', 0)
-    const rawB = getParam(tower, 'intB', 6)
-    const mid = (rawA + rawB) / 2
-    const half = ((rawB - rawA) / 2) * tower.rangeBonus
-    const intA = mid - half
-    const intB = mid + half
-    const fn = (x: number) => a * x * x + b * x + c
-
-    for (const enemy of game.enemies) {
-      if (!enemy.alive || enemy.isStealthed) continue
-      if (enemy.x >= intA && enemy.x <= intB) {
-        const curveY = fn(enemy.x)
-        const minY = Math.min(0, curveY)
-        const maxY = Math.max(0, curveY)
-        if (enemy.y >= minY && enemy.y <= maxY) {
-          this._dealDamage(enemy, tower.effectiveDamage, game)
-        }
-      }
-    }
-  }
-
-  /** Matrix Link: applies a linear transform to enemies within range and deals damage */
-  private _matrixLinkAttack(tower: Tower, game: Game): void {
-    const a00 = getParam(tower, 'a00', 1)
-    const a01 = getParam(tower, 'a01', 0)
-    const a10 = getParam(tower, 'a10', 0)
-    const a11 = getParam(tower, 'a11', 1)
-    const det = Math.abs(a00 * a11 - a01 * a10) // determinant ≈ scale factor
-
-    for (const enemy of game.enemies) {
-      if (!enemy.alive || enemy.isStealthed) continue
-      const dist = distance(tower.x, tower.y, enemy.x, enemy.y)
-      if (dist <= tower.effectiveRange) {
-        this._dealDamage(enemy, tower.effectiveDamage * Math.max(det, 0.5), game)
-      }
-    }
-  }
-
-  private _breakBossShield(game: Game): void {
-    // Reset both flags so a still-living boss that re-crosses the trigger threshold
-    // can re-arm its shield. Without this, the shield only ever fires once per level.
-    game.state.bossShieldTimer = 0
-    game.state.bossShieldTriggered = false
-    const boss = game.enemies.find((e) => e.type === EnemyType.BOSS_DRAGON && e.alive)
-    if (boss) boss.isStealthed = false
-    game.eventBus.emit(Events.BOSS_SHIELD_END, undefined)
-  }
-
-  /**
-   * Deterministic Fourier target waveform derived from a boss entity id.
-   * The id is hashed (FNV-1a) and used as the seed for mulberry32, so renaming
-   * boss ids will reshuffle targets — that is the contract.
-   */
-  private static _makeBossTarget(bossId: string): { freqs: number[]; amps: number[] } {
-    const rand = mulberry32(stringHash(bossId))
-    return {
-      freqs: [1 + rand() * 4, 2 + rand() * 4, 3 + rand() * 4],
-      amps: [0.5 + rand() * 1.5, 0.3 + rand(), 0.2 + rand()],
-    }
-  }
-
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    if (!enemy.alive || enemy.isStealthed) return
-    enemy.hp -= amount
+    if (!enemy.alive) return
+
+    let remaining = amount
+    if (enemy.shield > 0) {
+      const absorbed = Math.min(enemy.shield, remaining)
+      enemy.shield -= absorbed
+      remaining -= absorbed
+    }
+
+    if (remaining > 0) {
+      enemy.hp -= remaining
+    }
+
     if (enemy.hp <= 0) {
       enemy.hp = 0
       enemy.alive = false
       enemy.active = false
       game.eventBus.emit(Events.ENEMY_KILLED, enemy)
 
-      // Split slime: delegate to SplitSlimePolicy
-      if (shouldSplit(enemy)) {
+      if (shouldSplit(enemy) && game.levelContext?.path) {
         spawnChildren(enemy, {
-          path: game.levelContext?.path ?? null,
+          path: game.levelContext.path,
           onChildCreated: (child) => {
             game.enemies.push(child)
             game.eventBus.emit(Events.ENEMY_SPAWNED, child)

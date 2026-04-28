@@ -27,7 +27,7 @@ def create_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = build_session_service(db).create_session(current_user.id, req.level)
+    session = build_session_service(db).create_session(current_user.id, req.star_rating, initial_answer=req.initial_answer)
     return session_to_out(session)
 
 
@@ -60,6 +60,8 @@ def update_session(
         gold=req.gold,
         hp=req.hp,
         score=req.score,
+        kill_value=req.kill_value,
+        cost_total=req.cost_total,
     )
     return session_to_out(session)
 
@@ -91,5 +93,12 @@ def end_session(
         score=req.score,
         kills=req.kills,
         waves_survived=req.waves_survived,
+        kill_value=req.kill_value,
+        cost_total=req.cost_total,
+        time_total=req.time_total,
+        health_origin=req.health_origin,
+        health_final=req.health_final,
+        time_exclude_prepare=req.time_exclude_prepare,
+        total_score=req.total_score,
     )
     return session_to_out(session)

@@ -15,8 +15,11 @@ import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { Game, MovementLevelContext } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
 
+const ORIGIN = Object.freeze({ x: 0, y: 0 })
+
 export class MovementSystem {
   private _states = new Map<string, MovementState>()
+  private _assignedPaths = new Map<string, SegmentedPath>()
 
   /**
    * Optional sink for the lead-enemy x value. The composable injects
@@ -25,6 +28,10 @@ export class MovementSystem {
    * callback.
    */
   setLeadEnemyX?: (x: number) => void
+
+  registerEnemyPath(enemyId: string, path: SegmentedPath): void {
+    this._assignedPaths.set(enemyId, path)
+  }
 
   init(_game: Game): void {}
 
@@ -37,18 +44,20 @@ export class MovementSystem {
       const enemy = game.enemies[i]
       if (!enemy.alive) {
         this._states.delete(enemy.id)
+        this._assignedPaths.delete(enemy.id)
         game.enemies.splice(i, 1)
         continue
       }
 
       if (ctx) {
-        this._advanceSegmented(enemy, dt, game, ctx.path)
+        this._advanceSegmented(enemy, dt, game, this._assignedPaths.get(enemy.id) ?? ctx.path)
       }
 
       this._applyPostAdvance(enemy, game)
 
       if (!enemy.alive) {
         this._states.delete(enemy.id)
+        this._assignedPaths.delete(enemy.id)
         game.enemies.splice(i, 1)
       }
     }
@@ -103,22 +112,21 @@ export class MovementSystem {
     // `_advanceSegmented`) must not re-emit ENEMY_REACHED_ORIGIN or damage
     // the player — the outer update loop cleans them up next.
     if (!enemy.alive) return
-    enemy.isStealthed = enemy.stealthRanges.some(
-      ([min, max]) => enemy.x >= min && enemy.x <= max,
-    )
-
-    const distToOrigin = distance(enemy.x, enemy.y, 0, 0)
+    // Goal = level endpoint P* (V2) or origin (V1 fallback). MovementSystem
+    // reads `endpoint` structurally so it does not import context internals.
+    const goal = game.levelContext?.endpoint ?? ORIGIN
+    const distToGoal = distance(enemy.x, enemy.y, goal.x, goal.y)
     const reachedTarget =
       enemy._direction < 0
         ? enemy._pathX <= enemy._targetX
         : enemy._pathX >= enemy._targetX
 
-    if (distToOrigin < 0.5 || reachedTarget) {
+    if (distToGoal < 0.5 || reachedTarget) {
       enemy.alive = false
       enemy.active = false
-      // Reaching origin damages the player (handled by EconomySystem) and
+      // Reaching the goal damages the player (handled by EconomySystem) and
       // the enemy disappears. Splitting only happens on combat death —
-      // otherwise children would spawn next to the origin and immediately
+      // otherwise children would spawn next to the goal and immediately
       // deal more damage on their way out.
       game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, enemy)
     }

@@ -3,7 +3,7 @@ import { api } from './api'
 export interface LeaderboardEntry {
   id: string
   rank: number
-  username: string
+  player_name: string
   level: number
   score: number
   kills: number

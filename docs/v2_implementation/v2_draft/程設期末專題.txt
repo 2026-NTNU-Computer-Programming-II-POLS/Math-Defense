@@ -1,0 +1,63 @@
+﻿1. .Math Defense
+        S1 = kill / [time-total - n((time-exclude prepare))]
+S2 = kill / cost_total
+K = MAX(m*S1 + (1 - m)*S2), 0.5 <=m <= 0.7
+Total Score =  
+        (Initial Answer (Legal intersection point of all path) : True→1、False/Money/Ignore→0)
+2. Towers
+* Magic : {(1, 2, 3 次項的方程式), (Trigonometric Functions), (Logarithmic Function)} n=1
+* Radar : 
+   * Type-A : 範圍內掃描式傷害 (no target)
+   * Type-B : 攻速高、傷害低 (can select target)
+   * Type-C : 攻速低、傷害高 (can select target)
+* Matrix : 
+   * 兩塔為有效的一組；各塔預設一範圍 MR；各塔 (x,y) 將轉為矩陣元素 [x, y]
+   * 兩塔範圍重疊部分受到矩陣相乘之結果傷害 (can select target)
+   * 攻擊將以雷射鎖定同一目標，傷害將隨時間遞增
+* Limit : 塔放置的x值 = a，(選擇/填充題) / (x - a)，依結果有不同傷害
+   * 對敵人造成傷害: D(+∞) > D(+C)
+   * 治療敵人(哈哈笨蛋): H(-∞) > H(-C)
+   * Calculus : 給3~5個函式，選擇一次微分/二次微分/積分，依結果生成不同寵物
+   * 若為 0 ，則該塔被移除 (無補償金；活該)
+   * 若為常數，則失效
+   *  : 緩速
+   *  : 攻速高
+   *  : 傷害高
+   * 每波次可花錢選擇是否變更當前函數 (對其進行微分或積分)
+      3. Enemies
+      * general
+      * split
+      * strong
+      * fast
+      * helper
+      * boss
+      * Type-A : 有護盾、血量厚、能產生小怪......
+      * Type-B : Type-A + f(g(x))’
+學生回答 f(g(x))’ 的結果，
+正確→boss變成 f’(g(x))、 g’(x)；
+錯誤→原boss被打敗後再分成 f’(g(x))、 g’(x)
+         4. Location of the Start and End points
+         * path:
+         * A-path: 1, 2, 3 次項的方程式
+         * B-path: Trigonometric Functions
+         * C-path: Logarithmic Function
+         * path-type1: {A-path} n = 2-5
+         * path-type2: {A-path, B-path} n = 2-3
+         * path-type3: {A-path, C-path} n = 2-3
+         * path-type4: {B-path, C-path} n = 2-3
+         * Classified according to Difficulty
+         * start: path 與地圖邊界的交點
+         * end: 所有 path 的聯集交點 (會給定一個區間給玩家；保證該區間內僅有一個合法交點)
+         * Legal placement location: 隨機生成，不覆蓋 path 
+         5. Events of each wave
+         * 3-5 門中含有 1 門 buff、其餘為空
+         * 玩家可先擇一門 (不打開)，系統將刪除非被選門中的非 buff 門後，詢問玩家是否要換門
+         6. Money
+         * buy/upgrade tower
+         * intersection point
+         * buff / debuff
+         * tools
+         * move towers
+         * buff for tower
+         * health
+         * spells

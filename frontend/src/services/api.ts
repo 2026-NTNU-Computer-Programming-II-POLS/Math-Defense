@@ -179,7 +179,13 @@ export const api = {
   post<T>(path: string, body: unknown, opts: ApiOptions = {}) {
     return request<T>(path, { method: 'POST', body: JSON.stringify(body), signal: opts.signal })
   },
+  put<T>(path: string, body: unknown, opts: ApiOptions = {}) {
+    return request<T>(path, { method: 'PUT', body: JSON.stringify(body), signal: opts.signal })
+  },
   patch<T>(path: string, body: unknown, opts: ApiOptions = {}) {
     return request<T>(path, { method: 'PATCH', body: JSON.stringify(body), signal: opts.signal })
+  },
+  delete<T>(path: string, opts: ApiOptions = {}) {
+    return request<T>(path, { method: 'DELETE', signal: opts.signal })
   },
 }

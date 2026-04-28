@@ -6,6 +6,25 @@ from typing import Protocol, runtime_checkable
 from app.domain.session.aggregate import GameSession
 
 
+class CumulativeStats:
+    """Value object for aggregated user statistics across completed sessions."""
+    __slots__ = ("total_kills", "total_score", "total_waves", "total_sessions", "stars_played")
+
+    def __init__(
+        self,
+        total_kills: int,
+        total_score: int,
+        total_waves: int,
+        total_sessions: int,
+        stars_played: set[int],
+    ) -> None:
+        self.total_kills = total_kills
+        self.total_score = total_score
+        self.total_waves = total_waves
+        self.total_sessions = total_sessions
+        self.stars_played = stars_played
+
+
 @runtime_checkable
 class GameSessionRepository(Protocol):
     def find_by_id(self, session_id: str, user_id: str) -> GameSession | None: ...
@@ -22,3 +41,5 @@ class GameSessionRepository(Protocol):
     def save(self, session: GameSession) -> None: ...
 
     def save_all(self, sessions: list[GameSession]) -> None: ...
+
+    def get_cumulative_stats(self, user_id: str) -> CumulativeStats: ...

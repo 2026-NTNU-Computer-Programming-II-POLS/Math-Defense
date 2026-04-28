@@ -16,6 +16,7 @@
     "ci": "npm run arch-check && npm run validate-levels && npm run lint-chinese-comments && vitest run"
   },
   "dependencies": {
+    "katex": "^0.16.45",
     "pinia": "^3.0.4",
     "vue": "^3.5.30",
     "vue-router": "^4.6.4"

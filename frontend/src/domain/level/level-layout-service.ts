@@ -24,6 +24,12 @@ export type TileClass = 'path' | 'buildable' | 'forbidden'
 
 export interface LevelLayoutSource {
   readonly buildablePositions: ReadonlyArray<readonly [number, number]>
+  /**
+   * Extra cells classified as 'path' even though they don't lie on a real
+   * SegmentedPath. Used for V2 generated levels to scatter decoys so the
+   * forbidden-tile pattern doesn't reveal the true paths.
+   */
+  readonly decoyCells?: ReadonlyArray<readonly [number, number]>
 }
 
 export interface LevelLayoutService {
@@ -35,7 +41,7 @@ export interface LevelLayoutService {
 const SAMPLE_STEP = 1
 
 /**
- * Build an immutable layout service from a level source + resolved path.
+ * Build an immutable layout service from a level source + one or more paths.
  *
  * Path cells are sampled at integer grid resolution. For x-parameterized
  * segments we step `x` across `xRange` and round `evaluate(x)` to the
@@ -48,9 +54,23 @@ const SAMPLE_STEP = 1
  */
 export function createLevelLayoutService(
   level: LevelLayoutSource,
-  path: SegmentedPath,
+  pathOrPaths: SegmentedPath | ReadonlyArray<SegmentedPath>,
 ): LevelLayoutService {
-  const pathCells = derivePathCells(path.segments)
+  const paths: ReadonlyArray<SegmentedPath> = Array.isArray(pathOrPaths)
+    ? (pathOrPaths as ReadonlyArray<SegmentedPath>)
+    : [pathOrPaths as SegmentedPath]
+
+  const pathCells = new Set<string>()
+  for (const path of paths) {
+    for (const k of derivePathCells(path.segments)) pathCells.add(k)
+  }
+  if (level.decoyCells) {
+    for (const [gx, gy] of level.decoyCells) {
+      if (gx < GRID_MIN_X || gx >= GRID_MAX_X) continue
+      if (gy < GRID_MIN_Y || gy >= GRID_MAX_Y) continue
+      pathCells.add(cellKey(gx, gy))
+    }
+  }
   const buildableCells = deriveBuildableCells(level.buildablePositions)
 
   function classify(gx: number, gy: number): TileClass {

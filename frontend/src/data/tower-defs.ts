@@ -1,8 +1,14 @@
-/**
- * tower-defs.ts — tower stat definitions (pure data, no UI field specs)
- * UI field specs live in ui-defs.ts.
- */
 import { TowerType, Colors } from './constants'
+
+export type MagicMode = 'debuff' | 'buff'
+
+export interface UpgradeTier {
+  costPercent: number
+  damageBonus: number
+  rangeBonus: number
+  speedBonus: number
+  extra?: Record<string, number>
+}
 
 export interface TowerDef {
   type: TowerType
@@ -16,96 +22,121 @@ export interface TowerDef {
   unlockLevel: number
   description: string
   mathConcept: string
-  element: string
+  upgrades: UpgradeTier[]
 }
 
+const UPGRADE_TIER_2: UpgradeTier = { costPercent: 0.6, damageBonus: 0.25, rangeBonus: 0.1, speedBonus: 0 }
+const UPGRADE_TIER_3: UpgradeTier = { costPercent: 1.0, damageBonus: 0.5, rangeBonus: 0.2, speedBonus: 0.15 }
+
 export const TOWER_DEFS: Record<TowerType, TowerDef> = {
-  [TowerType.FUNCTION_CANNON]: {
-    type: TowerType.FUNCTION_CANNON,
-    name: '函數砲 Function Cannon',
-    nameEn: 'Function Cannon',
-    color: Colors.FUNCTION_CANNON,
-    cost: 50,
-    damage: 20,
-    range: 15,
-    cooldown: 1.5,
-    unlockLevel: 1,
-    description: '砲彈沿直線 y = mx + b 飛行，與敵人路徑的交點 = 命中點',
-    mathConcept: '一次函數 → 二次函數',
-    element: '冰系',
-  },
-  [TowerType.RADAR_SWEEP]: {
-    type: TowerType.RADAR_SWEEP,
-    name: '雷達掃描塔 Radar Sweep',
-    nameEn: 'Radar Sweep',
-    color: Colors.RADAR_SWEEP,
+  [TowerType.MAGIC]: {
+    type: TowerType.MAGIC,
+    name: 'Magic Tower',
+    nameEn: 'Magic Tower',
+    color: Colors.MAGIC,
     cost: 60,
-    // damage is per-fire (consistent with every other tower). Previously
-    // CombatSystem multiplied this by `cooldown`, so 8 × 0.5 = 4 damage per
-    // fire. Semantics were normalized; keep the same observed DPS by setting
-    // the per-fire value directly here.
-    damage: 4,
+    damage: 8,
+    range: 10,
+    cooldown: 1.0,
+    unlockLevel: 1,
+    description: 'Draws a math function curve as a zone of effect. Toggle between debuff enemies or buff allied towers.',
+    mathConcept: 'Function curves (polynomial, trig, log)',
+    upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
+  },
+  [TowerType.RADAR_A]: {
+    type: TowerType.RADAR_A,
+    name: 'Radar A — Sweep',
+    nameEn: 'Radar A — Sweep',
+    color: Colors.RADAR_A,
+    cost: 50,
+    damage: 5,
     range: 6,
     cooldown: 0.5,
-    unlockLevel: 2,
-    description: '持續掃描扇形區域，區域內敵人受傷',
-    mathConcept: '三角函數（sin/cos）、角度、扇形',
-    element: '風系',
+    unlockLevel: 1,
+    description: 'Continuous sweep around circle, AoE damage on contact.',
+    mathConcept: 'Radian intervals, arc sectors',
+    upgrades: [
+      { ...UPGRADE_TIER_2, extra: { sweepSpeed: 0.2 } },
+      { ...UPGRADE_TIER_3, extra: { sweepSpeed: 0.4, aoeWidth: 0.3 } },
+    ],
   },
-  [TowerType.MATRIX_LINK]: {
-    type: TowerType.MATRIX_LINK,
-    name: '矩陣連結塔 Matrix Link',
-    nameEn: 'Matrix Link',
-    color: Colors.MATRIX_LINK,
+  [TowerType.RADAR_B]: {
+    type: TowerType.RADAR_B,
+    name: 'Radar B — Rapid',
+    nameEn: 'Radar B — Rapid',
+    color: Colors.RADAR_B,
+    cost: 65,
+    damage: 8,
+    range: 7,
+    cooldown: 0.3,
+    unlockLevel: 2,
+    description: 'Fast single-target projectile shots.',
+    mathConcept: 'Radian intervals, arc sectors',
+    upgrades: [
+      { ...UPGRADE_TIER_2, extra: { targetCount: 1 } },
+      { ...UPGRADE_TIER_3, extra: { targetCount: 1 } },
+    ],
+  },
+  [TowerType.RADAR_C]: {
+    type: TowerType.RADAR_C,
+    name: 'Radar C — Sniper',
+    nameEn: 'Radar C — Sniper',
+    color: Colors.RADAR_C,
+    cost: 90,
+    damage: 40,
+    range: 12,
+    cooldown: 2.5,
+    unlockLevel: 2,
+    description: 'Slow powerful single-target shots with long range.',
+    mathConcept: 'Radian intervals, arc sectors',
+    upgrades: [
+      { ...UPGRADE_TIER_2, extra: { critChance: 0.1 } },
+      { ...UPGRADE_TIER_3, extra: { critChance: 0.2 } },
+    ],
+  },
+  [TowerType.MATRIX]: {
+    type: TowerType.MATRIX,
+    name: 'Matrix Tower',
+    nameEn: 'Matrix Tower',
+    color: Colors.MATRIX,
     cost: 80,
     damage: 0,
     range: 8,
-    cooldown: 0,
+    cooldown: 0.5,
+    unlockLevel: 2,
+    description: 'Pair two towers. Base damage = dot product of their grid coordinate vectors. Laser locks on and ramps damage.',
+    mathConcept: 'Dot product, vectors',
+    upgrades: [
+      { ...UPGRADE_TIER_2, extra: { rampRate: 0.2 } },
+      { ...UPGRADE_TIER_3, extra: { rampRate: 0.4 } },
+    ],
+  },
+  [TowerType.LIMIT]: {
+    type: TowerType.LIMIT,
+    name: 'Limit Tower',
+    nameEn: 'Limit Tower',
+    color: Colors.LIMIT,
+    cost: 70,
+    damage: 25,
+    range: 8,
+    cooldown: 3.0,
     unlockLevel: 3,
-    description: '選擇兩座相鄰的塔，輸入 2×2 矩陣做線性變換',
-    mathConcept: '2×2 矩陣、線性變換（旋轉、縮放）',
-    element: '祕術系',
+    description: 'Answer lim f(x)/(x-a) as x→a. Result determines tower effect: +∞ = max damage, 0 = removed.',
+    mathConcept: 'Limits, L\'Hôpital\'s rule',
+    upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
   },
-  [TowerType.PROBABILITY_SHRINE]: {
-    type: TowerType.PROBABILITY_SHRINE,
-    name: '機率神殿 Probability Shrine',
-    nameEn: 'Probability Shrine',
-    color: Colors.PROB_SHRINE,
-    cost: 40,
-    damage: 0,
-    range: 0,
-    cooldown: 0,
-    unlockLevel: 1,
-    description: '波次結束後觸發 Buff 卡系統',
-    mathConcept: '期望值、風險管理',
-    element: '命運系',
-  },
-  [TowerType.INTEGRAL_CANNON]: {
-    type: TowerType.INTEGRAL_CANNON,
-    name: '積分砲 Integral Cannon',
-    nameEn: 'Integral Cannon',
-    color: Colors.INTEGRAL,
+  [TowerType.CALCULUS]: {
+    type: TowerType.CALCULUS,
+    name: 'Calculus Tower',
+    nameEn: 'Calculus Tower',
+    color: Colors.CALCULUS,
     cost: 100,
-    damage: 30,
-    range: 12,
-    cooldown: 2.0,
-    unlockLevel: 3,
-    description: '曲線下方的陰影面積 = 攻擊範圍',
-    mathConcept: '定積分 = 面積 = 攻擊範圍',
-    element: '冰系',
-  },
-  [TowerType.FOURIER_SHIELD]: {
-    type: TowerType.FOURIER_SHIELD,
-    name: '傅立葉護盾破解 Fourier Shield Break',
-    nameEn: 'Fourier Shield Break',
-    color: Colors.FOURIER,
-    cost: 0,
     damage: 0,
-    range: 0,
+    range: 10,
     cooldown: 0,
-    unlockLevel: 4,
-    description: 'Level 4 Boss 戰專用機制',
-    mathConcept: '傅立葉分解、波的疊加',
-    element: '命運系',
+    unlockLevel: 3,
+    description: 'Choose a function, then derivative or integral. Result C*x^n spawns C pets with trait based on n.',
+    mathConcept: 'Derivatives, integrals, power rule',
+    upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
   },
 }

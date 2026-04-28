@@ -10,15 +10,16 @@ import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
 import router from '@/router'
 
+export type UserRole = 'admin' | 'teacher' | 'student'
+
 export interface User {
   id: string
-  username: string
+  email: string
+  player_name: string
+  role: UserRole
+  avatar_url: string | null
 }
 
-// Poll /auth/me at this interval while logged in so the UI notices token
-// expiry (cookie is HTTP-only, so the frontend can't read the exp claim
-// directly). Short enough that an expired session is caught well before
-// the user attempts a mutating action; long enough not to burden the API.
 const TOKEN_PROBE_INTERVAL_MS = 15_000
 
 export const useAuthStore = defineStore('auth', () => {
@@ -26,23 +27,29 @@ export const useAuthStore = defineStore('auth', () => {
   const initializing = ref(false)
   let probeTimer: ReturnType<typeof setInterval> | null = null
 
-  // Exposed so the router guard can await the /auth/me probe before making
-  // access decisions (fixes M-07: no more granting access with a stale token
-  // string during the init window).
   let _initResolve: (() => void) | null = null
   const initPromise = ref<Promise<void> | null>(null)
 
   const isLoggedIn = computed(() => user.value !== null)
+  const userRole = computed(() => user.value?.role ?? null)
+  const isAdmin = computed(() => user.value?.role === 'admin')
+  const isTeacher = computed(() => user.value?.role === 'teacher')
+  const isStudent = computed(() => user.value?.role === 'student')
 
   async function init(): Promise<void> {
     initializing.value = true
     initPromise.value = new Promise<void>((resolve) => { _initResolve = resolve })
     try {
       const res = await authService.me()
-      user.value = { id: res.id, username: res.username }
+      user.value = {
+        id: res.id,
+        email: res.email,
+        player_name: res.player_name,
+        role: res.role as UserRole,
+        avatar_url: res.avatar_url ?? null,
+      }
       startTokenProbe()
     } catch {
-      // Cookie is invalid / expired / absent — user stays logged out
       user.value = null
     } finally {
       initializing.value = false
@@ -63,15 +70,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function startTokenProbe(): void {
-    // Idempotent — a login-then-init sequence may call start twice; keep one timer.
     if (probeTimer !== null) return
     probeTimer = setInterval(async () => {
       if (user.value === null) { stopTokenProbe(); return }
       try {
         await authService.me()
       } catch {
-        // /auth/me failed — the 401 branch in api.ts has already called logout()
-        // and cleared state; other errors (network blip) we ignore and retry next tick.
+        // 401 branch in api.ts handles logout
       }
     }, TOKEN_PROBE_INTERVAL_MS)
   }
@@ -82,12 +87,14 @@ export const useAuthStore = defineStore('auth', () => {
     probeTimer = null
   }
 
+  async function updateAvatar(avatarUrl: string | null): Promise<void> {
+    await authService.updateAvatar(avatarUrl)
+    if (user.value) user.value = { ...user.value, avatar_url: avatarUrl }
+  }
+
   async function logout(): Promise<void> {
-    // Server clears the HTTP-only cookie in its response.
     await authService.logout()
     clearAuth()
-    // Serialize close-modal → navigate → toast so a 401 triggered mid-modal
-    // doesn't leave the user trapped behind stacked overlays (cf. F-7/F-8/F-9).
     try {
       const { useUiStore } = await import('@/stores/uiStore')
       const uiStore = useUiStore()
@@ -95,10 +102,10 @@ export const useAuthStore = defineStore('auth', () => {
         uiStore.dismissModal()
       }
     } catch {
-      // Pinia not installed yet (very early bootstrap) — skip modal cleanup.
+      // Pinia not installed yet
     }
 
-    const PROTECTED = new Set(['game', 'leaderboard'])
+    const PROTECTED = new Set(['game', 'leaderboard', 'rankings', 'profile', 'achievements', 'talents', 'classes', 'level-select', 'initial-answer', 'territory-list', 'territory-detail', 'territory-play', 'territory-rankings', 'admin-teachers', 'admin-classes', 'admin-students', 'territory-create', 'teacher-dashboard'])
     const currentName = router.currentRoute.value.name as string | undefined
     if (currentName && PROTECTED.has(currentName)) {
       try {
@@ -109,5 +116,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, isLoggedIn, initializing, initPromise, setUser, logout, init }
+  return { user, isLoggedIn, userRole, isAdmin, isTeacher, isStudent, initializing, initPromise, setUser, logout, init, updateAvatar }
 })

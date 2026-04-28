@@ -1,34 +1,41 @@
-/**
- * BuffSystem — Buff card / curse system (strategy-pattern rewrite)
- * buff-defs.ts stores effectId strings; this file owns the effectStrategies Map that executes them.
- * No more dynamically injected properties like game._shieldActive.
- */
-import { Events, GamePhase, TowerType } from '@/data/constants'
-import { BUFF_POOL, CURSE_POOL, type BuffDef } from '@/data/buff-defs'
+import { Events, TowerType } from '@/data/constants'
+import { PURCHASABLE_BUFFS, type BuffDef } from '@/data/buff-defs'
 import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
-import type { Game } from '@/engine/Game'
+import type { Game, GameSystem } from '@/engine/Game'
+import type { ActiveBuffEntry } from '@/engine/GameState'
 
-interface ActiveBuff extends BuffDef {
-  remainingWaves: number
-  isCurse: boolean
-  _targetTowerId?: string   // used by RANDOM_TOWER_RANGE effects
-}
+type EffectFn = (game: Game) => void
 
-// ── Effect strategy map ──
-
-type EffectFn = (game: Game, buff: ActiveBuff) => void
-
-/** Snap bonus to avoid floating-point drift from multiply/divide cycles */
 function snap(v: number): number {
   return Math.round(v * 1e8) / 1e8
 }
 
-/** Recalculate effective damage from base + bonus to avoid float drift */
 function recalcDamage(g: Game): void {
   g.towers.forEach((t) => { t.effectiveDamage = t.baseDamage * t.damageBonus })
 }
 
+function recalcRange(g: Game): void {
+  g.towers.forEach((t) => { t.effectiveRange = t.baseRange * t.rangeBonus })
+}
+
 const effectStrategies: Record<string, EffectFn> = {
+  // Tower damage modifiers
+  ALL_TOWERS_DAMAGE_MULTIPLY_1_2: (g) => {
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 1.2) })
+    recalcDamage(g)
+  },
+  ALL_TOWERS_DAMAGE_DIVIDE_1_2: (g) => {
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 1.2) })
+    recalcDamage(g)
+  },
+  ALL_TOWERS_DAMAGE_MULTIPLY_2: (g) => {
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 2) })
+    recalcDamage(g)
+  },
+  ALL_TOWERS_DAMAGE_DIVIDE_2: (g) => {
+    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 2) })
+    recalcDamage(g)
+  },
   ALL_TOWERS_DAMAGE_MULTIPLY_1_5: (g) => {
     g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 1.5) })
     recalcDamage(g)
@@ -45,50 +52,69 @@ const effectStrategies: Record<string, EffectFn> = {
     g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 0.8) })
     recalcDamage(g)
   },
-  RANDOM_TOWER_RANGE_MULTIPLY_1_3: (g, buff) => {
-    if (g.towers.length > 0) {
-      const t = g.towers[Math.floor(Math.random() * g.towers.length)]
-      t.rangeBonus = snap(t.rangeBonus * 1.3)
-      t.effectiveRange = t.baseRange * t.rangeBonus
-      buff._targetTowerId = t.id
-    }
+
+  // Tower speed modifiers
+  ALL_TOWERS_SPEED_MULTIPLY_1_15: (g) => {
+    g.towers.forEach((t) => { t.cooldown = snap(t.cooldown / 1.15) })
   },
-  RANDOM_TOWER_RANGE_DIVIDE_1_3: (g, buff) => {
-    if (buff._targetTowerId) {
-      const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
-      if (t) {
-        t.rangeBonus = snap(t.rangeBonus / 1.3)
-        t.effectiveRange = t.baseRange * t.rangeBonus
-      } else if (import.meta.env.DEV) {
-        // Target tower is gone (refund/destroy). The range bonus stays
-        // applied to nobody, so it's a no-op — surface it during dev so
-        // the leak is obvious if towers ever become removable.
-        console.warn(`[BuffSystem] RANDOM_TOWER_RANGE revert: tower ${buff._targetTowerId} no longer exists`)
-      }
-      buff._targetTowerId = undefined
-    }
+  ALL_TOWERS_SPEED_DIVIDE_1_15: (g) => {
+    g.towers.forEach((t) => { t.cooldown = snap(t.cooldown * 1.15) })
   },
-  UPGRADE_FUNCTION_CANNON: (g) => {
-    g.towers
-      .filter((t) => t.type === TowerType.FUNCTION_CANNON)
-      .forEach((t) => { (t as { level?: number }).level = 2 })
+
+  // Tower range modifiers
+  ALL_TOWERS_RANGE_MULTIPLY_1_15: (g) => {
+    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus * 1.15) })
+    recalcRange(g)
   },
+  ALL_TOWERS_RANGE_DIVIDE_1_15: (g) => {
+    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus / 1.15) })
+    recalcRange(g)
+  },
+  ALL_TOWERS_RANGE_MULTIPLY_1_5: (g) => {
+    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus * 1.5) })
+    recalcRange(g)
+  },
+  ALL_TOWERS_RANGE_DIVIDE_1_5: (g) => {
+    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus / 1.5) })
+    recalcRange(g)
+  },
+
+  // Enemy modifiers
+  ENEMY_SPEED_MULTIPLIER_0_85: (g) => { g.state.enemySpeedMultiplier = 0.85 },
+  ENEMY_SPEED_MULTIPLIER_0_6: (g) => { g.state.enemySpeedMultiplier = 0.6 },
+  ENEMY_SPEED_MULTIPLIER_1_5: (g) => { g.state.enemySpeedMultiplier = 1.5 },
+  ENEMY_SPEED_MULTIPLIER_RESET: (g) => { g.state.enemySpeedMultiplier = 1.0 },
+  ENEMY_VULNERABILITY_1_1: (g) => { g.state.enemyVulnerability = 1.1 },
+  ENEMY_VULNERABILITY_RESET: (g) => { g.state.enemyVulnerability = 1.0 },
+
+  // Player / economy
+  HEAL_3: (g) => { g.changeHp(3) },
+  HEAL_5: (g) => { g.changeHp(5) },
+  HEAL_10: (g) => { g.changeHp(10) },
+  HEAL_FULL: (g) => { g.changeHp(g.state.maxHp - g.state.hp) },
+  SHIELD_ACTIVATE: (g) => { g.state.shieldActive = true },
+  SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false },
   GOLD_MULTIPLIER_DOUBLE: (g) => { g.state.goldMultiplier *= 2 },
-  GOLD_MULTIPLIER_RESET: (g) => { g.state.goldMultiplier = Math.max(1, g.state.goldMultiplier / 2) },
+  GOLD_MULTIPLIER_TRIPLE: (g) => { g.state.goldMultiplier *= 3 },
+  GOLD_MULTIPLIER_RESET: (g) => { g.state.goldMultiplier = 1 },
   FREE_TOWER_NEXT: (g) => { g.state.freeTowerNext = true },
   FREE_TOWER_CLEAR: (g) => { g.state.freeTowerNext = false },
+  FREE_TOWER_CHARGES_2: (g) => { g.state.freeTowerCharges += 2 },
+
+  // Legacy effects kept for compatibility
+  UPGRADE_MAGIC_TOWER: (g) => {
+    g.towers
+      .filter((t) => t.type === TowerType.MAGIC)
+      .forEach((t) => { (t as { level?: number }).level = 2 })
+  },
   REFUND_LAST_TOWER: (g) => {
     if (g.towers.length > 0) {
       const last = g.towers[g.towers.length - 1]
       g.changeGold(last.cost)
     }
   },
-  HEAL_3: (g) => { g.changeHp(3) },
-  SHIELD_ACTIVATE: (g) => { g.state.shieldActive = true },
-  SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false },
   ORIGIN_EXPLOSION: (g) => {
-    // deal 50 damage to all living enemies
-    const enemies = [...g.enemies] // snapshot to avoid mutating the array during iteration
+    const enemies = [...g.enemies]
     for (const enemy of enemies) {
       if (!enemy.alive) continue
       enemy.hp -= 50
@@ -97,7 +123,6 @@ const effectStrategies: Record<string, EffectFn> = {
         enemy.alive = false
         enemy.active = false
         g.eventBus.emit(Events.ENEMY_KILLED, enemy)
-
         if (shouldSplit(enemy)) {
           spawnChildren(enemy, {
             path: g.levelContext?.path ?? null,
@@ -110,74 +135,41 @@ const effectStrategies: Record<string, EffectFn> = {
       }
     }
   },
-  ENEMY_SPEED_MULTIPLIER_1_5: (g) => { g.state.enemySpeedMultiplier = 1.5 },
-  ENEMY_SPEED_MULTIPLIER_RESET: (g) => { g.state.enemySpeedMultiplier = 1.0 },
-  DISABLE_RANDOM_TOWER: (g, buff) => {
-    if (g.towers.length > 0) {
-      const t = g.towers[Math.floor(Math.random() * g.towers.length)]
-      t.disabled = true
-      buff._targetTowerId = t.id
+  DISABLE_RANDOM_TOWER: (g) => {
+    const active = g.towers.filter((t) => !t.disabled)
+    if (active.length > 0) {
+      active[Math.floor(Math.random() * active.length)].disabled = true
     }
   },
-  ENABLE_DISABLED_TOWER: (g, buff) => {
-    if (buff._targetTowerId) {
-      const t = g.towers.find((tower) => tower.id === buff._targetTowerId)
-      if (t) t.disabled = false
-      else if (import.meta.env.DEV) {
-        console.warn(`[BuffSystem] DISABLE_RANDOM_TOWER revert: tower ${buff._targetTowerId} no longer exists`)
-      }
-      buff._targetTowerId = undefined
-    }
+  ENABLE_DISABLED_TOWER: (g) => {
+    g.towers.forEach((t) => { t.disabled = false })
   },
 }
 
-function applyEffect(effectId: string, game: Game, buff: ActiveBuff): void {
+function applyEffect(effectId: string, game: Game): void {
   const fn = effectStrategies[effectId]
-  if (fn) {
-    fn(game, buff)
-    return
-  }
-  // Silent missing-strategy paths leave buffs permanently half-applied: a
-  // typo in buff-defs would apply the forward effect but never revert it.
-  // Throw in dev so authoring mistakes surface at the moment of insertion;
-  // keep a warn in prod to avoid hard-crashing a live game from a data bug.
+  if (fn) { fn(game); return }
   const msg = `[BuffSystem] Unknown effectId: ${effectId}`
   if (import.meta.env.DEV) throw new Error(msg)
   console.warn(msg)
 }
 
-// ── BuffSystem ──
-
-export class BuffSystem {
-  currentCards: (BuffDef & { isCurse: boolean })[] = []
-  private activeBuffs: ActiveBuff[] = []
+export class BuffSystem implements GameSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
-    // Clear any prior subscriptions so HMR / re-init doesn't double-subscribe.
     this.destroy()
     this._unsubs.push(
-      game.eventBus.on(Events.BUFF_PHASE_START, () => this._drawCards(game)),
-
-      game.eventBus.on(Events.BUFF_CARD_SELECTED, (cardId) => {
-        const idx = this.currentCards.findIndex((c) => c.id === cardId)
-        this._applyCard(idx, game)
+      game.eventBus.on(Events.SHOP_PURCHASE, ({ itemId, cost }) => {
+        this._purchaseBuff(itemId, cost, game)
       }),
 
-      // Tick at WAVE_END so a duration=1 buff stays active for the wave that follows
-      // its selection. Decrementing at WAVE_START would revert it before the wave ran.
-      game.eventBus.on(Events.WAVE_END, () => this._tickBuffs(game)),
-
       game.eventBus.on(Events.LEVEL_START, () => {
-        // Run reverts in case a consumer emitted LEVEL_START without going
-        // through Game.startLevel() (direct replay flows, tests). When it
-        // *is* Game.startLevel, state/towers have already been rebuilt, so
-        // reverts are effectively no-ops — safe either way.
-        for (const buff of this.activeBuffs) {
-          if (buff.revertId) applyEffect(buff.revertId, game, buff)
+        for (const buff of game.state.activeBuffs) {
+          if (buff.revertId) applyEffect(buff.revertId, game)
         }
-        this.activeBuffs = []
-        this.currentCards = []
+        game.state.activeBuffs = []
+        game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [])
       }),
     )
   }
@@ -187,111 +179,67 @@ export class BuffSystem {
     this._unsubs = []
   }
 
-  /**
-   * Force-revert any active buffs that target the given tower id, and drop
-   * them from tracking. Call this the moment a tower leaves `game.towers`
-   * (refund, destroy, etc.) so a later wave-end revert can't either (a)
-   * silently no-op — leaving a phantom bonus tagged to a dead id — or (b)
-   * hit a *new* tower that reuses the id slot.
-   */
-  onTowerRemoved(game: Game, towerId: string): void {
-    for (let i = this.activeBuffs.length - 1; i >= 0; i--) {
-      const buff = this.activeBuffs[i]
-      if (buff._targetTowerId !== towerId) continue
-      if (buff.revertId) applyEffect(buff.revertId, game, buff)
-      this.activeBuffs.splice(i, 1)
+  purchaseBuffDirect(buffId: string, game: Game): boolean {
+    const def = PURCHASABLE_BUFFS.find((b) => b.id === buffId)
+    if (!def) return false
+    return this._purchaseBuff(buffId, def.cost, game)
+  }
+
+  applyExternalBuff(effectId: string, revertId: string | undefined, duration: number, name: string, game: Game): void {
+    applyEffect(effectId, game)
+    if (duration > 0) {
+      game.state.activeBuffs.push({
+        id: `ext_${Date.now()}`,
+        name,
+        effectId,
+        revertId,
+        remainingTime: duration,
+        totalDuration: duration,
+      })
+      game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [...game.state.activeBuffs])
     }
   }
 
-  private _drawCards(game?: Game): void {
-    // Each Probability Shrine adds one extra card and tilts the curse-vs-buff
-    // coin against the player less often. With no shrines, behave as before.
-    const shrines = game ? game.towers.filter((t) => t.type === TowerType.PROBABILITY_SHRINE).length : 0
-    const cardCount = 3 + shrines
-    const curseChance = Math.max(0.05, 0.3 - shrines * 0.08)
-    // Build a fresh array each draw so downstream consumers (e.g. the Pinia
-    // store) can treat the payload as an immutable snapshot. Reassigning
-    // `currentCards` — rather than splicing/pushing into the existing one —
-    // is what guarantees the store's previous reference stays untouched.
-    const fresh: (BuffDef & { isCurse: boolean })[] = []
-    for (let i = 0; i < cardCount; i++) {
-      if (Math.random() < curseChance && CURSE_POOL.length > 0) {
-        const curse = CURSE_POOL[Math.floor(Math.random() * CURSE_POOL.length)]
-        fresh.push({ ...curse, isCurse: true })
-      } else {
-        const buff = BUFF_POOL[Math.floor(Math.random() * BUFF_POOL.length)]
-        fresh.push({ ...buff, isCurse: false })
+  private _purchaseBuff(itemId: string, cost: number, game: Game): boolean {
+    const def = PURCHASABLE_BUFFS.find((b) => b.id === itemId)
+    if (!def) return false
+    if (game.state.gold < cost) return false
+
+    game.changeGold(-cost)
+    game.addCost(cost)
+    applyEffect(def.effectId, game)
+
+    if (def.duration > 0) {
+      const entry: ActiveBuffEntry = {
+        id: def.id + '_' + Date.now(),
+        name: def.name,
+        effectId: def.effectId,
+        revertId: def.revertId,
+        remainingTime: def.duration,
+        totalDuration: def.duration,
       }
+      game.state.activeBuffs.push(entry)
+      game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [...game.state.activeBuffs])
     }
-    this.currentCards = fresh
-    if (game) game.eventBus.emit(Events.BUFF_CARDS_UPDATED, fresh)
+    return true
   }
 
-  private _applyCard(cardIndex: number, game: Game): void {
-    if (cardIndex < 0 || cardIndex >= this.currentCards.length) {
-      game.eventBus.emit(Events.BUFF_RESULT, { success: false, cardId: '', skipped: true })
-      game.setPhase(GamePhase.BUILD)
-      return
+  update(dt: number, game: Game): void {
+    const buffs = game.state.activeBuffs
+    let changed = false
+    for (let i = buffs.length - 1; i >= 0; i--) {
+      buffs[i].remainingTime -= dt
+      if (buffs[i].remainingTime <= 0) {
+        const expired = buffs[i]
+        if (expired.revertId) applyEffect(expired.revertId, game)
+        buffs.splice(i, 1)
+        changed = true
+      }
     }
-
-    const card = this.currentCards[cardIndex]
-
-    if (card.isCurse) {
-      game.changeGold(card.goldReward ?? 0)
-      const entry: ActiveBuff = { ...card, remainingWaves: card.duration }
-      applyEffect(card.effectId, game, entry)
-      this._trackOrRevertImmediate(card, entry, game)
-      game.eventBus.emit(Events.BUFF_RESULT, { success: true, cardId: card.id, skipped: false })
-    } else {
-      if (game.state.gold < card.cost) {
-        game.eventBus.emit(Events.BUFF_RESULT, { success: false, cardId: card.id, skipped: false, insufficientGold: true })
-        return  // Stay in BUFF_SELECT — UI should show "insufficient gold" and let player pick another card
-      }
-      game.changeGold(-card.cost)
-      const success = Math.random() < card.probability
-      if (success) {
-        const entry: ActiveBuff = { ...card, remainingWaves: card.duration }
-        applyEffect(card.effectId, game, entry)
-        this._trackOrRevertImmediate(card, entry, game)
-      }
-      game.eventBus.emit(Events.BUFF_RESULT, { success, cardId: card.id, skipped: false })
-    }
-
-    game.setPhase(GamePhase.BUILD)
-  }
-
-  /**
-   * duration > 0 (including Infinity) → add to activeBuffs for tracking (reverted on LEVEL_START or _tickBuffs)
-   * duration === 0 with revertId → instant effect, revert immediately after applying
-   */
-  private _trackOrRevertImmediate(card: BuffDef & { isCurse: boolean }, entry: ActiveBuff, game: Game): void {
-    if (card.duration > 0) {
-      this.activeBuffs.push(entry)
-    } else if (card.duration === 0 && card.revertId) {
-      applyEffect(card.revertId, game, entry)
-    } else if (card.duration === 0 && !card.revertId) {
-      // One-shot effect (e.g. heal, explosion) — no revert needed.
-      // Warn if this looks like a persistent modifier that's missing a revertId.
-      if (import.meta.env.DEV) {
-        const id = card.effectId
-        if (id.includes('MULTIPLY') || id.includes('DIVIDE') || id.includes('DISABLE')) {
-          console.warn(`[BuffSystem] duration=0 buff "${card.id}" (${id}) modifies persistent state but has no revertId`)
-        }
-      }
+    if (changed) {
+      game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [...buffs])
     }
   }
 
-  private _tickBuffs(game: Game): void {
-    for (let i = this.activeBuffs.length - 1; i >= 0; i--) {
-      const buff = this.activeBuffs[i]
-      buff.remainingWaves--
-      if (buff.remainingWaves <= 0) {
-        if (buff.revertId) applyEffect(buff.revertId, game, buff)
-        this.activeBuffs.splice(i, 1)
-      }
-    }
-  }
-
-  update(_dt: number, _game: Game): void { /* no per-frame update needed */ }
-  render(_renderer: unknown, _game: Game): void { /* rendering handled by the Vue UI layer */ }
+  render(_renderer: unknown, _game: Game): void {}
 }

@@ -39,13 +39,18 @@ import type { Game, GameEvents } from '@/engine/Game'
 // (no per-test `as any`).
 type GameStub = Partial<Game> & {
   eventBus: EventBus<GameEvents>
-  state: Pick<Game['state'], 'score' | 'kills' | 'wave'>
+  state: Partial<Game['state']>
 }
 function makeGameStub(): Game & { eventBus: EventBus<GameEvents> } {
   const eventBus = new EventBus<GameEvents>()
   const stub: GameStub = {
     eventBus,
-    state: { score: 1234, kills: 7, wave: 5 } as Game['state'],
+    state: {
+      score: 1234, kills: 7, wave: 5,
+      starRating: 1, initialAnswer: 0,
+      cumulativeKillValue: 100, costTotal: 50,
+      timeTotal: 60, hp: 15, timeExcludePrepare: [5, 3],
+    } as Game['state'],
   }
   return stub as unknown as Game & { eventBus: EventBus<GameEvents> }
 }
@@ -60,7 +65,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.clearAllMocks()
     // Pretend the user is logged in so the sync path actually runs
     const auth = useAuthStore()
-    auth.setUser({ id: 'u1', username: 'tester' })
+    auth.setUser({ id: 'u1', email: 'tester@test.local', player_name: 'tester', role: 'student' })
 
     // No orphan session at mount
     vi.mocked(sessionService.getActive).mockResolvedValue(null)
@@ -117,7 +122,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     expect(sessionService.end).toHaveBeenCalledTimes(2)
     const lastCallArgs = vi.mocked(sessionService.end).mock.calls[1]
     expect(lastCallArgs[0]).toBe('sess-abc')
-    expect(lastCallArgs[1]).toEqual({ score: 1234, kills: 7, waves_survived: 5 })
+    expect(lastCallArgs[1]).toMatchObject({ score: 1234, kills: 7, waves_survived: 5 })
     expect(sync.sessionId.value).toBeNull()
   })
 
@@ -201,7 +206,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     game.eventBus.emit(Events.LEVEL_END, undefined)
     await flushPromises()
     expect(sessionService.end).toHaveBeenCalledTimes(2)
-    expect(vi.mocked(sessionService.end).mock.calls[1][1]).toEqual({
+    expect(vi.mocked(sessionService.end).mock.calls[1][1]).toMatchObject({
       score: 1234, kills: 7, waves_survived: 5,
     })
     expect(sync.sessionId.value).toBeNull()

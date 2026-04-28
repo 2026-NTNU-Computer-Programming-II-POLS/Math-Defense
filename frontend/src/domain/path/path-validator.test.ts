@@ -64,10 +64,10 @@ describe('validateLevelPath', () => {
   describe('out-of-world', () => {
     it('emits the code with the offending sampled y at a segment endpoint', () => {
       const errors = validateLevelPath(level([
-        // At x=0 the linear segment evaluates to y=-5, below GRID_MIN_Y (-2).
-        { id: 's', kind: 'linear', xRange: [0, 10], params: { kind: 'linear', slope: 0, intercept: -5 } },
+        // At x=0 the linear segment evaluates to y=-20, below GRID_MIN_Y (-14).
+        { id: 's', kind: 'linear', xRange: [0, 10], params: { kind: 'linear', slope: 0, intercept: -20 } },
       ]))
-      expect(errors).toContainEqual({ code: 'out-of-world', segmentId: 's', sampledY: -5 })
+      expect(errors).toContainEqual({ code: 'out-of-world', segmentId: 's', sampledY: -20 })
     })
 
     it('flags a vertical whose yEnd pokes above GRID_MAX_Y (14)', () => {
@@ -80,10 +80,10 @@ describe('validateLevelPath', () => {
 
   describe('buildable-out-of-bounds', () => {
     it('emits the code when a buildable cell is outside the grid on any axis', () => {
-      const errors = validateLevelPath(level([SAFE_BASE], [[-5, 3], [100, 3], [3, -10], [3, 100]]))
+      const errors = validateLevelPath(level([SAFE_BASE], [[-50, 3], [100, 3], [3, -50], [3, 100]]))
       const bad = errors.filter((e) => e.code === 'buildable-out-of-bounds')
       expect(bad.map((e) => e.code === 'buildable-out-of-bounds' ? e.cell : null))
-        .toEqual([[-5, 3], [100, 3], [3, -10], [3, 100]])
+        .toEqual([[-50, 3], [100, 3], [3, -50], [3, 100]])
     })
   })
 

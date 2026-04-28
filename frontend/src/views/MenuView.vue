@@ -15,14 +15,32 @@ const auth = useAuthStore()
     </div>
 
     <nav class="menu-nav">
-      <button class="btn menu-btn" @click="router.push('/game')">
+      <button v-if="auth.isStudent || !auth.isLoggedIn" class="btn menu-btn" @click="router.push('/game')">
         ▶ 開始遊戲
       </button>
       <button class="btn menu-btn" @click="router.push('/leaderboard')">
         ◈ 排行榜
       </button>
-      <button class="btn menu-btn" @click="router.push('/auth')">
-        {{ auth.isLoggedIn ? `⬡ ${auth.user?.username}` : '⬡ 登入 / 註冊' }}
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/territory')">
+        ⚔ 搶佔領地
+      </button>
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/rankings')">
+        ◈ 完整排名
+      </button>
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/classes')">
+        ◆ 班級管理
+      </button>
+      <button v-if="auth.isTeacher || auth.isAdmin" class="btn menu-btn" @click="router.push('/teacher')">
+        ⬡ 教師面板
+      </button>
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/profile')">
+        ⬡ {{ auth.user?.player_name }}
+      </button>
+      <button v-if="auth.isAdmin" class="btn menu-btn" @click="router.push('/admin/teachers')">
+        ✦ 管理面板
+      </button>
+      <button class="btn menu-btn" @click="auth.isLoggedIn ? auth.logout() : router.push('/auth')">
+        {{ auth.isLoggedIn ? '⏻ 登出' : '⬡ 登入 / 註冊' }}
       </button>
     </nav>
 

@@ -88,6 +88,7 @@ function makePath(
     xRange: s.xRange,
     params: { kind: 'horizontal', y: 0 },
     evaluate: () => 0,
+    evaluateDerivative: () => 0,
     expr: 'y=0',
     label: s.id,
   }))
