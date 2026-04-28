@@ -25,13 +25,14 @@ backend/
 ├── app/
 │   ├── main.py                    FastAPI factory, CORS, lifespan (Alembic upgrade), global DomainError/ValueError handlers
 │   ├── config.py                  Settings (Pydantic): SECRET_KEY, DATABASE_URL, CORS_ORIGINS, ...
+│   ├── factories.py               DI wiring — builds all application services
 │   ├── limiter.py                 slowapi Limiter instance shared across routers
 │   ├── shared_constants.py        Loads shared/game-constants.json so Python sees the same canvas / grid / player values as the frontend
 │   ├── seed.py                    Demo user seeding — ensure_demo_user(); called from lifespan after migrations
 │   │
 │   ├── domain/                    ── DOMAIN LAYER ──
 │   │   ├── value_objects.py       SessionStatus enum, Level, Score, GameResult
-│   │   ├── constraints.py         Numeric bounds (LEVEL/SCORE/HP/GOLD/KILLS/WAVES ranges, MAX_SCORE_DELTA) — single source of truth
+│   │   ├── constraints.py         Numeric bounds (STAR/SCORE/HP/GOLD/KILLS/WAVES ranges, MAX_SCORE_DELTA) — single source of truth
 │   │   ├── errors.py              DomainError hierarchy; each subclass carries its own HTTP status_code
 │   │   ├── session/
 │   │   │   ├── aggregate.py       GameSession aggregate root (state machine + invariants + events)
@@ -40,14 +41,26 @@ backend/
 │   │   ├── leaderboard/
 │   │   │   ├── aggregate.py       LeaderboardEntry aggregate
 │   │   │   └── repository.py      Repository Protocol
-│   │   └── user/
-│   │       ├── aggregate.py       User aggregate root (password_hash only — plaintext never reaches domain)
-│   │       └── repository.py      Repository Protocol
+│   │   ├── user/
+│   │   │   ├── aggregate.py       User aggregate root (email, player_name, role; password_hash only — plaintext never reaches domain)
+│   │   │   └── repository.py      Repository Protocol
+│   │   ├── achievement/           Achievement definitions + aggregate (20 achievements, 5 categories)
+│   │   ├── talent/                Talent tree aggregate (21 nodes, 7 tower types, prereq chains)
+│   │   ├── class_/                Class aggregate + ClassMembership + join_code
+│   │   ├── auth/                  Auth-specific domain helpers
+│   │   ├── identity/              Identity value objects
+│   │   ├── scoring/               score_calculator.py — server-side S1/S2/K/TotalScore formula
+│   │   └── territory/             Grabbing Territory aggregate + optimistic locking
 │   │
 │   ├── application/               ── APPLICATION LAYER ──
-│   │   ├── auth_service.py        AuthApplicationService — register / login / authenticate_token
-│   │   ├── session_service.py     Session use cases; consumes SessionCompleted to auto-create leaderboard
+│   │   ├── auth_service.py        AuthApplicationService — register(email, player_name, password) / login / authenticate_token
+│   │   ├── session_service.py     Session use cases; consumes SessionCompleted to auto-create leaderboard; calls achievement_svc post-commit
 │   │   ├── leaderboard_service.py Leaderboard query + manual score submission (idempotent)
+│   │   ├── achievement_service.py AchievementApplicationService — evaluate + unlock; awards talent points
+│   │   ├── talent_service.py      TalentApplicationService — allocate + reset + runtime modifiers
+│   │   ├── class_service.py       ClassApplicationService — CRUD + student join by code
+│   │   ├── admin_service.py       AdminApplicationService — teacher/class/student management
+│   │   ├── territory_service.py   TerritoryApplicationService — activity lifecycle + slot occupation
 │   │   └── mappers.py             Aggregate → Pydantic DTO mappers; keeps domain free of Pydantic imports
 │   │
 │   ├── infrastructure/            ── INFRASTRUCTURE LAYER ──
@@ -56,25 +69,41 @@ backend/
 │   │   ├── token_denylist.py      DB-backed JWT deny-list for server-side logout (jti → expiry); bounded by natural JWT TTL
 │   │   └── persistence/
 │   │       ├── user_repository.py         SQLAlchemy impl of UserRepository
-│   │       ├── session_repository.py      SQLAlchemy impl of SessionRepository
-│   │       └── leaderboard_repository.py  SQLAlchemy impl with per-level DENSE_RANK ranking
+│   │       ├── session_repository.py      SQLAlchemy impl of SessionRepository + get_cumulative_stats()
+│   │       ├── leaderboard_repository.py  SQLAlchemy impl with per-level DENSE_RANK ranking
+│   │       ├── achievement_repository.py  SQLAlchemy impl of AchievementRepository
+│   │       └── talent_repository.py       SQLAlchemy impl of TalentRepository
 │   │
 │   ├── models/                    SQLAlchemy ORM models
-│   │   ├── user.py                User
-│   │   ├── game_session.py        GameSession (CHECK level 1–4, partial unique index on active)
-│   │   ├── leaderboard.py         LeaderboardEntry (unique session_id)
+│   │   ├── user.py                User (email, player_name, avatar_url, role)
+│   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields)
+│   │   ├── leaderboard.py         LeaderboardEntry (unique session_id; user_id nullable via SET NULL)
 │   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline)
-│   │   └── denied_token.py        DeniedToken (revoked JWT JTIs until natural expiry)
+│   │   ├── denied_token.py        DeniedToken (revoked JWT JTIs until natural expiry)
+│   │   ├── achievement.py         UserAchievement (user_id + achievement_id, unique)
+│   │   ├── talent.py              TalentAllocation (user_id + node_id + level, unique)
+│   │   ├── class_.py              Class (join_code, teacher_id)
+│   │   ├── class_membership.py    ClassMembership (class_id + student_id)
+│   │   └── territory.py           GrabbingTerritoryActivity + TerritorySlot + TerritoryOccupation
 │   │
 │   ├── schemas/                   Pydantic request/response DTOs
 │   │   ├── auth.py
 │   │   ├── game_session.py
-│   │   └── leaderboard.py
+│   │   ├── leaderboard.py
+│   │   ├── achievement.py
+│   │   ├── admin.py
+│   │   ├── class_.py
+│   │   └── talent.py
 │   │
 │   ├── routers/                   HTTP adapters — thin controllers; error translation lives in main.py handlers
 │   │   ├── auth.py                /api/auth
 │   │   ├── game_session.py        /api/sessions
-│   │   └── leaderboard.py         /api/leaderboard
+│   │   ├── leaderboard.py         /api/leaderboard
+│   │   ├── achievement.py         /api/achievements
+│   │   ├── talent.py              /api/talents
+│   │   ├── class_.py              /api/classes
+│   │   ├── admin.py               /api/admin
+│   │   └── territory.py           /api/territory
 │   │
 │   ├── db/database.py             Engine, Base, get_db() session factory
 │   ├── middleware/
@@ -126,8 +155,8 @@ Pure Python — no SQLAlchemy, no FastAPI.
 Use-case orchestration. One method per user intent.
 
 - **`AuthApplicationService`**
-  - `register(username, password)` — hashes the password with bcrypt, persists a `User`, returns `(user, access_token)`. `UsernameTakenError` on unique-violation.
-  - `login(username, password)` — `InvalidCredentialsError` on mismatch.
+  - `register(email, player_name, password, role)` — hashes the password with bcrypt, persists a `User`, returns `(user, access_token)`. `EmailTakenError` on unique-violation.
+  - `login(email, password)` — `InvalidCredentialsError` on mismatch.
   - `authenticate_token(token)` — decodes the JWT and loads the `User`; raises `InvalidTokenError` / `UserNotFoundError`. Used by the `get_current_user` dependency.
 - **`SessionApplicationService`**
   - `create_session(user_id, level)` — abandons stale sessions (>2h) and any existing active session, then creates a new one. Retries once on `IntegrityError` to handle the race against the partial-unique index.
@@ -139,7 +168,7 @@ Use-case orchestration. One method per user intent.
   - `get_leaderboard(level, page, per_page)` — per-level `DENSE_RANK` when `level` is provided, global rank otherwise.
   - `submit_score(...)` — manual fallback if the auto-submit path fails.
 
-All domain errors (`SessionNotFoundError`, `SessionStaleError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `PermissionDeniedError`, `DuplicateSubmissionError`, `UsernameTakenError`, `InvalidCredentialsError`, `AccountLockedError`, `InvalidTokenError`, `UserNotFoundError`, `SessionValidationError`, `DomainValueError`) inherit from `DomainError` and carry their own `status_code`. The global handler in `main.py` surfaces them — routers never translate manually. `DomainValueError` dual-inherits from `ValueError` so existing `except ValueError` clauses keep working; aggregate invariants that raise plain `ValueError` are mapped to `422` by a second handler. `mappers.py` converts aggregates to Pydantic DTOs so routers stay one-liners.
+All domain errors (`SessionNotFoundError`, `SessionStaleError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `PermissionDeniedError`, `DuplicateSubmissionError`, `EmailTakenError`, `InvalidCredentialsError`, `AccountLockedError`, `InvalidTokenError`, `UserNotFoundError`, `SessionValidationError`, `DomainValueError`, `InsufficientTalentPoints`, `PrerequisiteNotMet`, `MaxLevelReached`, `TalentNodeNotFound`) inherit from `DomainError` and carry their own `status_code`. The global handler in `main.py` surfaces them — routers never translate manually. `DomainValueError` dual-inherits from `ValueError` so existing `except ValueError` clauses keep working; aggregate invariants that raise plain `ValueError` are mapped to `422` by a second handler. `mappers.py` converts aggregates to Pydantic DTOs so routers stay one-liners.
 
 ### Infrastructure
 
@@ -197,17 +226,17 @@ Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/sessions` | 30/min | Create session for `level` (1–4); abandons existing active session first |
+| POST | `/api/sessions` | 30/min | Create session for `star_rating` (1–5); abandons existing active session first |
 | GET | `/api/sessions/active` | 60/min | Fetch caller's active session (null if none) |
 | PATCH | `/api/sessions/{id}` | 120/min | Update `current_wave`, `gold`, `hp`, `score` (any subset; ≥1 field) |
 | POST | `/api/sessions/{id}/abandon` | 30/min | Idempotent abandon |
-| POST | `/api/sessions/{id}/end` | 30/min | Complete with `score` / `kills` / `waves_survived` → auto-creates leaderboard entry |
+| POST | `/api/sessions/{id}/end` | 30/min | Complete with `score` / `kills` / `waves_survived` / V2 scoring fields → auto-creates leaderboard entry |
 
 **Validation bounds** (enforced at schema + aggregate + DB layers):
 
 | Field | Range |
 |---|---|
-| `level` | 1 – 4 |
+| `star_rating` | 1 – 5 |
 | `current_wave` | 0 – 999 |
 | `gold` | 0 – 99,999 |
 | `hp` | 0 – 100 |
@@ -222,7 +251,7 @@ Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars
 | `401` | `InvalidCredentialsError`, `InvalidTokenError`, `UserNotFoundError` | Login mismatch / bad or expired JWT |
 | `403` | `PermissionDeniedError` | Session not owned by caller |
 | `404` | `SessionNotFoundError` | Session id does not exist |
-| `409` | `UsernameTakenError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `DuplicateSubmissionError` | Conflict: unique violation, illegal state transition, already-scored session |
+| `409` | `EmailTakenError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `DuplicateSubmissionError` | Conflict: unique violation, illegal state transition, already-scored session |
 | `410` | `SessionStaleError` | Session > 2h active — auto-abandoned before raise |
 | `422` | `DomainValueError` / plain `ValueError` from aggregate invariants | Bounds violation, score going backwards, delta > 50 000 |
 | `429` | `AccountLockedError`, slowapi `RateLimitExceeded` | Per-account login lockout or IP rate limit |
@@ -231,10 +260,54 @@ Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| GET | `/api/leaderboard?level=&page=&per_page=` | 30/min | Ranked entries. `level` gives per-level dense rank; omitting gives global rank |
+| GET | `/api/leaderboard?star_rating=&page=&per_page=` | 30/min | Ranked entries. `star_rating` gives per-difficulty dense rank; omitting gives global rank |
 | POST | `/api/leaderboard` | 10/min | Manual score submission (fallback if auto-create failed) |
 
-Query params: `level` 1–4 optional, `page` default 1, `per_page` default 20 (max 100).
+Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default 20 (max 100).
+
+### Achievements — `/api/achievements`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| GET | `/api/achievements` | 30/min | All achievement definitions with caller's unlock status |
+| GET | `/api/achievements/summary` | 30/min | Unlock count, total talent points earned |
+
+### Talents — `/api/talents`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| GET | `/api/talents/tree` | 30/min | Full talent tree with caller's allocation levels |
+| GET | `/api/talents/modifiers` | 30/min | Aggregated per-tower-type modifiers (damage/range/speed/pet) |
+| POST | `/api/talents/allocate` | 30/min | Allocate one point to a node; raises if prereqs unmet or max level reached |
+| POST | `/api/talents/reset` | 10/min | Reset all allocations; refunds all points |
+
+### Classes — `/api/classes`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| POST | `/api/classes` | 10/min | Create a class (teacher only) |
+| GET | `/api/classes` | 30/min | List caller's classes |
+| GET | `/api/classes/{id}` | 30/min | Class details |
+| POST | `/api/classes/join` | 10/min | Student joins by `join_code` |
+| DELETE | `/api/classes/{id}` | 10/min | Delete class (teacher/admin) |
+
+### Admin — `/api/admin`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| GET | `/api/admin/teachers` | 30/min | List all teacher accounts (admin only) |
+| GET | `/api/admin/classes` | 30/min | List all classes (admin only) |
+| GET | `/api/admin/students` | 30/min | List all student accounts (admin only) |
+
+### Territory — `/api/territory`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| POST | `/api/territory` | 10/min | Create Grabbing Territory activity (teacher) |
+| GET | `/api/territory` | 30/min | List activities visible to caller |
+| GET | `/api/territory/{id}` | 30/min | Activity + slots + current occupations |
+| POST | `/api/territory/{id}/slots/{slot_id}/occupy` | 30/min | Attempt to occupy a slot (student; optimistic locking) |
+| GET | `/api/territory/{id}/rankings` | 30/min | Territory rankings by occupation count |
 
 ---
 
@@ -245,7 +318,11 @@ Query params: `level` 1–4 optional, `page` default 1, `per_page` default 20 (m
 | Column | Type | Notes |
 |---|---|---|
 | `id` | String | UUID primary key |
-| `username` | String(50) | Unique, indexed |
+| `username` | String(50) | Nullable, unique (legacy; primary identity is `email`) |
+| `email` | String(255) | Unique, not null — primary login identifier |
+| `player_name` | String(50) | Display name shown on leaderboard |
+| `avatar_url` | String(500) | Nullable; path to one of the 6 preset SVG avatars |
+| `role` | Enum | `admin` / `teacher` / `student`; default `student` |
 | `password_hash` | String(255) | bcrypt hash |
 | `created_at`, `updated_at` | DateTime | Auto-managed |
 
@@ -255,9 +332,18 @@ Query params: `level` 1–4 optional, `page` default 1, `per_page` default 20 (m
 |---|---|---|
 | `id` | String | UUID primary key |
 | `user_id` | String | FK → User (ON DELETE CASCADE) |
-| `level` | Integer | CHECK 1–4 |
+| `star_rating` | Integer | CHECK 1–5 (difficulty level) |
+| `path_config` | JSON | Serialised generated curve path (nullable) |
+| `initial_answer` | Boolean | Whether player answered the initial-answer screen correctly |
 | `status` | Enum | `active` / `completed` / `abandoned` |
 | `current_wave`, `gold`, `hp`, `score` | Integer | Progress metrics |
+| `kills`, `waves_survived` | Integer | End-of-session counters |
+| `kill_value` | Integer | Cumulative weighted kill value (V2 scoring) |
+| `cost_total` | Integer | Total gold spent (V2 scoring) |
+| `time_total` | Float | Total active time in seconds |
+| `time_exclude_prepare` | JSON | Array of prepare-phase durations excluded from scoring time |
+| `health_origin`, `health_final` | Integer | HP at level start and end (scoring formula inputs) |
+| `total_score` | Float | Server-recomputed final score (K^(1/exp) formula) |
 | `started_at`, `ended_at` | DateTime | `ended_at` nullable |
 
 Indexes: `ix_game_session_user_id`; partial unique `uq_one_active_per_user WHERE status='active'` — enforces at most one active session per user.

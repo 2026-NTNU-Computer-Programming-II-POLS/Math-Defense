@@ -8,12 +8,13 @@ Each tower type corresponds to a real math topic:
 
 | Tower | Math Concept | How It Works |
 |---|---|---|
-| Function Cannon | Quadratic Functions | Projectile follows `y = ax² + bx + c`; hits enemy where trajectory intersects path |
-| Radar Sweep | Trigonometry & Sectors | Scans a sector area; damage applied to enemies inside via `pointInSector()` |
-| Matrix Link | 2×2 Matrix / Linear Transforms | Select two towers; input a matrix; applies rotation/scaling transformation |
-| Probability Shrine | Probability & Buffs | No direct attack; triggers buff-card selection phase after a wave clears |
-| Integral Cannon | Definite Integration | Damage computed as `∫[a,b] (ax² + bx + c) dx` via the trapezoid rule |
-| Fourier Shield | Fourier Series | Defensive mini-game; player matches a 3-sine composite target wave |
+| Magic | Function Curves (polynomial/trig/log) | Places a function curve as a zone that debuffs enemies or buffs nearby towers |
+| Radar A | Trigonometry & Sectors | Continuous AoE sweep; damage applied to all enemies inside the arc |
+| Radar B | Polar Coordinates | Fast single-target projectile launcher |
+| Radar C | Angular Momentum | Slow, powerful projectile shots with high per-hit damage |
+| Matrix | Linear Transforms / Dot Product | Paired tower system; dot-product damage; continuous laser beam between pair |
+| Limit | Limits (lim x→c) | Presents a multiple-choice limit question; outcome (±∞ / ±C / 0) sets effective range |
+| Calculus | Derivatives & Integrals | Player picks a function then derivative/integral; generates autonomous Pet projectiles |
 
 ---
 
@@ -44,10 +45,13 @@ Browser
        ├─ Game Engine (ECS-style systems, Canvas rendering, fixed 60 FPS)
        │    └─ WasmBridge → math_engine.wasm (C, Emscripten) with JS fallback
        └─ Services → FastAPI Backend
-                          ├─ Routers (thin controllers)
+                          ├─ Routers (thin controllers — auth/sessions/leaderboard/
+                          │           achievements/talents/classes/admin/territory)
                           ├─ Global exception handlers → HTTP status from DomainError.status_code
-                          ├─ Application Services (Auth / Session / Leaderboard use cases)
-                          ├─ Domain Aggregates (User, GameSession, LeaderboardEntry)
+                          ├─ Application Services (Auth / Session / Leaderboard /
+                          │   Achievement / Talent / Class / Admin / Territory)
+                          ├─ Domain Aggregates (User, GameSession, LeaderboardEntry,
+                          │   Achievement, Talent, Class, Territory)
                           └─ SQLAlchemy Repositories → PostgreSQL
 ```
 
@@ -69,16 +73,18 @@ Browser
 
 ```
 MENU
-  └─ LEVEL_SELECT (choose level 1–4)
-       └─ BUILD (place towers, configure math parameters)
-            └─ WAVE (enemies spawn; towers attack)
-                 ├─ BUFF_SELECT (wave cleared → pick a buff card → return to BUILD)
-                 ├─ BOSS_SHIELD (boss activates Fourier-match mini-game)
-                 ├─ LEVEL_END (all waves cleared → next level)
-                 └─ GAME_OVER (HP reaches 0)
+  └─ LEVEL_SELECT (choose star rating 1–5; shows difficulty, initial-answer screen)
+       └─ INITIAL_ANSWER (identify path endpoints before the wave; awards bonus)
+            └─ BUILD (place towers, configure math params; shop for time-based buffs / spells)
+                 └─ WAVE (enemies spawn; towers attack)
+                      ├─ BUILD (wave cleared → return to shop/build phase)
+                      ├─ MONTY_HALL (kill-value threshold crossed → Monty Hall event → BUILD)
+                      ├─ CHAIN_RULE (Boss Type-B triggers chain-rule challenge → WAVE)
+                      ├─ LEVEL_END (all waves cleared → score result screen)
+                      └─ GAME_OVER (HP reaches 0)
 ```
 
-Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend.
+Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend. The `BUFF_SELECT` phase remains valid in the FSM but is no longer part of the main flow — shop-based purchases during BUILD replaced the end-of-wave buff card draw.
 
 ---
 
@@ -172,7 +178,7 @@ Create `.env` at the project root (see `.env.example`):
 
 ```bash
 cd backend  && pytest              # 97 tests (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity)
-cd frontend && npm test            # 29 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity)
+cd frontend && npm test            # 26 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
