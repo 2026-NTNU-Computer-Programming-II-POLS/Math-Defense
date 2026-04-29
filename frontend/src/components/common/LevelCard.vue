@@ -1,5 +1,10 @@
 <script setup lang="ts">
-defineEmits<{ select: [levelId: number] }>()
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+
+const emit = defineEmits<{
+  select: [levelId: number]
+  close: []
+}>()
 
 interface LevelInfo {
   id: number
@@ -14,18 +19,60 @@ const LEVELS: LevelInfo[] = [
   { id: 3, name: '堡壘',   nameEn: 'Fortress',   description: '矩陣連結 + 積分砲'       },
   { id: 4, name: '魔王巢', nameEn: 'Dragon Lair',description: 'Boss 龍 + 傅立葉破盾'   },
 ]
+
+const dialogRef = ref<HTMLElement | null>(null)
+
+function handleKey(e: KeyboardEvent) {
+  if (!dialogRef.value) return
+  if (e.key === 'Escape') {
+    e.stopImmediatePropagation()
+    emit('close')
+    return
+  }
+  if (e.key === 'Tab') {
+    const focusable = Array.from(
+      dialogRef.value.querySelectorAll<HTMLElement>('button')
+    )
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus() }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+  }
+}
+
+onMounted(() => {
+  nextTick(() => dialogRef.value?.querySelector<HTMLElement>('button')?.focus())
+  window.addEventListener('keydown', handleKey)
+})
+
+onUnmounted(() => window.removeEventListener('keydown', handleKey))
 </script>
 
 <template>
   <div class="level-overlay">
-    <div class="level-select rune-panel">
-      <h2 class="select-title">選擇關卡</h2>
+    <div
+      ref="dialogRef"
+      class="level-select rune-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="level-select-title"
+    >
+      <div class="dialog-header">
+        <h2 id="level-select-title" class="select-title">選擇關卡</h2>
+        <button class="close-btn" aria-label="Close level select" @click="emit('close')">
+          <span aria-hidden="true">✕</span>
+        </button>
+      </div>
       <div class="level-grid">
         <button
           v-for="lv in LEVELS"
           :key="lv.id"
           class="level-card"
-          @click="$emit('select', lv.id)"
+          @click="emit('select', lv.id)"
         >
           <div class="lv-num">Level {{ lv.id }}</div>
           <div class="lv-name">{{ lv.name }}</div>
@@ -38,6 +85,30 @@ const LEVELS: LevelInfo[] = [
 </template>
 
 <style scoped>
+.dialog-header {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.close-btn {
+  position: absolute;
+  right: 0;
+  background: none;
+  border: none;
+  color: var(--axis);
+  cursor: pointer;
+  font-size: 14px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover { color: var(--gold); }
+
 .level-overlay {
   position: absolute;
   inset: 0;
@@ -50,6 +121,7 @@ const LEVELS: LevelInfo[] = [
 
 .level-select {
   width: 680px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;

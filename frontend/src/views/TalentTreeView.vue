@@ -10,8 +10,10 @@ const router = useRouter()
 const talentStore = useTalentStore()
 const tree = ref<TalentTreeOut | null>(null)
 const loading = ref(true)
-const error = ref('')
-const allocating = ref(false)
+const loadError = ref('')
+const allocError = ref('')
+const allocatingNodeId = ref<string | null>(null)
+const allocating = computed(() => allocatingNodeId.value !== null)
 
 const TOWER_ORDER: TowerType[] = [
   TowerType.MAGIC, TowerType.RADAR_A, TowerType.RADAR_B, TowerType.RADAR_C,
@@ -41,27 +43,30 @@ function canAllocate(node: TalentNodeOut): boolean {
 
 async function allocate(nodeId: string): Promise<void> {
   if (allocating.value) return
-  allocating.value = true
+  allocError.value = ''
+  allocatingNodeId.value = nodeId
   try {
     tree.value = await talentService.allocate(nodeId)
     await talentStore.load()
   } catch (e: any) {
-    error.value = e?.detail ?? 'Allocation failed'
+    allocError.value = e?.detail ?? 'Allocation failed'
   } finally {
-    allocating.value = false
+    allocatingNodeId.value = null
   }
 }
 
 async function resetTree(): Promise<void> {
   if (allocating.value) return
-  allocating.value = true
+  if (!confirm('Reset all talent points? All allocations will be refunded.')) return
+  allocError.value = ''
+  allocatingNodeId.value = '__reset__'
   try {
     tree.value = await talentService.reset()
     await talentStore.load()
   } catch (e: any) {
-    error.value = e?.detail ?? 'Reset failed'
+    allocError.value = e?.detail ?? 'Reset failed'
   } finally {
-    allocating.value = false
+    allocatingNodeId.value = null
   }
 }
 
@@ -69,7 +74,7 @@ onMounted(async () => {
   try {
     tree.value = await talentService.getTree()
   } catch {
-    error.value = 'Failed to load talent tree'
+    loadError.value = 'Failed to load talent tree'
   } finally {
     loading.value = false
   }
@@ -91,8 +96,10 @@ onMounted(async () => {
     </header>
 
     <div v-if="loading" class="talent-loading">Loading...</div>
-    <div v-else-if="error" class="talent-error">{{ error }}</div>
-    <div v-else class="talent-towers">
+    <div v-else-if="loadError" class="talent-error">{{ loadError }}</div>
+    <template v-else>
+      <div v-if="allocError" class="talent-alloc-error">{{ allocError }}</div>
+      <div class="talent-towers">
       <div v-for="tw in TOWER_ORDER" :key="tw" class="tower-section">
         <h3 class="tower-name" :style="{ color: TOWER_DEFS[tw]?.color }">
           {{ TOWER_DEFS[tw]?.nameEn ?? tw }}
@@ -105,11 +112,14 @@ onMounted(async () => {
               maxed: node.current_level >= node.max_level,
               available: canAllocate(node),
               locked: !canAllocate(node) && node.current_level < node.max_level,
+              loading: allocatingNodeId === node.id,
             }]"
             @click="canAllocate(node) && allocate(node.id)"
           >
             <div class="node-name">{{ node.name }}</div>
-            <div class="node-level">{{ node.current_level }} / {{ node.max_level }}</div>
+            <div class="node-level">
+              {{ allocatingNodeId === node.id ? '…' : `${node.current_level} / ${node.max_level}` }}
+            </div>
             <div class="node-desc">{{ node.description }}</div>
             <div class="node-effect">+{{ (node.effect_per_level * 100).toFixed(0) }}% per level</div>
             <div class="node-cost">Cost: {{ node.cost_per_level }} TP</div>
@@ -117,6 +127,7 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -129,6 +140,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: 24px;
   min-height: 100vh;
+  overflow-y: auto;
 }
 
 .talent-header {
@@ -151,6 +163,7 @@ onMounted(async () => {
 
 .talent-loading, .talent-error { text-align: center; color: var(--axis); padding: 32px; }
 .talent-error { color: var(--enemy-red); }
+.talent-alloc-error { font-size: 11px; color: var(--enemy-red); text-align: center; }
 
 .talent-towers { display: flex; flex-direction: column; gap: 24px; }
 
@@ -192,6 +205,7 @@ onMounted(async () => {
 }
 
 .talent-node.locked { opacity: 0.4; }
+.talent-node.loading { opacity: 0.6; cursor: wait; }
 
 .node-name { font-size: 11px; color: #e8dcc8; margin-bottom: 4px; }
 .node-level { font-size: 13px; color: var(--gold); margin-bottom: 4px; }

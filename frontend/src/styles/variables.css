@@ -24,6 +24,14 @@
   --panel-border:  #8b7342;
   --panel-shadow:  0 0 20px rgba(0, 0, 0, 0.8);
 
+  --text-primary:    #e0d0b0;
+  --text-secondary:  #e8dcc8;
+  --stone-selected:  #2a2535;
+  --option-selected: #2a2540;
+  --correct-bg:      #1a3020;
+  --wrong-bg:        #301a1a;
+  --error-red:       #e74c3c;
+
   --font-mono:     'Courier New', Courier, monospace;
   --font-main:     var(--font-mono);
 
@@ -40,4 +48,5 @@
   --z-floating:     30;
   --z-overlay:      40;
   --z-modal:        50;
+  --z-toast:       100;
 }

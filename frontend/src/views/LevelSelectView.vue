@@ -76,15 +76,15 @@ function startLevel() {
   flex-direction: column;
   align-items: center;
   padding: 2rem;
-  color: #e0d0b0;
+  color: var(--text-primary);
   min-height: 100vh;
-  background: #1a1520;
+  background: var(--stone-dark);
 }
 
 h1 {
   font-size: 2rem;
   margin-bottom: 2rem;
-  color: #ffd700;
+  color: var(--gold-bright);
 }
 
 .star-grid {
@@ -97,30 +97,30 @@ h1 {
 }
 
 .star-card {
-  background: #252030;
-  border: 2px solid #3a3028;
+  background: var(--stone-light);
+  border: 2px solid var(--grid-line);
   border-radius: 8px;
   padding: 1.5rem 1rem;
   cursor: pointer;
   min-width: 140px;
   text-align: center;
   transition: all 0.2s;
-  color: #e0d0b0;
+  color: var(--text-primary);
 }
 
 .star-card:hover {
-  border-color: #8b7342;
+  border-color: var(--axis);
 }
 
 .star-card.selected {
-  border-color: #ffd700;
-  background: #2a2535;
+  border-color: var(--gold-bright);
+  background: var(--stone-selected);
   box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
 }
 
 .star-icons {
   font-size: 1.5rem;
-  color: #ffd700;
+  color: var(--gold-bright);
   margin-bottom: 0.5rem;
 }
 
@@ -131,7 +131,7 @@ h1 {
 .start-btn {
   padding: 0.8rem 2rem;
   font-size: 1.1rem;
-  background: #4a82c8;
+  background: var(--tower-cannon);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -145,20 +145,20 @@ h1 {
 }
 
 .start-btn:hover:not(:disabled) {
-  background: #5a92d8;
+  filter: brightness(1.15);
 }
 
 .back-btn {
   padding: 0.5rem 1.5rem;
   background: transparent;
-  color: #8b7342;
-  border: 1px solid #3a3028;
+  color: var(--axis);
+  border: 1px solid var(--grid-line);
   border-radius: 6px;
   cursor: pointer;
 }
 
 .error {
-  color: #cc4444;
+  color: var(--hp-red);
   margin-bottom: 1rem;
 }
 </style>

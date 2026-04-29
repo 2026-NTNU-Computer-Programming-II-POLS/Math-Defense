@@ -173,6 +173,7 @@ async function submit(): Promise<void> {
 
 .auth-panel {
   width: 360px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;

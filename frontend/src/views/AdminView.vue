@@ -75,6 +75,7 @@ onMounted(loadData)
           :key="tab"
           class="tab-btn"
           :class="{ active: activeTab === tab }"
+          :disabled="loading"
           @click="switchTab(tab); loadData()"
         >
           {{ { teachers: '教師', classes: '班級', students: '學生' }[tab] }}
@@ -85,6 +86,7 @@ onMounted(loadData)
         v-model="searchQuery"
         class="rune-input search-input"
         type="text"
+        aria-label="Search teachers, classes, or students by name or email"
         placeholder="Search by name or email…"
       />
 
@@ -140,6 +142,7 @@ onMounted(loadData)
 
 .admin-panel {
   width: 480px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -158,6 +161,7 @@ onMounted(loadData)
   flex: 1;
   font-size: 11px;
   padding: 6px;
+  min-height: 44px;
   background: none;
   border: 1px solid var(--axis);
   color: var(--axis);

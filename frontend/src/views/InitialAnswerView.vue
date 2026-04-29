@@ -131,25 +131,25 @@ function startGame() {
   flex-direction: column;
   align-items: center;
   padding: 2rem;
-  color: #e0d0b0;
+  color: var(--text-primary);
   min-height: 100vh;
-  background: #1a1520;
+  background: var(--stone-dark);
 }
 
 h1 {
   font-size: 1.8rem;
-  color: #ffd700;
+  color: var(--gold-bright);
   margin-bottom: 0.5rem;
 }
 
 .subtitle {
-  color: #8b7342;
+  color: var(--axis);
   margin-bottom: 1.5rem;
 }
 
 .equations {
-  background: #252030;
-  border: 1px solid #3a3028;
+  background: var(--stone-light);
+  border: 1px solid var(--grid-line);
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -170,7 +170,7 @@ h1 {
 .path-label {
   font-weight: bold;
   min-width: 60px;
-  color: #8b7342;
+  color: var(--axis);
 }
 
 .options-grid {
@@ -184,32 +184,32 @@ h1 {
 
 .option-btn {
   padding: 0.8rem;
-  background: #252030;
-  border: 2px solid #3a3028;
+  background: var(--stone-light);
+  border: 2px solid var(--grid-line);
   border-radius: 6px;
-  color: #e0d0b0;
+  color: var(--text-primary);
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .option-btn:hover:not(:disabled) {
-  border-color: #8b7342;
+  border-color: var(--axis);
 }
 
 .option-btn.selected {
-  border-color: #4a82c8;
-  background: #2a2540;
+  border-color: var(--tower-cannon);
+  background: var(--option-selected);
 }
 
 .option-btn.correct {
-  border-color: #4aab6e;
-  background: #1a3020;
+  border-color: var(--hp-green);
+  background: var(--correct-bg);
 }
 
 .option-btn.wrong {
-  border-color: #cc4444;
-  background: #301a1a;
+  border-color: var(--hp-red);
+  background: var(--wrong-bg);
 }
 
 .actions {
@@ -221,7 +221,7 @@ h1 {
 
 .submit-btn {
   padding: 0.7rem 1.5rem;
-  background: #4a82c8;
+  background: var(--tower-cannon);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -235,8 +235,8 @@ h1 {
 
 .pay-btn {
   padding: 0.7rem 1.5rem;
-  background: #c89848;
-  color: #1a1520;
+  background: var(--hp-yellow);
+  color: var(--stone-dark);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -245,8 +245,8 @@ h1 {
 .ignore-btn {
   padding: 0.7rem 1.5rem;
   background: transparent;
-  color: #8b7342;
-  border: 1px solid #3a3028;
+  color: var(--axis);
+  border: 1px solid var(--grid-line);
   border-radius: 6px;
   cursor: pointer;
 }
@@ -255,16 +255,16 @@ h1 {
   text-align: center;
 }
 
-.result-correct { color: #4aab6e; font-size: 1.1rem; }
-.result-wrong { color: #cc4444; font-size: 1.1rem; }
-.result-paid { color: #c89848; font-size: 1.1rem; }
-.result-ignored { color: #8b7342; font-size: 1.1rem; }
+.result-correct { color: var(--hp-green); font-size: 1.1rem; }
+.result-wrong { color: var(--hp-red); font-size: 1.1rem; }
+.result-paid { color: var(--hp-yellow); font-size: 1.1rem; }
+.result-ignored { color: var(--axis); font-size: 1.1rem; }
 
 .start-btn {
   margin-top: 1rem;
   padding: 0.8rem 2rem;
   font-size: 1.1rem;
-  background: #4a82c8;
+  background: var(--tower-cannon);
   color: #fff;
   border: none;
   border-radius: 6px;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { achievementService, type AchievementOut } from '@/services/achievementService'
 import { ACHIEVEMENT_CATEGORIES } from '@/data/achievement-defs'
@@ -10,10 +10,20 @@ const loading = ref(true)
 const error = ref('')
 const selectedCategory = ref<string | null>(null)
 
+const PAGE_SIZE = 20
+const page = ref(1)
+
 const filtered = computed(() => {
   if (!selectedCategory.value) return achievements.value
   return achievements.value.filter(a => a.category === selectedCategory.value)
 })
+
+watch(selectedCategory, () => { page.value = 1 })
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
+const paginated = computed(() =>
+  filtered.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE),
+)
 
 const unlockedCount = computed(() => achievements.value.filter(a => a.unlocked).length)
 const totalPoints = computed(() =>
@@ -57,9 +67,10 @@ onMounted(async () => {
 
     <div v-if="loading" class="ach-loading">Loading...</div>
     <div v-else-if="error" class="ach-error">{{ error }}</div>
-    <div v-else class="ach-grid">
+    <template v-else>
+      <div class="ach-grid">
       <div
-        v-for="a in filtered"
+        v-for="a in paginated"
         :key="a.id"
         :class="['ach-card', { unlocked: a.unlocked, locked: !a.unlocked }]"
       >
@@ -76,6 +87,12 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+      <div v-if="totalPages > 1" class="ach-pagination">
+        <button class="btn" :disabled="page <= 1" @click="page--">‹ Prev</button>
+        <span class="page-info">{{ page }} / {{ totalPages }}</span>
+        <button class="btn" :disabled="page >= totalPages" @click="page++">Next ›</button>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -88,6 +105,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: 24px;
   min-height: 100vh;
+  overflow-y: auto;
 }
 
 .ach-header {
@@ -166,4 +184,13 @@ onMounted(async () => {
 
 .ach-tp { color: var(--gold); }
 .ach-date { color: var(--axis); opacity: 0.7; }
+
+.ach-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.page-info { font-size: 11px; color: var(--axis); }
 </style>

@@ -131,7 +131,8 @@ async function requestOnce<T>(
       headers,
       signal: controller.signal,
       // Send cookies (HTTP-only auth cookie) with every request.
-      credentials: 'same-origin',
+      // 'include' is required for cross-origin deployments (VITE_API_BASE_URL).
+      credentials: 'include',
     })
   } catch (e) {
     // Caller-initiated abort: re-throw so consumers can detect & ignore it
@@ -155,7 +156,9 @@ async function requestOnce<T>(
     if (res.status === 401) {
       try {
         const { useAuthStore } = await import('@/stores/authStore')
-        await useAuthStore().logout()
+        // Call handleSessionExpiry (sync, no API call) to avoid recursive logout
+        // when authService.logout() itself uses the api wrapper.
+        useAuthStore().handleSessionExpiry()
       } catch {
         // Pinia not installed yet (very early bootstrap) — best-effort
       }

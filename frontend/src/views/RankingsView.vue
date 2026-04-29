@@ -223,59 +223,61 @@ onBeforeUnmount(cancelInflight)
     <div v-if="loading" class="rk-loading">Loading…</div>
     <div v-else-if="error" class="rk-error">{{ error }}</div>
 
-    <!-- Standard leaderboard table (global / class) -->
-    <table v-else-if="activeTab === 'global' || activeTab === 'class'" class="rk-table">
-      <thead>
-        <tr>
-          <th>#</th><th>Player</th><th>Level</th><th>Score</th><th>Kills</th><th>Waves</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="e in entries" :key="e.id">
-          <td class="rank">{{ e.rank }}</td>
-          <td class="player-name">{{ e.player_name }}</td>
-          <td>Lv.{{ e.level }}</td>
-          <td class="score">{{ formatScore(e.score) }}</td>
-          <td>{{ e.kills }}</td>
-          <td>{{ e.waves_survived }}</td>
-        </tr>
-        <tr v-if="entries.length === 0"><td colspan="6" class="empty">No records</td></tr>
-      </tbody>
-    </table>
+    <div v-else class="rk-table-wrap">
+      <!-- Standard leaderboard table (global / class) -->
+      <table v-if="activeTab === 'global' || activeTab === 'class'" class="rk-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Player</th><th>Level</th><th>Score</th><th>Kills</th><th>Waves</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="e in entries" :key="e.id">
+            <td class="rank">{{ e.rank }}</td>
+            <td class="player-name">{{ e.player_name }}</td>
+            <td>Lv.{{ e.level }}</td>
+            <td class="score">{{ formatScore(e.score) }}</td>
+            <td>{{ e.kills }}</td>
+            <td>{{ e.waves_survived }}</td>
+          </tr>
+          <tr v-if="entries.length === 0"><td colspan="6" class="empty">No records</td></tr>
+        </tbody>
+      </table>
 
-    <!-- Internal rankings: per-student territory value -->
-    <table v-else-if="activeTab === 'internal'" class="rk-table">
-      <thead>
-        <tr>
-          <th>#</th><th>Student</th><th>Territory Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="r in territoryRankings" :key="r.student_id">
-          <td class="rank">{{ r.rank }}</td>
-          <td class="player-name" :title="r.student_id">{{ r.student_id.slice(0, 8) }}…</td>
-          <td class="score">{{ r.territory_value }}</td>
-        </tr>
-        <tr v-if="territoryRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>
-      </tbody>
-    </table>
+      <!-- Internal rankings: per-student territory value -->
+      <table v-else-if="activeTab === 'internal'" class="rk-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Student</th><th>Territory Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in territoryRankings" :key="r.student_id">
+            <td class="rank">{{ r.rank }}</td>
+            <td class="player-name" :title="r.student_id">{{ r.student_id.slice(0, 8) }}…</td>
+            <td class="score">{{ r.territory_value }}</td>
+          </tr>
+          <tr v-if="territoryRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>
+        </tbody>
+      </table>
 
-    <!-- External rankings: per-class average territory value -->
-    <table v-else-if="activeTab === 'external'" class="rk-table">
-      <thead>
-        <tr>
-          <th>#</th><th>Class</th><th>Avg Territory Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="r in externalRankings" :key="r.class_id">
-          <td class="rank">{{ r.rank }}</td>
-          <td class="player-name">{{ className(r.class_id) }}</td>
-          <td class="score">{{ r.avg_territory_value.toFixed(2) }}</td>
-        </tr>
-        <tr v-if="externalRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>
-      </tbody>
-    </table>
+      <!-- External rankings: per-class average territory value -->
+      <table v-else-if="activeTab === 'external'" class="rk-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Class</th><th>Avg Territory Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in externalRankings" :key="r.class_id">
+            <td class="rank">{{ r.rank }}</td>
+            <td class="player-name">{{ className(r.class_id) }}</td>
+            <td class="score">{{ r.avg_territory_value.toFixed(2) }}</td>
+          </tr>
+          <tr v-if="externalRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <div v-if="(activeTab === 'global' || activeTab === 'class') && totalPages > 1" class="rk-pagination">
       <button class="btn page-btn" :disabled="page <= 1" @click="goToPage(page - 1)">←</button>
@@ -296,6 +298,7 @@ onBeforeUnmount(cancelInflight)
   gap: 20px;
   background: radial-gradient(ellipse at center, #1e1828 0%, #0d0a12 70%);
   min-height: 100vh;
+  overflow-y: auto;
 }
 
 .rk-header { display: flex; justify-content: space-between; align-items: center; }
@@ -306,6 +309,7 @@ onBeforeUnmount(cancelInflight)
 
 .rk-selector { max-width: 300px; }
 
+.rk-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .rk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--grid-line); }
 th { color: var(--axis); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }

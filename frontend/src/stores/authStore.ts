@@ -69,6 +69,19 @@ export const useAuthStore = defineStore('auth', () => {
     stopTokenProbe()
   }
 
+  /**
+   * Called by the api.ts 401 interceptor. Clears local auth state and
+   * redirects without making any API call — avoids recursive logout loops
+   * when authService.logout() itself uses the api wrapper.
+   */
+  function handleSessionExpiry(): void {
+    clearAuth()
+    const meta = router.currentRoute.value.meta
+    if (meta.requiresAuth) {
+      router.push({ name: 'auth' }).catch(() => {})
+    }
+  }
+
   function startTokenProbe(): void {
     if (probeTimer !== null) return
     probeTimer = setInterval(async () => {
@@ -93,21 +106,31 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
-    await authService.logout()
+    try {
+      await authService.logout()
+    } catch {
+      // Server-side invalidation is best-effort; always clear local state.
+    }
     clearAuth()
+
+    try {
+      const { useTalentStore } = await import('@/stores/talentStore')
+      useTalentStore().clear()
+    } catch { /* Pinia not installed yet */ }
+
+    try {
+      const { useTerritoryStore } = await import('@/stores/territoryStore')
+      useTerritoryStore().clear()
+    } catch { /* Pinia not installed yet */ }
+
     try {
       const { useUiStore } = await import('@/stores/uiStore')
       const uiStore = useUiStore()
-      if (uiStore.modalVisible) {
-        uiStore.dismissModal()
-      }
-    } catch {
-      // Pinia not installed yet
-    }
+      if (uiStore.modalVisible) uiStore.dismissModal()
+    } catch { /* Pinia not installed yet */ }
 
-    const PROTECTED = new Set(['game', 'leaderboard', 'rankings', 'profile', 'achievements', 'talents', 'classes', 'level-select', 'initial-answer', 'territory-list', 'territory-detail', 'territory-play', 'territory-rankings', 'admin-teachers', 'admin-classes', 'admin-students', 'territory-create', 'teacher-dashboard'])
-    const currentName = router.currentRoute.value.name as string | undefined
-    if (currentName && PROTECTED.has(currentName)) {
+    const meta = router.currentRoute.value.meta
+    if (meta.requiresAuth) {
       try {
         await router.push({ name: 'auth' })
       } catch {
@@ -116,5 +139,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, isLoggedIn, userRole, isAdmin, isTeacher, isStudent, initializing, initPromise, setUser, logout, init, updateAvatar }
+  return {
+    user,
+    isLoggedIn,
+    userRole,
+    isAdmin,
+    isTeacher,
+    isStudent,
+    initializing,
+    initPromise,
+    setUser,
+    clearAuth,
+    handleSessionExpiry,
+    logout,
+    init,
+    updateAvatar,
+  }
 })

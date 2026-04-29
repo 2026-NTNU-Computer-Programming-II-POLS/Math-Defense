@@ -213,7 +213,7 @@ function onUnhover(): void {
 .fn-panel {
   position: absolute;
   right: 16px;
-  top: 64px;
+  top: 100px;
   width: 232px;
   background: rgba(26, 21, 32, 0.92);
   border: 1px solid var(--panel-border, #3a3028);
@@ -356,7 +356,7 @@ function onUnhover(): void {
   align-items: center;
   width: auto;
   max-width: calc(100% - 32px);
-  top: 52px;
+  top: 100px;
   padding: 6px 10px;
   gap: 12px;
 }
@@ -391,7 +391,7 @@ function onUnhover(): void {
     align-items: center;
     width: auto;
     max-width: calc(100vw - 32px);
-    top: 52px;
+    top: 100px;
     padding: 6px 10px;
     gap: 12px;
   }

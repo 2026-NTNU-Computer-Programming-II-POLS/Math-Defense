@@ -13,6 +13,7 @@ const selectedClassId = ref<string | null>(null)
 const slots = ref<{ star_rating: number }[]>([{ star_rating: 1 }])
 const classes = ref<ClassInfo[]>([])
 const submitting = ref(false)
+const validationError = ref('')
 
 function addSlot(): void {
   slots.value.push({ star_rating: 1 })
@@ -23,16 +24,27 @@ function removeSlot(index: number): void {
 }
 
 async function submit(): Promise<void> {
-  if (!title.value.trim() || !deadline.value) return
+  if (!title.value.trim()) {
+    validationError.value = 'Please enter a title'
+    return
+  }
+  if (!deadline.value) {
+    validationError.value = 'Please set a deadline'
+    return
+  }
+  validationError.value = ''
   submitting.value = true
-  const activity = await store.createActivity({
-    title: title.value.trim(),
-    deadline: new Date(deadline.value).toISOString(),
-    class_id: selectedClassId.value,
-    slots: slots.value.map((s) => ({ star_rating: s.star_rating })),
-  })
-  submitting.value = false
-  if (activity) router.push(`/territory/${activity.id}`)
+  try {
+    const activity = await store.createActivity({
+      title: title.value.trim(),
+      deadline: new Date(deadline.value).toISOString(),
+      class_id: selectedClassId.value,
+      slots: slots.value.map((s) => ({ star_rating: s.star_rating })),
+    })
+    if (activity) router.push(`/territory/${activity.id}`)
+  } finally {
+    submitting.value = false
+  }
 }
 
 onMounted(async () => {
@@ -49,7 +61,8 @@ onMounted(async () => {
     <div class="setup-panel rune-panel">
       <h2 class="setup-title">Create Territory Activity</h2>
 
-      <div v-if="store.error" class="error-msg">{{ store.error }}</div>
+      <div v-if="validationError" class="error-msg">{{ validationError }}</div>
+      <div v-else-if="store.errorCreate" class="error-msg">{{ store.errorCreate }}</div>
 
       <form class="setup-form" @submit.prevent="submit">
         <div class="field">
@@ -106,6 +119,7 @@ onMounted(async () => {
 
 .setup-panel {
   width: 440px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -141,6 +155,9 @@ onMounted(async () => {
 .btn-sm {
   font-size: 9px;
   padding: 2px 6px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: 1px solid var(--axis);
   color: var(--axis);

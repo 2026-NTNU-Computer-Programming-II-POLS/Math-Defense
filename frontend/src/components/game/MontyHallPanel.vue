@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
 import type { MontyHallSystem } from '@/systems/MontyHallSystem'
 
 const g = useGameStore()
 const resultTimeout = ref(false)
+const dialogRef = ref<HTMLElement | null>(null)
 
 const mhState = computed(() => {
   const engine = g.getEngine()
@@ -24,6 +25,38 @@ const doors = computed(() => {
     isPrize: state.phase === 'result' && state.prizeIndex === i,
   }))
 })
+
+watch(mhState, (val) => {
+  window.removeEventListener('keydown', handleKey)
+  if (val) {
+    nextTick(() => dialogRef.value?.querySelector<HTMLElement>('button:not([disabled])')?.focus())
+    window.addEventListener('keydown', handleKey)
+  }
+}, { immediate: true })
+
+onUnmounted(() => window.removeEventListener('keydown', handleKey))
+
+function handleKey(e: KeyboardEvent) {
+  if (!dialogRef.value) return
+  if (e.key === 'Escape' && mhState.value?.phase === 'result') {
+    e.stopImmediatePropagation()
+    close()
+    return
+  }
+  if (e.key === 'Tab') {
+    const focusable = Array.from(
+      dialogRef.value.querySelectorAll<HTMLElement>('button:not([disabled])')
+    )
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus() }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+  }
+}
 
 function selectDoor(index: number): void {
   const engine = g.getEngine()
@@ -49,8 +82,14 @@ function close(): void {
 
 <template>
   <div v-if="mhState" class="monty-hall-overlay">
-    <div class="monty-hall-panel">
-      <h2 class="mh-title">Monty Hall Challenge</h2>
+    <div
+      ref="dialogRef"
+      class="monty-hall-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mh-title"
+    >
+      <h2 id="mh-title" class="mh-title">Monty Hall Challenge</h2>
 
       <!-- Select phase -->
       <p v-if="mhState.phase === 'select'" class="mh-prompt">Choose a door!</p>
@@ -99,13 +138,13 @@ function close(): void {
 
 <style scoped>
 .monty-hall-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .monty-hall-panel {
@@ -221,5 +260,14 @@ function close(): void {
 
 .btn:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .door {
+    transition: none;
+  }
+  .door:hover:not(:disabled) {
+    transform: none;
+  }
 }
 </style>

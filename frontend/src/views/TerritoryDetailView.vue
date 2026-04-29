@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -17,18 +17,22 @@ const canSettle = computed(() => {
   if (!detail.value) return false
   return (isOwner.value || auth.isAdmin) && !detail.value.activity.settled
 })
+const settling = ref(false)
 
 function handlePlay(slotId: string): void {
-  router.push(`/territory/${activityId.value}/play/${slotId}`)
+  router.push({ name: 'territory-play', params: { id: activityId.value, slotId } })
 }
 
 async function handleSettle(): Promise<void> {
+  if (!confirm('Settle this activity? This action is permanent and cannot be undone.')) return
+  settling.value = true
   const ok = await store.settleActivity(activityId.value)
+  settling.value = false
   if (ok) await store.loadDetail(activityId.value)
 }
 
 function viewRankings(): void {
-  router.push(`/territory/${activityId.value}/rankings`)
+  router.push({ name: 'territory-rankings', params: { id: activityId.value } })
 }
 
 watch(activityId, (id) => {
@@ -40,8 +44,10 @@ watch(activityId, (id) => {
 <template>
   <div class="territory-detail-view">
     <div class="detail-panel rune-panel">
-      <div v-if="store.loading" class="loading">Loading…</div>
-      <div v-else-if="store.error" class="error-msg">{{ store.error }}</div>
+      <div v-if="store.loadingDetail" class="loading">Loading…</div>
+      <div v-else-if="store.errorDetail || store.errorSettle" class="error-msg">
+        {{ store.errorDetail || store.errorSettle }}
+      </div>
 
       <template v-else-if="detail">
         <header class="detail-header">
@@ -67,7 +73,9 @@ watch(activityId, (id) => {
 
         <div class="detail-actions">
           <button class="btn" @click="viewRankings">Rankings</button>
-          <button v-if="canSettle" class="btn settle-btn" @click="handleSettle">Settle Activity</button>
+          <button v-if="canSettle" class="btn settle-btn" :disabled="settling" @click="handleSettle">
+            {{ settling ? 'Settling…' : 'Settle Activity' }}
+          </button>
           <button class="btn back-btn" @click="router.push('/territory')">← Back</button>
         </div>
       </template>
@@ -86,6 +94,7 @@ watch(activityId, (id) => {
 
 .detail-panel {
   width: 600px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;

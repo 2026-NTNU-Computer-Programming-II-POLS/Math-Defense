@@ -17,7 +17,6 @@ const submitting = ref(false)
 function resetState(): void {
   result.value = null
   submitting.value = false
-  store.error = ''
   const q = route.query.score
   score.value = q ? Number(q) : 0
 }
@@ -25,7 +24,6 @@ function resetState(): void {
 async function submitPlay(): Promise<void> {
   if (score.value <= 0 || submitting.value) return
   submitting.value = true
-  store.error = ''
   const res = await store.playSlot(activityId.value, slotId.value, score.value)
   if (res) {
     result.value = { seized: res.seized, score: res.occupation.score }
@@ -41,7 +39,7 @@ watch(() => route.params.slotId, resetState, { immediate: true })
     <div class="result-panel rune-panel">
       <h2 class="result-title">Territory Challenge</h2>
 
-      <div v-if="store.error" class="error-msg">{{ store.error }}</div>
+      <div v-if="store.errorPlay" class="error-msg">{{ store.errorPlay }}</div>
 
       <template v-if="!result">
         <div class="score-input-section">
@@ -78,6 +76,7 @@ watch(() => route.params.slotId, resetState, { immediate: true })
 
 .result-panel {
   width: 360px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;

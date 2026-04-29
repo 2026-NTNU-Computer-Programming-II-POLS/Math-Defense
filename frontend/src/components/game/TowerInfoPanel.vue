@@ -49,6 +49,7 @@ function refundTower() {
   const engine = gameStore.getEngine()
   const t = tower.value
   if (!engine || !t) return
+  if (!confirm(`Refund ${towerDef.value?.nameEn ?? 'this tower'}? You will receive half the cost back.`)) return
   engine.eventBus.emit(Events.TOWER_REFUND, { towerId: t.id })
   uiStore.closeBuildPanel()
 }
@@ -94,6 +95,7 @@ const isRadar = computed(() => {
       <button
         v-if="canRefund"
         class="btn refund-btn"
+        :aria-label="`Refund ${towerDef?.nameEn ?? 'tower'} for half cost`"
         @click="refundTower"
       >⟲ Refund</button>
 
@@ -157,4 +159,10 @@ const isRadar = computed(() => {
 .refund-btn:hover { background: var(--hp-red); color: var(--stone-dark); }
 .upgrade-btn { flex: 1; font-size: 11px; padding: 8px 12px; }
 .upgrade-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tower-info-panel {
+    animation: none;
+  }
+}
 </style>

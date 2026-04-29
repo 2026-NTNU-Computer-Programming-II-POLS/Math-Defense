@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { calculateScore, type ScoreInput } from '@/domain/scoring/score-calculator'
 
 const g = useGameStore()
+const continueRef = ref<HTMLButtonElement | null>(null)
 
 const breakdown = computed(() => {
   const input: ScoreInput = {
@@ -23,12 +24,35 @@ function fmt(v: number): string {
 }
 
 const emit = defineEmits<{ (e: 'close'): void }>()
+
+function handleKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.stopImmediatePropagation()
+    emit('close')
+  }
+  if (e.key === 'Tab' && continueRef.value) {
+    e.preventDefault()
+    continueRef.value.focus()
+  }
+}
+
+onMounted(() => {
+  nextTick(() => continueRef.value?.focus())
+  window.addEventListener('keydown', handleKey)
+})
+
+onUnmounted(() => window.removeEventListener('keydown', handleKey))
 </script>
 
 <template>
   <div class="score-overlay">
-    <div class="score-panel">
-      <h2 class="score-title">Level Complete!</h2>
+    <div
+      class="score-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="score-title"
+    >
+      <h2 id="score-title" class="score-title">Level Complete!</h2>
 
       <div class="star-display">
         <span v-for="i in g.starRating" :key="i" class="star filled">&#9733;</span>
@@ -81,20 +105,20 @@ const emit = defineEmits<{ (e: 'close'): void }>()
         <span class="total-value">{{ fmt(breakdown.totalScore) }}</span>
       </div>
 
-      <button class="btn-continue" @click="emit('close')">Continue</button>
+      <button ref="continueRef" class="btn-continue" @click="emit('close')">Continue</button>
     </div>
   </div>
 </template>
 
 <style scoped>
 .score-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .score-panel {

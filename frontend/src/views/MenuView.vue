@@ -15,31 +15,31 @@ const auth = useAuthStore()
     </div>
 
     <nav class="menu-nav">
-      <button v-if="auth.isStudent || !auth.isLoggedIn" class="btn menu-btn" @click="router.push('/game')">
+      <button v-if="auth.isStudent || !auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'level-select' })">
         ▶ 開始遊戲
       </button>
-      <button class="btn menu-btn" @click="router.push('/leaderboard')">
+      <button class="btn menu-btn" @click="router.push({ name: 'leaderboard' })">
         ◈ 排行榜
       </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/territory')">
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'territory-list' })">
         ⚔ 搶佔領地
       </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/rankings')">
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'rankings' })">
         ◈ 完整排名
       </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/classes')">
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'classes' })">
         ◆ 班級管理
       </button>
-      <button v-if="auth.isTeacher || auth.isAdmin" class="btn menu-btn" @click="router.push('/teacher')">
+      <button v-if="auth.isTeacher || auth.isAdmin" class="btn menu-btn" @click="router.push({ name: 'teacher-dashboard' })">
         ⬡ 教師面板
       </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push('/profile')">
+      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'profile' })">
         ⬡ {{ auth.user?.player_name }}
       </button>
-      <button v-if="auth.isAdmin" class="btn menu-btn" @click="router.push('/admin/teachers')">
+      <button v-if="auth.isAdmin" class="btn menu-btn" @click="router.push({ name: 'admin-teachers' })">
         ✦ 管理面板
       </button>
-      <button class="btn menu-btn" @click="auth.isLoggedIn ? auth.logout() : router.push('/auth')">
+      <button class="btn menu-btn" @click="auth.isLoggedIn ? auth.logout() : router.push({ name: 'auth' })">
         {{ auth.isLoggedIn ? '⏻ 登出' : '⬡ 登入 / 註冊' }}
       </button>
     </nav>
@@ -56,7 +56,9 @@ const auth = useAuthStore()
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  min-height: 100vh;
+  padding: 32px 0;
+  overflow-y: auto;
   gap: 48px;
   background: radial-gradient(ellipse at center, #1e1828 0%, #0d0a12 70%);
 }
@@ -78,6 +80,17 @@ const auth = useAuthStore()
   color: var(--gold);
   letter-spacing: 12px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 480px) {
+  .title-main {
+    font-size: 32px;
+    letter-spacing: 4px;
+  }
+  .title-sub {
+    font-size: 16px;
+    letter-spacing: 6px;
+  }
 }
 
 .title-motto {

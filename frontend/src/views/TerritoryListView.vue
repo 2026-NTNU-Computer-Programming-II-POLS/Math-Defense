@@ -24,16 +24,16 @@ onMounted(() => store.loadActivities())
           <button
             v-if="auth.isTeacher || auth.isAdmin"
             class="btn"
-            @click="router.push('/territory/create')"
+            @click="router.push({ name: 'territory-create' })"
           >
             + New Activity
           </button>
-          <button class="btn back-btn" @click="router.push('/')">← Back</button>
+          <button class="btn back-btn" @click="router.push({ name: 'menu' })">← Back</button>
         </div>
       </header>
 
-      <div v-if="store.error" class="error-msg">{{ store.error }}</div>
-      <div v-if="store.loading" class="loading">Loading…</div>
+      <div v-if="store.errorActivities" class="error-msg">{{ store.errorActivities }}</div>
+      <div v-if="store.loadingActivities" class="loading">Loading…</div>
 
       <div v-else-if="store.activities.length === 0" class="empty">No activities available</div>
 
@@ -68,6 +68,7 @@ onMounted(() => store.loadActivities())
 
 .territory-panel {
   width: 500px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;

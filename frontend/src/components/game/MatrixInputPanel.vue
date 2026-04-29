@@ -54,6 +54,7 @@ const fields = [
           <input
             type="number"
             class="rune-input matrix-input"
+            :aria-label="`Matrix row ${field.row + 1} column ${field.col + 1} (${field.label})`"
             :value="params[field.key] ?? (field.key === 'a00' || field.key === 'a11' ? 1 : 0)"
             min="-5"
             max="5"

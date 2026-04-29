@@ -26,6 +26,7 @@ const PRESET_AVATARS = [
 const achievementSummary = ref<AchievementSummary | null>(null)
 const talentSummary = ref<TalentTreeOut | null>(null)
 const loading = ref(true)
+const loadError = ref('')
 const avatarSaving = ref(false)
 const avatarError = ref('')
 
@@ -38,7 +39,7 @@ onMounted(async () => {
     achievementSummary.value = ach
     talentSummary.value = tal
   } catch {
-    // Non-critical — profile still shows basic info
+    loadError.value = 'Could not load progression data'
   } finally {
     loading.value = false
   }
@@ -99,7 +100,9 @@ async function selectAvatar(url: string): Promise<void> {
         </div>
       </div>
 
-      <div v-if="!loading" class="progression-summary">
+      <div v-if="loading" class="progression-loading">Loading progression…</div>
+      <div v-else-if="loadError" class="progression-error">{{ loadError }}</div>
+      <div v-else class="progression-summary">
         <div v-if="achievementSummary" class="summary-card" @click="router.push('/achievements')">
           <div class="summary-title">Achievements</div>
           <div class="summary-stat">{{ achievementSummary.unlocked }} / {{ achievementSummary.total }}</div>
@@ -132,6 +135,7 @@ async function selectAvatar(url: string): Promise<void> {
 
 .profile-panel {
   width: 420px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -189,7 +193,7 @@ async function selectAvatar(url: string): Promise<void> {
 .avatar-btn.selected { border-color: var(--gold); border-width: 2px; }
 .avatar-btn:disabled { opacity: 0.5; cursor: default; }
 
-.avatar-error { font-size: 10px; color: #e74c3c; }
+.avatar-error { font-size: 10px; color: var(--error-red); }
 
 .profile-info {
   display: flex;
@@ -205,6 +209,9 @@ async function selectAvatar(url: string): Promise<void> {
 
 .profile-label { color: var(--axis); opacity: 0.7; }
 .profile-value { color: var(--gold); }
+
+.progression-loading { font-size: 11px; color: var(--axis); opacity: 0.6; text-align: center; }
+.progression-error { font-size: 11px; color: var(--enemy-red); text-align: center; }
 
 .progression-summary {
   display: flex;

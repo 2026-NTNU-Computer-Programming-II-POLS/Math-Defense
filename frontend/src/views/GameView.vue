@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeMount, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useGameLoop } from '@/composables/useGameLoop'
@@ -42,14 +42,18 @@ const { game, ready, loadError, retry, newlyUnlockedAchievements } = useGameLoop
 })
 
 function navigateHome(): void {
-  router.push('/').catch((err) => {
+  router.push({ name: 'menu' }).catch((err) => {
     console.warn('[GameView] Navigation failed:', err)
   })
 }
 
-onBeforeMount(() => {
-  if (!_generatedLevel) {
-    router.replace({ name: 'level-select' })
+// Warn before navigating away mid-game (progress would be lost).
+// beforeEnter on the game route already blocks entry without level data,
+// so _generatedLevel is always non-null here.
+onBeforeRouteLeave(() => {
+  const activePhases = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
+  if (activePhases.includes(gameStore.phase)) {
+    return window.confirm('Leave the game? Your current progress will be lost.')
   }
 })
 

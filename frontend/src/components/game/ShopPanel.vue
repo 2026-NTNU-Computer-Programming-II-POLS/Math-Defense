@@ -48,8 +48,8 @@ function purchase(itemId: string, cost: number): void {
 <style scoped>
 .shop-panel {
   position: absolute;
-  right: 8px;
-  top: 56px;
+  left: 8px;
+  top: 100px;
   width: 200px;
   background: rgba(26, 21, 32, 0.95);
   border: 1px solid var(--panel-border);

@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
 
 .hud-row2 {
   position: absolute;
-  top: 49px; left: 0; right: 0;
+  top: var(--hud-height, 48px); left: 0; right: 0;
   height: 44px;
   background: rgba(26,21,32,0.85);
   border-bottom: 1px solid var(--panel-border);
@@ -342,23 +342,4 @@ onBeforeUnmount(() => {
   .phase-pulse { animation: none; }
 }
 
-@media (max-width: 640px) {
-  .hud {
-    height: auto;
-    min-height: 48px;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    padding: 6px 12px;
-  }
-  .hud-row2 {
-    top: auto;
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 44px;
-  }
-  .score-item {
-    margin-left: 0;
-    flex-basis: 100%;
-  }
-}
 </style>

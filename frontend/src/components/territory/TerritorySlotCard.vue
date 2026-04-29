@@ -31,7 +31,11 @@ const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat
       <span class="occupant-score">{{ slot.occupation.score.toFixed(0) }}</span>
     </div>
     <div v-else class="slot-empty">Unoccupied</div>
-    <button class="btn slot-play-btn" @click="$emit('play', slot.id)">
+    <button
+      class="btn slot-play-btn"
+      :aria-label="`${state === 'mine' ? 'Improve' : state === 'occupied' ? 'Challenge' : 'Seize'} slot #${slot.slot_index + 1}`"
+      @click="$emit('play', slot.id)"
+    >
       {{ state === 'mine' ? 'Improve' : state === 'occupied' ? 'Challenge' : 'Seize' }}
     </button>
   </div>
@@ -61,5 +65,5 @@ const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat
 
 .slot-empty { font-size: 11px; color: var(--axis); opacity: 0.5; }
 
-.slot-play-btn { font-size: 10px; padding: 4px 10px; }
+.slot-play-btn { font-size: 10px; padding: 4px 10px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 </style>

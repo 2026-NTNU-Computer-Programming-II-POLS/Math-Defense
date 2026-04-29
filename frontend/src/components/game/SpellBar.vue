@@ -56,6 +56,7 @@ defineExpose({ castingSpell, castAtPosition })
       :style="{ '--spell-color': spell.color }"
       :disabled="spell.onCooldown || !spell.affordable"
       :title="`${spell.name} (${spell.cost}g) — ${spell.description}`"
+      :aria-label="`${spell.name}, costs ${spell.cost} gold${spell.onCooldown ? `, on cooldown ${spell.cooldownLabel}` : ''}`"
       @click="selectSpell(spell.id)"
     >
       <span class="spell-icon">{{ spell.name[0] }}</span>
@@ -74,8 +75,8 @@ defineExpose({ castingSpell, castAtPosition })
 
 .spell-btn {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: 2px solid var(--spell-color, #888);
   border-radius: 6px;
   background: rgba(26, 21, 32, 0.9);
@@ -139,5 +140,14 @@ defineExpose({ castingSpell, castAtPosition })
   font-size: 8px;
   color: var(--gold);
   z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spell-btn {
+    transition: none;
+  }
+  .spell-btn:hover:not(:disabled) {
+    transform: none;
+  }
 }
 </style>

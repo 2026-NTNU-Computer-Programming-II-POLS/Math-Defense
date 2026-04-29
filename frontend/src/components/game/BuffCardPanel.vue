@@ -202,7 +202,7 @@ function skipBuff(): void {
 }
 
 .buff-panel {
-  width: 680px;
+  width: min(680px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -217,11 +217,12 @@ function skipBuff(): void {
 
 .card-list {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
 .buff-card {
-  flex: 1;
+  flex: 1 1 180px;
   display: flex;
   flex-direction: column;
   gap: 8px;

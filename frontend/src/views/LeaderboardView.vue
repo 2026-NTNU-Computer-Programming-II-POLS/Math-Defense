@@ -64,7 +64,8 @@ onBeforeUnmount(() => {
 
     <div v-if="loading" class="lb-loading">載入中…</div>
     <div v-else-if="error" class="lb-error">{{ error }}</div>
-    <table v-else class="lb-table">
+    <div v-else class="lb-table-wrap">
+    <table class="lb-table">
       <thead>
         <tr>
           <th>#</th>
@@ -89,6 +90,7 @@ onBeforeUnmount(() => {
         </tr>
       </tbody>
     </table>
+    </div>
 
     <div v-if="totalPages > 1" class="lb-pagination">
       <button class="btn page-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">←</button>
@@ -109,6 +111,7 @@ onBeforeUnmount(() => {
   gap: 24px;
   background: radial-gradient(ellipse at center, #1e1828 0%, #0d0a12 70%);
   min-height: 100vh;
+  overflow-y: auto;
 }
 
 .lb-header {
@@ -131,6 +134,7 @@ onBeforeUnmount(() => {
   color: var(--stone-dark);
 }
 
+.lb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .lb-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 
 th, td {

@@ -45,7 +45,7 @@ watch(() => props.achievements, (newVal) => {
   position: fixed;
   top: 16px;
   right: 16px;
-  z-index: 9999;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -73,5 +73,16 @@ watch(() => props.achievements, (newVal) => {
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-item {
+    animation: none;
+  }
+  .toast-enter-active,
+  .toast-leave-active {
+    animation: none;
+    transition: opacity 0.15s;
+  }
 }
 </style>

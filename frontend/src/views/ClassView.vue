@@ -18,6 +18,14 @@ const selectedClassId = ref<string | null>(null)
 const students = ref<Membership[]>([])
 const newStudentId = ref('')
 
+const creatingClass = ref(false)
+const joiningClass = ref(false)
+const addingStudent = ref(false)
+const regeneratingId = ref<string | null>(null)
+const studentsLoading = ref(false)
+const studentsError = ref('')
+const copiedCode = ref<string | null>(null)
+
 const isTeacherOrAdmin = computed(() => auth.isTeacher || auth.isAdmin)
 
 async function loadClasses(): Promise<void> {
@@ -33,52 +41,79 @@ async function loadClasses(): Promise<void> {
 }
 
 async function createClass(): Promise<void> {
-  if (!newClassName.value.trim()) return
+  if (!newClassName.value.trim()) {
+    error.value = '請輸入班級名稱'
+    return
+  }
+  if (creatingClass.value) return
   error.value = ''
+  creatingClass.value = true
   try {
     await classService.createClass(newClassName.value.trim())
     newClassName.value = ''
     await loadClasses()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to create class'
+  } finally {
+    creatingClass.value = false
   }
 }
 
 async function joinClass(): Promise<void> {
-  if (!joinCode.value.trim()) return
+  if (!joinCode.value.trim()) {
+    error.value = '請輸入加入代碼'
+    return
+  }
+  if (joiningClass.value) return
   error.value = ''
+  joiningClass.value = true
   try {
     await classService.joinByCode(joinCode.value.trim())
     joinCode.value = ''
     await loadClasses()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to join class'
+  } finally {
+    joiningClass.value = false
   }
 }
 
 async function selectClass(id: string): Promise<void> {
   selectedClassId.value = id
+  studentsLoading.value = true
+  studentsError.value = ''
   try {
     students.value = await classService.listStudents(id)
-  } catch {
+  } catch (e) {
+    studentsError.value = e instanceof Error ? e.message : 'Failed to load students'
     students.value = []
+  } finally {
+    studentsLoading.value = false
   }
 }
 
 async function addStudent(): Promise<void> {
-  if (!selectedClassId.value || !newStudentId.value.trim()) return
+  if (!selectedClassId.value || !newStudentId.value.trim()) {
+    error.value = '請輸入學生 ID'
+    return
+  }
+  if (addingStudent.value) return
   error.value = ''
+  addingStudent.value = true
   try {
     await classService.addStudent(selectedClassId.value, newStudentId.value.trim())
     newStudentId.value = ''
     await selectClass(selectedClassId.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to add student'
+  } finally {
+    addingStudent.value = false
   }
 }
 
 async function removeStudent(studentId: string): Promise<void> {
   if (!selectedClassId.value) return
+  if (!confirm(`確定要移除學生 ${studentId}？`)) return
   try {
     await classService.removeStudent(selectedClassId.value, studentId)
     await selectClass(selectedClassId.value)
@@ -88,17 +123,26 @@ async function removeStudent(studentId: string): Promise<void> {
 }
 
 async function regenerateCode(classId: string): Promise<void> {
+  if (regeneratingId.value) return
+  regeneratingId.value = classId
   try {
     const res = await classService.regenerateCode(classId)
     const idx = classes.value.findIndex((c) => c.id === classId)
     if (idx !== -1) classes.value[idx].join_code = res.join_code
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to regenerate code'
+  } finally {
+    regeneratingId.value = null
   }
 }
 
 function copyCode(code: string): void {
-  navigator.clipboard.writeText(code).catch(() => {})
+  navigator.clipboard.writeText(code).then(() => {
+    copiedCode.value = code
+    setTimeout(() => { copiedCode.value = null }, 2000)
+  }).catch(() => {
+    error.value = 'Failed to copy code'
+  })
 }
 
 onMounted(loadClasses)
@@ -116,7 +160,9 @@ onMounted(loadClasses)
         <h3 class="section-title">建立班級</h3>
         <form class="inline-form" @submit.prevent="createClass">
           <input v-model="newClassName" class="rune-input" type="text" placeholder="班級名稱" />
-          <button class="btn" type="submit">建立</button>
+          <button class="btn" type="submit" :disabled="creatingClass">
+            {{ creatingClass ? '建立中…' : '建立' }}
+          </button>
         </form>
       </div>
 
@@ -125,7 +171,9 @@ onMounted(loadClasses)
         <h3 class="section-title">加入班級</h3>
         <form class="inline-form" @submit.prevent="joinClass">
           <input v-model="joinCode" class="rune-input" type="text" placeholder="加入代碼" />
-          <button class="btn" type="submit">加入</button>
+          <button class="btn" type="submit" :disabled="joiningClass">
+            {{ joiningClass ? '加入中…' : '加入' }}
+          </button>
         </form>
       </div>
 
@@ -143,12 +191,23 @@ onMounted(loadClasses)
           >
             <div class="class-item-header" @click="isTeacherOrAdmin ? selectClass(c.id) : undefined">
               <span class="class-name">{{ c.name }}</span>
-              <span v-if="c.join_code" class="join-code" @click.stop="copyCode(c.join_code!)">
-                {{ c.join_code }}
+              <span
+                v-if="c.join_code"
+                class="join-code"
+                :class="{ copied: copiedCode === c.join_code }"
+                @click.stop="copyCode(c.join_code!)"
+              >
+                {{ copiedCode === c.join_code ? '已複製！' : c.join_code }}
               </span>
             </div>
             <div v-if="isTeacherOrAdmin && c.join_code" class="class-actions">
-              <button class="btn-sm" @click="regenerateCode(c.id)">重新產生代碼</button>
+              <button
+                class="btn-sm"
+                :disabled="regeneratingId === c.id"
+                @click="regenerateCode(c.id)"
+              >
+                {{ regeneratingId === c.id ? '產生中…' : '重新產生代碼' }}
+              </button>
             </div>
           </li>
         </ul>
@@ -159,9 +218,13 @@ onMounted(loadClasses)
         <h3 class="section-title">班級學生</h3>
         <form class="inline-form" @submit.prevent="addStudent">
           <input v-model="newStudentId" class="rune-input" type="text" placeholder="學生 ID" />
-          <button class="btn" type="submit">加入</button>
+          <button class="btn" type="submit" :disabled="addingStudent">
+            {{ addingStudent ? '加入中…' : '加入' }}
+          </button>
         </form>
-        <ul v-if="students.length > 0" class="student-list">
+        <div v-if="studentsLoading" class="loading">載入中…</div>
+        <div v-else-if="studentsError" class="class-error">{{ studentsError }}</div>
+        <ul v-else-if="students.length > 0" class="student-list">
           <li v-for="s in students" :key="s.id" class="student-item">
             <span>{{ s.student_id }}</span>
             <button class="btn-sm danger" @click="removeStudent(s.student_id)">移除</button>
@@ -186,6 +249,7 @@ onMounted(loadClasses)
 
 .class-panel {
   width: 420px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -232,9 +296,11 @@ onMounted(loadClasses)
   color: var(--axis);
   cursor: pointer;
   font-size: 10px;
+  transition: color 0.15s;
 }
 
 .join-code:hover { color: var(--gold); }
+.join-code.copied { color: var(--gold); }
 
 .class-actions { display: flex; gap: 4px; }
 
@@ -249,15 +315,19 @@ onMounted(loadClasses)
 .btn-sm {
   font-size: 9px;
   padding: 2px 6px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: 1px solid var(--axis);
   color: var(--axis);
   cursor: pointer;
 }
 
-.btn-sm:hover { background: var(--axis); color: var(--stone-dark); }
+.btn-sm:hover:not(:disabled) { background: var(--axis); color: var(--stone-dark); }
 .btn-sm.danger { border-color: var(--enemy-red); color: var(--enemy-red); }
 .btn-sm.danger:hover { background: var(--enemy-red); color: var(--stone-dark); }
+.btn-sm:disabled { opacity: 0.4; cursor: default; }
 
 .loading, .empty { font-size: 11px; color: var(--axis); opacity: 0.5; }
 

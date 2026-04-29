@@ -88,6 +88,7 @@ onMounted(async () => {
 
 .dashboard-panel {
   width: 480px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;

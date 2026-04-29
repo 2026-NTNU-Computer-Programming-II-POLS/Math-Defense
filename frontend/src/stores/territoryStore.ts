@@ -13,30 +13,39 @@ export const useTerritoryStore = defineStore('territory', () => {
   const activities = ref<ActivityInfo[]>([])
   const currentDetail = ref<ActivityDetail | null>(null)
   const rankings = ref<RankingEntry[]>([])
-  const loading = ref(false)
-  const error = ref('')
+
+  const loadingActivities = ref(false)
+  const loadingDetail = ref(false)
+  const loadingRankings = ref(false)
+
+  const errorActivities = ref('')
+  const errorDetail = ref('')
+  const errorPlay = ref('')
+  const errorCreate = ref('')
+  const errorRankings = ref('')
+  const errorSettle = ref('')
 
   async function loadActivities(classId?: string): Promise<void> {
-    loading.value = true
-    error.value = ''
+    loadingActivities.value = true
+    errorActivities.value = ''
     try {
       activities.value = await territoryService.listActivities(classId)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load activities'
+      errorActivities.value = e instanceof Error ? e.message : 'Failed to load activities'
     } finally {
-      loading.value = false
+      loadingActivities.value = false
     }
   }
 
   async function loadDetail(activityId: string): Promise<void> {
-    loading.value = true
-    error.value = ''
+    loadingDetail.value = true
+    errorDetail.value = ''
     try {
       currentDetail.value = await territoryService.getActivity(activityId)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load activity'
+      errorDetail.value = e instanceof Error ? e.message : 'Failed to load activity'
     } finally {
-      loading.value = false
+      loadingDetail.value = false
     }
   }
 
@@ -46,60 +55,80 @@ export const useTerritoryStore = defineStore('territory', () => {
     class_id?: string | null
     slots: SlotDefinition[]
   }): Promise<ActivityInfo | null> {
-    error.value = ''
+    errorCreate.value = ''
     try {
       const activity = await territoryService.createActivity(payload)
       return activity
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create activity'
+      errorCreate.value = e instanceof Error ? e.message : 'Failed to create activity'
       return null
     }
   }
 
   async function playSlot(activityId: string, slotId: string, score: number): Promise<PlayResult | null> {
-    error.value = ''
+    errorPlay.value = ''
     try {
       return await territoryService.playTerritory(activityId, slotId, score)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to play territory'
+      errorPlay.value = e instanceof Error ? e.message : 'Failed to play territory'
       return null
     }
   }
 
   async function loadRankings(activityId: string): Promise<void> {
-    loading.value = true
-    error.value = ''
+    loadingRankings.value = true
+    errorRankings.value = ''
     try {
       rankings.value = await territoryService.getRankings(activityId)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load rankings'
+      errorRankings.value = e instanceof Error ? e.message : 'Failed to load rankings'
     } finally {
-      loading.value = false
+      loadingRankings.value = false
     }
   }
 
   async function settleActivity(activityId: string): Promise<boolean> {
-    error.value = ''
+    errorSettle.value = ''
     try {
       await territoryService.settleActivity(activityId)
       return true
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to settle activity'
+      errorSettle.value = e instanceof Error ? e.message : 'Failed to settle activity'
       return false
     }
+  }
+
+  function clear(): void {
+    activities.value = []
+    currentDetail.value = null
+    rankings.value = []
+    errorActivities.value = ''
+    errorDetail.value = ''
+    errorPlay.value = ''
+    errorCreate.value = ''
+    errorRankings.value = ''
+    errorSettle.value = ''
   }
 
   return {
     activities,
     currentDetail,
     rankings,
-    loading,
-    error,
+    loadingActivities,
+    loadingDetail,
+    loadingRankings,
+    errorActivities,
+    errorDetail,
+    errorPlay,
+    errorCreate,
+    errorRankings,
+    errorSettle,
     loadActivities,
     loadDetail,
     createActivity,
     playSlot,
     loadRankings,
     settleActivity,
+    clear,
   }
 })
