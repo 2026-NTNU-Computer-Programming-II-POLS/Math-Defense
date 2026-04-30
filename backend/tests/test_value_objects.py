@@ -20,20 +20,20 @@ class TestSessionStatus:
 
 class TestLevel:
     def test_valid_levels(self):
-        for i in range(1, 5):
+        for i in range(1, 6):
             lv = Level(i)
             assert lv == i
 
     def test_level_zero_raises(self):
-        with pytest.raises(ValueError, match="between 1 and 4"):
+        with pytest.raises(ValueError, match="between 1 and 5"):
             Level(0)
 
-    def test_level_five_raises(self):
-        with pytest.raises(ValueError, match="between 1 and 4"):
-            Level(5)
+    def test_level_six_raises(self):
+        with pytest.raises(ValueError, match="between 1 and 5"):
+            Level(6)
 
     def test_negative_level_raises(self):
-        with pytest.raises(ValueError, match="between 1 and 4"):
+        with pytest.raises(ValueError, match="between 1 and 5"):
             Level(-1)
 
 

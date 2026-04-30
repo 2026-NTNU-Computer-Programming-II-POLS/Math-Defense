@@ -51,7 +51,7 @@ function navigateHome(): void {
 // beforeEnter on the game route already blocks entry without level data,
 // so _generatedLevel is always non-null here.
 onBeforeRouteLeave(() => {
-  const activePhases = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
+  const activePhases: GamePhase[] = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
   if (activePhases.includes(gameStore.phase)) {
     return window.confirm('Leave the game? Your current progress will be lost.')
   }

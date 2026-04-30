@@ -13,6 +13,8 @@ export interface BuffDef {
   revertId?: string
 }
 
+export type BuffCard = BuffDef & { isCurse: boolean; probability: number; goldReward?: number }
+
 export const PURCHASABLE_BUFFS: BuffDef[] = [
   // ── Tower buffs ──
   {

@@ -114,7 +114,8 @@ export class MovementSystem {
     if (!enemy.alive) return
     // Goal = level endpoint P* (V2) or origin (V1 fallback). MovementSystem
     // reads `endpoint` structurally so it does not import context internals.
-    const goal = game.levelContext?.endpoint ?? ORIGIN
+    const ctx = game.levelContext
+    const goal = (ctx && 'endpoint' in ctx) ? (ctx as { endpoint: { x: number; y: number } }).endpoint : ORIGIN
     const distToGoal = distance(enemy.x, enemy.y, goal.x, goal.y)
     const reachedTarget =
       enemy._direction < 0

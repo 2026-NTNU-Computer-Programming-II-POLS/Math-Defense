@@ -10,8 +10,7 @@ import { PhaseStateMachine } from './PhaseStateMachine'
 import { type GameState, createInitialState } from './GameState'
 import { GamePhase, Events, FIXED_DT } from '@/data/constants'
 import type { Tower, Enemy, Projectile, Pet, LimitResult } from '@/entities/types'
-import type { BuffDef } from '@/data/buff-defs'
-import type { SpellDef } from '@/data/spell-defs'
+import type { BuffCard } from '@/data/buff-defs'
 import type { MontyHallReward } from '@/data/monty-hall-defs'
 import type { ActiveBuffEntry } from './GameState'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
@@ -82,7 +81,7 @@ export interface GameEvents {
   [Events.ENEMY_REACHED_ORIGIN]: Enemy
   [Events.TOWER_ATTACK]:         { tower: Tower; target: Enemy }
   [Events.BUFF_PHASE_START]:     void
-  [Events.BUFF_CARDS_UPDATED]:   ReadonlyArray<BuffDef & { isCurse: boolean }>
+  [Events.BUFF_CARDS_UPDATED]:   ReadonlyArray<BuffCard>
   [Events.BUFF_CARD_SELECTED]:   string
   [Events.BUFF_RESULT]:          { success: boolean; cardId: string; skipped: boolean; insufficientGold?: boolean }
   [Events.BUFF_PHASE_END]:       void
@@ -99,7 +98,7 @@ export interface GameEvents {
   [Events.RADAR_ARC_CHANGED]:    { towerId: string; arcStart: number; arcEnd: number; restrict: boolean }
   [Events.MATRIX_PAIR_CHANGED]:  { towerId: string; pairId: string }
   [Events.LIMIT_ANSWER]:         { towerId: string; answer: LimitResult }
-  [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: 'derivative' | 'integral' }
+  [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: 'derivative' | 'derivative2' | 'integral' }
   [Events.TOWER_UPGRADE]:        { towerId: string }
   [Events.TOWER_REFUND]:         { towerId: string }
   [Events.PET_SPAWNED]:          Pet

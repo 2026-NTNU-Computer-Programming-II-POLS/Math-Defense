@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
 import type { CalculusTowerSystem, MonomialPreset } from '@/systems/CalculusTowerSystem'

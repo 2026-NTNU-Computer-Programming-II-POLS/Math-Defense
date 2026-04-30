@@ -101,7 +101,7 @@ export class MontyHallSystem implements GameSystem {
     }
   }
 
-  private _revealDoor(game: Game): void {
+  private _revealDoor(_game: Game): void {
     if (!this.current || this.current.selectedDoor === null) return
     const { doorCount, prizeIndex, selectedDoor } = this.current
 

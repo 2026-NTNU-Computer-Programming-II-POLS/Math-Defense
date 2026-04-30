@@ -145,6 +145,8 @@ function makeNonVerticalEvaluator(params: PathSegmentParams): (x: number) => num
     case 'trigonometric': return makeTrigonometric(params).evaluate
     case 'vertical':
       throw new Error('makeNonVerticalEvaluator: vertical kind passed to non-vertical sampler.')
+    default:
+      throw new Error(`makeNonVerticalEvaluator: unhandled kind`)
   }
 }
 

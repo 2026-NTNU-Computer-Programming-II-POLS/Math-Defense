@@ -1,9 +1,8 @@
 import { Events, GamePhase } from '@/data/constants'
 import type { TowerType } from '@/data/constants'
 import { createTower } from '@/entities/TowerFactory'
-import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import type { Game } from '@/engine/Game'
-import type { Tower, TowerPreview } from '@/entities/types'
+import type { Tower } from '@/entities/types'
 import { computeLegalPositions, type LegalPositionSet } from '@/domain/placement/legal-positions'
 import { isGeneratedLevelContext } from '@/engine/generated-level-context'
 
