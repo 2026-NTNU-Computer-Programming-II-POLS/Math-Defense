@@ -4,8 +4,8 @@
     "width": 1280,
     "height": 720,
     "originX": 640,
-    "originY": 360,
-    "unitPx": 24
+    "originY": 374,
+    "unitPx": 20
   },
   "grid": {
     "minX": -14, "maxX": 14,

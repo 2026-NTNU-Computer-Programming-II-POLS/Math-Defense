@@ -28,7 +28,7 @@ const show = computed(() => gameStore.phase === GamePhase.BUILD)
 <style scoped>
 .build-hint {
   position: absolute;
-  top: calc(var(--hud-height, 48px) + 8px);
+  top: calc(var(--hud-height, 48px) + 44px + 8px);
   left: 50%;
   transform: translateX(-50%);
   background: rgba(26,21,32,0.9);

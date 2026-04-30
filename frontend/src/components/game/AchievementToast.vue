@@ -42,8 +42,8 @@ watch(() => props.achievements, (newVal) => {
 
 <style scoped>
 .achievement-toast {
-  position: fixed;
-  top: 16px;
+  position: absolute;
+  top: calc(var(--hud-height, 48px) + 44px + 8px);
   right: 16px;
   z-index: var(--z-toast);
   display: flex;
