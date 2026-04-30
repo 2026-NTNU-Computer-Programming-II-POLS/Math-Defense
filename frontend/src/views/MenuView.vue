@@ -15,7 +15,7 @@ const auth = useAuthStore()
     </div>
 
     <nav class="menu-nav">
-      <button v-if="auth.isStudent || !auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'level-select' })">
+      <button v-if="auth.isStudent || auth.isTeacher || !auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'level-select' })">
         ▶ 開始遊戲
       </button>
       <button class="btn menu-btn" @click="router.push({ name: 'leaderboard' })">
