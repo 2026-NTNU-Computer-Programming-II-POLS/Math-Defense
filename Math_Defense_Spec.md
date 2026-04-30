@@ -1,4 +1,11 @@
-# 數學防線 Math Defense — 期末專題企劃書（v3）
+# 數學防線 Math Defense — 期末專題企劃書（v3，歷史設計稿）
+
+> **⚠️ 版本歷史說明**：本文件是原始設計稿（v3）。實際實作已演進至 **V2 Phase 5（2026-04-30）**。
+> - **V1 設計**（本文件）：6 種塔、5 種敵人、Buff 卡系統、傅立葉護盾
+> - **V2 Phase 5 實作**：7 種數學概念塔（Magic/Radar A–C/Matrix/Limit/Calculus）、7 種敵人、時間制 Spell 系統、Monty Hall 事件、成就/天賦樹、排名競賽系統
+> 
+> 前端詳見 [`frontend/README.md`](frontend/README.md)、後端詳見 [`backend/README.md`](backend/README.md)。
+> 核心遊戲理念（「數學即機制」）保持不變，但經濟系統、難度設計、進度機制已大幅重新設計。
 
 ## 一、專題概述
 
@@ -13,8 +20,6 @@
 | 開發時程 | 6 週以上 |
 | 關卡數量 | 4 關精緻版 |
 
-> **實作細節**：前端詳見 [`frontend/README.md`](frontend/README.md)、後端詳見 [`backend/README.md`](backend/README.md)。本文件描述遊戲設計與機制；工程架構以 README 為準（本文件 §11 為歷史脈絡，已於 DDD 重構後更新）。
-
 ### 核心理念
 
 **「數學即機制」而非「答題換金幣」。** 數學概念不是用來解鎖獎勵的門檻，而是直接構成遊戲的操作機制。玩家輸入的函數參數決定砲彈軌跡、攻擊範圍、塔的連動方式，數學理解程度直接影響遊戲表現。
@@ -24,6 +29,30 @@
 - **手動輸入，非滑桿操作**：玩家必須手動輸入數學參數（如 m、b、角度），不能透過拖曳滑桿「看著調」。每一次修改都需要從視覺結果反推數值，強迫數學思考。
 - **概念名稱與操作同時顯示**：Build Phase 中，數學術語直接標示在操作面板上（如「斜率 slope (m)」、「定積分 ∫」），玩家每次操作都在建立「術語 ↔ 直覺」的連結。
 - **允許試錯的安全環境**：Build Phase 內可無限修改參數，波次開始後鎖定。參考 Kapur (2008) Productive Failure 理論——允許失敗，但每次失敗都有學習價值。
+
+---
+
+## V1 → V2 Phase 5 重大變更總結
+
+本節簡述原始設計 (v3) 與最終實作 (Phase 5) 間的進化。詳細請見 [`frontend/README.md`](frontend/README.md#v2-phase-5---progression-system) 與 [`backend/README.md`](backend/README.md)。
+
+| 面向 | V1 設計稿 | V2 Phase 5 實作 |
+|------|---------|-----------------|
+| **塔系統** | 6 種塔（含 V1 命名） | 7 種數學概念塔（Magic/Radar A–C/Matrix/Limit/Calculus） |
+| **敵人系統** | 5 種史萊姆 + Boss 龍 | 7 種敵人（含 Boss Type-A/B，B 有鏈式法則挑戰） |
+| **經濟系統** | 全塔攻擊力倍增等固定 Buff 卡 | 時間制 Spell（Fireball/Frost Nova/Lightning/Rejuvenate） + 時間基 Buff |
+| **事件系統** | Buff 卡抽籤（3 張選 1 張） | Monty Hall 隨機事件（kill-value 觸發，門後獎勵） |
+| **難度系統** | 固定 4 關 | 1–5 星難度動態調整 |
+| **進度系統** | — | 20 成就 + 21 節點天賦樹（7 塔類型） + 角色頭像 |
+| **競賽系統** | — | Grabbing Territory 活動 + 4 種排行榜（全球/天賦/活動/地域） |
+| **計分公式** | 簡單金幣計分 | S1/S2/K/TotalScore 多維公式（殺傷效率 vs 成本效率） |
+| **初始答題** | — | Initial Answer（戰前端點辨識，答對加分） |
+| **角色系統** | — | 多角色（Admin/Teacher/Student）+ 班級管理 + RBAC |
+| **資料庫** | SQLite | PostgreSQL + DDD 分層 + 樂觀鎖（地域佔領） |
+
+本文件後續內容描述 V1 設計的完整細節（供歷史參考），但不影響 V2 Phase 5 的實際遊戲流程與機制。
+
+---
 
 ---
 

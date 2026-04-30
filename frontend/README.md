@@ -566,12 +566,12 @@ Vitest is configured with `happy-dom` so systems can be tested without a real br
 The game has its own coordinate system, separate from pixels:
 
 ```
-Game unit (0, 0) = pixel (originX, originY) = pixel (160, 600)
-1 game unit      = 40 pixels (unitPx)
+Game unit (0, 0) = pixel (originX, originY) = pixel (640, 360)
+1 game unit      = 24 pixels (unitPx)
 
 Conversion:
   pixelX = originX + gameX * unitPx
   pixelY = originY - gameY * unitPx      ← Y axis inverted (game-Y up = pixel-Y down)
 ```
 
-Grid bounds: X ∈ [-3, 25], Y ∈ [-2, 14]. Tower placement snaps to grid intersection points (not all cells — legal positions are pre-computed from path clearance). Canvas size, origin, unit, bounds, initial HP/gold and `hitRadius` all come from `shared/game-constants.json`.
+Grid bounds: X ∈ [-14, 14], Y ∈ [-14, 14]. Tower placement snaps to grid intersection points (not all cells — legal positions are pre-computed from path clearance). Canvas size, origin, unit, bounds, initial HP/gold and `hitRadius` all come from `shared/game-constants.json`.

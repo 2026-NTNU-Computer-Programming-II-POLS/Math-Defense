@@ -6,7 +6,7 @@ High-performance math module for Math Defense, written in C99 and compiled to We
 
 ## Why WASM?
 
-The core tower mechanics drive tight numerical loops every frame — point-in-sector checks for every enemy per Radar Sweep tick, MSE sampling for Fourier Shield matching, trapezoid integration for Integral Cannon damage. A compiled binary runs these noticeably faster than interpreted JS and keeps the math layer decoupled from both the UI and the DOM.
+The core tower mechanics drive tight numerical loops every frame — point-in-sector checks for every enemy per Radar system tick, sector coverage area calculations, matrix transformations, and integration for Calculus tower damage. A compiled binary runs these noticeably faster than interpreted JS and keeps the math layer decoupled from both the UI and the DOM.
 
 The frontend always calls the bridge (`WasmBridge.*`); it never imports `math_engine.js` directly. `WasmBridge.test.ts` asserts that the JS fallback and WASM output agree on boundary cases.
 
@@ -230,9 +230,12 @@ Every WASM function has a pure-TypeScript equivalent in `WasmBridge.ts`. `initWa
 
 | Tower | WASM Function(s) |
 |---|---|
-| Function Cannon | `calculate_trajectory`, `line_circle_intersect` |
-| Radar Sweep | `point_in_sector`, `sector_coverage` |
-| Matrix Link | `matrix_multiply` |
-| Integral Cannon | `numerical_integrate` |
-| Fourier Shield | `fourier_composite`, `fourier_match` |
-| Probability Shrine | — (pure JS — no numerical hotspot) |
+| Magic | — (pure JS — generates polynomial/trig/log function curves) |
+| Radar A (Sweep) | `point_in_sector`, `sector_coverage` |
+| Radar B (Single-target) | `point_in_sector` |
+| Radar C (Slow powerful) | `point_in_sector` |
+| Matrix | `matrix_multiply` |
+| Limit | — (pure JS — limit question generation and outcome resolution) |
+| Calculus | `numerical_integrate` |
+
+> **Historical note**: Earlier V1 versions included Function Cannon, Integral Cannon, Fourier Shield, and Probability Shrine. The V2 redesign (Phase 5, April 2026) unified them into 7 concept-based towers with tighter mathematical coupling to gameplay mechanics.

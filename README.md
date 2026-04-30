@@ -161,12 +161,15 @@ Create `.env` at the project root (see `.env.example`):
 
 ```json
 {
-  "canvas":      { "width": 1280, "height": 720, "originX": 160, "originY": 600, "unitPx": 40 },
-  "grid":        { "minX": -3, "maxX": 25, "minY": -2, "maxY": 14 },
+  "canvas":      { "width": 1280, "height": 720, "originX": 640, "originY": 360, "unitPx": 24 },
+  "grid":        { "minX": -14, "maxX": 14, "minY": -14, "maxY": 14, "pointSpacing": 1 },
   "player":      { "initialHp": 20, "initialGold": 200 },
   "loop":        { "targetFps": 60 },
   "collision":   { "hitRadius": 0.5 },
-  "waveSystem":  { "pathValidationMinCoverage": 0.8 }
+  "waveSystem":  { "pathValidationMinCoverage": 0.8 },
+  "roles":       ["admin", "teacher", "student"],
+  "starRatings": { "min": 1, "max": 5 },
+  "economy":     { "startingGoldByStar": {...}, "waveCompletionBonus": {...}, "bossCorrectAnswerBonus": 100 }
 }
 ```
 
