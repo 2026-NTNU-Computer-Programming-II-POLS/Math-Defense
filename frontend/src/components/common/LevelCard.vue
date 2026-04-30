@@ -17,7 +17,7 @@ const LEVELS: LevelInfo[] = [
   { id: 1, name: '草原',   nameEn: 'Grassland',  description: '教學關，引導 y = mx + b' },
   { id: 2, name: '峽谷',   nameEn: 'Canyon',     description: '三角函數 + 拋物線路徑'   },
   { id: 3, name: '堡壘',   nameEn: 'Fortress',   description: '矩陣連結 + 積分砲'       },
-  { id: 4, name: '魔王巢', nameEn: 'Dragon Lair',description: 'Boss 龍 + 傅立葉破盾'   },
+  { id: 4, name: '魔王巢', nameEn: 'Dragon Lair',description: 'Boss + 傅立葉破盾'     },
 ]
 
 const dialogRef = ref<HTMLElement | null>(null)

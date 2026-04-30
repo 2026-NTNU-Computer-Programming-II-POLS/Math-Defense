@@ -21,7 +21,6 @@ class User:
     def __init__(
         self,
         id: str,
-        username: str | None,
         email: str,
         player_name: str,
         role: Role,
@@ -30,7 +29,6 @@ class User:
         created_at: datetime | None = None,
     ) -> None:
         self.id = id
-        self.username = username
         self.email = email
         self.player_name = player_name
         self.role = role
@@ -45,12 +43,10 @@ class User:
         player_name: str,
         role: Role,
         password_hash: str,
-        username: str | None = None,
     ) -> User:
         """Factory — assigns a new id. Password is already hashed by the caller."""
         return cls(
             id=str(uuid.uuid4()),
-            username=username,
             email=email,
             player_name=player_name,
             role=role,

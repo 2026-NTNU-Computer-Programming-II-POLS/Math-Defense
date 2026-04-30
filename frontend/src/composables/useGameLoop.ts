@@ -141,7 +141,11 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
       if (g.generatedLevel) {
         g.state.pathsVisible = options.iaResult !== 'ignored'
         g.state.starRating = g.generatedLevel.starRating
-        g.state.initialAnswer = (options.iaResult === 'correct' || options.iaResult === 'paid') ? 1 : 0
+        g.state.initialAnswer = options.iaResult === 'correct' ? 1 : 0
+        if (options.iaResult === 'paid') {
+          g.changeGold(-50)
+          g.addCost(50)
+        }
         g.levelContext = createGeneratedLevelContext(g.generatedLevel, g.eventBus)
         return
       }

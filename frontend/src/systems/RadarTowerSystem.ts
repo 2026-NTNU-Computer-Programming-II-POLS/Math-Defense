@@ -95,10 +95,13 @@ export class RadarTowerSystem {
     tower.cooldownTimer = tower.cooldown
 
     const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0)
+    const critChance = tower.upgradeExtras?.['critChance'] ?? 0
     const targets = this._findTargets(tower, game, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)
-      this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus, game)
+      const isCrit = critChance > 0 && Math.random() < critChance
+      const critMult = isCrit ? 2.0 : 1.0
+      this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus * critMult, game)
     }
   }
 

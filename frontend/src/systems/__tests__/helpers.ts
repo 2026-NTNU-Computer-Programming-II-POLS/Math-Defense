@@ -96,6 +96,7 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     chainRuleTriggered: false,
     chainRuleAnsweredCorrectly: null,
     slowFactor: 0,
+    slowTimer: 0,
     speedBoost: 0,
     dotDamage: 0,
     dotTimer: 0,

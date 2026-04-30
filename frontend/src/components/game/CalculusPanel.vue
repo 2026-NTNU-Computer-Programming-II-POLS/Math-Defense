@@ -28,7 +28,7 @@ function selectPreset(index: number) {
   engine.eventBus.emit(Events.CALCULUS_OPERATION, { towerId: props.towerId, presetIndex: index })
 }
 
-function applyOp(op: 'derivative' | 'integral') {
+function applyOp(op: 'derivative' | 'derivative2' | 'integral') {
   const engine = gameStore.getEngine()
   if (!engine) return
   engine.eventBus.emit(Events.CALCULUS_OPERATION, { towerId: props.towerId, operation: op })
@@ -57,8 +57,9 @@ function applyOp(op: 'derivative' | 'integral') {
         C = {{ tower?.calculusState?.coefficient }}, n = {{ tower?.calculusState?.exponent }}
       </p>
       <div class="op-btns">
-        <button class="btn" @click="applyOp('derivative')">Derivative (f')</button>
-        <button class="btn" @click="applyOp('integral')">Integral (∫f)</button>
+        <button class="btn" @click="applyOp('derivative')">f'</button>
+        <button class="btn" @click="applyOp('derivative2')">f''</button>
+        <button class="btn" @click="applyOp('integral')">∫f</button>
       </div>
     </template>
   </div>

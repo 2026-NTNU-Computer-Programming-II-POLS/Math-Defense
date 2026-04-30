@@ -10,7 +10,7 @@ export interface LimitQuestion {
 
 export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
   const rng = mulberry32(seed)
-  const questionType = Math.floor(rng() * 6)
+  const questionType = Math.floor(rng() * 7)
 
   let fExpr: string
   let outcome: LimitOutcome
@@ -49,10 +49,17 @@ export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
       value = -Infinity
       break
     }
-    default: {
+    case 5: {
       const k = -(Math.floor(rng() * 3) + 1)
       fExpr = `${k}(x - ${a})`
       outcome = '-c'
+      value = k
+      break
+    }
+    default: {
+      const k = Math.floor(rng() * 3) + 1
+      fExpr = `${k}|x - ${a}|`
+      outcome = 'constant'
       value = k
       break
     }

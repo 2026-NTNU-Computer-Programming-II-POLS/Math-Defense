@@ -44,6 +44,7 @@ export interface Tower {
   matrixPairId?: string | null
   limitResult?: LimitResult | null
   calculusState?: CalculusState | null
+  upgradeExtras?: Record<string, number>
 }
 
 export type LimitOutcome = '+inf' | '+c' | 'zero' | 'constant' | '-c' | '-inf'
@@ -124,6 +125,7 @@ export interface Enemy {
   chainRuleAnsweredCorrectly: boolean | null
 
   slowFactor: number
+  slowTimer: number
   speedBoost: number
   dotDamage: number
   dotTimer: number

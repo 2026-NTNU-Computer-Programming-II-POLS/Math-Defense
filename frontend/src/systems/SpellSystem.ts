@@ -1,6 +1,6 @@
 import { Events, GamePhase } from '@/data/constants'
 import { SPELL_MAP, type SpellDef } from '@/data/spell-defs'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { Renderer } from '@/engine/Renderer'
 import type { Enemy } from '@/entities/types'
@@ -72,7 +72,13 @@ export class SpellSystem implements GameSystem {
       if (!enemy.alive) continue
       if (dist(x, y, enemy.x, enemy.y) > radius) continue
       const dmg = damage * game.state.enemyVulnerability
-      enemy.hp -= dmg
+      if (enemy.shield > 0) {
+        const absorbed = Math.min(enemy.shield, dmg)
+        enemy.shield -= absorbed
+        enemy.hp -= dmg - absorbed
+      } else {
+        enemy.hp -= dmg
+      }
       if (enemy.hp <= 0) {
         this._killEnemy(enemy, game)
       }
@@ -83,8 +89,8 @@ export class SpellSystem implements GameSystem {
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
       if (dist(x, y, enemy.x, enemy.y) > radius) continue
-      enemy.slowFactor = factor
-      enemy.dotTimer = (enemy.dotTimer ?? 0) + duration
+      enemy.slowFactor = Math.max(enemy.slowFactor, factor)
+      enemy.slowTimer = Math.max(enemy.slowTimer, duration)
     }
   }
 
@@ -94,7 +100,13 @@ export class SpellSystem implements GameSystem {
       : game.enemies.find((e) => e.alive)
     if (!target) return
     const dmg = damage * game.state.enemyVulnerability
-    target.hp -= dmg
+    if (target.shield > 0) {
+      const absorbed = Math.min(target.shield, dmg)
+      target.shield -= absorbed
+      target.hp -= dmg - absorbed
+    } else {
+      target.hp -= dmg
+    }
     if (target.hp <= 0) {
       this._killEnemy(target, game)
     }

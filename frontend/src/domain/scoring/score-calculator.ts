@@ -36,7 +36,7 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
   }
 
   const exponentDenom = 1 + (2 + input.healthOrigin - input.healthFinal - input.initialAnswer)
-  const exponent = 1 / Math.max(1, exponentDenom)
+  const exponent = 1 / exponentDenom
   const totalScore = Math.pow(Math.max(0, k), exponent)
 
   return {

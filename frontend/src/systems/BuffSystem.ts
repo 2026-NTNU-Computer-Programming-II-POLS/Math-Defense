@@ -1,6 +1,6 @@
 import { Events, TowerType } from '@/data/constants'
 import { PURCHASABLE_BUFFS, type BuffDef } from '@/data/buff-defs'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { ActiveBuffEntry } from '@/engine/GameState'
 

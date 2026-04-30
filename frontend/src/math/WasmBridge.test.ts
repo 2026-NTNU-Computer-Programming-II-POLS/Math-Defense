@@ -54,8 +54,8 @@ describe('WasmBridge (JS fallback)', () => {
 
     // ── JS-vs-WASM boundary parity (bug 2.12) ──
     // The JS fallback uses a 1e-6 epsilon on angle comparisons. WASM (point_in_sector
-    // in math_engine.c) must agree on these exact boundary conditions or stealth
-    // detection / radar sweeps will diverge between platforms.
+    // in math_engine.c) must agree on these exact boundary conditions or radar
+    // sweeps will diverge between platforms.
     describe('boundary parity (must match WASM behaviour)', () => {
       it('point exactly on the radius is inside (dist === radius, not >)', () => {
         // Sector at origin, radius 2, full first quadrant. (2, 0) sits on the arc.

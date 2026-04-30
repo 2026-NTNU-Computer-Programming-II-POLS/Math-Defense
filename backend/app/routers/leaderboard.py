@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 @limiter.limit("30/minute")
 def get_leaderboard(
     request: Request,
-    level: int | None = Query(None, ge=1, le=4),
+    level: int | None = Query(None, ge=1, le=5),
     class_id: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),

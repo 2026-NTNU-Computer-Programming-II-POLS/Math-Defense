@@ -11,7 +11,7 @@ export interface MontyHallState {
   doorCount: number
   prizeIndex: number
   selectedDoor: number | null
-  revealedDoor: number | null
+  revealedDoors: number[]
   reward: MontyHallReward
   phase: 'select' | 'reveal' | 'switch' | 'result'
   won: boolean
@@ -94,7 +94,7 @@ export class MontyHallSystem implements GameSystem {
       doorCount,
       prizeIndex,
       selectedDoor: null,
-      revealedDoor: null,
+      revealedDoors: [],
       reward,
       phase: 'select',
       won: false,
@@ -109,17 +109,22 @@ export class MontyHallSystem implements GameSystem {
     for (let i = 0; i < doorCount; i++) {
       if (i !== selectedDoor && i !== prizeIndex) candidates.push(i)
     }
-    this.current.revealedDoor = candidates[Math.floor(Math.random() * candidates.length)]
+    const revealCount = doorCount - 2
+    for (let r = 0; r < revealCount && candidates.length > 0; r++) {
+      const idx = Math.floor(Math.random() * candidates.length)
+      this.current.revealedDoors.push(candidates[idx])
+      candidates.splice(idx, 1)
+    }
     this.current.phase = 'switch'
   }
 
   private _resolveSwitch(doSwitch: boolean, game: Game): void {
-    if (!this.current || this.current.selectedDoor === null || this.current.revealedDoor === null) return
+    if (!this.current || this.current.selectedDoor === null || this.current.revealedDoors.length === 0) return
 
     let finalDoor = this.current.selectedDoor
     if (doSwitch) {
       for (let i = 0; i < this.current.doorCount; i++) {
-        if (i !== this.current.selectedDoor && i !== this.current.revealedDoor) {
+        if (i !== this.current.selectedDoor && !this.current.revealedDoors.includes(i)) {
           finalDoor = i
           break
         }

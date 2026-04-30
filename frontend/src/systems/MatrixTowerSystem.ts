@@ -115,6 +115,8 @@ export class MatrixTowerSystem {
     if (nearest) {
       tower.matrixPairId = nearest.id
       nearest.matrixPairId = tower.id
+      tower.configured = true
+      nearest.configured = true
     }
   }
 

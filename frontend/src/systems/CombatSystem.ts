@@ -1,6 +1,6 @@
 import { Events, GamePhase, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y, UNIT_PX } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitSlimePolicy'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
 
@@ -53,10 +53,18 @@ export class CombatSystem {
           enemy.dotDamage = 0
         }
       }
+      if (enemy.slowTimer > 0) {
+        enemy.slowTimer -= dt
+        if (enemy.slowTimer <= 0) {
+          enemy.slowTimer = 0
+        }
+      }
       const baseMul = 1 + enemy.speedBoost
       if (enemy.slowFactor > 0) {
         enemy.speedMultiplier = baseMul * (1 - enemy.slowFactor)
-        enemy.slowFactor = 0
+        if (enemy.slowTimer <= 0) {
+          enemy.slowFactor = 0
+        }
       } else {
         enemy.speedMultiplier = baseMul
       }

@@ -327,7 +327,7 @@ class TestUserDeletionCascade:
 def matrix_db(db_session):
     """PG session seeded with the user we hang parametrised sessions off."""
     db_session.add(UserModel(
-        id="u-matrix", username="u_matrix", email="u_matrix@test.local",
+        id="u-matrix", email="u_matrix@test.local",
         player_name="u_matrix", role="student", password_hash="x",
     ))
     db_session.commit()

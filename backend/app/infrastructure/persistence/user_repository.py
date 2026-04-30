@@ -15,10 +15,6 @@ class SqlAlchemyUserRepository:
     def __init__(self, db: DbSession):
         self._db = db
 
-    def find_by_username(self, username: str) -> User | None:
-        row = self._db.query(UserModel).filter(UserModel.username == username).first()
-        return self._to_domain(row) if row else None
-
     def find_by_email(self, email: str) -> User | None:
         row = self._db.query(UserModel).filter(UserModel.email == email.lower()).first()
         return self._to_domain(row) if row else None
@@ -34,7 +30,6 @@ class SqlAlchemyUserRepository:
     def save(self, user: User) -> None:
         row = self._db.query(UserModel).filter(UserModel.id == user.id).first()
         if row:
-            row.username = user.username
             row.email = user.email
             row.player_name = user.player_name
             row.avatar_url = user.avatar_url
@@ -43,7 +38,6 @@ class SqlAlchemyUserRepository:
         else:
             row = UserModel(
                 id=user.id,
-                username=user.username,
                 email=user.email,
                 player_name=user.player_name,
                 avatar_url=user.avatar_url,
@@ -58,7 +52,6 @@ class SqlAlchemyUserRepository:
     def _to_domain(row: UserModel) -> User:
         return User(
             id=row.id,
-            username=row.username,
             email=row.email,
             player_name=row.player_name,
             avatar_url=row.avatar_url,

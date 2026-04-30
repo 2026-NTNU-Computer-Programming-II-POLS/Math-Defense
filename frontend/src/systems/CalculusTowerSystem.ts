@@ -19,7 +19,7 @@ export class CalculusTowerSystem {
       game.eventBus.on(Events.CALCULUS_OPERATION, (payload: {
         towerId: string
         presetIndex?: number
-        operation?: 'derivative' | 'integral'
+        operation?: 'derivative' | 'derivative2' | 'integral'
       }) => {
         const tower = game.towers.find((t) => t.id === payload.towerId)
         if (!tower || tower.type !== TowerType.CALCULUS) return
@@ -72,7 +72,7 @@ export class CalculusTowerSystem {
     return presets
   }
 
-  private _applyOperation(tower: Tower, op: 'derivative' | 'integral', game: Game): void {
+  private _applyOperation(tower: Tower, op: 'derivative' | 'derivative2' | 'integral', game: Game): void {
     const state = tower.calculusState!
     let newCoeff: number
     let newExp: number
@@ -80,6 +80,9 @@ export class CalculusTowerSystem {
     if (op === 'derivative') {
       newCoeff = state.coefficient * state.exponent
       newExp = state.exponent - 1
+    } else if (op === 'derivative2') {
+      newCoeff = state.coefficient * state.exponent * (state.exponent - 1)
+      newExp = state.exponent - 2
     } else {
       newCoeff = state.coefficient / (state.exponent + 1)
       newExp = state.exponent + 1

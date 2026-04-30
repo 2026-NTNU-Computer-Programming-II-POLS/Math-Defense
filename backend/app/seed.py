@@ -36,14 +36,13 @@ def ensure_demo_user(db: Session) -> None:
     result = db.execute(
         text(
             """
-            INSERT INTO users (id, username, email, player_name, role, password_hash, created_at, updated_at)
-            VALUES (:id, :username, :email, :player_name, :role, :password_hash, :created_at, :updated_at)
+            INSERT INTO users (id, email, player_name, role, password_hash, created_at, updated_at)
+            VALUES (:id, :email, :player_name, :role, :password_hash, :created_at, :updated_at)
             ON CONFLICT DO NOTHING
             """
         ),
         {
             "id": str(uuid.uuid4()),
-            "username": DEMO_PLAYER_NAME,
             "email": DEMO_EMAIL,
             "player_name": DEMO_PLAYER_NAME,
             "role": "student",

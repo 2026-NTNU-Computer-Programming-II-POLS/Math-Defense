@@ -21,7 +21,7 @@ const doors = computed(() => {
   return Array.from({ length: state.doorCount }, (_, i) => ({
     index: i,
     isSelected: state.selectedDoor === i,
-    isRevealed: state.revealedDoor === i,
+    isRevealed: state.revealedDoors.includes(i),
     isPrize: state.phase === 'result' && state.prizeIndex === i,
   }))
 })
@@ -96,7 +96,10 @@ function close(): void {
 
       <!-- Switch phase -->
       <p v-if="mhState.phase === 'switch'" class="mh-prompt">
-        Door {{ (mhState.revealedDoor ?? 0) + 1 }} was empty! Do you want to switch?
+        {{ mhState.revealedDoors.length === 1
+          ? `Door ${mhState.revealedDoors[0] + 1} was empty!`
+          : `Doors ${mhState.revealedDoors.map(d => d + 1).join(', ')} were empty!`
+        }} Do you want to switch?
       </p>
 
       <!-- Result phase -->

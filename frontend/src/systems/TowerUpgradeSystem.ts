@@ -60,6 +60,9 @@ export class TowerUpgradeSystem {
     tower.effectiveRange = tower.baseRange * tower.rangeBonus
     tower.talentMods = mods
     tower.cooldown = def.cooldown * (1 - tier.speedBonus) * (1 - talentSpeed)
+    if (tier.extra) {
+      tower.upgradeExtras = { ...(tower.upgradeExtras ?? {}), ...tier.extra }
+    }
   }
 
   private _refund(towerId: string, game: Game): void {
@@ -67,7 +70,7 @@ export class TowerUpgradeSystem {
     if (idx < 0) return
     const tower = game.towers[idx]
     game.towers.splice(idx, 1)
-    game.changeGold(tower.cost)
+    game.changeGold(Math.floor(tower.cost / 2))
     game.getSystem('buff')?.onTowerRemoved(game, towerId)
   }
 
