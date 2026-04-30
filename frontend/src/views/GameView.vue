@@ -155,20 +155,25 @@ watch(() => gameStore.phase, (phase) => {
 // pointer mapping (browsers account for CSS transforms), and DPR handling in
 // `Renderer` all stay untouched.
 const shellRef = ref<HTMLDivElement | null>(null)
-const scale = ref(1)
-const offsetX = ref(0)
-const offsetY = ref(0)
+
+function calcScale(W: number, H: number) {
+  const pad = 2
+  const s = Math.min(1, (W - pad * 2) / 1280, (H - pad * 2) / 720)
+  return { s, ox: Math.floor((W - 1280 * s) / 2), oy: Math.floor((H - 720 * s) / 2) }
+}
+
+const _init = calcScale(window.innerWidth, window.innerHeight)
+const scale = ref(_init.s)
+const offsetX = ref(_init.ox)
+const offsetY = ref(_init.oy)
 
 function recomputeScale(): void {
   const shell = shellRef.value
   if (!shell) return
-  const W = shell.clientWidth
-  const H = shell.clientHeight
-  const pad = 2
-  const s = Math.min(1, (W - pad * 2) / 1280, (H - pad * 2) / 720)
+  const { s, ox, oy } = calcScale(shell.clientWidth, shell.clientHeight)
   scale.value = s
-  offsetX.value = Math.floor((W - 1280 * s) / 2)
-  offsetY.value = Math.floor((H - 720 * s) / 2)
+  offsetX.value = ox
+  offsetY.value = oy
 }
 
 let ro: ResizeObserver | null = null
@@ -194,8 +199,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="shellRef" class="game-shell">
-    <AchievementToast :achievements="newlyUnlockedAchievements" />
-
     <!-- R-5: on portrait phones the 1280×720 world scales down to an
          unusably small strip. Ask the user to rotate — the rest of the
          game stays rendered underneath so landscape resumes instantly. -->
@@ -234,6 +237,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="ready" class="game-overlay">
+      <AchievementToast :achievements="newlyUnlockedAchievements" />
       <HUD />
       <BuildHint />
 
