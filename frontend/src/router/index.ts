@@ -32,7 +32,7 @@ const routes: RouteRecordRaw[] = [
     path: '/game',
     name: 'game',
     component: () => import('@/views/GameView.vue'),
-    meta: { requiresAuth: true, requiresRole: 'student' },
+    meta: { requiresAuth: true},
     beforeEnter: () => {
       try {
         if (!history.state?.level) return { name: 'level-select', replace: true }
