@@ -22,7 +22,8 @@ export function spawnPets(
 
   const trait = traitFromExponent(exponent)
   const isInteger = Number.isInteger(coefficient) && coefficient > 0
-  const count = isInteger ? coefficient : 1
+  const bonusCount = Math.floor(mods['pet_count'] ?? 0)
+  const count = (isInteger ? coefficient : 1) + bonusCount
   const abilityMod = isInteger ? 1 : Math.abs(coefficient)
 
   const dmgMult = 1 + (mods['pet_damage'] ?? 0)

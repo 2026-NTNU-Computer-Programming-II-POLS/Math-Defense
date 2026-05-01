@@ -56,13 +56,14 @@ export class RadarTowerSystem {
 
   private _updateSweep(tower: Tower, dt: number, game: Game): void {
     let angle = this._sweepAngles.get(tower.id) ?? 0
-    const sweepSpeed = 2.0 * (1 + (tower.talentMods['sweep_speed'] ?? 0))
+    const upgradeSweep = tower.upgradeExtras?.['sweepSpeed'] ?? 0
+    const sweepSpeed = 2.0 * (1 + (tower.talentMods['sweep_speed'] ?? 0) + upgradeSweep)
     angle += sweepSpeed * dt
     if (angle > 2 * Math.PI) angle -= 2 * Math.PI
     this._sweepAngles.set(tower.id, angle)
 
-    const range = tower.effectiveRange * tower.rangeBonus
-    const aoeWidth = 0.5
+    const range = tower.effectiveRange
+    const aoeWidth = 0.5 + (tower.upgradeExtras?.['aoeWidth'] ?? 0)
     const arcBonus = this._getArcBonus(tower, angle)
 
     for (const enemy of game.enemies) {
@@ -82,7 +83,7 @@ export class RadarTowerSystem {
     if (tower.cooldownTimer > 0) return
     tower.cooldownTimer = tower.cooldown
 
-    const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0)
+    const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
     const targets = this._findTargets(tower, game, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)
@@ -95,19 +96,20 @@ export class RadarTowerSystem {
     if (tower.cooldownTimer > 0) return
     tower.cooldownTimer = tower.cooldown
 
-    const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0)
+    const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
     const critChance = tower.upgradeExtras?.['critChance'] ?? 0
+    const critDmgBonus = tower.upgradeExtras?.['critDamage'] ?? 0
     const targets = this._findTargets(tower, game, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)
       const isCrit = critChance > 0 && Math.random() < critChance
-      const critMult = isCrit ? 2.0 : 1.0
+      const critMult = isCrit ? 2.0 + critDmgBonus : 1.0
       this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus * critMult, game)
     }
   }
 
   private _findTargets(tower: Tower, game: Game, count: number): Enemy[] {
-    const range = tower.effectiveRange * tower.rangeBonus
+    const range = tower.effectiveRange
     const candidates: { enemy: Enemy; dist: number }[] = []
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue

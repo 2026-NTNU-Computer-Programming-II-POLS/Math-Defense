@@ -18,7 +18,7 @@ export class RadarRangeRenderer {
 
       const px = gameToCanvasX(tower.x)
       const py = gameToCanvasY(tower.y)
-      const radiusPx = tower.effectiveRange * tower.rangeBonus * UNIT_PX
+      const radiusPx = tower.effectiveRange * UNIT_PX
 
       ctx.save()
 

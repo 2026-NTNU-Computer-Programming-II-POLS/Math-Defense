@@ -48,6 +48,15 @@ export class CombatSystem {
           enemy.alive = false
           enemy.active = false
           game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+          if (shouldSplit(enemy) && game.levelContext?.path) {
+            spawnChildren(enemy, {
+              path: game.levelContext.path,
+              onChildCreated: (child) => {
+                game.enemies.push(child)
+                game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+              },
+            })
+          }
         }
         if (enemy.dotTimer <= 0) {
           enemy.dotDamage = 0

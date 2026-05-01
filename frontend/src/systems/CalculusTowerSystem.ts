@@ -115,7 +115,12 @@ export class CalculusTowerSystem {
     tower.disabled = false
 
     this._removePets(tower.id, game)
-    const pets = spawnPets(tower.id, tower.x, tower.y, tower.effectiveRange, newCoeff, newExp, tower.talentMods)
+    const combinedMods = {
+      ...tower.talentMods,
+      pet_hp: (tower.talentMods['pet_hp'] ?? 0) + (tower.upgradeExtras?.['petHp'] ?? 0),
+      pet_count: (tower.talentMods['pet_count'] ?? 0) + (tower.upgradeExtras?.['petCount'] ?? 0),
+    }
+    const pets = spawnPets(tower.id, tower.x, tower.y, tower.effectiveRange, newCoeff, newExp, combinedMods)
     game.pets.push(...pets)
     for (const pet of pets) {
       game.eventBus.emit(Events.PET_SPAWNED, pet)

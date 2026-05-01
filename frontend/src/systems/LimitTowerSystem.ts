@@ -49,7 +49,7 @@ export class LimitTowerSystem {
       const result = tower.limitResult
       if (result.outcome === 'zero' || result.outcome === 'constant') continue
 
-      const range = tower.effectiveRange * tower.rangeBonus
+      const range = tower.effectiveRange
       for (const enemy of game.enemies) {
         if (!enemy.alive) continue
         if (distance(tower.x, tower.y, enemy.x, enemy.y) > range) continue
