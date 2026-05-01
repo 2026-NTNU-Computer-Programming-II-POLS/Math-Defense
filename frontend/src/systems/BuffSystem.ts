@@ -92,10 +92,12 @@ const effectStrategies: Record<string, EffectFn> = {
   HEAL_5: (g) => { g.changeHp(5) },
   HEAL_10: (g) => { g.changeHp(10) },
   HEAL_FULL: (g) => { g.changeHp(g.state.maxHp - g.state.hp) },
-  SHIELD_ACTIVATE: (g) => { g.state.shieldActive = true },
-  SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false },
+  SHIELD_ACTIVATE: (g) => { g.state.shieldActive = true; g.state.shieldHitsRemaining = 3 },
+  SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false; g.state.shieldHitsRemaining = 0 },
   GOLD_MULTIPLIER_DOUBLE: (g) => { g.state.goldMultiplier *= 2 },
+  GOLD_MULTIPLIER_DOUBLE_REVERT: (g) => { g.state.goldMultiplier = Math.max(1, g.state.goldMultiplier / 2) },
   GOLD_MULTIPLIER_TRIPLE: (g) => { g.state.goldMultiplier *= 3 },
+  GOLD_MULTIPLIER_TRIPLE_REVERT: (g) => { g.state.goldMultiplier = Math.max(1, g.state.goldMultiplier / 3) },
   GOLD_MULTIPLIER_RESET: (g) => { g.state.goldMultiplier = 1 },
   FREE_TOWER_NEXT: (g) => { g.state.freeTowerNext = true },
   FREE_TOWER_CLEAR: (g) => { g.state.freeTowerNext = false },
@@ -117,7 +119,13 @@ const effectStrategies: Record<string, EffectFn> = {
     const enemies = [...g.enemies]
     for (const enemy of enemies) {
       if (!enemy.alive) continue
-      enemy.hp -= 50
+      let remaining = 50 * g.state.enemyVulnerability
+      if (enemy.shield > 0) {
+        const absorbed = Math.min(enemy.shield, remaining)
+        enemy.shield -= absorbed
+        remaining -= absorbed
+      }
+      if (remaining > 0) enemy.hp -= remaining
       if (enemy.hp <= 0) {
         enemy.hp = 0
         enemy.alive = false

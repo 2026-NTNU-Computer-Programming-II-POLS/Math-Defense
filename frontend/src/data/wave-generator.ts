@@ -26,7 +26,7 @@ export function buildWavesForStar(starRating: number): WaveDef[] {
         { spawnInterval: 0.9, enemies: [...s(EnemyType.STRONG, 1), ...s(EnemyType.SPLIT, 2), ...s(EnemyType.FAST, 3)] },
         { spawnInterval: 0.8, enemies: [...s(EnemyType.STRONG, 2), ...s(EnemyType.SPLIT, 2), ...s(EnemyType.FAST, 4)] },
         { spawnInterval: 0.7, enemies: [...s(EnemyType.HELPER, 1), ...s(EnemyType.SPLIT, 3), ...s(EnemyType.STRONG, 2), ...s(EnemyType.FAST, 5)] },
-        { spawnInterval: 0.6, enemies: [...s(EnemyType.HELPER, 1), ...s(EnemyType.STRONG, 3), ...s(EnemyType.SPLIT, 3), ...s(EnemyType.FAST, 4)] },
+        { spawnInterval: 2.0, enemies: [...s(EnemyType.HELPER, 1), ...s(EnemyType.STRONG, 3), ...s(EnemyType.FAST, 4), ...s(EnemyType.BOSS_A, 1)] },
       ]
     case 4:
       return [

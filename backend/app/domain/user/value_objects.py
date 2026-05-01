@@ -24,7 +24,7 @@ class Email:
         if not normalised or len(normalised) > EMAIL_MAX_LENGTH:
             raise ValueError(f"Email must be 1-{EMAIL_MAX_LENGTH} characters")
         if not _EMAIL_RE.match(normalised):
-            raise ValueError(f"Invalid email format: {value}")
+            raise ValueError("Invalid email format")
         self._value = normalised
 
     @property

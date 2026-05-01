@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     # secure=True requires HTTPS (modern browsers treat localhost as secure).
     # Disabling this is only honoured under CI/pytest — see validator below.
     cookie_secure: bool = True
+    # Debug mode: enables Swagger /docs and /redoc. Defaults to True only in
+    # test/CI environments so production never exposes the API schema.
+    debug: bool = Field(default_factory=_is_test_env)
     # Double-submit CSRF protection. Defaults ON everywhere except under the
     # pytest/CI harness — SameSite=Lax alone doesn't cover older browsers or
     # GET-mutation edge cases, so production must fail closed. Disabling

@@ -18,6 +18,15 @@ class SqlAlchemyTalentRepository:
         rows = self._db.query(TalentModel).filter(TalentModel.user_id == user_id).all()
         return [self._to_domain(r) for r in rows]
 
+    def find_by_user_for_update(self, user_id: str) -> list[TalentAllocation]:
+        rows = (
+            self._db.query(TalentModel)
+            .filter(TalentModel.user_id == user_id)
+            .with_for_update()
+            .all()
+        )
+        return [self._to_domain(r) for r in rows]
+
     def find_by_user_and_node(self, user_id: str, talent_node_id: str) -> TalentAllocation | None:
         row = (
             self._db.query(TalentModel)

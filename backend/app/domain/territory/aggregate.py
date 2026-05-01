@@ -26,6 +26,7 @@ class TerritoryOccupation:
         score: float,
         occupied_at: datetime | None = None,
         player_name: str | None = None,
+        session_id: str | None = None,
     ) -> None:
         self.id = id
         self.slot_id = slot_id
@@ -33,6 +34,7 @@ class TerritoryOccupation:
         self.score = score
         self.occupied_at = occupied_at or datetime.now(UTC)
         self.player_name = player_name
+        self.session_id = session_id
 
 
 class TerritorySlot:
@@ -166,6 +168,7 @@ class GrabbingTerritoryActivity:
         student_id: str,
         new_score: float,
         student_occupation_count: int,
+        session_id: str | None = None,
     ) -> TerritoryOccupation:
         self.ensure_playable()
 
@@ -178,6 +181,7 @@ class GrabbingTerritoryActivity:
                 )
             current.score = new_score
             current.occupied_at = datetime.now(UTC)
+            current.session_id = session_id
             return current
 
         if current is not None and new_score <= current.score:
@@ -195,6 +199,7 @@ class GrabbingTerritoryActivity:
             slot_id=slot.id,
             student_id=student_id,
             score=new_score,
+            session_id=session_id,
         )
         slot.occupation = occ
         return occ

@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 from app.domain.value_objects import SessionStatus
+from app.shared_constants import INITIAL_GOLD
 
 
 class GameSession(Base):
@@ -32,7 +33,7 @@ class GameSession(Base):
         default=SessionStatus.ACTIVE.value,
     )
     current_wave: Mapped[int] = mapped_column(Integer, default=0)
-    gold: Mapped[int] = mapped_column(Integer, default=200)
+    gold: Mapped[int] = mapped_column(Integer, default=INITIAL_GOLD)
     hp: Mapped[int] = mapped_column(Integer, default=20)
     score: Mapped[int] = mapped_column(Integer, default=0)
     kills: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

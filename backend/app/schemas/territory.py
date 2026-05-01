@@ -1,7 +1,11 @@
+import json
 from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+_PATH_CONFIG_MAX_BYTES = 10_240
 
 
 class SlotDefinition(BaseModel):
@@ -9,6 +13,13 @@ class SlotDefinition(BaseModel):
 
     star_rating: int = Field(ge=1, le=5)
     path_config: dict[str, Any] | None = None
+
+    @field_validator("path_config")
+    @classmethod
+    def path_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is not None and len(json.dumps(v)) > _PATH_CONFIG_MAX_BYTES:
+            raise ValueError(f"path_config exceeds {_PATH_CONFIG_MAX_BYTES} byte limit")
+        return v
 
 
 class CreateActivityRequest(BaseModel):

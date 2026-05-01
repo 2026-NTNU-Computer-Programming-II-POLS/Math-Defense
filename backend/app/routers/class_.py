@@ -59,7 +59,7 @@ def join_class(
     user: User = Depends(require_role(Role.STUDENT)),
     db: Session = Depends(get_db),
 ):
-    membership = build_class_service(db).join_by_code(code=req.code, student_id=user.id)
+    membership = build_class_service(db).join_by_code(code=req.code, student_id=user.id, student_role=user.role)
     return _membership_out(membership)
 
 

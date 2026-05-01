@@ -95,7 +95,8 @@ export class TowerPlacementSystem {
 
     const mods = game.towerModifierProvider?.(selectedType) ?? {}
     const tower = createTower(selectedType, gx, gy, mods)
-    const cost = game.state.freeTowerNext ? 0 : tower.cost
+    const isFree = game.state.freeTowerNext || game.state.freeTowerCharges > 0
+    const cost = isFree ? 0 : tower.cost
 
     if (game.state.gold < cost) {
       game.eventBus.emit(Events.PLACEMENT_REJECTED, { gx, gy, reason: 'insufficient-gold' })
@@ -108,7 +109,12 @@ export class TowerPlacementSystem {
   private _commitPlacement(tower: Tower, cost: number, game: Game): void {
     game.towers.push(tower)
     game.changeGold(-cost)
-    if (game.state.freeTowerNext) game.state.freeTowerNext = false
+    game.addCost(cost)
+    if (game.state.freeTowerNext) {
+      game.state.freeTowerNext = false
+    } else if (game.state.freeTowerCharges > 0) {
+      game.state.freeTowerCharges--
+    }
 
     game.eventBus.emit(Events.TOWER_PLACED, tower)
     this.clearSelectedTowerType()

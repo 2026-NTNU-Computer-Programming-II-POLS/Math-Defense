@@ -71,7 +71,7 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     name: 'Gold Rush',
     description: 'Triple gold from kills for 20s',
     effectId: 'GOLD_MULTIPLIER_TRIPLE',
-    revertId: 'GOLD_MULTIPLIER_RESET',
+    revertId: 'GOLD_MULTIPLIER_TRIPLE_REVERT',
     duration: 20,
   },
   {

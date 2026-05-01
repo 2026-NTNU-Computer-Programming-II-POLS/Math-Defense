@@ -17,7 +17,14 @@ export class EconomySystem implements GameSystem {
     this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
-        if (isShielded(game.state)) return
+        if (isShielded(game.state)) {
+          game.state.shieldHitsRemaining--
+          if (game.state.shieldHitsRemaining <= 0) {
+            game.state.shieldActive = false
+            game.state.shieldHitsRemaining = 0
+          }
+          return
+        }
         if (game.state.hp <= 0) return
         game.changeHp(-(enemy.damage ?? 1))
       }),
@@ -27,7 +34,7 @@ export class EconomySystem implements GameSystem {
         game.addKillValue(enemy.killValue)
         game.addScore(enemy.killValue)
         const reward = (enemy.reward || 15) * game.state.goldMultiplier
-        game.changeGold(reward)
+        game.changeGold(Math.round(reward))
       }),
 
       game.eventBus.on(Events.WAVE_END, () => {

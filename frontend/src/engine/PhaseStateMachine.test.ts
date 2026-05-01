@@ -39,15 +39,20 @@ describe('PhaseStateMachine', () => {
     expect(sm.current).toBe(GamePhase.WAVE)
   })
 
-  it('follows full game lifecycle: MENU → BUILD → WAVE → BUFF → BUILD → WAVE → LEVEL_END', () => {
+  it('follows full game lifecycle: MENU → BUILD → WAVE → BUILD → WAVE → LEVEL_END', () => {
     const sm = new PhaseStateMachine()
     expect(sm.transition(GamePhase.BUILD)).toBe(true)
     expect(sm.transition(GamePhase.WAVE)).toBe(true)
-    expect(sm.transition(GamePhase.BUFF_SELECT)).toBe(true)
     expect(sm.transition(GamePhase.BUILD)).toBe(true)
     expect(sm.transition(GamePhase.WAVE)).toBe(true)
     expect(sm.transition(GamePhase.LEVEL_END)).toBe(true)
     expect(sm.current).toBe(GamePhase.LEVEL_END)
+  })
+
+  it('WAVE → BUFF_SELECT is not a valid transition (phase unimplemented)', () => {
+    const sm = new PhaseStateMachine()
+    sm.forceTransition(GamePhase.WAVE)
+    expect(sm.canTransition(GamePhase.BUFF_SELECT)).toBe(false)
   })
 
   it('WAVE → GAME_OVER is valid', () => {

@@ -48,11 +48,17 @@ class ClassApplicationService:
         cls_.verify_owner(user_id)
 
     def create_class(self, name: str, teacher_id: str) -> Class:
-        with self._uow:
+        last_exc: Exception | None = None
+        for _ in range(5):
             cls_ = Class.create(name=name, teacher_id=teacher_id)
-            self._class_repo.save(cls_)
-            self._uow.commit()
-        return cls_
+            try:
+                with self._uow:
+                    self._class_repo.save(cls_)
+                    self._uow.commit()
+                return cls_
+            except IntegrityError as exc:
+                last_exc = exc
+        raise last_exc  # type: ignore[misc]
 
     def get_class(self, class_id: str) -> Class:
         return self._get_class_or_raise(class_id)
@@ -109,7 +115,9 @@ class ClassApplicationService:
         self._verify_owner_or_admin(cls_, requester_id, requester_role)
         return self._class_repo.find_memberships_by_class(class_id)
 
-    def join_by_code(self, code: str, student_id: str) -> ClassMembership:
+    def join_by_code(self, code: str, student_id: str, student_role: Role = Role.STUDENT) -> ClassMembership:
+        if student_role != Role.STUDENT:
+            raise PermissionDeniedError("Only students can join a class by code")
         cls_ = self._class_repo.find_by_join_code(code.upper().strip())
         if cls_ is None:
             raise InvalidJoinCodeError("Invalid join code")

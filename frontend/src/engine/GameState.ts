@@ -45,6 +45,7 @@ export interface GameState {
 
   // Buff flags
   shieldActive: boolean
+  shieldHitsRemaining: number
   goldMultiplier: number
   freeTowerNext: boolean
   freeTowerCharges: number
@@ -86,6 +87,7 @@ export function createInitialState(): GameState {
     montyHallNextIndex: 0,
     montyHallPending: false,
     shieldActive: false,
+    shieldHitsRemaining: 0,
     goldMultiplier: 1,
     freeTowerNext: false,
     freeTowerCharges: 0,

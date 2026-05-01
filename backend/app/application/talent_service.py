@@ -90,7 +90,7 @@ class TalentApplicationService:
 
         with self._uow:
             earned = self._achievement_repo.sum_talent_points(user_id)
-            alloc_list = self._talent_repo.find_by_user(user_id)
+            alloc_list = self._talent_repo.find_by_user_for_update(user_id)
             spent = self._calculate_spent_points(alloc_list)
             available = earned - spent
 

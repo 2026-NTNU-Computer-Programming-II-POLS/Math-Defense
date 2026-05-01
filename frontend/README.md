@@ -72,8 +72,7 @@ frontend/
 │   │       ├── BuffCardPanel.vue   (Legacy V1 — buff card draw overlay; superseded by ShopPanel)
 │   │       ├── FunctionPanel.vue   (Legacy V1 — quadratic a/b/c input)
 │   │       ├── MatrixInputPanel.vue (Legacy V1 — 2×2 matrix input)
-│   │       ├── IntegralPanel.vue   (Legacy V1 — [a,b] interval input)
-│   │       └── FourierPanel.vue    (Legacy V1 — 3-sine sliders)
+│   │       └── IntegralPanel.vue   (Legacy V1 — [a,b] interval input)
 │   │
 │   ├── composables/
 │   │   ├── useGameLoop.ts          Mount/unmount engine, inject systems, wire UI bridges, talent modifiers
@@ -566,8 +565,8 @@ Vitest is configured with `happy-dom` so systems can be tested without a real br
 The game has its own coordinate system, separate from pixels:
 
 ```
-Game unit (0, 0) = pixel (originX, originY) = pixel (640, 360)
-1 game unit      = 24 pixels (unitPx)
+Game unit (0, 0) = pixel (originX, originY) = pixel (640, 374)
+1 game unit      = 20 pixels (unitPx)
 
 Conversion:
   pixelX = originX + gameX * unitPx

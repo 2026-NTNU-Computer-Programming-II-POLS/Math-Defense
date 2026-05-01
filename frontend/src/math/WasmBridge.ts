@@ -145,10 +145,11 @@ export function matrixMultiply(a: number[], b: number[]): number[] {
 
 export function sectorCoverage(radius: number, angleWidth: number): number {
   const m = _module
+  const clampedAngle = Math.max(0, Math.min(2 * Math.PI, angleWidth))
   if (_useWasm && m) {
-    return m.ccall('sector_coverage', 'number', ['number', 'number'], [radius, angleWidth])
+    return m.ccall('sector_coverage', 'number', ['number', 'number'], [radius, clampedAngle])
   }
-  return 0.5 * radius * radius * angleWidth
+  return 0.5 * radius * radius * clampedAngle
 }
 
 export function pointInSector(

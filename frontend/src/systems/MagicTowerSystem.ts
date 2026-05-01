@@ -47,7 +47,8 @@ export class MagicTowerSystem {
   update(dt: number, game: Game): void {
     if (game.state.phase !== GamePhase.WAVE) return
 
-    // Reset transient magic buff from last frame before any buff tower fires.
+    // Reset all magic buffs before reapplying below — ensures buff clears
+    // on the frame after a buff tower is destroyed or disabled.
     for (const t of game.towers) {
       if (t.magicBuff !== 1) {
         t.magicBuff = 1
@@ -59,16 +60,18 @@ export class MagicTowerSystem {
       if (tower.type !== TowerType.MAGIC || tower.disabled || !tower.configured) continue
       if (tower.magicFunctionIndex === undefined || tower.magicFunctionIndex < 0) continue
 
-      tower.cooldownTimer -= dt
-      if (tower.cooldownTimer > 0) continue
-      tower.cooldownTimer = tower.cooldown
-
       const fn = this.getTowerCurve(tower)
       if (!fn) continue
 
       if (tower.magicMode === 'debuff') {
+        // Debuff: cooldown-gated so DoT doesn't stack every frame.
+        tower.cooldownTimer -= dt
+        if (tower.cooldownTimer > 0) continue
+        tower.cooldownTimer = tower.cooldown
         this._applyDebuff(tower, fn, game)
       } else {
+        // Buff: applied every frame as a persistent zone — effect lasts as
+        // long as the source tower is alive (cleared by the reset above).
         this._applyBuff(tower, fn, game)
       }
     }

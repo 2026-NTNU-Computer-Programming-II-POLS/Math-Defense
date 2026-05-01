@@ -353,9 +353,9 @@ Indexes: `ix_game_session_user_id`; partial unique `uq_one_active_per_user WHERE
 | Column | Type | Notes |
 |---|---|---|
 | `id` | String | UUID primary key |
-| `user_id` | String | FK → User (ON DELETE CASCADE) |
+| `user_id` | String | FK → User (ON DELETE SET NULL), nullable |
 | `session_id` | String | FK → GameSession (ON DELETE SET NULL), unique |
-| `level` | Integer | CHECK 1–4 |
+| `level` | Integer | CHECK 1–5 (stores star_rating of the completed session) |
 | `score`, `kills`, `waves_survived` | Integer | |
 | `created_at` | DateTime | |
 

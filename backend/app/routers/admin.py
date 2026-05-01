@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -16,33 +16,42 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 @limiter.limit("30/minute")
 def list_teachers(
     request: Request,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=200),
     _user: User = Depends(require_role(Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     teachers = build_admin_service(db).list_teachers()
-    return [_to_user_out(t) for t in teachers]
+    start = (page - 1) * per_page
+    return [_to_user_out(t) for t in teachers[start:start + per_page]]
 
 
 @router.get("/students", response_model=list[UserSummaryOut])
 @limiter.limit("30/minute")
 def list_students(
     request: Request,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=200),
     _user: User = Depends(require_role(Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     students = build_admin_service(db).list_students()
-    return [_to_user_out(s) for s in students]
+    start = (page - 1) * per_page
+    return [_to_user_out(s) for s in students[start:start + per_page]]
 
 
 @router.get("/classes", response_model=list[ClassSummaryOut])
 @limiter.limit("30/minute")
 def list_classes(
     request: Request,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=200),
     _user: User = Depends(require_role(Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     classes = build_admin_service(db).list_all_classes()
-    return [_to_class_out(c) for c in classes]
+    start = (page - 1) * per_page
+    return [_to_class_out(c) for c in classes[start:start + per_page]]
 
 
 def _to_user_out(u: User) -> UserSummaryOut:

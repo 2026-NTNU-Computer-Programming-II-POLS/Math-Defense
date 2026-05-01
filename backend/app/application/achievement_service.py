@@ -115,7 +115,7 @@ class AchievementApplicationService:
         if ct == "total_waves":
             return stats.total_waves >= cv
         if ct == "level_cleared_at_star":
-            return session_star >= cv
+            return session_star == cv
         if ct == "all_stars_played":
             return stats.stars_played == {1, 2, 3, 4, 5}
         if ct == "frugal_run":

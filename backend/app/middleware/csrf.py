@@ -30,7 +30,7 @@ _UNSAFE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 _EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register", "/api/auth/logout"}
 
 
-def _mint_csrf_cookie(response) -> None:
+def mint_csrf_cookie(response) -> None:
     response.set_cookie(
         key=CSRF_COOKIE_NAME,
         value=secrets.token_urlsafe(32),
@@ -58,7 +58,7 @@ class CsrfMiddleware(BaseHTTPMiddleware):
                 # response ever refreshes the token (its next mutation is
                 # rejected before reaching the mint branch below).
                 if cookie_token is None:
-                    _mint_csrf_cookie(response)
+                    mint_csrf_cookie(response)
                 return response
 
         response = await call_next(request)
@@ -68,5 +68,5 @@ class CsrfMiddleware(BaseHTTPMiddleware):
         # method, including safe GETs, so a freshly loaded SPA obtains a
         # token from its first page fetch.
         if settings.csrf_enabled and request.cookies.get(CSRF_COOKIE_NAME) is None:
-            _mint_csrf_cookie(response)
+            mint_csrf_cookie(response)
         return response

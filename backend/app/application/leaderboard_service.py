@@ -100,15 +100,15 @@ class LeaderboardApplicationService:
             if existing:
                 raise DuplicateSubmissionError("Score already submitted for this session")
 
-            # Use the session's authoritative level and score — NOT client-
-            # reported values — to prevent score/level forgery (C-01).
+            # Use the session's authoritative level, score, kills, and waves —
+            # NOT client-reported values — to prevent forgery (C-01, M-7).
             entry = LeaderboardEntry(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 level=session.level,
                 score=Score(session.score),
-                kills=kills,
-                waves_survived=waves_survived,
+                kills=session.kills,
+                waves_survived=session.waves_survived,
                 session_id=session_id,
             )
             self._leaderboard_repo.save(entry)
