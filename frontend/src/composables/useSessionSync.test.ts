@@ -65,7 +65,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.clearAllMocks()
     // Pretend the user is logged in so the sync path actually runs
     const auth = useAuthStore()
-    auth.setUser({ id: 'u1', email: 'tester@test.local', player_name: 'tester', role: 'student' })
+    auth.setUser({ id: 'u1', email: 'tester@test.local', player_name: 'tester', role: 'student', avatar_url: null })
 
     // No orphan session at mount
     vi.mocked(sessionService.getActive).mockResolvedValue(null)
@@ -73,7 +73,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.mocked(sessionService.create).mockResolvedValue({
       schema_version: 1,
       id: 'sess-abc',
-      level: 1,
+      star_rating: 1,
       status: 'active',
       current_wave: 0,
       gold: 200,
@@ -90,7 +90,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
       .mockResolvedValueOnce({
         schema_version: 1,
         id: 'sess-abc',
-        level: 1,
+        star_rating: 1,
         status: 'completed',
         current_wave: 5,
         gold: 200,
@@ -180,7 +180,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
       .mockResolvedValueOnce({
         schema_version: 1,
         id: 'sess-abc',
-        level: 1,
+        star_rating: 1,
         status: 'completed',
         current_wave: 5,
         gold: 200,
@@ -216,7 +216,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.mocked(sessionService.end).mockResolvedValueOnce({
       schema_version: 1,
       id: 'sess-abc',
-      level: 1,
+      star_rating: 1,
       status: 'completed',
       current_wave: 5,
       gold: 200,

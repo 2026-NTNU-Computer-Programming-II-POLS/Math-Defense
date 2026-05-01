@@ -51,7 +51,7 @@ function navigateHome(): void {
 // beforeEnter on the game route already blocks entry without level data,
 // so _generatedLevel is always non-null here.
 onBeforeRouteLeave(() => {
-  const activePhases = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
+  const activePhases: GamePhase[] = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
   if (activePhases.includes(gameStore.phase)) {
     return window.confirm('Leave the game? Your current progress will be lost.')
   }
@@ -290,7 +290,6 @@ onBeforeUnmount(() => {
 .game-shell {
   position: fixed;
   inset: 0;
-  overflow: hidden;
   background: #0b0a12;
 }
 
@@ -299,15 +298,16 @@ onBeforeUnmount(() => {
   width: 1280px;
   height: 720px;
   transform-origin: top left;
+  overflow: hidden;
 }
 
 .game-canvas {
+  box-sizing: content-box;
   display: block;
   width: 1280px;
   height: 720px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  border: 2px solid #5a4a2a;
 }
 
 .game-overlay {

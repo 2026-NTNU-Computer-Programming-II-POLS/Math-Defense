@@ -1,5 +1,5 @@
-import { Events, GamePhase } from '@/data/constants'
-import { SPELL_MAP, type SpellDef } from '@/data/spell-defs'
+import { Events } from '@/data/constants'
+import { SPELL_MAP } from '@/data/spell-defs'
 import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { Renderer } from '@/engine/Renderer'

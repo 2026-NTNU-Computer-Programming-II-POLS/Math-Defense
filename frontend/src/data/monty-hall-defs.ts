@@ -1,5 +1,3 @@
-import type { BuffDef } from './buff-defs'
-
 export interface MontyHallThreshold {
   killValue: number
   doorCount: number       // 3-5 doors

@@ -132,23 +132,25 @@ function generatePolynomialThrough(
   y0: number,
   rng: () => number,
 ): PolynomialCurve | null {
-  const bounds = COEFFICIENT_BOUNDS.polynomial[degree]
   switch (degree) {
     case 1: {
-      const slope = randRange(bounds.slope[0], bounds.slope[1], rng)
+      const b1 = COEFFICIENT_BOUNDS.polynomial[1]
+      const slope = randRange(b1.slope[0], b1.slope[1], rng)
       const intercept = y0 - slope * x0
       return { family: 'polynomial', degree: 1, coefficients: [slope, intercept] }
     }
     case 2: {
-      const a = randRange(bounds.a[0], bounds.a[1], rng)
-      const b = randRange(bounds.b[0], bounds.b[1], rng)
+      const b2 = COEFFICIENT_BOUNDS.polynomial[2]
+      const a = randRange(b2.a[0], b2.a[1], rng)
+      const b = randRange(b2.b[0], b2.b[1], rng)
       const c = y0 - a * x0 * x0 - b * x0
       return { family: 'polynomial', degree: 2, coefficients: [a, b, c] }
     }
     case 3: {
-      const a = randRange(bounds.a[0], bounds.a[1], rng)
-      const b = randRange(bounds.b[0], bounds.b[1], rng)
-      const c = randRange(bounds.c[0], bounds.c[1], rng)
+      const b3 = COEFFICIENT_BOUNDS.polynomial[3]
+      const a = randRange(b3.a[0], b3.a[1], rng)
+      const b = randRange(b3.b[0], b3.b[1], rng)
+      const c = randRange(b3.c[0], b3.c[1], rng)
       const d = y0 - a * x0 ** 3 - b * x0 ** 2 - c * x0
       return { family: 'polynomial', degree: 3, coefficients: [a, b, c, d] }
     }

@@ -1,5 +1,5 @@
 import { Events, TowerType } from '@/data/constants'
-import { PURCHASABLE_BUFFS, type BuffDef } from '@/data/buff-defs'
+import { PURCHASABLE_BUFFS } from '@/data/buff-defs'
 import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { ActiveBuffEntry } from '@/engine/GameState'
@@ -240,6 +240,8 @@ export class BuffSystem implements GameSystem {
       game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [...buffs])
     }
   }
+
+  onTowerRemoved(_game: Game, _towerId: string): void {}
 
   render(_renderer: unknown, _game: Game): void {}
 }

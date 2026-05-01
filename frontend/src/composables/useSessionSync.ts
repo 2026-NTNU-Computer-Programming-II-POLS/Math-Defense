@@ -33,7 +33,7 @@ export function useSessionSync() {
   let alertedForFailures = false
   let lastSyncedWave = -1
 
-  async function createSessionWithRetry(levelNum: number, gen: number, game: Game): Promise<string | null> {
+  async function createSessionWithRetry(_levelNum: number, gen: number, game: Game): Promise<string | null> {
     for (let attempt = 0; attempt <= MAX_CREATE_RETRIES; attempt++) {
       if (gen !== createGeneration) return null
       try {

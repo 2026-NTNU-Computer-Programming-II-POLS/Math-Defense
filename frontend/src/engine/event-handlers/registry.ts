@@ -111,14 +111,75 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   ],
 
   // ── Piecewise paths (construction plan Phase 3) ──
-  // SEGMENT_CHANGED: emitted by PathProgressTracker via LevelContext's sink.
-  // Presentation-layer projection `projectPathPanel` (added Phase 5) will
-  // subscribe to keep `gameStore.pathPanel.currentSegmentId` in sync.
   SEGMENT_CHANGED:    [],
-  // PLACEMENT_REJECTED: emitted by TowerPlacementSystem when PlacementPolicy
-  // denies a click. Dev-only console warning lives in useGameLoop; the
-  // user-facing UI feedback hookup lands alongside the Function Panel.
   PLACEMENT_REJECTED: [],
+
+  // ── V2 tower events ──
+  MAGIC_FUNCTION_SELECTED: [
+    { module: 'systems/MagicTowerSystem', handler: 'anonymous', purpose: 'Store selected function index on tower' },
+  ],
+  MAGIC_MODE_CHANGED: [
+    { module: 'systems/MagicTowerSystem', handler: 'anonymous', purpose: 'Toggle debuff/buff mode on magic tower' },
+  ],
+  RADAR_ARC_CHANGED: [
+    { module: 'systems/RadarTowerSystem', handler: 'anonymous', purpose: 'Update arc parameters on radar tower' },
+  ],
+  MATRIX_PAIR_CHANGED: [
+    { module: 'systems/MatrixTowerSystem', handler: 'anonymous', purpose: 'Update matrix pair id on tower' },
+  ],
+  LIMIT_ANSWER: [
+    { module: 'systems/LimitTowerSystem', handler: 'anonymous', purpose: 'Evaluate limit answer and apply result' },
+  ],
+  CALCULUS_OPERATION: [
+    { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Apply calculus operation to tower state' },
+  ],
+  TOWER_UPGRADE: [
+    { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Upgrade tower level and stats' },
+  ],
+  TOWER_REFUND: [
+    { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Refund tower cost and remove it' },
+  ],
+  PET_SPAWNED:  [],
+  PET_KILLED:   [],
+
+  // ── Chain rule / boss ──
+  CHAIN_RULE_START: [],
+  CHAIN_RULE_ANSWER: [
+    { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Score chain rule answer' },
+  ],
+  CHAIN_RULE_END: [],
+  BOSS_SPLIT:    [],
+
+  // ── V2 Phase 4: spells ──
+  SPELL_CAST: [
+    { module: 'systems/SpellSystem', handler: 'anonymous', purpose: 'Execute spell effect on cast' },
+  ],
+  SPELL_EFFECT:         [],
+  SPELL_COOLDOWN_READY: [],
+
+  // ── Monty Hall ──
+  MONTY_HALL_TRIGGER: [
+    { module: 'systems/MontyHallSystem', handler: 'anonymous', purpose: 'Start Monty Hall event' },
+  ],
+  MONTY_HALL_DOOR_SELECTED: [
+    { module: 'systems/MontyHallSystem', handler: 'anonymous', purpose: 'Record door selection and reveal goats' },
+  ],
+  MONTY_HALL_SWITCH_DECISION: [
+    { module: 'systems/MontyHallSystem', handler: 'anonymous', purpose: 'Resolve final door and award reward' },
+  ],
+  MONTY_HALL_RESULT: [],
+
+  // ── Shop / economy ──
+  SHOP_PURCHASE: [
+    { module: 'systems/BuffSystem', handler: 'anonymous', purpose: 'Apply purchased buff from shop' },
+  ],
+  KILL_VALUE_CHANGED:  [],
+  COST_TOTAL_CHANGED:  [],
+
+  // ── Active buffs mirror ──
+  ACTIVE_BUFFS_CHANGED: [
+    { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror active buffs to reactive store' },
+  ],
 })
 
 /**

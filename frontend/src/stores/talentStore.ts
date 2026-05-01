@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { talentService } from '@/services/talentService'
-import type { TalentModifiersOut } from '@/services/talentService'
 import type { TowerType } from '@/data/constants'
 
 export const useTalentStore = defineStore('talent', () => {

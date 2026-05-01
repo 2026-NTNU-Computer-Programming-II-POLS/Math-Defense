@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { STAR_MIN, STAR_MAX } from '@/data/difficulty-defs'
 import { generateLevel } from '@/domain/level/level-generator'
 import { mulberry32 } from '@/math/MathUtils'
-import type { GeneratedLevel } from '@/math/curve-types'
 
 const router = useRouter()
 const selectedStar = ref(1)

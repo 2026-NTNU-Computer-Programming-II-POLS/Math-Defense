@@ -124,6 +124,8 @@ export function createMockTower(overrides?: Partial<Tower>): Tower {
     rangeBonus: 1,
     baseDamage: 20,
     baseRange: 5,
+    talentMods: {},
+    magicBuff: 0,
     color: '#a855f7',
     ...overrides,
   }

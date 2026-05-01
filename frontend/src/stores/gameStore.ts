@@ -4,6 +4,7 @@ import { GamePhase } from '@/data/constants'
 import type { Game } from '@/engine/Game'
 import { Events } from '@/data/constants'
 import type { ActiveBuffEntry } from '@/engine/GameState'
+import type { BuffCard } from '@/data/buff-defs'
 import type { PathSegmentView } from '@/engine/projections/project-path-panel'
 export type { PathSegmentView } from '@/engine/projections/project-path-panel'
 
@@ -41,7 +42,7 @@ export const useGameStore = defineStore('game', () => {
   const pathsVisible = ref(false)
 
   // V1 compat (BuffCardPanel reads this; V2 flow never enters BUFF_SELECT)
-  const buffCards = ref<unknown[]>([])
+  const buffCards = ref<BuffCard[]>([])
 
   // V2 Monty Hall
   const montyHallProgress = ref(0)

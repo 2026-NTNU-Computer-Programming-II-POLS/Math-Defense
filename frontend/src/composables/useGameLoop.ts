@@ -102,6 +102,34 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
     const movement = new MovementSystem()
     movement.setLeadEnemyX = (x: number) => { gameStore.setLeadEnemyX(x) }
 
+    // Register LEVEL_START/END handlers BEFORE addSystem so the level context
+    // is created before TowerPlacementSystem (and other systems) read it.
+    unsubs.push(g.eventBus.on(Events.LEVEL_START, (_levelNum) => {
+      g.levelContext?.dispose()
+      g.levelContext = null
+      gameStore.clearPathPanel()
+
+      if (g.generatedLevel) {
+        g.state.pathsVisible = options.iaResult !== 'ignored'
+        g.state.starRating = g.generatedLevel.starRating
+        g.state.initialAnswer = options.iaResult === 'correct' ? 1 : 0
+        if (options.iaResult === 'paid') {
+          g.changeGold(-50)
+          g.addCost(50)
+        }
+        g.levelContext = createGeneratedLevelContext(g.generatedLevel, g.eventBus)
+        return
+      }
+
+      uiStore.showModal('Level failed to load (K-3)', 'No level configuration available.')
+    }))
+
+    unsubs.push(g.eventBus.on(Events.LEVEL_END, () => {
+      g.levelContext?.dispose()
+      g.levelContext = null
+      gameStore.clearPathPanel()
+    }))
+
     const systems: [string, import('@/engine/Game').GameSystem][] = [
       ['placement', placement],
       ['combat', new CombatSystem()],
@@ -129,35 +157,6 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
       ['spellEffectRenderer', new SpellEffectRenderer()],
     ]
     for (const [name, sys] of systems) g.addSystem(name, sys)
-
-    // V2: Generated level context wiring on LEVEL_START.
-    // For V1 levels (no generatedLevel), nothing is loaded and the game stays
-    // in MENU phase until a level is selected via the legacy LevelCard overlay.
-    unsubs.push(g.eventBus.on(Events.LEVEL_START, (_levelNum) => {
-      g.levelContext?.dispose()
-      g.levelContext = null
-      gameStore.clearPathPanel()
-
-      if (g.generatedLevel) {
-        g.state.pathsVisible = options.iaResult !== 'ignored'
-        g.state.starRating = g.generatedLevel.starRating
-        g.state.initialAnswer = options.iaResult === 'correct' ? 1 : 0
-        if (options.iaResult === 'paid') {
-          g.changeGold(-50)
-          g.addCost(50)
-        }
-        g.levelContext = createGeneratedLevelContext(g.generatedLevel, g.eventBus)
-        return
-      }
-
-      uiStore.showModal('Level failed to load (K-3)', 'No level configuration available.')
-    }))
-
-    unsubs.push(g.eventBus.on(Events.LEVEL_END, () => {
-      g.levelContext?.dispose()
-      g.levelContext = null
-      gameStore.clearPathPanel()
-    }))
 
     unsubs.push(watch(
       () => uiStore.hoveredSegmentId,
@@ -209,7 +208,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
     if (generatedLevel.value) {
       g.generatedLevel = generatedLevel.value
       g.currentWaves = buildWavesForStar(generatedLevel.value.starRating)
-      g.startLevel(-1)
+      g.startLevel(generatedLevel.value.starRating)
     }
     } catch (err) {
       try { g.destroy() } catch { /* ignore cascading teardown failures */ }

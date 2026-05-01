@@ -1,7 +1,7 @@
 """Domain constraints — single source of truth for value bounds.
 
 Imported by Pydantic schemas (shape validation) and by value objects / the
-GameSession aggregate (invariant enforcement) so that "level must be 1..4"
+GameSession aggregate (invariant enforcement) so that "level must be 1..5"
 is encoded exactly once.
 """
 from __future__ import annotations

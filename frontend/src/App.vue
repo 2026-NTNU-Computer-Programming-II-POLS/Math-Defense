@@ -10,7 +10,7 @@ router.afterEach(() => { navigating.value = false })
 </script>
 
 <template>
-  <div class="app-root" :aria-busy="String(navigating)">
+  <div class="app-root" :aria-busy="navigating">
     <div v-if="navigating" class="nav-progress" aria-hidden="true" />
     <RouterView v-slot="{ Component }">
       <Transition name="fade" mode="out-in">

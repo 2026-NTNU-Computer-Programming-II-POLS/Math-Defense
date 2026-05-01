@@ -2,7 +2,7 @@ import { Events, GamePhase, TowerType } from '@/data/constants'
 import { hashStr, mulberry32 } from '@/math/RandomUtils'
 import { spawnPets } from '@/entities/PetFactory'
 import type { Game } from '@/engine/Game'
-import type { Tower, Pet, CalculusState } from '@/entities/types'
+import type { Tower } from '@/entities/types'
 
 export interface MonomialPreset {
   coefficient: number
