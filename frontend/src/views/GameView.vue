@@ -121,13 +121,7 @@ watch(() => gameStore.hp, (hp) => {
 })
 
 watch(() => gameStore.phase, (phase) => {
-  if (phase === GamePhase.LEVEL_END) {
-    uiStore.showModal(
-      'Victory!',
-      `Score: ${formatScore(gameStore.score)}  Kills: ${gameStore.kills}`,
-      navigateAfterGame,
-    )
-  } else if (phase === GamePhase.GAME_OVER) {
+  if (phase === GamePhase.GAME_OVER) {
     uiStore.showModal(
       'Game Over',
       `Survived ${gameStore.wave} waves · Score: ${formatScore(gameStore.score)}`,
@@ -289,7 +283,7 @@ onBeforeUnmount(() => {
       <!-- Score Result (Victory) -->
       <ScoreResultView
         v-if="gameStore.phase === GamePhase.LEVEL_END"
-        @close="navigateHome"
+        @close="navigateAfterGame"
       />
 
       <!-- Chain Rule Challenge (Boss Type-B) -->

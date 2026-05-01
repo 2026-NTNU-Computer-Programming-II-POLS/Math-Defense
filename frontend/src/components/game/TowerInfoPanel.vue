@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { TOWER_DEFS } from '@/data/tower-defs'
@@ -13,6 +13,7 @@ import CalculusPanel from './CalculusPanel.vue'
 
 const gameStore = useGameStore()
 const uiStore = useUiStore()
+const confirmingRefund = ref(false)
 
 const tower = computed(() => {
   const id = uiStore.buildPanelTowerId
@@ -20,6 +21,8 @@ const tower = computed(() => {
   const engine = gameStore.getEngine()
   return engine?.towers.find((t) => t.id === id) ?? null
 })
+
+watch(() => uiStore.buildPanelTowerId, () => { confirmingRefund.value = false })
 
 const towerDef = computed(() =>
   tower.value ? TOWER_DEFS[tower.value.type] : null,
@@ -45,12 +48,20 @@ function close() {
   uiStore.closeBuildPanel()
 }
 
-function refundTower() {
+function requestRefund() {
+  confirmingRefund.value = true
+}
+
+function cancelRefund() {
+  confirmingRefund.value = false
+}
+
+function confirmRefund() {
   const engine = gameStore.getEngine()
   const t = tower.value
   if (!engine || !t) return
-  if (!confirm(`Refund ${towerDef.value?.nameEn ?? 'this tower'}? You will receive half the cost back.`)) return
   engine.eventBus.emit(Events.TOWER_REFUND, { towerId: t.id })
+  confirmingRefund.value = false
   uiStore.closeBuildPanel()
 }
 
@@ -92,12 +103,20 @@ const isRadar = computed(() => {
     <CalculusPanel v-else-if="tower.type === TowerType.CALCULUS" :tower-id="tower.id" />
 
     <div class="panel-actions">
-      <button
-        v-if="canRefund"
-        class="btn refund-btn"
-        :aria-label="`Refund ${towerDef?.nameEn ?? 'tower'} for half cost`"
-        @click="refundTower"
-      >⟲ Refund</button>
+      <template v-if="canRefund && !confirmingRefund">
+        <button
+          class="btn refund-btn"
+          :aria-label="`Refund ${towerDef?.nameEn ?? 'tower'} for half cost`"
+          @click="requestRefund"
+        >⟲ Refund</button>
+      </template>
+      <template v-if="confirmingRefund">
+        <div class="refund-confirm">
+          <span class="refund-prompt">Refund for half cost?</span>
+          <button class="btn refund-yes" @click="confirmRefund">Yes</button>
+          <button class="btn refund-no" @click="cancelRefund">No</button>
+        </div>
+      </template>
 
       <button
         v-if="upgradeInfo && upgradeInfo.cost > 0"
@@ -157,6 +176,13 @@ const isRadar = computed(() => {
   border-color: var(--hp-red); color: var(--hp-red);
 }
 .refund-btn:hover { background: var(--hp-red); color: var(--stone-dark); }
+.refund-confirm {
+  display: flex; align-items: center; gap: 6px; flex: 1;
+}
+.refund-prompt { font-size: 11px; color: var(--hp-red); white-space: nowrap; }
+.refund-yes { font-size: 10px; padding: 6px 10px; min-height: 32px; border-color: var(--hp-red); color: var(--hp-red); }
+.refund-yes:hover { background: var(--hp-red); color: var(--stone-dark); }
+.refund-no { font-size: 10px; padding: 6px 10px; min-height: 32px; }
 .upgrade-btn { flex: 1; font-size: 11px; padding: 8px 12px; }
 .upgrade-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 

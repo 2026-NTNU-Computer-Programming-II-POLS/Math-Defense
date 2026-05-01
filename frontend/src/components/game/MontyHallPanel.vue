@@ -153,7 +153,7 @@ function close(): void {
 .monty-hall-panel {
   background: linear-gradient(135deg, #1a1520, #252030);
   border: 2px solid var(--gold);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 24px 32px;
   text-align: center;
   min-width: 360px;
@@ -188,7 +188,7 @@ function close(): void {
   width: 64px;
   height: 80px;
   border: 2px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(139, 115, 66, 0.2);
   color: #e8dcc8;
   cursor: pointer;

@@ -22,11 +22,18 @@ onBeforeUnmount(() => {
   _unsubClick = null
 })
 
+function shortName(name: string): string {
+  const words = name.split(/\s+/)
+  if (words.length >= 2) return words.map(w => w[0]).join('').toUpperCase()
+  return name.slice(0, 3)
+}
+
 const spells = computed(() =>
   SPELL_DEFS.map((s) => {
     const cd = g.spellCooldowns[s.id] ?? 0
     return {
       ...s,
+      abbrev: shortName(s.name),
       onCooldown: cd > 0,
       cooldownPct: cd > 0 ? (cd / s.cooldown) * 100 : 0,
       cooldownLabel: cd > 0 ? Math.ceil(cd) + 's' : '',
@@ -74,7 +81,7 @@ defineExpose({ castingSpell, castAtPosition })
       :aria-label="`${spell.name}, costs ${spell.cost} gold${spell.onCooldown ? `, on cooldown ${spell.cooldownLabel}` : ''}`"
       @click="selectSpell(spell.id)"
     >
-      <span class="spell-icon">{{ spell.name[0] }}</span>
+      <span class="spell-icon">{{ spell.abbrev }}</span>
       <span v-if="spell.onCooldown" class="cd-overlay" :style="{ height: `${spell.cooldownPct}%` }" />
       <span v-if="spell.onCooldown" class="cd-label">{{ spell.cooldownLabel }}</span>
       <span class="spell-cost">{{ spell.cost }}</span>
@@ -98,7 +105,7 @@ defineExpose({ castingSpell, castAtPosition })
   color: var(--spell-color, #888);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 16px;
+  font-size: 12px;
   font-weight: bold;
   overflow: hidden;
   transition: background 120ms, transform 80ms;
