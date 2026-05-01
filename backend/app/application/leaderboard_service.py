@@ -13,7 +13,7 @@ from app.domain.errors import (
     PermissionDeniedError,
     SessionValidationError,
 )
-from app.domain.value_objects import Level, Score, SessionStatus
+from app.domain.value_objects import Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.leaderboard.view import RankedLeaderboardEntry
 from app.utils.integrity import is_constraint_violation

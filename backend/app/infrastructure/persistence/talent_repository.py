@@ -1,7 +1,7 @@
 """SQLAlchemy implementation of TalentRepository"""
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC
 
 from sqlalchemy.orm import Session as DbSession
 

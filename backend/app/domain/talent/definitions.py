@@ -4,7 +4,7 @@ Each talent node upgrades a specific tower attribute permanently across sessions
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
