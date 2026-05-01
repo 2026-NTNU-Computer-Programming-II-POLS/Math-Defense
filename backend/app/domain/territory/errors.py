@@ -28,3 +28,7 @@ class ScoreNotHighEnoughError(DomainError):
 
 class NotActivityOwnerError(DomainError):
     status_code = 403
+
+
+class InvalidSessionError(DomainError):
+    status_code = 422

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 
@@ -10,28 +10,28 @@ const store = useTerritoryStore()
 const activityId = computed(() => route.params.id as string)
 const slotId = computed(() => route.params.slotId as string)
 
-const score = ref(0)
+const submitting = ref(true)
 const result = ref<{ seized: boolean; score: number } | null>(null)
-const submitting = ref(false)
+const noSession = ref(false)
 
-function resetState(): void {
-  result.value = null
-  submitting.value = false
-  const q = route.query.score
-  score.value = q ? Number(q) : 0
-}
+onMounted(async () => {
+  const sessionId = history.state?.sessionId as string | undefined
+  if (!sessionId) {
+    noSession.value = true
+    submitting.value = false
+    return
+  }
 
-async function submitPlay(): Promise<void> {
-  if (score.value <= 0 || submitting.value) return
-  submitting.value = true
-  const res = await store.playSlot(activityId.value, slotId.value, score.value)
+  const res = await store.playSlot(activityId.value, slotId.value, sessionId)
   if (res) {
     result.value = { seized: res.seized, score: res.occupation.score }
   }
   submitting.value = false
-}
+})
 
-watch(() => route.params.slotId, resetState, { immediate: true })
+function goBack(): void {
+  router.push({ name: 'territory-detail', params: { id: activityId.value } })
+}
 </script>
 
 <template>
@@ -39,29 +39,26 @@ watch(() => route.params.slotId, resetState, { immediate: true })
     <div class="result-panel rune-panel">
       <h2 class="result-title">Territory Challenge</h2>
 
-      <div v-if="store.errorPlay" class="error-msg">{{ store.errorPlay }}</div>
+      <div v-if="submitting" class="loading">Submitting result…</div>
 
-      <template v-if="!result">
-        <div class="score-input-section">
-          <label class="score-label">Your Score</label>
-          <input v-model.number="score" type="number" class="rune-input score-input" min="1" step="1" />
-          <button class="btn" :disabled="submitting || score <= 0" @click="submitPlay">
-            {{ submitting ? 'Submitting…' : 'Submit Score' }}
-          </button>
-        </div>
-      </template>
+      <div v-else-if="noSession" class="error-msg">
+        No game session found. Please play a territory slot from the activity page.
+      </div>
 
-      <template v-else>
+      <div v-else-if="store.errorPlay" class="error-msg">{{ store.errorPlay }}</div>
+
+      <template v-else-if="result">
         <div :class="['result-box', result.seized ? 'success' : 'failure']">
           <div class="result-text">
             {{ result.seized ? 'Territory Seized!' : 'Score Not High Enough' }}
           </div>
-          <div class="result-score">Score: {{ result.score.toFixed(0) }}</div>
-        </div>
-        <div class="result-actions">
-          <button class="btn" @click="router.push(`/territory/${activityId}`)">Back to Activity</button>
+          <div class="result-score">Score: {{ result.score.toFixed(2) }}</div>
         </div>
       </template>
+
+      <div class="result-actions">
+        <button class="btn" @click="goBack">Back to Activity</button>
+      </div>
     </div>
   </div>
 </template>
@@ -89,17 +86,8 @@ watch(() => route.params.slotId, resetState, { immediate: true })
   letter-spacing: 3px;
 }
 
-.error-msg { font-size: 11px; color: var(--enemy-red); }
-
-.score-input-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
-.score-label { font-size: 11px; color: var(--axis); }
-.score-input { width: 100%; text-align: center; font-size: 18px; }
+.error-msg { font-size: 11px; color: var(--enemy-red); text-align: center; }
+.loading { font-size: 11px; color: var(--axis); text-align: center; }
 
 .result-box {
   display: flex;

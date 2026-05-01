@@ -1,11 +1,26 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { SPELL_DEFS } from '@/data/spell-defs'
 import { Events } from '@/data/constants'
 
 const g = useGameStore()
 const castingSpell = ref<string | null>(null)
+let _unsubClick: (() => void) | null = null
+
+onMounted(() => {
+  const engine = g.getEngine()
+  if (!engine) return
+  _unsubClick = engine.eventBus.on(Events.CANVAS_CLICK, ({ game: gp }) => {
+    if (!castingSpell.value) return
+    castAtPosition(gp.x, gp.y)
+  })
+})
+
+onBeforeUnmount(() => {
+  _unsubClick?.()
+  _unsubClick = null
+})
 
 const spells = computed(() =>
   SPELL_DEFS.map((s) => {

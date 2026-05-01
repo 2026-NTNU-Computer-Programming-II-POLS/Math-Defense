@@ -90,7 +90,7 @@ def play_territory(
         activity_id=activity_id,
         slot_id=slot_id,
         student_id=user.id,
-        score=req.score,
+        session_id=req.session_id,
     )
     return PlayResultOut(
         seized=result["seized"],

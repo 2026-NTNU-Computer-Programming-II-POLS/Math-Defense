@@ -24,6 +24,7 @@ export function useSessionSync() {
   const authStore = useAuthStore()
   const uiStore = useUiStore()
   const sessionId = ref<string | null>(null)
+  const lastCompletedSessionId = ref<string | null>(null)
   const syncing = ref(false)
   const newlyUnlockedAchievements = ref<UnlockedAchievement[]>([])
   let pendingLevel: number | null = null
@@ -200,6 +201,7 @@ export function useSessionSync() {
       if (result.newly_unlocked_achievements?.length) {
         newlyUnlockedAchievements.value = result.newly_unlocked_achievements
       }
+      lastCompletedSessionId.value = id
       sessionId.value = null
       pendingLevel = null
     } catch (e) {
@@ -207,5 +209,5 @@ export function useSessionSync() {
     }
   }
 
-  return { sessionId, newlyUnlockedAchievements, bind }
+  return { sessionId, lastCompletedSessionId, newlyUnlockedAchievements, bind }
 }

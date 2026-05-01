@@ -1,8 +1,6 @@
 from datetime import datetime
 from typing import Any
 
-import math
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -33,14 +31,7 @@ class CreateActivityRequest(BaseModel):
 class PlayTerritoryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    score: float = Field(gt=0)
-
-    @field_validator("score")
-    @classmethod
-    def score_finite(cls, v: float) -> float:
-        if not math.isfinite(v):
-            raise ValueError("Score must be a finite number")
-        return v
+    session_id: str = Field(min_length=1, max_length=100)
 
 
 class OccupationOut(BaseModel):

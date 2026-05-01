@@ -14,6 +14,7 @@ const options = ref<AnswerOption[]>([])
 const selectedIndex = ref<number | null>(null)
 const answered = ref(false)
 const iaResult = ref<'correct' | 'wrong' | 'paid' | 'ignored' | null>(null)
+const territoryContext = ref<string | undefined>(undefined)
 
 onMounted(() => {
   const raw = history.state?.level
@@ -21,6 +22,7 @@ onMounted(() => {
     router.replace({ name: 'level-select' })
     return
   }
+  territoryContext.value = history.state?.territoryContext as string | undefined
   level.value = JSON.parse(raw) as GeneratedLevel
   const seed = history.state?.seed ?? Date.now()
   const rng = mulberry32(seed + 1)
@@ -71,6 +73,7 @@ function startGame() {
     state: {
       level: JSON.stringify(level.value),
       iaResult: iaResult.value,
+      territoryContext: territoryContext.value,
     },
   })
 }

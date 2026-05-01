@@ -97,6 +97,7 @@ def build_territory_service(db: "DbSession") -> TerritoryApplicationService:
     return TerritoryApplicationService(
         territory_repo=SqlAlchemyTerritoryRepository(db),
         class_repo=SqlAlchemyClassRepository(db),
+        session_repo=SqlAlchemySessionRepository(db),
         uow=SqlAlchemyUnitOfWork(db),
     )
 

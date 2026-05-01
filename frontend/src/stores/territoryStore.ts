@@ -65,10 +65,10 @@ export const useTerritoryStore = defineStore('territory', () => {
     }
   }
 
-  async function playSlot(activityId: string, slotId: string, score: number): Promise<PlayResult | null> {
+  async function playSlot(activityId: string, slotId: string, sessionId: string): Promise<PlayResult | null> {
     errorPlay.value = ''
     try {
-      return await territoryService.playTerritory(activityId, slotId, score)
+      return await territoryService.playTerritory(activityId, slotId, sessionId)
     } catch (e) {
       errorPlay.value = e instanceof Error ? e.message : 'Failed to play territory'
       return null

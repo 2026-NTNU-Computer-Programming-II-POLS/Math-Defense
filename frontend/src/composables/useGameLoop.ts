@@ -53,7 +53,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
   const loadError = ref<string | null>(null)
   const gameStore = useGameStore()
   const uiStore = useUiStore()
-  const { bind: bindSession, newlyUnlockedAchievements } = useSessionSync()
+  const { bind: bindSession, newlyUnlockedAchievements, lastCompletedSessionId } = useSessionSync()
   const unsubs: (() => void)[] = []
 
   async function boot(): Promise<void> {
@@ -252,5 +252,5 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
     }
   })
 
-  return { game, ready, loadError, retry, pathsVisible, generatedLevel, newlyUnlockedAchievements }
+  return { game, ready, loadError, retry, pathsVisible, generatedLevel, newlyUnlockedAchievements, lastCompletedSessionId }
 }

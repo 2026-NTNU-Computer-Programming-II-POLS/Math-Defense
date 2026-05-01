@@ -9,12 +9,15 @@ from app.domain.class_.errors import ClassNotFoundError
 from app.domain.territory.aggregate import GrabbingTerritoryActivity
 from app.domain.territory.errors import (
     ActivityNotFoundError,
+    InvalidSessionError,
     ScoreNotHighEnoughError,
     SlotNotFoundError,
 )
 from app.domain.user.value_objects import Role
+from app.domain.value_objects import SessionStatus
 
 if TYPE_CHECKING:
+    from app.domain.session.repository import GameSessionRepository
     from app.domain.territory.repository import TerritoryRepository
     from app.domain.class_.repository import ClassRepository
     from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -28,10 +31,12 @@ class TerritoryApplicationService:
         self,
         territory_repo: TerritoryRepository,
         class_repo: ClassRepository,
+        session_repo: GameSessionRepository,
         uow: SqlAlchemyUnitOfWork,
     ) -> None:
         self._territory_repo = territory_repo
         self._class_repo = class_repo
+        self._session_repo = session_repo
         self._uow = uow
 
     def _get_activity_or_raise(self, activity_id: str) -> GrabbingTerritoryActivity:
@@ -115,24 +120,40 @@ class TerritoryApplicationService:
         slots = self._territory_repo.find_slots_by_activity(activity_id)
         return {"activity": activity, "slots": slots}
 
+    def _validate_session(
+        self, session_id: str, student_id: str, slot_star_rating: int,
+    ) -> float:
+        session = self._session_repo.find_by_id(session_id, student_id)
+        if session is None:
+            raise InvalidSessionError("Game session not found")
+        if session.status != SessionStatus.COMPLETED:
+            raise InvalidSessionError("Game session is not completed")
+        if session.total_score is None or session.total_score <= 0:
+            raise InvalidSessionError("Game session has no valid score")
+        if int(session.level) != slot_star_rating:
+            raise InvalidSessionError(
+                f"Session difficulty ({int(session.level)}) does not match "
+                f"slot requirement ({slot_star_rating})"
+            )
+        return session.total_score
+
     def play_territory(
         self,
         activity_id: str,
         slot_id: str,
         student_id: str,
-        score: float,
+        session_id: str,
     ) -> dict:
         with self._uow:
             activity = self._get_activity_or_raise(activity_id)
 
-            # Lock the occupation row first to serialise concurrent plays on the same slot.
             occ_from_db = self._territory_repo.find_occupation_by_slot_for_update(slot_id)
 
-            # Slot metadata (star_rating, path_config) is immutable after creation, so
-            # no row-level lock is needed — only the occupation can change concurrently.
             slot = self._territory_repo.find_slot_by_id(slot_id)
             if slot is None or slot.activity_id != activity_id:
                 raise SlotNotFoundError("Territory slot not found in this activity")
+
+            score = self._validate_session(session_id, student_id, slot.star_rating)
 
             slot.occupation = occ_from_db
 
@@ -144,8 +165,6 @@ class TerritoryApplicationService:
             try:
                 occupation = activity.attempt_occupation(slot, student_id, score, effective_count)
             except ScoreNotHighEnoughError:
-                # Score too low — territory not seized. UoW __exit__ rolls back,
-                # releasing the FOR UPDATE lock. Return current holder's occupation.
                 return {"seized": False, "occupation": occ_from_db}
 
             if occ_from_db and occ_from_db.student_id != occupation.student_id:

@@ -35,8 +35,12 @@ const _generatedLevel = _rawLevel
 const _iaResult = (_rawIa === 'correct' || _rawIa === 'wrong' || _rawIa === 'paid' || _rawIa === 'ignored')
   ? _rawIa
   : null
+const _rawTerritoryCtx = history.state?.territoryContext as string | undefined
+const _territoryContext = _rawTerritoryCtx
+  ? (() => { try { return JSON.parse(_rawTerritoryCtx) as { activityId: string; slotId: string } } catch { return null } })()
+  : null
 
-const { game, ready, loadError, retry, newlyUnlockedAchievements } = useGameLoop(canvasRef, {
+const { game, ready, loadError, retry, newlyUnlockedAchievements, lastCompletedSessionId } = useGameLoop(canvasRef, {
   generatedLevel: _generatedLevel,
   iaResult: _iaResult,
 })
@@ -45,6 +49,33 @@ function navigateHome(): void {
   router.push({ name: 'menu' }).catch((err) => {
     console.warn('[GameView] Navigation failed:', err)
   })
+}
+
+function navigateAfterGame(): void {
+  if (_territoryContext && lastCompletedSessionId.value) {
+    router.push({
+      name: 'territory-play',
+      params: { id: _territoryContext.activityId, slotId: _territoryContext.slotId },
+      state: { sessionId: lastCompletedSessionId.value },
+    }).catch((err) => {
+      console.warn('[GameView] Territory navigation failed:', err)
+    })
+  } else {
+    navigateHome()
+  }
+}
+
+function navigateAfterLoss(): void {
+  if (_territoryContext) {
+    router.push({
+      name: 'territory-detail',
+      params: { id: _territoryContext.activityId },
+    }).catch((err) => {
+      console.warn('[GameView] Territory-detail navigation failed:', err)
+    })
+  } else {
+    navigateHome()
+  }
 }
 
 // Warn before navigating away mid-game (progress would be lost).
@@ -94,13 +125,13 @@ watch(() => gameStore.phase, (phase) => {
     uiStore.showModal(
       'Victory!',
       `Score: ${formatScore(gameStore.score)}  Kills: ${gameStore.kills}`,
-      navigateHome,
+      navigateAfterGame,
     )
   } else if (phase === GamePhase.GAME_OVER) {
     uiStore.showModal(
       'Game Over',
       `Survived ${gameStore.wave} waves · Score: ${formatScore(gameStore.score)}`,
-      navigateHome,
+      navigateAfterLoss,
     )
   }
 })
