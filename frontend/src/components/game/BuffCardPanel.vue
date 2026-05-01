@@ -147,7 +147,7 @@ function skipBuff(): void {
     @keydown="onKeydown"
   >
     <div ref="panelRef" class="buff-panel rune-panel" tabindex="-1">
-      <h3 class="buff-title">⊕ 機率神殿 — 選擇命運</h3>
+      <h3 class="buff-title">⊕ Shrine of Fate — Choose Your Destiny</h3>
 
       <p v-if="cards.length === 0" class="empty-state">
         No buff cards available this round — skip to continue.
@@ -169,7 +169,7 @@ function skipBuff(): void {
           <div class="card-desc">{{ card.description }}</div>
           <div class="card-footer">
             <span v-if="card.isCurse" class="card-reward">
-              + {{ (card as { goldReward?: number }).goldReward ?? 0 }} 金
+              + {{ (card as { goldReward?: number }).goldReward ?? 0 }} Gold
             </span>
             <span v-else class="card-cost">
               {{ card.cost > 0 ? `⬡ ${card.cost}` : 'Free' }}
@@ -229,6 +229,7 @@ function skipBuff(): void {
   padding: 16px;
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--grid-line);
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s, background 0.15s;

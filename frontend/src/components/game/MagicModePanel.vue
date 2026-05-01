@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
-import { generateMagicCandidates } from '@/domain/tower/magic-candidates'
 import type { MagicMode } from '@/data/tower-defs'
 
 const props = defineProps<{ towerId: string }>()
@@ -13,11 +12,7 @@ const tower = computed(() => {
   return engine?.towers.find((t) => t.id === props.towerId) ?? null
 })
 
-const candidates = computed(() => {
-  const t = tower.value
-  if (!t) return []
-  return generateMagicCandidates(t.id, t.x, t.y)
-})
+const candidates = computed(() => gameStore.getMagicCandidates(props.towerId))
 
 function selectFunction(index: number) {
   const engine = gameStore.getEngine()

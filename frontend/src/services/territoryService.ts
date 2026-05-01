@@ -68,8 +68,8 @@ export const territoryService = {
     return api.get<ActivityDetail>(`/api/activities/${id}`)
   },
 
-  playTerritory(activityId: string, slotId: string, score: number) {
-    return api.post<PlayResult>(`/api/activities/${activityId}/slots/${slotId}/play`, { score })
+  playTerritory(activityId: string, slotId: string, sessionId: string) {
+    return api.post<PlayResult>(`/api/activities/${activityId}/slots/${slotId}/play`, { session_id: sessionId })
   },
 
   getRankings(activityId: string) {

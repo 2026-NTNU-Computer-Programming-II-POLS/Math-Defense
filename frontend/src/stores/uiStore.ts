@@ -72,8 +72,8 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function _showErrorFallback(): void {
-    modalTitle.value = '發生錯誤'
-    modalMessage.value = '操作未能完成，請再試一次。'
+    modalTitle.value = 'Error'
+    modalMessage.value = 'The operation could not be completed. Please try again.'
     modalCallback.value = null
     modalVisible.value = true
   }

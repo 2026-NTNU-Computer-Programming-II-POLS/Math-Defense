@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
+import { generateLevel } from '@/domain/level/level-generator'
+import { mulberry32 } from '@/math/MathUtils'
 import TerritorySlotCard from '@/components/territory/TerritorySlotCard.vue'
 
 const router = useRouter()
@@ -20,7 +22,21 @@ const canSettle = computed(() => {
 const settling = ref(false)
 
 function handlePlay(slotId: string): void {
-  router.push({ name: 'territory-play', params: { id: activityId.value, slotId } })
+  const slot = detail.value?.slots.find(s => s.id === slotId)
+  if (!slot) return
+
+  const seed = Date.now()
+  const rng = mulberry32(seed)
+  const level = generateLevel(slot.star_rating, rng)
+
+  router.push({
+    name: 'initial-answer',
+    state: {
+      level: JSON.stringify(level),
+      seed,
+      territoryContext: JSON.stringify({ activityId: activityId.value, slotId }),
+    },
+  })
 }
 
 async function handleSettle(): Promise<void> {

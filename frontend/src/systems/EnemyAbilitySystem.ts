@@ -43,7 +43,7 @@ export class EnemyAbilitySystem implements GameSystem {
         this._tickMinionSpawn(dt, enemy, game)
       }
 
-      if (enemy.type === EnemyType.BOSS_B && !enemy.chainRuleTriggered) {
+      if (enemy.type === EnemyType.BOSS_B && !enemy.chainRuleTriggered && enemy.hp <= enemy.maxHp * 0.5) {
         this._triggerChainRule(enemy, game)
       }
     }
@@ -89,6 +89,7 @@ export class EnemyAbilitySystem implements GameSystem {
     if (payload.correct) {
       boss.alive = false
       boss.active = false
+      game.eventBus.emit(Events.ENEMY_KILLED, boss)
       this._splitBoss(boss, question, game)
     }
 

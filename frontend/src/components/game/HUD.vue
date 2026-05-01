@@ -211,7 +211,11 @@ onBeforeUnmount(() => {
   gap: 24px;
   font-family: var(--font-mono);
   z-index: var(--z-chrome);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
+.hud::-webkit-scrollbar { display: none; }
 
 .hud-row2 {
   position: absolute;
@@ -231,6 +235,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hud-label {

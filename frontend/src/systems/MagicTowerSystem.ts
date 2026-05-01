@@ -84,6 +84,7 @@ export class MagicTowerSystem {
       const curveY = fn(enemy.x)
       if (Math.abs(enemy.y - curveY) < zoneWidth) {
         enemy.slowFactor = Math.max(enemy.slowFactor, 0.4)
+        enemy.slowTimer = dotDuration
         enemy.dotDamage = tower.effectiveDamage * strengthMult
         enemy.dotTimer = dotDuration
       }

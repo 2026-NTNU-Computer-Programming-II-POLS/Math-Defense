@@ -115,7 +115,7 @@ function submit(index: number) {
 .chain-rule-card {
   background: var(--stone-dark);
   border: 2px solid var(--panel-border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 24px 32px;
   max-width: 520px;
   width: 90%;
@@ -136,7 +136,7 @@ function submit(index: number) {
 
 .expression {
   background: var(--stone-light);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 16px;
   margin-bottom: 20px;
 }
@@ -152,7 +152,7 @@ function submit(index: number) {
   border: 1px solid var(--grid-line);
   color: var(--text-secondary);
   padding: 12px 8px;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   transition: background 0.15s, border-color 0.15s;

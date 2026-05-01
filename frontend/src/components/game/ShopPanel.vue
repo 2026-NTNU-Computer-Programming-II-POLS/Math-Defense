@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { PURCHASABLE_BUFFS } from '@/data/buff-defs'
 import { Events } from '@/data/constants'
 
 const g = useGameStore()
+const collapsed = ref(false)
 
 const items = computed(() =>
   PURCHASABLE_BUFFS.map((b) => ({
@@ -22,9 +23,12 @@ function purchase(itemId: string, cost: number): void {
 </script>
 
 <template>
-  <div class="shop-panel">
-    <h3 class="shop-title">Shop</h3>
-    <div class="shop-grid">
+  <div class="shop-panel" :class="{ collapsed }">
+    <h3 class="shop-title" @click="collapsed = !collapsed">
+      <span>Shop</span>
+      <span class="collapse-icon">{{ collapsed ? '▶' : '▼' }}</span>
+    </h3>
+    <div v-if="!collapsed" class="shop-grid">
       <button
         v-for="item in items"
         :key="item.id"
@@ -66,8 +70,14 @@ function purchase(itemId: string, cost: number): void {
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 0 0 8px;
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
 }
+.shop-panel.collapsed .shop-title { margin-bottom: 0; }
+.collapse-icon { font-size: 9px; color: var(--axis); }
 
 .shop-grid {
   display: flex;

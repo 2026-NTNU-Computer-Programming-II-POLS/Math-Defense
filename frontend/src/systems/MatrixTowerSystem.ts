@@ -1,5 +1,6 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 
@@ -55,10 +56,10 @@ export class MatrixTowerSystem {
       const baseDamage = tower.x * pair.x + tower.y * pair.y
       if (baseDamage <= 0) continue
 
-      const overlapRange = Math.min(tower.effectiveRange, pair.effectiveRange)
       const mods = tower.talentMods
-      const rampRate = 0.5 * (1 + (mods['damage_ramp'] ?? 0))
-      const count = 1 + Math.floor(mods['target_count'] ?? 0)
+      const upgradeRamp = tower.upgradeExtras?.['rampRate'] ?? 0
+      const rampRate = 0.5 * (1 + (mods['damage_ramp'] ?? 0) + upgradeRamp)
+      const count = 1 + Math.floor(mods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
 
       const pairKey = [tower.id, pair.id].sort().join(':')
       let laser = this._lasers.get(pairKey)
@@ -75,7 +76,7 @@ export class MatrixTowerSystem {
       // Acquire new targets up to the talent-modified count
       if (aliveIds.length < count) {
         const existing = new Set(aliveIds)
-        const more = this._findOverlapTargets(tower, pair, overlapRange, count, game)
+        const more = this._findOverlapTargets(tower, pair, count, game)
           .filter(t => !existing.has(t.id))
           .slice(0, count - aliveIds.length)
         if (more.length > 0 && aliveIds.length === 0) laser.rampTime = 0
@@ -98,7 +99,8 @@ export class MatrixTowerSystem {
 
   getLaserState(towerId: string): LaserState | undefined {
     for (const [key, state] of this._lasers) {
-      if (key.includes(towerId)) return state
+      const [a, b] = key.split(':')
+      if (a === towerId || b === towerId) return state
     }
     return undefined
   }
@@ -120,13 +122,13 @@ export class MatrixTowerSystem {
     }
   }
 
-  private _findOverlapTargets(a: Tower, b: Tower, range: number, count: number, game: Game): Enemy[] {
+  private _findOverlapTargets(a: Tower, b: Tower, count: number, game: Game): Enemy[] {
     const candidates: { enemy: Enemy; dist: number }[] = []
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
       const da = distance(a.x, a.y, enemy.x, enemy.y)
       const db = distance(b.x, b.y, enemy.x, enemy.y)
-      if (da > range || db > range) continue
+      if (da > a.effectiveRange || db > b.effectiveRange) continue
       candidates.push({ enemy, dist: da })
     }
     candidates.sort((x, y) => x.dist - y.dist)
@@ -135,12 +137,31 @@ export class MatrixTowerSystem {
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
     if (!enemy.alive) return
-    enemy.hp -= amount
+
+    let remaining = amount * game.state.enemyVulnerability
+    if (enemy.shield > 0) {
+      const absorbed = Math.min(enemy.shield, remaining)
+      enemy.shield -= absorbed
+      remaining -= absorbed
+    }
+    if (remaining > 0) {
+      enemy.hp -= remaining
+    }
+
     if (enemy.hp <= 0) {
       enemy.hp = 0
       enemy.alive = false
       enemy.active = false
       game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+      if (shouldSplit(enemy) && game.levelContext?.path) {
+        spawnChildren(enemy, {
+          path: game.levelContext.path,
+          onChildCreated: (child) => {
+            game.enemies.push(child)
+            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+          },
+        })
+      }
     }
   }
 

@@ -74,7 +74,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Radian intervals, arc sectors',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { targetCount: 1 } },
-      { ...UPGRADE_TIER_3, extra: { targetCount: 1 } },
+      { ...UPGRADE_TIER_3, extra: { targetCount: 2 } },
     ],
   },
   [TowerType.RADAR_C]: {
@@ -91,7 +91,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Radian intervals, arc sectors',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { critChance: 0.1 } },
-      { ...UPGRADE_TIER_3, extra: { critChance: 0.2 } },
+      { ...UPGRADE_TIER_3, extra: { critChance: 0.2, critDamage: 0.5 } },
     ],
   },
   [TowerType.MATRIX]: {
@@ -108,7 +108,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Dot product, vectors',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { rampRate: 0.2 } },
-      { ...UPGRADE_TIER_3, extra: { rampRate: 0.4 } },
+      { ...UPGRADE_TIER_3, extra: { rampRate: 0.4, targetCount: 1 } },
     ],
   },
   [TowerType.LIMIT]: {
@@ -137,6 +137,9 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 3,
     description: 'Choose a function, then derivative or integral. Result C*x^n spawns C pets with trait based on n.',
     mathConcept: 'Derivatives, integrals, power rule',
-    upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
+    upgrades: [
+      { ...UPGRADE_TIER_2, extra: { petHp: 0.25 } },
+      { ...UPGRADE_TIER_3, extra: { petHp: 0.5, petCount: 1 } },
+    ],
   },
 }

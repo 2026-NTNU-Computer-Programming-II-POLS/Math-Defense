@@ -62,7 +62,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
       <table class="breakdown">
         <tbody>
           <tr>
-            <td class="label">Kill Value</td>
+            <td class="label">Enemies Defeated</td>
             <td class="value">{{ g.cumulativeKillValue }}</td>
           </tr>
           <tr>
@@ -70,32 +70,28 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
             <td class="value">{{ fmt(breakdown.activeTime) }}s</td>
           </tr>
           <tr>
-            <td class="label">Cost Total</td>
+            <td class="label">Gold Spent</td>
             <td class="value">{{ g.costTotal }}</td>
           </tr>
           <tr class="formula">
-            <td class="label">S1 (kill/time)</td>
+            <td class="label">Speed Bonus</td>
             <td class="value">{{ fmt(breakdown.s1) }}</td>
           </tr>
           <tr class="formula">
-            <td class="label">S2 (kill/cost)</td>
+            <td class="label">Efficiency Bonus</td>
             <td class="value">{{ fmt(breakdown.s2) }}</td>
           </tr>
           <tr class="formula">
-            <td class="label">K (m={{ breakdown.mUsed }})</td>
+            <td class="label">Combo Multiplier</td>
             <td class="value">{{ fmt(breakdown.k) }}</td>
           </tr>
           <tr>
-            <td class="label">Exponent</td>
-            <td class="value">{{ fmt(breakdown.exponent) }}</td>
+            <td class="label">HP Remaining</td>
+            <td class="value">{{ g.hp }} / {{ g.healthOrigin }}</td>
           </tr>
           <tr>
-            <td class="label">HP {{ g.healthOrigin }} → {{ g.hp }}</td>
-            <td class="value">-{{ g.healthOrigin - g.hp }}</td>
-          </tr>
-          <tr>
-            <td class="label">IA</td>
-            <td class="value">{{ g.initialAnswer }}</td>
+            <td class="label">Initial Answer</td>
+            <td class="value">{{ g.initialAnswer === 1 ? 'Correct' : 'Wrong' }}</td>
           </tr>
         </tbody>
       </table>
@@ -124,7 +120,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 .score-panel {
   background: linear-gradient(135deg, #1a1520, #252030);
   border: 2px solid var(--gold);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 24px 40px;
   text-align: center;
   min-width: 340px;

@@ -79,7 +79,7 @@ function canAfford(cost: number): boolean {
           { unaffordable: !canAfford(def.cost) },
           { shaking: shakingType === def.type },
         ]"
-        :data-tooltip="`${def.description} — ${def.mathConcept} · 費用：${def.cost} 金`"
+        :data-tooltip="`${def.description} — ${def.mathConcept} · Cost: ${def.cost} gold`"
         :aria-label="`${def.nameEn}, ${def.mathConcept}, cost ${def.cost} gold${canAfford(def.cost) ? '' : ', unaffordable'}`"
         :aria-pressed="uiStore.selectedTowerType === def.type"
         :aria-disabled="!canAfford(def.cost)"
@@ -134,6 +134,7 @@ function canAfford(cost: number): boolean {
   gap: 3px; padding: 8px 12px;
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--grid-line);
+  border-radius: 6px;
   cursor: pointer;
   min-width: 90px;
   flex: 0 0 auto;
@@ -184,8 +185,7 @@ function canAfford(cost: number): boolean {
 }
 
 .tower-icon { font-size: 18px; }
-/* T-2: bump label sizes above the 12px accessibility floor. */
-.tower-name { font-size: 11px; color: #e8dcc8; letter-spacing: 1px; }
+.tower-name { font-size: 12px; color: #e8dcc8; letter-spacing: 1px; }
 .tower-cost { font-size: 12px; color: var(--gold); }
 .cost-red   { color: var(--hp-red); }
 
@@ -202,7 +202,7 @@ function canAfford(cost: number): boolean {
   padding: 6px 10px;
   background: rgba(20, 16, 28, 0.96);
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   color: #e8dcc8;
   font-size: 11px;
   line-height: 1.4;

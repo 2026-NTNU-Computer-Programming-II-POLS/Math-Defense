@@ -35,7 +35,7 @@ export class CombatSystem {
       if (!enemy.alive) continue
       if (enemy.dotTimer > 0) {
         enemy.dotTimer -= dt
-        const dotDmg = enemy.dotDamage * dt
+        const dotDmg = enemy.dotDamage * dt * game.state.enemyVulnerability
         if (enemy.shield > 0) {
           const absorbed = Math.min(enemy.shield, dotDmg)
           enemy.shield -= absorbed
@@ -48,6 +48,15 @@ export class CombatSystem {
           enemy.alive = false
           enemy.active = false
           game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+          if (shouldSplit(enemy) && game.levelContext?.path) {
+            spawnChildren(enemy, {
+              path: game.levelContext.path,
+              onChildCreated: (child) => {
+                game.enemies.push(child)
+                game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+              },
+            })
+          }
         }
         if (enemy.dotTimer <= 0) {
           enemy.dotDamage = 0
@@ -107,7 +116,7 @@ export class CombatSystem {
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
     if (!enemy.alive) return
 
-    let remaining = amount
+    let remaining = amount * game.state.enemyVulnerability
     if (enemy.shield > 0) {
       const absorbed = Math.min(enemy.shield, remaining)
       enemy.shield -= absorbed
