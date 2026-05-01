@@ -1,8 +1,9 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { hashStr, mulberry32 } from '@/math/RandomUtils'
 import { spawnPets } from '@/entities/PetFactory'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
-import type { Tower } from '@/entities/types'
+import type { Tower, Enemy } from '@/entities/types'
 
 export interface MonomialPreset {
   coefficient: number
@@ -184,13 +185,37 @@ export class PetCombatSystem {
 
       if (!target) continue
 
-      target.hp -= pet.damage
-      if (target.hp <= 0) {
-        target.hp = 0
-        target.alive = false
-        target.active = false
-        game.eventBus.emit(Events.ENEMY_KILLED, target)
-        pet.targetId = null
+      this._dealDamage(target, pet.damage, game)
+      if (!target.alive) pet.targetId = null
+    }
+  }
+
+  private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
+    if (!enemy.alive) return
+
+    let remaining = amount * game.state.enemyVulnerability
+    if (enemy.shield > 0) {
+      const absorbed = Math.min(enemy.shield, remaining)
+      enemy.shield -= absorbed
+      remaining -= absorbed
+    }
+    if (remaining > 0) {
+      enemy.hp -= remaining
+    }
+
+    if (enemy.hp <= 0) {
+      enemy.hp = 0
+      enemy.alive = false
+      enemy.active = false
+      game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+      if (shouldSplit(enemy) && game.levelContext?.path) {
+        spawnChildren(enemy, {
+          path: game.levelContext.path,
+          onChildCreated: (child) => {
+            game.enemies.push(child)
+            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+          },
+        })
       }
     }
   }

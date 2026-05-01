@@ -165,4 +165,4 @@ if _SECRET_KEY_SOURCE == "unset":
     # explicit ERROR guards against a future default that masks the miss.
     _logger.error("SECRET_KEY not found in environment or .env file")
 else:
-    _logger.info("SECRET_KEY loaded from %s", _SECRET_KEY_SOURCE)
+    _logger.info("SECRET_KEY loaded successfully")

@@ -2,6 +2,7 @@ import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { hashStr } from '@/math/RandomUtils'
 import { generateLimitQuestion } from '@/math/limit-evaluator'
+import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, LimitResult } from '@/entities/types'
 
@@ -57,18 +58,39 @@ export class LimitTowerSystem {
         switch (result.outcome) {
           case '+inf': dmg = tower.effectiveDamage * 3; break
           case '+c': dmg = tower.effectiveDamage * Math.abs(result.value); break
-          case '-c': enemy.hp += tower.effectiveDamage * Math.abs(result.value) * 0.5; continue
-          case '-inf': enemy.hp += tower.effectiveDamage * 2; continue
+          case '-c':
+            enemy.hp = Math.min(enemy.maxHp, enemy.hp + tower.effectiveDamage * Math.abs(result.value) * 0.5)
+            continue
+          case '-inf':
+            enemy.hp = Math.min(enemy.maxHp, enemy.hp + tower.effectiveDamage * 2)
+            continue
           default: dmg = 0
         }
 
         if (dmg > 0) {
-          enemy.hp -= dmg
+          let remaining = dmg * game.state.enemyVulnerability
+          if (enemy.shield > 0) {
+            const absorbed = Math.min(enemy.shield, remaining)
+            enemy.shield -= absorbed
+            remaining -= absorbed
+          }
+          if (remaining > 0) {
+            enemy.hp -= remaining
+          }
           if (enemy.hp <= 0) {
             enemy.hp = 0
             enemy.alive = false
             enemy.active = false
             game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+            if (shouldSplit(enemy) && game.levelContext?.path) {
+              spawnChildren(enemy, {
+                path: game.levelContext.path,
+                onChildCreated: (child) => {
+                  game.enemies.push(child)
+                  game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+                },
+              })
+            }
           }
         }
       }

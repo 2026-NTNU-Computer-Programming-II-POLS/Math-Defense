@@ -7,6 +7,8 @@ import type { ActiveBuffEntry } from '@/engine/GameState'
 import type { BuffCard } from '@/data/buff-defs'
 import type { PathSegmentView } from '@/engine/projections/project-path-panel'
 export type { PathSegmentView } from '@/engine/projections/project-path-panel'
+import { generateMagicCandidates, type MagicCandidate } from '@/domain/tower/magic-candidates'
+export type { MagicCandidate } from '@/domain/tower/magic-candidates'
 
 export interface PathPanelState {
   readonly segments: ReadonlyArray<PathSegmentView>
@@ -206,6 +208,12 @@ export const useGameStore = defineStore('game', () => {
     return _game
   }
 
+  function getMagicCandidates(towerId: string): MagicCandidate[] {
+    const tower = _game?.towers.find((t) => t.id === towerId)
+    if (!tower) return []
+    return generateMagicCandidates(towerId, tower.x, tower.y)
+  }
+
   return {
     phase, level, starRating, wave, totalWaves,
     gold, hp, maxHp, score, kills, cumulativeKillValue, enemiesAlive, buffCards,
@@ -215,6 +223,6 @@ export const useGameStore = defineStore('game', () => {
     pathPanel,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, isMontyHall, hpPercent, activeTime,
-    bindEngine, unbindEngine, syncFromEngine, getEngine,
+    bindEngine, unbindEngine, syncFromEngine, getEngine, getMagicCandidates,
   }
 })
