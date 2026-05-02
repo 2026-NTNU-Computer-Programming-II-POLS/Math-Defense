@@ -9,6 +9,7 @@ import type { Tower, LimitResult } from '@/entities/types'
 export class LimitTowerSystem {
   private _unsubs: (() => void)[] = []
   private _questionSeed = 0
+  private _levelSeedNonce = 0
 
   init(game: Game): void {
     this.destroy()
@@ -21,7 +22,8 @@ export class LimitTowerSystem {
         this._applyLimitEffect(tower, answer, game)
       }),
       game.eventBus.on(Events.LEVEL_START, () => {
-        this._questionSeed = Date.now()
+        this._levelSeedNonce += 1
+        this._questionSeed = Date.now() + this._levelSeedNonce
       }),
     )
   }
