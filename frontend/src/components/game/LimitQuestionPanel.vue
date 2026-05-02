@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
 import { outcomeLabel } from '@/math/limit-evaluator'
@@ -12,9 +12,13 @@ const gameStore = useGameStore()
 const answered = ref(false)
 
 const tower = computed(() => {
+  void gameStore.level
   const engine = gameStore.getEngine()
   return engine?.towers.find((t) => t.id === props.towerId) ?? null
 })
+
+watch(() => props.towerId, () => { answered.value = false })
+watch(tower, (t) => { if (!t) answered.value = false })
 
 const question = computed(() => {
   const t = tower.value
@@ -36,7 +40,10 @@ function answer(choice: LimitResult) {
   <div class="limit-panel">
     <template v-if="question && !answered && !tower?.limitResult">
       <p class="question-text">
-        Evaluate: lim {{ question.fExpr }} / (x - {{ question.a }}) as x → {{ question.a }}
+        Given: {{ question.fExpr }}
+      </p>
+      <p class="question-text">
+        Evaluate: lim [f(x) / (x - {{ question.a }})] as x → {{ question.a }}
       </p>
       <div class="choices">
         <button

@@ -56,7 +56,7 @@ export class LimitTowerSystem {
 
         let dmg: number
         switch (result.outcome) {
-          case '+inf': dmg = tower.effectiveDamage * 3; break
+          case '+inf': dmg = tower.effectiveDamage * 5; break
           case '+c': dmg = tower.effectiveDamage * Math.abs(result.value); break
           case '-c':
             enemy.hp = Math.min(enemy.maxHp, enemy.hp + tower.effectiveDamage * Math.abs(result.value) * 0.5)

@@ -10,7 +10,7 @@ export interface LimitQuestion {
 
 export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
   const rng = mulberry32(seed)
-  const questionType = Math.floor(rng() * 7)
+  const questionType = Math.floor(rng() * 8)
 
   let fExpr: string
   let outcome: LimitOutcome
@@ -56,11 +56,18 @@ export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
       value = k
       break
     }
-    default: {
-      const k = Math.floor(rng() * 3) + 1
-      fExpr = `${k}|x - ${a}|`
+    case 6: {
+      const c = Math.floor(rng() * 4) + 2
+      fExpr = `${c}`
       outcome = 'constant'
-      value = k
+      value = c
+      break
+    }
+    default: {
+      const k = Math.floor(rng() * 4) + 1
+      fExpr = `${k}(x - ${a})³`
+      outcome = 'zero'
+      value = 0
       break
     }
   }
@@ -72,29 +79,25 @@ export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
 }
 
 function generateDistractors(correct: LimitResult, rng: () => number): LimitResult[] {
-  const allOutcomes: LimitResult[] = [
-    correct,
+  const pool: LimitResult[] = [
     { outcome: '+inf', value: Infinity },
     { outcome: '-inf', value: -Infinity },
     { outcome: 'zero', value: 0 },
-    { outcome: '+c', value: Math.floor(rng() * 5) + 1 },
-    { outcome: '-c', value: -(Math.floor(rng() * 5) + 1) },
-  ]
+    { outcome: 'constant', value: Math.floor(rng() * 4) + 2 },
+    { outcome: '+c', value: Math.floor(rng() * 4) + 1 },
+    { outcome: '-c', value: -(Math.floor(rng() * 3) + 1) },
+  ].filter(r => r.outcome !== correct.outcome)
 
-  const unique = allOutcomes.filter((r, i) =>
-    i === 0 || r.outcome !== correct.outcome,
-  )
-
-  for (let i = unique.length - 1; i > 1; i--) {
-    const j = 1 + Math.floor(rng() * i)
-    ;[unique[i], unique[j]] = [unique[j], unique[i]]
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j], pool[i]]
   }
 
-  const choices = unique.slice(0, 4)
-  const insertIdx = Math.floor(rng() * choices.length)
-  const correctIdx = choices.indexOf(correct)
-  if (correctIdx > 0) {
-    [choices[correctIdx], choices[insertIdx]] = [choices[insertIdx], choices[correctIdx]]
+  const choices: LimitResult[] = [correct, ...pool.slice(0, 3)]
+
+  for (let i = choices.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[choices[i], choices[j]] = [choices[j], choices[i]]
   }
 
   return choices
@@ -102,12 +105,12 @@ function generateDistractors(correct: LimitResult, rng: () => number): LimitResu
 
 export function outcomeLabel(r: LimitResult): string {
   switch (r.outcome) {
-    case '+inf': return '+∞'
-    case '-inf': return '-∞'
-    case 'zero': return '0'
-    case '+c': return `+${r.value}`
-    case '-c': return `${r.value}`
-    case 'constant': return `${r.value} (constant)`
+    case '+inf': return '+∞ (max damage)'
+    case '-inf': return '-∞ (max heal)'
+    case 'zero': return '0 (tower removed)'
+    case '+c': return `+${r.value} (damage)`
+    case '-c': return `${r.value} (heal)`
+    case 'constant': return 'Limit undefined (disabled)'
     default: {
       const _exhaustive: never = r.outcome
       return String(_exhaustive)

@@ -138,7 +138,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     range: 8,
     cooldown: 3.0,
     unlockLevel: 3,
-    description: 'Answer lim f(x)/(x-a) as x→a. Result determines tower effect: +∞ = max damage, 0 = removed.',
+    description: 'Answer: lim [f(x)/(x-a)] as x→a. Effects: +∞=max dmg, +C=dmg, 0=removed, const=disabled, -C=heal, -∞=max heal.',
     mathConcept: 'Limits, L\'Hôpital\'s rule',
     upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
   },
