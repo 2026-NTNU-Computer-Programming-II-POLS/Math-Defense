@@ -49,7 +49,10 @@ async function handlePlay(slotId: string): Promise<void> {
       )
       if (!ok) return
     }
-  } catch { /* non-critical — proceed if the check fails */ }
+  } catch (error) {
+    // non-critical — proceed if the check fails
+    console.error('Failed to check active session:', error)
+  }
 
   // Stable seed derived from the slot id so every student faces the same level
   const seed = stringHash(slotId)
