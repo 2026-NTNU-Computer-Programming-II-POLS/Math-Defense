@@ -79,14 +79,14 @@ export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
 }
 
 function generateDistractors(correct: LimitResult, rng: () => number): LimitResult[] {
-  const pool: LimitResult[] = [
+  const pool: LimitResult[] = (([
     { outcome: '+inf', value: Infinity },
     { outcome: '-inf', value: -Infinity },
     { outcome: 'zero', value: 0 },
     { outcome: 'constant', value: Math.floor(rng() * 4) + 2 },
     { outcome: '+c', value: Math.floor(rng() * 4) + 1 },
     { outcome: '-c', value: -(Math.floor(rng() * 3) + 1) },
-  ].filter(r => r.outcome !== correct.outcome)
+  ] as LimitResult[]).filter(r => r.outcome !== correct.outcome))
 
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1))
