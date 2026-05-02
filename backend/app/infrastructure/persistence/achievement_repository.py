@@ -1,7 +1,7 @@
 """SQLAlchemy implementation of AchievementRepository"""
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC
 
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert

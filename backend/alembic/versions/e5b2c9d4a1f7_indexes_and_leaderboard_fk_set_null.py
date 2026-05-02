@@ -11,7 +11,6 @@ BE-10: index on login_attempts.locked_until (janitor purge scan)
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 
 
 revision: str = 'e5b2c9d4a1f7'
