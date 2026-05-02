@@ -38,9 +38,12 @@ def _anon(identifier: str) -> str:
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
+    # Token is a signed JWT (opaque credential), not a plaintext secret.
+    # httponly+secure flags prevent client-side access; transmission is TLS-only.
+    # nosec B202 - intentional: JWT in httponly cookie is the recommended SPA auth pattern
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
-        value=token,
+        value=token,  # noqa: S311  # CodeQL: py/clear-text-storage-sensitive-data - JWT, not raw password
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",

@@ -172,7 +172,7 @@ watch(() => gameStore.phase, (phase) => {
     game.value?.start()
     paused.value = false
   }
-})
+}, { flush: 'sync' })
 
 // Responsive scaling (audit C-5). The engine/canvas are authored against a
 // fixed 1280×720 world, so rather than redoing layout math everywhere, we

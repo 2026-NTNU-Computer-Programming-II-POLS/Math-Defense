@@ -1,6 +1,6 @@
 import { Events, TowerType } from '@/data/constants'
 import { PURCHASABLE_BUFFS } from '@/data/buff-defs'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
+import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { ActiveBuffEntry } from '@/engine/GameState'
 
@@ -119,28 +119,7 @@ const effectStrategies: Record<string, EffectFn> = {
     const enemies = [...g.enemies]
     for (const enemy of enemies) {
       if (!enemy.alive) continue
-      let remaining = 50 * g.state.enemyVulnerability
-      if (enemy.shield > 0) {
-        const absorbed = Math.min(enemy.shield, remaining)
-        enemy.shield -= absorbed
-        remaining -= absorbed
-      }
-      if (remaining > 0) enemy.hp -= remaining
-      if (enemy.hp <= 0) {
-        enemy.hp = 0
-        enemy.alive = false
-        enemy.active = false
-        g.eventBus.emit(Events.ENEMY_KILLED, enemy)
-        if (shouldSplit(enemy)) {
-          spawnChildren(enemy, {
-            path: g.levelContext?.path ?? null,
-            onChildCreated: (child) => {
-              g.enemies.push(child)
-              g.eventBus.emit(Events.ENEMY_SPAWNED, child)
-            },
-          })
-        }
-      }
+      applyDamage(enemy, 50, g)
     }
   },
   DISABLE_RANDOM_TOWER: (g) => {
@@ -173,11 +152,13 @@ export class BuffSystem implements GameSystem {
       }),
 
       game.eventBus.on(Events.LEVEL_START, () => {
+        const surviving: typeof game.state.activeBuffs = []
         for (const buff of game.state.activeBuffs) {
+          if (buff.survivesLevelStart) { surviving.push(buff); continue }
           if (buff.revertId) applyEffect(buff.revertId, game)
         }
-        game.state.activeBuffs = []
-        game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [])
+        game.state.activeBuffs = surviving
+        game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [...surviving])
       }),
     )
   }
@@ -193,7 +174,7 @@ export class BuffSystem implements GameSystem {
     return this._purchaseBuff(buffId, def.cost, game)
   }
 
-  applyExternalBuff(effectId: string, revertId: string | undefined, duration: number, name: string, game: Game): void {
+  applyExternalBuff(effectId: string, revertId: string | undefined, duration: number, name: string, game: Game, survivesLevelStart = false): void {
     applyEffect(effectId, game)
     if (duration > 0) {
       game.state.activeBuffs.push({
@@ -203,6 +184,7 @@ export class BuffSystem implements GameSystem {
         revertId,
         remainingTime: duration,
         totalDuration: duration,
+        survivesLevelStart,
       })
       game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [...game.state.activeBuffs])
     }

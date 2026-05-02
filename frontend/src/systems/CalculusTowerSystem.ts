@@ -1,7 +1,7 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { hashStr, mulberry32 } from '@/math/RandomUtils'
 import { spawnPets } from '@/entities/PetFactory'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
+import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 
@@ -91,7 +91,10 @@ export class CalculusTowerSystem {
 
     if (newCoeff === 0 || (op === 'derivative' && state.exponent === 0)) {
       const idx = game.towers.findIndex((t) => t.id === tower.id)
-      if (idx >= 0) game.towers.splice(idx, 1)
+      if (idx >= 0) {
+        game.getSystem('buff')?.onTowerRemoved(game, tower.id)
+        game.towers.splice(idx, 1)
+      }
       this._removePets(tower.id, game)
       return
     }
@@ -190,39 +193,16 @@ export class PetCombatSystem {
 
       if (!target) continue
 
-      this._dealDamage(target, pet.damage, game)
+      if (!target.alive) { pet.targetId = null; continue }
+      const owner = game.towers.find(t => t.id === pet.ownerId)
+      if (!owner) continue
+      this._dealDamage(target, owner.effectiveDamage * pet.abilityMod, game)
       if (!target.alive) pet.targetId = null
     }
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    if (!enemy.alive) return
-
-    let remaining = amount * game.state.enemyVulnerability
-    if (enemy.shield > 0) {
-      const absorbed = Math.min(enemy.shield, remaining)
-      enemy.shield -= absorbed
-      remaining -= absorbed
-    }
-    if (remaining > 0) {
-      enemy.hp -= remaining
-    }
-
-    if (enemy.hp <= 0) {
-      enemy.hp = 0
-      enemy.alive = false
-      enemy.active = false
-      game.eventBus.emit(Events.ENEMY_KILLED, enemy)
-      if (shouldSplit(enemy) && game.levelContext?.path) {
-        spawnChildren(enemy, {
-          path: game.levelContext.path,
-          onChildCreated: (child) => {
-            game.enemies.push(child)
-            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-          },
-        })
-      }
-    }
+    applyDamage(enemy, amount, game)
   }
 
   render(): void {}

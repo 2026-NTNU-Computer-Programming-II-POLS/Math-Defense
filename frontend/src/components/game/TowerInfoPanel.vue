@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { TOWER_DEFS } from '@/data/tower-defs'
@@ -14,6 +14,9 @@ import CalculusPanel from './CalculusPanel.vue'
 const gameStore = useGameStore()
 const uiStore = useUiStore()
 const confirmingRefund = ref(false)
+
+let _refundUnsub: (() => void) | null = null
+onUnmounted(() => { _refundUnsub?.() })
 
 const tower = computed(() => {
   const id = uiStore.buildPanelTowerId
@@ -60,9 +63,13 @@ function confirmRefund() {
   const engine = gameStore.getEngine()
   const t = tower.value
   if (!engine || !t) return
+  _refundUnsub?.()
+  _refundUnsub = engine.eventBus.once(Events.TOWER_REFUND_RESULT, ({ success }) => {
+    _refundUnsub = null
+    confirmingRefund.value = false
+    if (success) uiStore.closeBuildPanel()
+  })
   engine.eventBus.emit(Events.TOWER_REFUND, { towerId: t.id })
-  confirmingRefund.value = false
-  uiStore.closeBuildPanel()
 }
 
 const canRefund = computed(() => gameStore.isBuilding)

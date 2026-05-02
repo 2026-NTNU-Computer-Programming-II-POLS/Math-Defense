@@ -103,17 +103,21 @@ export class TowerPlacementSystem {
       return
     }
 
-    this._commitPlacement(tower, cost, game)
+    this._commitPlacement(tower, game)
   }
 
-  private _commitPlacement(tower: Tower, cost: number, game: Game): void {
+  private _commitPlacement(tower: Tower, game: Game): void {
+    const isFree = game.state.freeTowerNext || game.state.freeTowerCharges > 0
+    const cost = isFree ? 0 : tower.cost
+    if (game.state.gold < cost) return
+
     game.towers.push(tower)
     game.changeGold(-cost)
     game.addCost(cost)
     if (game.state.freeTowerNext) {
       game.state.freeTowerNext = false
     } else if (game.state.freeTowerCharges > 0) {
-      game.state.freeTowerCharges--
+      game.state.freeTowerCharges = Math.max(0, game.state.freeTowerCharges - 1)
     }
 
     game.eventBus.emit(Events.TOWER_PLACED, tower)

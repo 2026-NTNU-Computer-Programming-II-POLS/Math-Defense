@@ -45,6 +45,7 @@ export interface Tower {
   limitResult?: LimitResult | null
   calculusState?: CalculusState | null
   upgradeExtras?: Record<string, number>
+  upgradeSpend?: number
 }
 
 export type LimitOutcome = '+inf' | '+c' | 'zero' | 'constant' | '-c' | '-inf'
@@ -129,6 +130,8 @@ export interface Enemy {
   speedBoost: number
   dotDamage: number
   dotTimer: number
+
+  _emittedReachedOrigin?: boolean
 }
 
 // ── Projectile ──

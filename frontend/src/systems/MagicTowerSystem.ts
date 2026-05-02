@@ -4,6 +4,9 @@ import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 
 const ZONE_WIDTH = 1.5
+// Buff zone uses a 2× multiplier relative to the debuff zone: towers sit on a
+// fixed grid so a tighter width would miss well-placed towers.
+const BUFF_ZONE_MULTIPLIER = 2
 
 export class MagicTowerSystem {
   private _unsubs: (() => void)[] = []
@@ -102,7 +105,7 @@ export class MagicTowerSystem {
     for (const other of game.towers) {
       if (other.id === tower.id || other.disabled) continue
       const curveY = fn(other.x)
-      if (Math.abs(other.y - curveY) < zoneWidth * 2) {
+      if (Math.abs(other.y - curveY) < zoneWidth * BUFF_ZONE_MULTIPLIER) {
         other.magicBuff = Math.max(other.magicBuff, buffAmount)
         other.effectiveDamage = other.baseDamage * other.damageBonus * other.magicBuff
       }

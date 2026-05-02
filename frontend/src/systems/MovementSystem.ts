@@ -122,7 +122,8 @@ export class MovementSystem {
         ? enemy._pathX <= enemy._targetX
         : enemy._pathX >= enemy._targetX
 
-    if (distToGoal < 0.5 || reachedTarget) {
+    if ((distToGoal < 0.5 || reachedTarget) && !enemy._emittedReachedOrigin) {
+      enemy._emittedReachedOrigin = true
       enemy.alive = false
       enemy.active = false
       // Reaching the goal damages the player (handled by EconomySystem) and

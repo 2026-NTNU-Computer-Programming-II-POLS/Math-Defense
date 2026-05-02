@@ -46,10 +46,10 @@ function makeGameStub(): Game & { eventBus: EventBus<GameEvents> } {
   const stub: GameStub = {
     eventBus,
     state: {
-      score: 1234, kills: 7, wave: 5,
+      kills: 7, wave: 5,
       starRating: 1, initialAnswer: 0,
       cumulativeKillValue: 100, costTotal: 50,
-      timeTotal: 60, hp: 15, timeExcludePrepare: [5, 3],
+      timeTotal: 60, hp: 15, healthOrigin: 20, timeExcludePrepare: [5, 3],
     } as Game['state'],
   }
   return stub as unknown as Game & { eventBus: EventBus<GameEvents> }
@@ -122,7 +122,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     expect(sessionService.end).toHaveBeenCalledTimes(2)
     const lastCallArgs = vi.mocked(sessionService.end).mock.calls[1]
     expect(lastCallArgs[0]).toBe('sess-abc')
-    expect(lastCallArgs[1]).toMatchObject({ score: 1234, kills: 7, waves_survived: 5 })
+    expect(lastCallArgs[1]).toMatchObject({ score: 1.0879, kills: 7, waves_survived: 5 })
     expect(sync.sessionId.value).toBeNull()
   })
 
@@ -207,7 +207,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     await flushPromises()
     expect(sessionService.end).toHaveBeenCalledTimes(2)
     expect(vi.mocked(sessionService.end).mock.calls[1][1]).toMatchObject({
-      score: 1234, kills: 7, waves_survived: 5,
+      score: 1.0879, kills: 7, waves_survived: 5,
     })
     expect(sync.sessionId.value).toBeNull()
   })

@@ -14,15 +14,15 @@ export class EconomySystem implements GameSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
+    if (import.meta.env.DEV && this._unsubs.length > 0) {
+      console.warn('[EconomySystem] init() called while still subscribed; ensure destroy() is called first')
+    }
     this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
         if (isShielded(game.state)) {
-          game.state.shieldHitsRemaining--
-          if (game.state.shieldHitsRemaining <= 0) {
-            game.state.shieldActive = false
-            game.state.shieldHitsRemaining = 0
-          }
+          game.state.shieldHitsRemaining = Math.max(0, game.state.shieldHitsRemaining - 1)
+          if (game.state.shieldHitsRemaining === 0) game.state.shieldActive = false
           return
         }
         if (game.state.hp <= 0) return

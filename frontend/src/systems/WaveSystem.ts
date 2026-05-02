@@ -48,12 +48,11 @@ export class WaveSystem {
 
     if (this._spawnQueue.length > 0) {
       this._spawnTimer -= dt
-      if (this._spawnTimer <= 0) {
-        const config = this._spawnQueue.shift()!
-        this._spawn(config, game)
-        this._spawnTimer = this._spawnInterval
+      while (this._spawnQueue.length > 0 && this._spawnTimer <= 0) {
+        this._spawn(this._spawnQueue.shift()!, game)
+        this._spawnTimer += this._spawnInterval
       }
-      return
+      if (this._spawnQueue.length > 0) return
     }
 
     if (game.enemies.length === 0) {

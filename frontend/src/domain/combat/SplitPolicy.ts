@@ -1,6 +1,14 @@
+import { Events } from '@/data/constants'
 import { createEnemy } from '@/entities/EnemyFactory'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { Enemy } from '@/entities/types'
+
+export interface CombatGameContext {
+  eventBus: { emit(event: string, payload?: unknown): void }
+  levelContext: { path: SegmentedPath | null } | null | undefined
+  enemies: Enemy[]
+  state: { enemyVulnerability: number }
+}
 
 export interface SplitContext {
   path: SegmentedPath | null
@@ -62,4 +70,38 @@ export function spawnChildren(
   }
 
   return children
+}
+
+export function killEnemy(enemy: Enemy, game: CombatGameContext): void {
+  enemy.hp = 0
+  enemy.alive = false
+  enemy.active = false
+  game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+  if (shouldSplit(enemy) && game.levelContext?.path) {
+    spawnChildren(enemy, {
+      path: game.levelContext.path,
+      onChildCreated: (child) => {
+        game.enemies.push(child)
+        game.eventBus.emit(Events.ENEMY_SPAWNED, child)
+      },
+    })
+  }
+}
+
+// All damage sources (instant hits, DoT ticks, pets, spells) route through here.
+// enemyVulnerability is applied exactly once at this call site.
+export function applyDamage(enemy: Enemy, rawAmount: number, game: CombatGameContext): void {
+  if (!enemy.alive) return
+  let remaining = rawAmount * game.state.enemyVulnerability
+  if (enemy.shield > 0) {
+    const absorbed = Math.min(enemy.shield, remaining)
+    enemy.shield -= absorbed
+    remaining -= absorbed
+  }
+  if (remaining > 0) {
+    enemy.hp = Math.round((enemy.hp - remaining) * 1e4) / 1e4
+  }
+  if (enemy.hp <= 0) {
+    killEnemy(enemy, game)
+  }
 }
