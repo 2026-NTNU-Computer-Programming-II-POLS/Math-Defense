@@ -143,7 +143,6 @@ export function useSessionSync() {
         }
       } finally {
         syncing.value = false
-        pending.value = null
       }
     }))
 
