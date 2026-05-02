@@ -7,20 +7,39 @@ commit.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
 class LoginAttemptRepository(Protocol):
-    def is_locked(self, username: str) -> bool: pass
+    def is_locked(self, username: str) -> bool: ...
 
-    def record_failure(self, username: str) -> None: pass
+    def record_failure(self, username: str) -> None: ...
 
-    def clear(self, username: str) -> None: pass
+    def clear(self, username: str) -> None: ...
 
 
 @runtime_checkable
 class TokenDenylistRepository(Protocol):
-    def deny(self, jti: str, expires_at: float) -> None: pass
+    def deny(self, jti: str, expires_at: float) -> None: ...
 
-    def is_denied(self, jti: str) -> bool: pass
+    def is_denied(self, jti: str) -> bool: ...
+
+
+@runtime_checkable
+class EmailVerificationRepository(Protocol):
+    def create(self, user_id: str, token: str, expires_at: datetime) -> None: ...
+
+    def consume_verification_token(self, token: str) -> str | None:
+        """Mark the token used and return its user_id, or None if invalid/expired."""
+        ...
+
+    def invalidate_for_user(self, user_id: str) -> None:
+        """Mark all pending tokens for a user as used (called before issuing a new one)."""
+        ...
+
+
+@runtime_checkable
+class EmailService(Protocol):
+    def send_verification_email(self, to: str, player_name: str, token: str) -> None: ...

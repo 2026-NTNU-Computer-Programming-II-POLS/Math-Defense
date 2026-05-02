@@ -21,6 +21,11 @@ from app.infrastructure.persistence.class_repository import SqlAlchemyClassRepos
 from app.infrastructure.persistence.leaderboard_repository import (
     SqlAlchemyLeaderboardRepository,
 )
+from app.config import settings
+from app.infrastructure.email_service import SmtpEmailService
+from app.infrastructure.persistence.email_verification_repository import (
+    SqlAlchemyEmailVerificationRepository,
+)
 from app.infrastructure.persistence.login_attempt_repository import (
     SqlAlchemyLoginAttemptRepository,
 )
@@ -48,6 +53,8 @@ def build_auth_service(db: "DbSession") -> AuthApplicationService:
         user_repo=SqlAlchemyUserRepository(db),
         login_attempt_repo=SqlAlchemyLoginAttemptRepository(db),
         token_denylist_repo=SqlAlchemyTokenDenylistRepository(db),
+        email_verification_repo=SqlAlchemyEmailVerificationRepository(db),
+        email_svc=SmtpEmailService(settings),
         uow=SqlAlchemyUnitOfWork(db),
     )
 

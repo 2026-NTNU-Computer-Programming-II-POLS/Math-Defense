@@ -5,14 +5,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from app.domain.user.constraints import EMAIL_MAX_LENGTH, PLAYER_NAME_MIN_LENGTH, PLAYER_NAME_MAX_LENGTH
 
 
-_COMMON_PASSWORDS = frozenset({
-    "password1", "password12", "password123", "passw0rd", "p@ssw0rd",
-    "qwerty123", "qwerty1234", "abc12345", "abcd1234", "123456789", "1234567890",
-    "letmein1", "letmein123", "welcome1", "welcome123", "iloveyou1", "iloveyou123",
-    "admin123", "admin1234", "master123", "monkey123", "dragon123",
-    "football1", "baseball1", "superman1", "sunshine1", "princess1",
-    "test1234", "hello123", "changeme1", "trustno1", "starwars1",
-})
+import zxcvbn
 
 def _validate_password_strength(v: str) -> str:
     if len(v) < 8:
@@ -23,10 +16,12 @@ def _validate_password_strength(v: str) -> str:
         raise ValueError("Password must contain at least one letter")
     if not re.search(r'[0-9]', v):
         raise ValueError("Password must contain at least one digit")
-    if re.search(r'(.)\1{4,}', v):
-        raise ValueError("Password must not contain five or more of the same character in a row")
-    if v.lower() in _COMMON_PASSWORDS:
-        raise ValueError("Password is too common; choose something less guessable")
+
+    result = zxcvbn.zxcvbn(v)
+    if result['score'] < 2:
+        feedback = result['feedback']['warning'] or "Password is too weak or common."
+        raise ValueError(f"Password is too weak: {feedback}")
+
     return v
 
 
@@ -99,6 +94,9 @@ class TokenResponse(BaseModel):
     player_name: str
     role: str
     avatar_url: str | None = None
+    is_email_verified: bool = False
+    mfa_required: bool = False
+    mfa_token: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):
@@ -130,6 +128,8 @@ class AuthMeResponse(BaseModel):
     role: str
     created_at: datetime
     avatar_url: str | None = None
+    is_email_verified: bool = False
+    mfa_enabled: bool = False
 
 
 class UpdatePlayerNameRequest(BaseModel):
@@ -166,4 +166,49 @@ class AvatarUpdateRequest(BaseModel):
     def avatar_url_valid(cls, v: str | None) -> str | None:
         if v is not None and v not in _ALLOWED_AVATAR_URLS:
             raise ValueError("Invalid avatar URL")
+        return v
+
+
+class MFASetupResponse(BaseModel):
+    secret: str
+    provisioning_uri: str
+
+
+class MFAConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def code_digits(cls, v: str) -> str:
+        if not re.match(r'^\d{6}$', v):
+            raise ValueError("TOTP code must be exactly 6 digits")
+        return v
+
+
+class MFAChallengeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_token: str
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def code_digits(cls, v: str) -> str:
+        if not re.match(r'^\d{6}$', v):
+            raise ValueError("TOTP code must be exactly 6 digits")
+        return v
+
+
+class DisableMFARequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str
+
+    @field_validator("current_password")
+    @classmethod
+    def current_password_max_length(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password is too long")
         return v

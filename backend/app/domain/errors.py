@@ -55,6 +55,22 @@ class UserNotFoundError(DomainError):
     status_code = 401
 
 
+class EmailNotVerifiedError(DomainError):
+    status_code = 403
+
+
+class InvalidMFACodeError(DomainError):
+    status_code = 401
+
+
+class MFANotSetupError(DomainError):
+    status_code = 400
+
+
+class MFAAlreadyEnabledError(DomainError):
+    status_code = 409
+
+
 # ── Validation ──
 
 class DomainValueError(DomainError, ValueError):

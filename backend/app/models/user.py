@@ -21,6 +21,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     password_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )

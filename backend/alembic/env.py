@@ -8,9 +8,9 @@ from app.config import settings
 from app.db.database import Base
 
 # Import all models so Base.metadata is populated for autogenerate.
-from app.models import user, leaderboard, game_session, login_attempt, denied_token, class_, class_membership, territory
+from app.models import user, leaderboard, game_session, login_attempt, denied_token, class_, class_membership, territory, audit_log, achievement, removed_class_membership, talent, email_verification_token
 
-__all__ = ["user", "leaderboard", "game_session", "login_attempt", "denied_token", "class_", "class_membership", "territory"]
+__all__ = ["user", "leaderboard", "game_session", "login_attempt", "denied_token", "class_", "class_membership", "territory", "audit_log", "achievement", "removed_class_membership", "talent", "email_verification_token"]
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
