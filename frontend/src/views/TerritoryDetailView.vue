@@ -60,9 +60,9 @@ async function handlePlay(slotId: string): Promise<void> {
   sessionStorage.setItem(
     'initial-answer-context',
     JSON.stringify({
-      level: JSON.stringify(level),
+      level,
       seed,
-      territoryContext: JSON.stringify(territoryContext),
+      territoryContext,
     })
   )
 
