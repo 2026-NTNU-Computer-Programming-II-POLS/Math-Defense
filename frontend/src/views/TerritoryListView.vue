@@ -18,6 +18,14 @@ const pagedActivities = computed(() => {
   return store.activities.slice(start, start + PAGE_SIZE)
 })
 
+const pagedActivitiesWithStatus = computed(() => {
+  const now = new Date()
+  return pagedActivities.value.map((a) => ({
+    ...a,
+    isExpired: !a.settled && new Date(a.deadline) < now
+  }))
+})
+
 function goToPage(p: number): void {
   if (p < 1 || p > totalPages.value) return
   page.value = p
@@ -54,15 +62,15 @@ onMounted(() => store.loadActivities())
 
       <ul v-else class="activity-list">
         <li
-          v-for="a in pagedActivities"
+          v-for="a in pagedActivitiesWithStatus"
           :key="a.id"
           class="activity-item"
           @click="router.push(`/territory/${a.id}`)"
         >
           <div class="activity-title">{{ a.title }}</div>
           <div class="activity-meta">
-            <span :class="['status-badge', { settled: a.settled, expired: !a.settled && new Date(a.deadline) < new Date() }]">
-              {{ a.settled ? 'Settled' : new Date(a.deadline) < new Date() ? 'Expired' : 'Active' }}
+            <span :class="['status-badge', { settled: a.settled, expired: a.isExpired }]">
+              {{ a.settled ? 'Settled' : a.isExpired ? 'Expired' : 'Active' }}
             </span>
             <span v-if="a.class_id === null" class="scope-badge">All Classes</span>
             <span class="deadline">Deadline: {{ formatDeadline(a.deadline) }}</span>
