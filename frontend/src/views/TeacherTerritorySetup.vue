@@ -164,6 +164,10 @@ onMounted(async () => {
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
+:root {
+  --min-touch-target: 44px;
+}
+
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field-label { font-size: 11px; color: var(--gold); }
 
@@ -183,7 +187,7 @@ onMounted(async () => {
 .btn-sm {
   font-size: 9px;
   padding: 2px 6px;
-  min-height: 44px;
+  min-height: var(--min-touch-target);
   display: inline-flex;
   align-items: center;
   background: none;
