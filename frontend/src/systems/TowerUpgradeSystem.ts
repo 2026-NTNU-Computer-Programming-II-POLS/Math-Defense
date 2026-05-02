@@ -45,7 +45,8 @@ export class TowerUpgradeSystem {
     if (!tier) return
 
     game.changeGold(-cost)
-    tower.upgradeSpend = (tower.upgradeSpend ?? 0) + cost
+    tower.upgradeSpend ??= 0
+    tower.upgradeSpend += cost
     tower.level++
 
     const mods = game.towerModifierProvider?.(tower.type) ?? {}
