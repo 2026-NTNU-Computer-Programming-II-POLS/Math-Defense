@@ -91,7 +91,10 @@ export class CalculusTowerSystem {
 
     if (newCoeff === 0 || (op === 'derivative' && state.exponent === 0)) {
       const idx = game.towers.findIndex((t) => t.id === tower.id)
-      if (idx >= 0) game.towers.splice(idx, 1)
+      if (idx >= 0) {
+        game.getSystem('buff')?.onTowerRemoved(game, tower.id)
+        game.towers.splice(idx, 1)
+      }
       this._removePets(tower.id, game)
       return
     }
