@@ -12,15 +12,15 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class LoginAttemptRepository(Protocol):
-    def is_locked(self, username: str) -> bool: ...
+    def is_locked(self, username: str) -> bool: pass
 
-    def record_failure(self, username: str) -> None: ...
+    def record_failure(self, username: str) -> None: pass
 
-    def clear(self, username: str) -> None: ...
+    def clear(self, username: str) -> None: pass
 
 
 @runtime_checkable
 class TokenDenylistRepository(Protocol):
-    def deny(self, jti: str, expires_at: float) -> None: ...
+    def deny(self, jti: str, expires_at: float) -> None: pass
 
-    def is_denied(self, jti: str) -> bool: ...
+    def is_denied(self, jti: str) -> bool: pass

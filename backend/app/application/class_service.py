@@ -56,11 +56,10 @@ class ClassApplicationService:
             raise ClassNotFoundError("Class not found")
         return cls_
 
-    def _verify_owner_or_admin(self, cls_: Class, user_id: str, user_role: Role) -> None:
-        # Admin has full write access to all classes. Spec §2.4 says "audits"
-        # but the current implementation allows full mutation. Tighten here if
-        # read-only admin access is ever required.
+    def _verify_owner_or_admin(self, cls_: Class, user_id: str, user_role: Role, *, is_read_op: bool = False) -> None:
         if user_role == Role.ADMIN:
+            if not is_read_op:
+                raise PermissionDeniedError("Admins have read-only access and cannot perform mutations")
             return
         cls_.verify_owner(user_id)
 
@@ -84,7 +83,7 @@ class ClassApplicationService:
 
     def get_class_for_owner(self, class_id: str, requester_id: str, requester_role: Role) -> Class:
         cls_ = self._get_class_or_raise(class_id)
-        self._verify_owner_or_admin(cls_, requester_id, requester_role)
+        self._verify_owner_or_admin(cls_, requester_id, requester_role, is_read_op=True)
         return cls_
 
     def list_classes_for_teacher(self, teacher_id: str) -> list[Class]:
@@ -151,7 +150,7 @@ class ClassApplicationService:
         # Intentional: a teacher can only roster their own class. There is no
         # cross-teacher sharing by design. Admin sees all via the bypass above.
         cls_ = self._get_class_or_raise(class_id)
-        self._verify_owner_or_admin(cls_, requester_id, requester_role)
+        self._verify_owner_or_admin(cls_, requester_id, requester_role, is_read_op=True)
         return self._class_repo.find_memberships_by_class(class_id)
 
     def join_by_code(self, code: str, student_id: str, student_role: Role = Role.STUDENT) -> ClassMembership:

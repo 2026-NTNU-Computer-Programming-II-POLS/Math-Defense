@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/activities", tags=["territory"])
 def create_activity(
     request: Request,
     req: CreateActivityRequest,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     activity = build_territory_service(db).create_activity(
@@ -133,7 +133,7 @@ def get_activity_external_rankings(
 def settle_activity(
     request: Request,
     activity_id: str,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     build_territory_service(db).settle_activity(

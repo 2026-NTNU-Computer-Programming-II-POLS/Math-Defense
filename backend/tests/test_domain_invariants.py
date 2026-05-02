@@ -76,13 +76,13 @@ class TestRepositoryProtocolConformance:
 
     def test_incomplete_session_repo_rejected(self):
         class PartialRepo:
-            def find_by_id(self, session_id, user_id): ...
+            def find_by_id(self, session_id, user_id): pass
             # missing: find_active_by_user, find_stale_sessions, save, save_all,
             #          find_by_id_for_update
         assert not isinstance(PartialRepo(), GameSessionRepository)
 
     def test_incomplete_leaderboard_repo_rejected(self):
         class PartialRepo:
-            def find_by_session_id(self, session_id): ...
+            def find_by_session_id(self, session_id): pass
             # missing: save, query_ranked_global, query_ranked_by_level
         assert not isinstance(PartialRepo(), LeaderboardRepository)
