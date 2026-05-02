@@ -55,14 +55,19 @@ async function handlePlay(slotId: string): Promise<void> {
   const seed = stringHash(slotId)
   const rng = mulberry32(seed)
   const level = generateLevel(slot.star_rating, rng)
+  const territoryContext = { activityId: activityId.value, slotId }
+
+  sessionStorage.setItem(
+    'initial-answer-context',
+    JSON.stringify({
+      level: JSON.stringify(level),
+      seed,
+      territoryContext: JSON.stringify(territoryContext),
+    })
+  )
 
   router.push({
     name: 'initial-answer',
-    state: {
-      level: JSON.stringify(level),
-      seed,
-      territoryContext: JSON.stringify({ activityId: activityId.value, slotId }),
-    },
   })
 }
 
