@@ -4,7 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
 import { generateLevel } from '@/domain/level/level-generator'
-import { mulberry32 } from '@/math/MathUtils'
+import { mulberry32, stringHash } from '@/math/MathUtils'
+import { sessionService } from '@/services/sessionService'
 import TerritorySlotCard from '@/components/territory/TerritorySlotCard.vue'
 
 const router = useRouter()
@@ -16,16 +17,42 @@ const activityId = computed(() => route.params.id as string)
 const detail = computed(() => store.currentDetail)
 const isOwner = computed(() => detail.value?.activity.teacher_id === auth.user?.id)
 const canSettle = computed(() => {
-  if (!detail.value) return false
-  return (isOwner.value || auth.isAdmin) && !detail.value.activity.settled
+  if (!detail.value || detail.value.activity.settled) return false
+  if (auth.isAdmin) return true
+  if (auth.isTeacher) {
+    // C-5: any teacher may settle an inter-class activity
+    return detail.value.activity.class_id === null || isOwner.value
+  }
+  return false
 })
 const settling = ref(false)
 
-function handlePlay(slotId: string): void {
+// B-H-12: propagate activity state so slot cards can disable the Play button
+const slotDisabledReason = computed((): string | undefined => {
+  const a = detail.value?.activity
+  if (!a) return undefined
+  if (a.settled) return 'Activity is settled'
+  if (new Date(a.deadline) <= new Date()) return 'Activity deadline has passed'
+  return undefined
+})
+
+async function handlePlay(slotId: string): Promise<void> {
   const slot = detail.value?.slots.find(s => s.id === slotId)
   if (!slot) return
 
-  const seed = Date.now()
+  // B-M-6: warn before silently abandoning an in-progress game session
+  try {
+    const active = await sessionService.getActive()
+    if (active) {
+      const ok = confirm(
+        'You have an active game session in progress. Starting a territory game will abandon it. Continue?'
+      )
+      if (!ok) return
+    }
+  } catch { /* non-critical — proceed if the check fails */ }
+
+  // Stable seed derived from the slot id so every student faces the same level
+  const seed = stringHash(slotId)
   const rng = mulberry32(seed)
   const level = generateLevel(slot.star_rating, rng)
 
@@ -40,7 +67,12 @@ function handlePlay(slotId: string): void {
 }
 
 async function handleSettle(): Promise<void> {
-  if (!confirm('Settle this activity? This action is permanent and cannot be undone.')) return
+  const deadline = detail.value?.activity.deadline
+  const isBeforeDeadline = deadline && new Date(deadline) > new Date()
+  const msg = isBeforeDeadline
+    ? 'The deadline has not passed yet. Settle this activity early? This action is permanent and cannot be undone.'
+    : 'Settle this activity? This action is permanent and cannot be undone.'
+  if (!confirm(msg)) return
   settling.value = true
   const ok = await store.settleActivity(activityId.value)
   settling.value = false
@@ -75,6 +107,7 @@ watch(activityId, (id) => {
 
         <div class="detail-meta">
           <span>Deadline: {{ new Date(detail.activity.deadline).toLocaleString() }}</span>
+          <span v-if="detail.activity.class_id === null" class="scope-tag">All Classes</span>
         </div>
 
         <div class="slot-grid">
@@ -82,7 +115,7 @@ watch(activityId, (id) => {
             v-for="s in detail.slots"
             :key="s.id"
             :slot="s"
-            :current-user-id="auth.user?.id"
+            :disabled-reason="slotDisabledReason"
             @play="handlePlay"
           />
         </div>
@@ -137,7 +170,8 @@ watch(activityId, (id) => {
 
 .status-badge.settled { border-color: var(--axis); color: var(--axis); }
 
-.detail-meta { font-size: 11px; color: var(--axis); }
+.detail-meta { font-size: 11px; color: var(--axis); display: flex; gap: 12px; align-items: center; }
+.scope-tag { padding: 2px 6px; border: 1px solid #7a6fa0; color: #a08fc0; font-size: 9px; letter-spacing: 1px; }
 
 .slot-grid {
   display: grid;

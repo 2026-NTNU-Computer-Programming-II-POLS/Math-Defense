@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -7,6 +7,21 @@ import { useAuthStore } from '@/stores/authStore'
 const router = useRouter()
 const store = useTerritoryStore()
 const auth = useAuthStore()
+
+const PAGE_SIZE = 20
+const page = ref(1)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(store.activities.length / PAGE_SIZE)))
+
+const pagedActivities = computed(() => {
+  const start = (page.value - 1) * PAGE_SIZE
+  return store.activities.slice(start, start + PAGE_SIZE)
+})
+
+function goToPage(p: number): void {
+  if (p < 1 || p > totalPages.value) return
+  page.value = p
+}
 
 function formatDeadline(iso: string): string {
   return new Date(iso).toLocaleString()
@@ -39,7 +54,7 @@ onMounted(() => store.loadActivities())
 
       <ul v-else class="activity-list">
         <li
-          v-for="a in store.activities"
+          v-for="a in pagedActivities"
           :key="a.id"
           class="activity-item"
           @click="router.push(`/territory/${a.id}`)"
@@ -49,10 +64,17 @@ onMounted(() => store.loadActivities())
             <span :class="['status-badge', { settled: a.settled, expired: !a.settled && new Date(a.deadline) < new Date() }]">
               {{ a.settled ? 'Settled' : new Date(a.deadline) < new Date() ? 'Expired' : 'Active' }}
             </span>
+            <span v-if="a.class_id === null" class="scope-badge">All Classes</span>
             <span class="deadline">Deadline: {{ formatDeadline(a.deadline) }}</span>
           </div>
         </li>
       </ul>
+
+      <div v-if="totalPages > 1" class="pagination">
+        <button class="btn page-btn" :disabled="page <= 1" @click="goToPage(page - 1)">←</button>
+        <span class="page-info">{{ page }} / {{ totalPages }}</span>
+        <button class="btn page-btn" :disabled="page >= totalPages" @click="goToPage(page + 1)">→</button>
+      </div>
     </div>
   </div>
 </template>
@@ -125,6 +147,14 @@ onMounted(() => store.loadActivities())
 .status-badge.settled { border-color: var(--axis); color: var(--axis); }
 .status-badge.expired { border-color: var(--enemy-red); color: var(--enemy-red); }
 
+.scope-badge {
+  padding: 2px 6px;
+  border: 1px solid #7a6fa0;
+  color: #a08fc0;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
 .deadline { font-size: 10px; }
 
 .back-btn {
@@ -134,4 +164,8 @@ onMounted(() => store.loadActivities())
 }
 
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.page-info { font-size: 12px; color: var(--axis); }
+.page-btn:disabled { opacity: 0.3; cursor: default; }
 </style>

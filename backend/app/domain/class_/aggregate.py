@@ -6,11 +6,29 @@ import string
 import uuid
 from datetime import datetime, UTC
 
-from app.domain.class_.errors import NotClassOwnerError
+from app.domain.class_.errors import ClassNameInvalidError, NotClassOwnerError
+
+
+class RemovedMembership:
+
+    def __init__(self, id: str, class_id: str, student_id: str, removed_at: datetime) -> None:
+        self.id = id
+        self.class_id = class_id
+        self.student_id = student_id
+        self.removed_at = removed_at
+
+    @classmethod
+    def create(cls, class_id: str, student_id: str) -> RemovedMembership:
+        return cls(
+            id=str(uuid.uuid4()),
+            class_id=class_id,
+            student_id=student_id,
+            removed_at=datetime.now(UTC),
+        )
 
 
 _JOIN_CODE_ALPHABET = string.ascii_uppercase + string.digits
-_JOIN_CODE_LENGTH = 6
+_JOIN_CODE_LENGTH = 8
 
 
 def _generate_join_code() -> str:
@@ -41,11 +59,18 @@ class Class:
         self.join_code = join_code
         self.created_at = created_at or datetime.now(UTC)
 
+    @staticmethod
+    def _validate_name(name: str) -> str:
+        name = name.strip()
+        if len(name) < 1 or len(name) > 100:
+            raise ClassNameInvalidError("Class name must be 1-100 characters")
+        return name
+
     @classmethod
     def create(cls, name: str, teacher_id: str) -> Class:
         return cls(
             id=str(uuid.uuid4()),
-            name=name,
+            name=cls._validate_name(name),
             teacher_id=teacher_id,
             join_code=_generate_join_code(),
         )
@@ -54,9 +79,17 @@ class Class:
         return self.teacher_id == user_id
 
     def verify_owner(self, user_id: str) -> None:
-        """Raise NotClassOwnerError if user_id is not the owning teacher."""
+        """Raise NotClassOwnerError if user_id is not the owning teacher.
+
+        This method only enforces teacher ownership. Admin bypass is the
+        caller's responsibility — use _verify_owner_or_admin in the
+        application layer for any user-facing mutation.
+        """
         if not self.is_owned_by(user_id):
             raise NotClassOwnerError("You do not own this class")
+
+    def rename(self, name: str) -> None:
+        self.name = self._validate_name(name)
 
     def regenerate_join_code(self) -> str:
         self.join_code = _generate_join_code()

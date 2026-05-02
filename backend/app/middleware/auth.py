@@ -5,7 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.domain.errors import InvalidTokenError, PermissionDeniedError
+from app.domain.errors import DomainError, InvalidTokenError, PermissionDeniedError
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 from app.factories import build_auth_service
@@ -35,6 +35,18 @@ def get_current_user(
     user = build_auth_service(db).authenticate_token(token)
     setattr(request.state, _REQUEST_CACHE_ATTR, user)
     return user
+
+
+def get_current_user_optional(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Like get_current_user but returns None instead of raising when unauthenticated."""
+    try:
+        return get_current_user(request, credentials, db)
+    except DomainError:
+        return None
 
 
 def require_role(*roles: Role) -> Callable[..., User]:

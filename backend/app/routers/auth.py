@@ -12,7 +12,7 @@ from app.factories import build_auth_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.middleware.csrf import mint_csrf_cookie
-from app.schemas.auth import AuthMeResponse, AvatarUpdateRequest, ChangePasswordRequest, LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import AuthMeResponse, AvatarUpdateRequest, ChangePasswordRequest, LoginRequest, RegisterRequest, TokenResponse, UpdatePlayerNameRequest
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         email=req.email,
         password=req.password,
         player_name=req.player_name,
-        role="student",
+        role=req.role,
     )
     logger.info("User registered: id=%s", user.id)
     _set_auth_cookie(response, token)
@@ -113,6 +113,25 @@ def get_me(request: Request, current_user: User = Depends(get_current_user)):
         role=current_user.role.value,
         created_at=current_user.created_at,
         avatar_url=current_user.avatar_url,
+    )
+
+
+@router.put("/profile/name", response_model=AuthMeResponse)
+@limiter.limit("10/minute")
+def update_player_name(
+    request: Request,
+    req: UpdatePlayerNameRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user = build_auth_service(db).update_player_name(current_user.id, req.player_name)
+    return AuthMeResponse(
+        id=user.id,
+        email=user.email,
+        player_name=user.player_name,
+        role=user.role.value,
+        created_at=user.created_at,
+        avatar_url=user.avatar_url,
     )
 
 

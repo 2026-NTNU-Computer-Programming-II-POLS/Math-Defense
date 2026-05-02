@@ -94,6 +94,8 @@ class GrabbingTerritoryActivity:
         settled: bool = False,
         created_at: datetime | None = None,
         slots: list[TerritorySlot] | None = None,
+        settled_at: datetime | None = None,
+        settled_by: str | None = None,
     ) -> None:
         self.id = id
         self.class_id = class_id
@@ -103,6 +105,8 @@ class GrabbingTerritoryActivity:
         self.settled = settled
         self.created_at = created_at or datetime.now(UTC)
         self.slots: list[TerritorySlot] = slots or []
+        self.settled_at = settled_at
+        self.settled_by = settled_by
 
     @classmethod
     def create(
@@ -128,7 +132,7 @@ class GrabbingTerritoryActivity:
             raise NotActivityOwnerError("You do not own this activity")
 
     def is_expired(self) -> bool:
-        return datetime.now(UTC) > self.deadline
+        return datetime.now(UTC) >= self.deadline
 
     def ensure_playable(self) -> None:
         if self.settled:
@@ -179,10 +183,16 @@ class GrabbingTerritoryActivity:
                 raise ScoreNotHighEnoughError(
                     "Your new score does not beat your current score on this territory"
                 )
-            current.score = new_score
-            current.occupied_at = datetime.now(UTC)
-            current.session_id = session_id
-            return current
+            # B-M-2: return new object instead of mutating current in place so
+            # a rollback (IntegrityError) cannot leave the aggregate in a dirty state.
+            return TerritoryOccupation(
+                id=current.id,
+                slot_id=current.slot_id,
+                student_id=current.student_id,
+                score=new_score,
+                occupied_at=datetime.now(UTC),
+                session_id=session_id,
+            )
 
         if current is not None and new_score <= current.score:
             raise ScoreNotHighEnoughError(
@@ -194,17 +204,17 @@ class GrabbingTerritoryActivity:
                 f"You already hold {TERRITORY_CAP_PER_STUDENT} territories in this activity"
             )
 
-        occ = TerritoryOccupation(
+        return TerritoryOccupation(
             id=str(uuid.uuid4()),
             slot_id=slot.id,
             student_id=student_id,
             score=new_score,
             session_id=session_id,
         )
-        slot.occupation = occ
-        return occ
 
-    def settle(self) -> None:
+    def settle(self, settled_by: str | None = None) -> None:
         if self.settled:
             raise ActivityAlreadySettledError("Activity already settled")
         self.settled = True
+        self.settled_at = datetime.now(UTC)
+        self.settled_by = settled_by

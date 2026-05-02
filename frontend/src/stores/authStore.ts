@@ -100,6 +100,11 @@ export const useAuthStore = defineStore('auth', () => {
     probeTimer = null
   }
 
+  async function updatePlayerName(playerName: string): Promise<void> {
+    await authService.updatePlayerName(playerName)
+    if (user.value) user.value = { ...user.value, player_name: playerName }
+  }
+
   async function updateAvatar(avatarUrl: string | null): Promise<void> {
     await authService.updateAvatar(avatarUrl)
     if (user.value) user.value = { ...user.value, avatar_url: avatarUrl }
@@ -154,5 +159,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     init,
     updateAvatar,
+    updatePlayerName,
   }
 })

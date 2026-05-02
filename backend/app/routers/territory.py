@@ -1,4 +1,10 @@
-"""Grabbing Territory router"""
+"""Grabbing Territory router
+
+CSRF posture: all state-changing endpoints accept JSON bodies and require a
+Bearer token in the Authorization header.  Browser-initiated cross-origin
+requests cannot set custom Authorization headers, so CSRF tokens are
+unnecessary here.
+"""
 import logging
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -37,6 +43,7 @@ def create_activity(
 ):
     activity = build_territory_service(db).create_activity(
         teacher_id=user.id,
+        user_role=user.role,
         title=req.title,
         deadline=req.deadline,
         class_id=req.class_id,
@@ -72,7 +79,7 @@ def get_activity_detail(
     detail = build_territory_service(db).get_activity_detail(activity_id, user.id, user.role)
     return ActivityDetailOut(
         activity=_activity_out(detail["activity"]),
-        slots=[_slot_out(s) for s in detail["slots"]],
+        slots=[_slot_out(s, user.id, user.role) for s in detail["slots"]],
     )
 
 
@@ -92,9 +99,10 @@ def play_territory(
         student_id=user.id,
         session_id=req.session_id,
     )
+    occ = result["occupation"]
     return PlayResultOut(
         seized=result["seized"],
-        occupation=_occupation_out(result["occupation"]),
+        occupation=_occupation_out(occ, user.id, user.role) if occ is not None else None,
     )
 
 
@@ -143,27 +151,32 @@ def _activity_out(a) -> ActivityOut:
         title=a.title,
         deadline=a.deadline,
         settled=a.settled,
+        settled_at=getattr(a, "settled_at", None),
+        settled_by=getattr(a, "settled_by", None),
         created_at=a.created_at,
     )
 
 
-def _slot_out(s) -> SlotOut:
+def _slot_out(s, requesting_user_id: str | None = None, requesting_user_role: Role | None = None) -> SlotOut:
     return SlotOut(
         id=s.id,
         activity_id=s.activity_id,
         star_rating=s.star_rating,
         slot_index=s.slot_index,
         path_config=s.path_config,
-        occupation=_occupation_out(s.occupation) if s.occupation else None,
+        occupation=_occupation_out(s.occupation, requesting_user_id, requesting_user_role) if s.occupation else None,
     )
 
 
-def _occupation_out(o) -> OccupationOut:
+def _occupation_out(o, requesting_user_id: str | None = None, requesting_user_role: Role | None = None) -> OccupationOut:
+    is_own = requesting_user_id is not None and o.student_id == requesting_user_id
+    show_id = is_own or requesting_user_role in (Role.TEACHER, Role.ADMIN)
     return OccupationOut(
         id=o.id,
         slot_id=o.slot_id,
-        student_id=o.student_id,
+        student_id=o.student_id if show_id else None,
         score=o.score,
         occupied_at=o.occupied_at,
         player_name=getattr(o, "player_name", None),
+        is_own=is_own,
     )

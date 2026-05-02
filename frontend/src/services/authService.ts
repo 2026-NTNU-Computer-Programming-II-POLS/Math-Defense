@@ -32,8 +32,17 @@ export const authService = {
   me() {
     return api.get<MeResponse>('/api/auth/me')
   },
+  updatePlayerName(playerName: string) {
+    return api.put<MeResponse>('/api/auth/profile/name', { player_name: playerName })
+  },
   updateAvatar(avatarUrl: string | null) {
     return api.put<MeResponse>('/api/auth/profile/avatar', { avatar_url: avatarUrl })
+  },
+  changePassword(currentPassword: string, newPassword: string) {
+    return api.post<void>('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
   },
   logout(): Promise<void> {
     // Uses raw fetch intentionally: avoids the api.ts 401 interceptor, which

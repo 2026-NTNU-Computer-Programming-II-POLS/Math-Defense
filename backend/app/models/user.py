@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, DateTime, Enum
+from sqlalchemy import Boolean, String, Integer, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
@@ -18,6 +18,7 @@ class User(Base):
         nullable=False,
         server_default="student",
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     password_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(

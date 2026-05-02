@@ -5,6 +5,7 @@ import type { RankingEntry } from './territoryService'
 export interface ExternalRankingEntry {
   rank: number
   class_id: string
+  class_name: string | null
   avg_territory_value: number
 }
 

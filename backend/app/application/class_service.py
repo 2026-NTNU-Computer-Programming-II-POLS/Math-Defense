@@ -6,22 +6,34 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
-from app.domain.class_.aggregate import Class, ClassMembership
+from app.domain.class_.aggregate import Class, ClassMembership, RemovedMembership
 from app.domain.class_.errors import (
+    ClassNameConflictError,
     ClassNotFoundError,
     InvalidJoinCodeError,
+    NotAStudentError,
     StudentAlreadyInClassError,
+    StudentEmailNotFoundError,
     StudentNotInClassError,
+    StudentRemovedFromClassError,
 )
 from app.domain.errors import PermissionDeniedError
 from app.domain.user.value_objects import Role
 
 if TYPE_CHECKING:
     from app.domain.class_.repository import ClassRepository
+    from app.domain.territory.repository import TerritoryRepository
     from app.domain.user.repository import UserRepository
     from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
+
+
+def _is_name_conflict(exc: IntegrityError) -> bool:
+    try:
+        return exc.orig.diag.constraint_name == "uq_classes_teacher_name"  # type: ignore[union-attr]
+    except AttributeError:
+        return "uq_classes_teacher_name" in str(exc.orig)
 
 
 class ClassApplicationService:
@@ -31,10 +43,12 @@ class ClassApplicationService:
         class_repo: ClassRepository,
         user_repo: UserRepository,
         uow: SqlAlchemyUnitOfWork,
+        territory_repo: TerritoryRepository | None = None,
     ) -> None:
         self._class_repo = class_repo
         self._user_repo = user_repo
         self._uow = uow
+        self._territory_repo = territory_repo
 
     def _get_class_or_raise(self, class_id: str) -> Class:
         cls_ = self._class_repo.find_by_id(class_id)
@@ -43,13 +57,16 @@ class ClassApplicationService:
         return cls_
 
     def _verify_owner_or_admin(self, cls_: Class, user_id: str, user_role: Role) -> None:
+        # Admin has full write access to all classes. Spec §2.4 says "audits"
+        # but the current implementation allows full mutation. Tighten here if
+        # read-only admin access is ever required.
         if user_role == Role.ADMIN:
             return
         cls_.verify_owner(user_id)
 
     def create_class(self, name: str, teacher_id: str) -> Class:
         last_exc: Exception | None = None
-        for _ in range(5):
+        for _ in range(3):
             cls_ = Class.create(name=name, teacher_id=teacher_id)
             try:
                 with self._uow:
@@ -57,6 +74,8 @@ class ClassApplicationService:
                     self._uow.commit()
                 return cls_
             except IntegrityError as exc:
+                if _is_name_conflict(exc):
+                    raise ClassNameConflictError("A class with this name already exists") from exc
                 last_exc = exc
         raise last_exc  # type: ignore[misc]
 
@@ -76,29 +95,43 @@ class ClassApplicationService:
 
     def list_classes_for_student(self, student_id: str) -> list[Class]:
         memberships = self._class_repo.find_memberships_by_student(student_id)
-        classes = []
-        for m in memberships:
-            cls_ = self._class_repo.find_by_id(m.class_id)
-            if cls_:
-                classes.append(cls_)
-        return classes
+        ids = [m.class_id for m in memberships]
+        return self._class_repo.find_by_ids(ids)
 
-    def add_student(self, class_id: str, student_id: str, requester_id: str, requester_role: Role) -> ClassMembership:
+    def add_student(self, class_id: str, student_email: str, requester_id: str, requester_role: Role) -> ClassMembership:
         cls_ = self._get_class_or_raise(class_id)
         self._verify_owner_or_admin(cls_, requester_id, requester_role)
-        student = self._user_repo.find_by_id(student_id)
-        if student is None or student.role != Role.STUDENT:
-            raise PermissionDeniedError("Target user is not a student")
+        student = self._user_repo.find_by_email(student_email.strip().lower())
+        if student is None:
+            raise StudentEmailNotFoundError("No account found for that email")
+        if student.role != Role.STUDENT:
+            raise NotAStudentError("That account is not a student")
+        student_id = student.id
         with self._uow:
+            # Optimistic read: the unique constraint on (class_id, student_id) is
+            # the true guard. Two concurrent calls can both pass here; whichever
+            # INSERT loses is caught below and mapped to StudentAlreadyInClassError.
             if self._class_repo.find_membership(class_id, student_id):
                 raise StudentAlreadyInClassError("Student is already in this class")
             membership = ClassMembership.create(class_id=class_id, student_id=student_id)
             try:
                 self._class_repo.save_membership(membership)
+                # Teacher explicitly re-adding a removed student clears the blocklist.
+                self._class_repo.delete_removed_membership(class_id, student_id)
                 self._uow.commit()
             except IntegrityError as e:
                 raise StudentAlreadyInClassError("Student is already in this class") from e
         return membership
+
+    def verify_access(self, class_id: str, user_id: str, user_role: Role) -> None:
+        """Raise PermissionDeniedError unless the user owns the class, is an admin, or is a member."""
+        cls_ = self._get_class_or_raise(class_id)
+        if user_role == Role.ADMIN or cls_.is_owned_by(user_id):
+            return
+        if user_role == Role.STUDENT:
+            if self._class_repo.find_membership(class_id, user_id):
+                return
+        raise PermissionDeniedError("You are not a member of this class")
 
     def remove_student(self, class_id: str, student_id: str, requester_id: str, requester_role: Role) -> None:
         cls_ = self._get_class_or_raise(class_id)
@@ -108,9 +141,15 @@ class ClassApplicationService:
             raise StudentNotInClassError("Student is not in this class")
         with self._uow:
             self._class_repo.delete_membership(class_id, student_id)
+            self._class_repo.record_removal(RemovedMembership.create(class_id, student_id))
+            if self._territory_repo is not None:
+                self._territory_repo.delete_occupations_for_student_in_class(student_id, class_id)
             self._uow.commit()
+        logger.info("Student %s removed from class %s", student_id, class_id)
 
     def list_students_in_class(self, class_id: str, requester_id: str, requester_role: Role) -> list[ClassMembership]:
+        # Intentional: a teacher can only roster their own class. There is no
+        # cross-teacher sharing by design. Admin sees all via the bypass above.
         cls_ = self._get_class_or_raise(class_id)
         self._verify_owner_or_admin(cls_, requester_id, requester_role)
         return self._class_repo.find_memberships_by_class(class_id)
@@ -118,12 +157,14 @@ class ClassApplicationService:
     def join_by_code(self, code: str, student_id: str, student_role: Role = Role.STUDENT) -> ClassMembership:
         if student_role != Role.STUDENT:
             raise PermissionDeniedError("Only students can join a class by code")
-        cls_ = self._class_repo.find_by_join_code(code.upper().strip())
+        cls_ = self._class_repo.find_by_join_code(code)
         if cls_ is None:
             raise InvalidJoinCodeError("Invalid join code")
         with self._uow:
             if self._class_repo.find_membership(cls_.id, student_id):
                 raise StudentAlreadyInClassError("You are already in this class")
+            if self._class_repo.find_removed_membership(cls_.id, student_id):
+                raise StudentRemovedFromClassError("You have been removed from this class and cannot rejoin via code")
             membership = ClassMembership.create(class_id=cls_.id, student_id=student_id)
             try:
                 self._class_repo.save_membership(membership)
@@ -132,11 +173,38 @@ class ClassApplicationService:
                 raise StudentAlreadyInClassError("You are already in this class") from e
         return membership
 
-    def regenerate_join_code(self, class_id: str, requester_id: str, requester_role: Role) -> str:
+    def delete_class(self, class_id: str, requester_id: str, requester_role: Role) -> None:
         cls_ = self._get_class_or_raise(class_id)
         self._verify_owner_or_admin(cls_, requester_id, requester_role)
         with self._uow:
-            new_code = cls_.regenerate_join_code()
-            self._class_repo.save(cls_)
+            self._class_repo.delete(class_id)
             self._uow.commit()
-        return new_code
+
+    def rename_class(self, class_id: str, name: str, requester_id: str, requester_role: Role) -> Class:
+        cls_ = self._get_class_or_raise(class_id)
+        self._verify_owner_or_admin(cls_, requester_id, requester_role)
+        cls_.rename(name)
+        with self._uow:
+            try:
+                self._class_repo.save(cls_)
+                self._uow.commit()
+            except IntegrityError as exc:
+                if _is_name_conflict(exc):
+                    raise ClassNameConflictError("A class with this name already exists") from exc
+                raise
+        return cls_
+
+    def regenerate_join_code(self, class_id: str, requester_id: str, requester_role: Role) -> str:
+        cls_ = self._get_class_or_raise(class_id)
+        self._verify_owner_or_admin(cls_, requester_id, requester_role)
+        last_exc: Exception | None = None
+        for _ in range(3):
+            cls_.regenerate_join_code()
+            try:
+                with self._uow:
+                    self._class_repo.save(cls_)
+                    self._uow.commit()
+                return cls_.join_code
+            except IntegrityError as exc:
+                last_exc = exc
+        raise last_exc  # type: ignore[misc]

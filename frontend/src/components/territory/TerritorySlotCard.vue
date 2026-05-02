@@ -4,7 +4,7 @@ import type { SlotInfo } from '@/services/territoryService'
 
 const props = defineProps<{
   slot: SlotInfo
-  currentUserId?: string
+  disabledReason?: string
 }>()
 
 defineEmits<{
@@ -13,7 +13,7 @@ defineEmits<{
 
 const state = computed(() => {
   if (!props.slot.occupation) return 'unoccupied'
-  if (props.slot.occupation.student_id === props.currentUserId) return 'mine'
+  if (props.slot.occupation.is_own) return 'mine'
   return 'occupied'
 })
 
@@ -25,18 +25,18 @@ const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat
     <div class="slot-stars">{{ stars }}</div>
     <div class="slot-index">#{{ slot.slot_index + 1 }}</div>
     <div v-if="slot.occupation" class="slot-occupant">
-      <span class="occupant-id" :title="slot.occupation.student_id">
-        {{ slot.occupation.player_name ?? slot.occupation.student_id.slice(0, 8) + '…' }}
-      </span>
+      <span class="occupant-id">{{ slot.occupation.player_name ?? '—' }}</span>
       <span class="occupant-score">{{ slot.occupation.score.toFixed(0) }}</span>
     </div>
     <div v-else class="slot-empty">Unoccupied</div>
     <button
       class="btn slot-play-btn"
+      :disabled="!!disabledReason"
+      :title="disabledReason"
       :aria-label="`${state === 'mine' ? 'Improve' : state === 'occupied' ? 'Challenge' : 'Seize'} slot #${slot.slot_index + 1}`"
       @click="$emit('play', slot.id)"
     >
-      {{ state === 'mine' ? 'Improve' : state === 'occupied' ? 'Challenge' : 'Seize' }}
+      {{ disabledReason ? 'Closed' : state === 'mine' ? 'Improve' : state === 'occupied' ? 'Challenge' : 'Seize' }}
     </button>
   </div>
 </template>

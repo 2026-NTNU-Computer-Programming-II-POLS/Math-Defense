@@ -13,10 +13,11 @@ export interface ActivityInfo {
 export interface OccupationInfo {
   id: string
   slot_id: string
-  student_id: string
+  student_id: string | null
   score: number
   occupied_at: string
   player_name?: string | null
+  is_own: boolean
 }
 
 export interface SlotInfo {
@@ -35,12 +36,13 @@ export interface ActivityDetail {
 
 export interface PlayResult {
   seized: boolean
-  occupation: OccupationInfo
+  occupation: OccupationInfo | null
 }
 
 export interface RankingEntry {
   rank: number
   student_id: string
+  player_name: string | null
   territory_value: number
 }
 

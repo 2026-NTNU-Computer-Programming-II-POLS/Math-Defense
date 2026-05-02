@@ -11,7 +11,7 @@ const activityId = computed(() => route.params.id as string)
 const slotId = computed(() => route.params.slotId as string)
 
 const submitting = ref(true)
-const result = ref<{ seized: boolean; score: number } | null>(null)
+const result = ref<{ seized: boolean; score: number | null } | null>(null)
 const noSession = ref(false)
 
 onMounted(async () => {
@@ -24,7 +24,7 @@ onMounted(async () => {
 
   const res = await store.playSlot(activityId.value, slotId.value, sessionId)
   if (res) {
-    result.value = { seized: res.seized, score: res.occupation.score }
+    result.value = { seized: res.seized, score: res.occupation?.score ?? null }
   }
   submitting.value = false
 })
@@ -52,11 +52,12 @@ function goBack(): void {
           <div class="result-text">
             {{ result.seized ? 'Territory Seized!' : 'Score Not High Enough' }}
           </div>
-          <div class="result-score">Score: {{ result.score.toFixed(2) }}</div>
+          <div v-if="result.score !== null" class="result-score">Score: {{ result.score.toFixed(2) }}</div>
         </div>
       </template>
 
       <div class="result-actions">
+        <button v-if="result && !result.seized" class="btn retry-btn" @click="goBack">Try Again</button>
         <button class="btn" @click="goBack">Back to Activity</button>
       </div>
     </div>
@@ -106,4 +107,6 @@ function goBack(): void {
 .result-score { font-size: 12px; color: var(--axis); }
 
 .result-actions { display: flex; gap: 8px; }
+.retry-btn { border-color: var(--gold); color: var(--gold); }
+.retry-btn:hover { background: var(--gold); color: var(--stone-dark); }
 </style>
