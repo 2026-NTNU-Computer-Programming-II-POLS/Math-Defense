@@ -49,20 +49,28 @@ async function handlePlay(slotId: string): Promise<void> {
       )
       if (!ok) return
     }
-  } catch { /* non-critical — proceed if the check fails */ }
+  } catch (error) {
+    // non-critical — proceed if the check fails
+    console.error('Failed to check active session:', error)
+  }
 
   // Stable seed derived from the slot id so every student faces the same level
   const seed = stringHash(slotId)
   const rng = mulberry32(seed)
   const level = generateLevel(slot.star_rating, rng)
+  const territoryContext = { activityId: activityId.value, slotId }
+
+  sessionStorage.setItem(
+    'initial-answer-context',
+    JSON.stringify({
+      level,
+      seed,
+      territoryContext,
+    })
+  )
 
   router.push({
     name: 'initial-answer',
-    state: {
-      level: JSON.stringify(level),
-      seed,
-      territoryContext: JSON.stringify({ activityId: activityId.value, slotId }),
-    },
   })
 }
 

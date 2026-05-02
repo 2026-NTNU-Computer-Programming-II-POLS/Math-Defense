@@ -14,7 +14,7 @@ def _auth(token):
 def _register(client, name):
     res = client.post("/api/auth/register", json={
         "email": f"{name}@test.local",
-        "password": "secret123",
+        "password": "xQ7!aPm2#vKz9",
         "player_name": name,
     })
     return res.cookies.get("access_token")

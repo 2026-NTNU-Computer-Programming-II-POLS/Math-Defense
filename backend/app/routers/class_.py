@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/classes", tags=["classes"])
 def create_class(
     request: Request,
     req: CreateClassRequest,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     cls_ = build_class_service(db).create_class(name=req.name, teacher_id=user.id)
@@ -95,7 +95,7 @@ def rename_class(
     request: Request,
     class_id: str,
     req: UpdateClassRequest,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     cls_ = build_class_service(db).rename_class(class_id, req.name, user.id, user.role)
@@ -108,7 +108,7 @@ def rename_class(
 def delete_class(
     request: Request,
     class_id: str,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     build_class_service(db).delete_class(class_id, user.id, user.role)
@@ -121,7 +121,7 @@ def add_student(
     request: Request,
     class_id: str,
     req: AddStudentRequest,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     membership = build_class_service(db).add_student(
@@ -140,7 +140,7 @@ def remove_student(
     request: Request,
     class_id: str,
     student_id: str,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     build_class_service(db).remove_student(
@@ -171,7 +171,7 @@ def list_students(
 def regenerate_code(
     request: Request,
     class_id: str,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     new_code = build_class_service(db).regenerate_join_code(

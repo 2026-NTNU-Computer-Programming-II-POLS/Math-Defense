@@ -14,7 +14,7 @@ from app.models.denied_token import DeniedToken
 def _register_and_token(client) -> str:
     res = client.post(
         "/api/auth/register",
-        json={"email": "logoutme@test.local", "password": "secret123", "player_name": "logoutme"},
+        json={"email": "logoutme@test.local", "password": "xQ7!aPm2#vKz9", "player_name": "logoutme"},
     )
     assert res.status_code == 201
     return res.cookies.get("access_token")

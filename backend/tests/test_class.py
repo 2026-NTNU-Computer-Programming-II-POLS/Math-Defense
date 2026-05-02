@@ -13,7 +13,7 @@ def _auth(token):
 def _register_student(client, name):
     res = client.post("/api/auth/register", json={
         "email": f"{name}@test.local",
-        "password": "secret123",
+        "password": "xQ7!aPm2#vKz9",
         "player_name": name,
     })
     return res.cookies.get("access_token")
@@ -77,7 +77,8 @@ def test_other_teacher_cannot_view_class(client, db_session):
     t1 = _register_teacher(db_session, "t_view_own")
     t2 = _register_teacher(db_session, "t_view_other")
     class_id = _create_class(client, t1).json()["id"]
-    assert client.get(f"/api/classes/{class_id}", headers=_auth(t2)).status_code == 403
+    res = client.get(f"/api/classes/{class_id}", headers=_auth(t2))
+    assert res.status_code == 403
 
 
 def test_other_teacher_cannot_rename_class(client, db_session):
@@ -92,7 +93,8 @@ def test_other_teacher_cannot_delete_class(client, db_session):
     t1 = _register_teacher(db_session, "t_del_own")
     t2 = _register_teacher(db_session, "t_del_other")
     class_id = _create_class(client, t1).json()["id"]
-    assert client.delete(f"/api/classes/{class_id}", headers=_auth(t2)).status_code == 403
+    res = client.delete(f"/api/classes/{class_id}", headers=_auth(t2))
+    assert res.status_code == 403
 
 
 def test_other_teacher_cannot_add_student_to_class(client, db_session):
@@ -222,8 +224,10 @@ def test_regenerate_code_invalidates_old_code(client, db_session):
     new_code = regen_res.json()["join_code"]
     assert new_code != old_code
 
-    assert client.post("/api/classes/join", json={"code": old_code}, headers=_auth(s1)).status_code == 404
-    assert client.post("/api/classes/join", json={"code": new_code}, headers=_auth(s2)).status_code == 201
+    res_old = client.post("/api/classes/join", json={"code": old_code}, headers=_auth(s1))
+    assert res_old.status_code == 404
+    res_new = client.post("/api/classes/join", json={"code": new_code}, headers=_auth(s2))
+    assert res_new.status_code == 201
 
 
 # ── Cascade on membership removal ─────────────────────────────────────────────
@@ -252,7 +256,8 @@ def test_remove_student_cascades_territory_occupations(client, db_session):
     play_res = client.post(f"/api/activities/{activity_id}/slots/{slot_id}/play", json={"session_id": sid}, headers=_auth(student_token))
     assert play_res.json()["seized"] is True
 
-    assert client.delete(f"/api/classes/{class_id}/students/{student_id}", headers=_auth(teacher_token)).status_code == 204
+    del_res = client.delete(f"/api/classes/{class_id}/students/{student_id}", headers=_auth(teacher_token))
+    assert del_res.status_code == 204
 
     detail = client.get(f"/api/activities/{activity_id}", headers=_auth(teacher_token)).json()
     assert detail["slots"][0]["occupation"] is None
@@ -264,7 +269,8 @@ def test_delete_class_removes_it_from_teacher_list(client, db_session):
     teacher_token = _register_teacher(db_session, "t_delete")
     class_id = _create_class(client, teacher_token, "Doomed Class").json()["id"]
 
-    assert client.delete(f"/api/classes/{class_id}", headers=_auth(teacher_token)).status_code == 204
+    res = client.delete(f"/api/classes/{class_id}", headers=_auth(teacher_token))
+    assert res.status_code == 204
 
     ids = {c["id"] for c in client.get("/api/classes", headers=_auth(teacher_token)).json()}
     assert class_id not in ids

@@ -9,7 +9,6 @@ game_sessions.  This adds the FK with SET NULL on session delete.
 No separate index is needed: the existing unique constraint
 (uq_territory_occupation_session) already creates an implicit B-tree index.
 """
-import sqlalchemy as sa
 from alembic import op
 
 revision = "l6a7b8c9d0e1"

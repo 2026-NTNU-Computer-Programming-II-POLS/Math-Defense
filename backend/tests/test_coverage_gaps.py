@@ -37,7 +37,7 @@ from app.models.user import User as UserModel
 def _register_and_token(client, name):
     res = client.post(
         "/api/auth/register",
-        json={"email": f"{name}@test.local", "password": "secret123", "player_name": name},
+        json={"email": f"{name}@test.local", "password": "xQ7!aPm2#vKz9", "player_name": name},
     )
     return res.cookies.get("access_token")
 

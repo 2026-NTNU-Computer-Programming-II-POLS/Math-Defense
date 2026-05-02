@@ -29,6 +29,9 @@ class User:
         created_at: datetime | None = None,
         password_version: int = 0,
         is_active: bool = True,
+        is_email_verified: bool = False,
+        totp_secret: str | None = None,
+        mfa_enabled: bool = False,
     ) -> None:
         self.id = id
         self.email = email
@@ -39,6 +42,9 @@ class User:
         self.created_at = created_at or datetime.now(UTC)
         self.password_version = password_version
         self.is_active = is_active
+        self.is_email_verified = is_email_verified
+        self.totp_secret = totp_secret
+        self.mfa_enabled = mfa_enabled
 
     @classmethod
     def create(

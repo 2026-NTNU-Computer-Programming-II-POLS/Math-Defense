@@ -9,9 +9,9 @@ from app.domain.leaderboard.view import RankedLeaderboardEntry
 
 @runtime_checkable
 class LeaderboardRepository(Protocol):
-    def find_by_session_id(self, session_id: str) -> LeaderboardEntry | None: ...
+    def find_by_session_id(self, session_id: str) -> LeaderboardEntry | None: pass
 
-    def save(self, entry: LeaderboardEntry) -> None: ...
+    def save(self, entry: LeaderboardEntry) -> None: pass
 
     def query_ranked_global(
         self,
@@ -19,8 +19,7 @@ class LeaderboardRepository(Protocol):
         per_page: int,
     ) -> tuple[list[RankedLeaderboardEntry], int]:
         """Global DENSE_RANK across all levels."""
-        ...
-
+        pass
     def query_ranked_by_level(
         self,
         level: int,
@@ -28,8 +27,7 @@ class LeaderboardRepository(Protocol):
         per_page: int,
     ) -> tuple[list[RankedLeaderboardEntry], int]:
         """Per-level DENSE_RANK restricted to the given level."""
-        ...
-
+        pass
     def query_ranked_by_class(
         self,
         class_id: str,
@@ -37,4 +35,4 @@ class LeaderboardRepository(Protocol):
         per_page: int,
     ) -> tuple[list[RankedLeaderboardEntry], int]:
         """Class-scoped ranking — best score per student in the class."""
-        ...
+        pass

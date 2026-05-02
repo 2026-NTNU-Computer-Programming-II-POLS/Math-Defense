@@ -55,7 +55,7 @@ def require_role(*roles: Role) -> Callable[..., User]:
     Usage:
         @router.post("/classes")
         def create_class(user: User = Depends(require_role(Role.TEACHER, Role.ADMIN))):
-            ...
+            pass
     """
     allowed = set(roles)
 

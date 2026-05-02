@@ -49,6 +49,9 @@ class SqlAlchemyUserRepository:
             row.is_active = user.is_active
             row.password_hash = user.password_hash
             row.password_version = user.password_version
+            row.is_email_verified = user.is_email_verified
+            row.totp_secret = user.totp_secret
+            row.mfa_enabled = user.mfa_enabled
         else:
             row = UserModel(
                 id=user.id,
@@ -60,6 +63,9 @@ class SqlAlchemyUserRepository:
                 password_hash=user.password_hash,
                 password_version=user.password_version,
                 created_at=user.created_at,
+                is_email_verified=user.is_email_verified,
+                totp_secret=user.totp_secret,
+                mfa_enabled=user.mfa_enabled,
             )
             self._db.add(row)
         self._db.flush()
@@ -76,6 +82,9 @@ class SqlAlchemyUserRepository:
             password_hash=row.password_hash,
             created_at=_ensure_utc(row.created_at),
             password_version=row.password_version or 0,
+            is_email_verified=row.is_email_verified if row.is_email_verified is not None else False,
+            totp_secret=row.totp_secret,
+            mfa_enabled=row.mfa_enabled if row.mfa_enabled is not None else False,
         )
 
 

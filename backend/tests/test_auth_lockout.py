@@ -14,7 +14,7 @@ from app.infrastructure.login_guard import MAX_ATTEMPTS
 from app.models.login_attempt import LoginAttempt
 
 
-def _register(client, email: str = "lockme@test.local", password: str = "correct1") -> None:
+def _register(client, email: str = "lockme@test.local", password: str = "xQ7!aPm2#vKz9") -> None:
     res = client.post("/api/auth/register", json={
         "email": email, "password": password, "player_name": "lockme",
     })
@@ -28,7 +28,7 @@ def test_five_failed_logins_lock_account(client):
         res = client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "wrong"})
         assert res.status_code == 401
 
-    res = client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "correct1"})
+    res = client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "xQ7!aPm2#vKz9"})
     assert res.status_code == 429
 
 
@@ -46,7 +46,7 @@ def test_lockout_window_expiry_restores_login(client, db_session):
     )
     db_session.commit()
 
-    res = client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "correct1"})
+    res = client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "xQ7!aPm2#vKz9"})
     assert res.status_code == 200
 
 
@@ -56,7 +56,7 @@ def test_successful_login_resets_failure_counter(client, db_session):
     for _ in range(MAX_ATTEMPTS - 1):
         client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "wrong"})
 
-    ok = client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "correct1"})
+    ok = client.post("/api/auth/login", json={"email": "lockme@test.local", "password": "xQ7!aPm2#vKz9"})
     assert ok.status_code == 200
 
     row = db_session.query(LoginAttempt).filter_by(username="lockme@test.local").one_or_none()

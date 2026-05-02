@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     # outside the test harness is explicitly rejected by the validator below.
     csrf_enabled: bool = Field(default_factory=_csrf_enabled_default)
 
+    # SMTP — all optional; if smtp_host is empty, outbound email is skipped gracefully.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "noreply@math-defense.app"
+    smtp_tls: bool = True
+    # Base URL for constructing email verification links.
+    frontend_url: str = "http://localhost:5173"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: str | list[str]) -> list[str]:

@@ -27,19 +27,18 @@ class CumulativeStats:
 
 @runtime_checkable
 class GameSessionRepository(Protocol):
-    def find_by_id(self, session_id: str, user_id: str) -> GameSession | None: ...
+    def find_by_id(self, session_id: str, user_id: str) -> GameSession | None: pass
 
     def find_by_id_for_update(self, session_id: str, user_id: str) -> GameSession | None:
         """Like find_by_id, but acquires a row-level lock to serialise
         duplicate-submission checks against concurrent writes."""
-        ...
+        pass
+    def find_active_by_user(self, user_id: str) -> GameSession | None: pass
 
-    def find_active_by_user(self, user_id: str) -> GameSession | None: ...
+    def find_stale_sessions(self, user_id: str) -> list[GameSession]: pass
 
-    def find_stale_sessions(self, user_id: str) -> list[GameSession]: ...
+    def save(self, session: GameSession) -> None: pass
 
-    def save(self, session: GameSession) -> None: ...
+    def save_all(self, sessions: list[GameSession]) -> None: pass
 
-    def save_all(self, sessions: list[GameSession]) -> None: ...
-
-    def get_cumulative_stats(self, user_id: str) -> CumulativeStats: ...
+    def get_cumulative_stats(self, user_id: str) -> CumulativeStats: pass

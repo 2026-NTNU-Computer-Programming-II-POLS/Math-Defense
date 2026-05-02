@@ -56,17 +56,15 @@ class ClassApplicationService:
             raise ClassNotFoundError("Class not found")
         return cls_
 
-    def _verify_owner_or_admin(self, cls_: Class, user_id: str, user_role: Role) -> None:
-        # Admin has full write access to all classes. Spec §2.4 says "audits"
-        # but the current implementation allows full mutation. Tighten here if
-        # read-only admin access is ever required.
+    def _verify_owner_or_admin(self, cls_: Class, user_id: str, user_role: Role, *, is_read_op: bool = False) -> None:
         if user_role == Role.ADMIN:
+            if not is_read_op:
+                raise PermissionDeniedError("Admins have read-only access and cannot perform mutations")
             return
         cls_.verify_owner(user_id)
 
     def create_class(self, name: str, teacher_id: str) -> Class:
-        last_exc: Exception | None = None
-        for _ in range(3):
+        for attempt in range(3):
             cls_ = Class.create(name=name, teacher_id=teacher_id)
             try:
                 with self._uow:
@@ -76,15 +74,16 @@ class ClassApplicationService:
             except IntegrityError as exc:
                 if _is_name_conflict(exc):
                     raise ClassNameConflictError("A class with this name already exists") from exc
-                last_exc = exc
-        raise last_exc  # type: ignore[misc]
+                if attempt == 2:
+                    raise
+        raise RuntimeError("Unreachable")
 
     def get_class(self, class_id: str) -> Class:
         return self._get_class_or_raise(class_id)
 
     def get_class_for_owner(self, class_id: str, requester_id: str, requester_role: Role) -> Class:
         cls_ = self._get_class_or_raise(class_id)
-        self._verify_owner_or_admin(cls_, requester_id, requester_role)
+        self._verify_owner_or_admin(cls_, requester_id, requester_role, is_read_op=True)
         return cls_
 
     def list_classes_for_teacher(self, teacher_id: str) -> list[Class]:
@@ -151,7 +150,7 @@ class ClassApplicationService:
         # Intentional: a teacher can only roster their own class. There is no
         # cross-teacher sharing by design. Admin sees all via the bypass above.
         cls_ = self._get_class_or_raise(class_id)
-        self._verify_owner_or_admin(cls_, requester_id, requester_role)
+        self._verify_owner_or_admin(cls_, requester_id, requester_role, is_read_op=True)
         return self._class_repo.find_memberships_by_class(class_id)
 
     def join_by_code(self, code: str, student_id: str, student_role: Role = Role.STUDENT) -> ClassMembership:
@@ -197,14 +196,14 @@ class ClassApplicationService:
     def regenerate_join_code(self, class_id: str, requester_id: str, requester_role: Role) -> str:
         cls_ = self._get_class_or_raise(class_id)
         self._verify_owner_or_admin(cls_, requester_id, requester_role)
-        last_exc: Exception | None = None
-        for _ in range(3):
+        for attempt in range(3):
             cls_.regenerate_join_code()
             try:
                 with self._uow:
                     self._class_repo.save(cls_)
                     self._uow.commit()
                 return cls_.join_code
-            except IntegrityError as exc:
-                last_exc = exc
-        raise last_exc  # type: ignore[misc]
+            except IntegrityError:
+                if attempt == 2:
+                    raise
+        raise RuntimeError("Unreachable")

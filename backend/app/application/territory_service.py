@@ -64,8 +64,13 @@ class TerritoryApplicationService:
         activity: GrabbingTerritoryActivity,
         user_id: str,
         user_role: Role,
+        *,
+        is_read_op: bool = False
     ) -> None:
         if user_role == Role.ADMIN:
+            if not is_read_op:
+                from app.domain.errors import PermissionDeniedError
+                raise PermissionDeniedError("Admins have read-only access and cannot perform mutations")
             return
         # C-5: any teacher may settle an inter-class activity (no single owner)
         if user_role == Role.TEACHER and activity.class_id is None:
@@ -91,7 +96,10 @@ class TerritoryApplicationService:
                 cls_ = self._class_repo.find_by_id(class_id)
                 if cls_ is None:
                     raise ClassNotFoundError("Class not found")
-                if user_role != Role.ADMIN and cls_.teacher_id != teacher_id:
+                if user_role == Role.ADMIN:
+                    from app.domain.errors import PermissionDeniedError
+                    raise PermissionDeniedError("Admins have read-only access and cannot create activities")
+                if cls_.teacher_id != teacher_id:
                     raise ClassNotFoundError("Class not found")
 
             activity = GrabbingTerritoryActivity.create(
@@ -318,5 +326,6 @@ class TerritoryApplicationService:
                     self._uow.commit()
                     count += 1
             except ActivityAlreadySettledError:
+                # Handled concurrently, safe to ignore
                 pass
         return count
