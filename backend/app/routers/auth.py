@@ -55,7 +55,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         player_name=req.player_name,
         role=req.role,
     )
-    logger.info("User registered: id=%s", user.id)
+    logger.info("User registered: anon=%s", _anon(str(user.id)))
     _set_auth_cookie(response, token)
     mint_csrf_cookie(response)
     return TokenResponse(id=user.id, email=user.email, player_name=user.player_name, role=user.role.value, avatar_url=user.avatar_url)
@@ -65,7 +65,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
 @limiter.limit("10/minute")
 def login(request: Request, response: Response, req: LoginRequest, db: Session = Depends(get_db)):
     user, token = build_auth_service(db).login(req.email, req.password)
-    logger.info("User logged in: id=%s", user.id)
+    logger.info("User logged in: anon=%s", _anon(str(user.id)))
     _set_auth_cookie(response, token)
     mint_csrf_cookie(response)
     return TokenResponse(id=user.id, email=user.email, player_name=user.player_name, role=user.role.value, avatar_url=user.avatar_url)
