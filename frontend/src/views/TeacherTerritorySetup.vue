@@ -43,12 +43,19 @@ async function submit(): Promise<void> {
     validationError.value = 'Please set a deadline'
     return
   }
+
+  const parsedDeadline = new Date(deadline.value)
+  if (Number.isNaN(parsedDeadline.getTime())) {
+    validationError.value = 'Please enter a valid deadline'
+    return
+  }
+
   validationError.value = ''
   submitting.value = true
   try {
     const activity = await store.createActivity({
       title: title.value.trim(),
-      deadline: new Date(deadline.value).toISOString(),
+      deadline: parsedDeadline.toISOString(),
       class_id: selectedClassId.value,
       slots: slots.value.map((s) => ({ star_rating: s.star_rating })),
     })
