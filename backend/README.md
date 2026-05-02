@@ -147,7 +147,7 @@ backend/
 
 Pure Python — no SQLAlchemy, no FastAPI.
 
-- **Value objects** (`value_objects.py`): `SessionStatus` enum, `Level` (1–4), `Score` (0 – 9,999,999), `GameResult`. Immutable dataclasses that validate on construction.
+- **Value objects** (`value_objects.py`): `SessionStatus` enum, `Level` (1–5), `Score` (0 – 9,999,999), `GameResult`. Immutable dataclasses that validate on construction.
 - **Constraints** (`constraints.py`): numeric bounds (level / score / hp / gold / kills / waves ranges, `MAX_SCORE_DELTA`) — imported by both Pydantic schemas and value-object/aggregate invariants so each limit is encoded exactly once.
 - **`GameSession` aggregate** (`session/aggregate.py`): the root. Owns its state transitions via `_ALLOWED_TRANSITIONS`; `update_progress()` / `complete()` / `abandon()` raise if called in an illegal status. Score is monotonic; per-update deltas are capped to reject obvious abuse. Emits domain events into an internal buffer collected by the application layer.
 - **`LeaderboardEntry` aggregate** — created from a `GameSession` result. Holds `score` as a `Score` VO.

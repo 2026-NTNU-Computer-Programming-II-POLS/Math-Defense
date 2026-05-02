@@ -483,7 +483,7 @@ Append-only security event log. `user_id` is a plain string with **no FK constra
 | `details` | `Text` | YES | — |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
-**Indexes:** `user_id` (implicit), `event_type` (implicit)
+**Indexes:** `ix_audit_logs_user_id` (on `user_id`), `ix_audit_logs_event_type` (on `event_type`)
 
 ---
 
@@ -535,6 +535,8 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `ix_login_attempts_locked_until` | `login_attempts` | `locked_until` | BTREE |
 | `ix_denied_tokens_expires_at` | `denied_tokens` | `expires_at` | BTREE |
 | `ix_email_verification_tokens_user_id` | `email_verification_tokens` | `user_id` | BTREE |
+| `ix_audit_logs_user_id` | `audit_logs` | `user_id` | BTREE |
+| `ix_audit_logs_event_type` | `audit_logs` | `event_type` | BTREE |
 
 ---
 
@@ -586,7 +588,7 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `f7a3b8c2d1e6` | V2 foundation — roles, classes, email-based auth |
 | `a1b2c3d4e5f6` | V2 level schema — replace level with `star_rating` |
 | `b2c3d4e5f6a7` | Add `kill_value` to `game_sessions` |
-| `c3d4e5f6a7b8` *(first — **DUPLICATE REVISION ID**)* | V2 achievement + talent tables |
+| `c3d4e5f6a7b8` *(removed — see note)* | V2 achievement + talent tables |
 | `d4e5f6a7b8c9` | V2 grabbing territory tables |
 | `e6f7a8b9c0d1` | Session scoring fields (`time_exclude_prepare`, `total_score`) |
 | `f0a1b2c3d4e5` | Add `password_version` to `users` |
@@ -598,6 +600,6 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `l6a7b8c9d0e1` | FK on `territory_occupations.session_id` |
 | `m7b8c9d0e1f2` | Territory data integrity — `settled_at/settled_by`, slot uniqueness |
 | `58cbdc857a81` | Fix dropped tables (recreate `talent_allocations`, `user_achievements`, `removed_class_memberships`) |
-| `c3d4e5f6a7b8` *(second — **DUPLICATE REVISION ID**)* | Email verification + MFA (`totp_secret`, `mfa_enabled`, `email_verification_tokens`) |
+| `d5e6f7a8b9c0` | Email verification + MFA (`totp_secret`, `mfa_enabled`, `email_verification_tokens`) |
 
-> **Bug**: `c3d4e5f6a7b8_v2_achievement_talent.py` and `c3d4e5f6a7b8_add_email_verification_and_mfa.py` both declare `revision = "c3d4e5f6a7b8"`. Alembic raises `DuplicatedRevisionError` when scanning the versions directory. In practice the email-verification file supersedes the achievement/talent one (the latter is ignored), which is why `58cbdc857a81` had to manually recreate `user_achievements` and `talent_allocations`. The achievement/talent migration file should be assigned a distinct revision ID to resolve this conflict.
+> **History**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create. The email verification + MFA migration was given a distinct revision `d5e6f7a8b9c0` (revising `58cbdc857a81`) and is the current head.
