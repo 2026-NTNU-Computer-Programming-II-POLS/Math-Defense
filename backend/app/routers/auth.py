@@ -85,9 +85,10 @@ def logout(
     if token:
         try:
             build_auth_service(db).logout_token(token)
-        except Exception:
-            # Ignored: clearing cookies on client side regardless of server-side state
-            pass
+        except Exception as exc:
+            # Ignored for user flow: clearing cookies on client side regardless of server-side state.
+            # Logged at debug level to aid troubleshooting without exposing details to clients.
+            logger.debug("Logout token revocation failed; proceeding with client-side logout", exc_info=exc)
     _clear_auth_cookie(response)
     mint_csrf_cookie(response)
 
