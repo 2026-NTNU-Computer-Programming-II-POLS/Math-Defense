@@ -5,7 +5,7 @@ import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
-const { loading, error, login, register } = useAuth()
+const { loading, error, login, register, mfaRequired, verifyMfa, cancelMfa } = useAuth()
 
 const isLogin = ref(
   route.query.mode === 'login' || (!route.query.mode && !!route.query.next),
@@ -14,6 +14,7 @@ const email = ref('')
 const password = ref('')
 const playerName = ref('')
 const role = ref('student')
+const mfaCode = ref('')
 
 const title = computed(() => isLogin.value ? '登入' : '註冊')
 
@@ -49,6 +50,11 @@ function toggleMode(): void {
   if (!isLogin.value) updatePasswordRules(password.value)
 }
 
+function handleCancelMfa(): void {
+  mfaCode.value = ''
+  cancelMfa()
+}
+
 function validate(): string {
   if (!email.value) return '請輸入電子信箱'
   if (!password.value) return '請輸入密碼'
@@ -65,7 +71,22 @@ function validate(): string {
   return ''
 }
 
+function getNextPath(): string {
+  const raw = typeof route.query.next === 'string' ? route.query.next : ''
+  return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
+}
+
 async function submit(): Promise<void> {
+  if (mfaRequired.value) {
+    if (!mfaCode.value || !/^\d{6}$/.test(mfaCode.value)) {
+      error.value = '請輸入 6 位數驗證碼'
+      return
+    }
+    const ok = await verifyMfa(mfaCode.value)
+    if (ok) router.push(getNextPath())
+    return
+  }
+
   const e = email.value.trim()
   const p = password.value
   email.value = e
@@ -77,88 +98,110 @@ async function submit(): Promise<void> {
   const ok = isLogin.value
     ? await login(e, p)
     : await register(e, p, playerName.value.trim(), role.value)
-  if (ok) {
-    const raw = typeof route.query.next === 'string' ? route.query.next : ''
-    const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
-    router.push(next)
-  }
+  if (ok) router.push(getNextPath())
 }
 </script>
 
 <template>
   <div class="auth-view">
     <div class="auth-panel rune-panel">
-      <h2 class="auth-title">{{ title }}</h2>
+      <h2 class="auth-title">{{ mfaRequired ? '雙重驗證' : title }}</h2>
 
       <form class="auth-form" @submit.prevent="submit">
-        <label class="auth-field">
-          <span>電子信箱</span>
-          <input
-            v-model="email"
-            class="rune-input"
-            type="email"
-            autocomplete="email"
-            required
-            @input="clearError"
-          />
-        </label>
-
-        <template v-if="!isLogin">
+        <template v-if="mfaRequired">
+          <p class="mfa-hint">請輸入驗證器 App 中的 6 位數驗證碼</p>
           <label class="auth-field">
-            <span>玩家名稱</span>
+            <span>驗證碼</span>
             <input
-              v-model="playerName"
+              v-model="mfaCode"
               class="rune-input"
               type="text"
-              autocomplete="nickname"
+              inputmode="numeric"
+              pattern="\d{6}"
+              maxlength="6"
+              autocomplete="one-time-code"
+              placeholder="000000"
+              required
+              @input="clearError"
+            />
+          </label>
+        </template>
+
+        <template v-else>
+          <label class="auth-field">
+            <span>電子信箱</span>
+            <input
+              v-model="email"
+              class="rune-input"
+              type="email"
+              autocomplete="email"
               required
               @input="clearError"
             />
           </label>
 
+          <template v-if="!isLogin">
+            <label class="auth-field">
+              <span>玩家名稱</span>
+              <input
+                v-model="playerName"
+                class="rune-input"
+                type="text"
+                autocomplete="nickname"
+                required
+                @input="clearError"
+              />
+            </label>
+
+            <label class="auth-field">
+              <span>身份</span>
+              <select v-model="role" class="rune-input">
+                <option value="student">學生</option>
+                <option value="teacher">教師</option>
+              </select>
+            </label>
+          </template>
+
           <label class="auth-field">
-            <span>身份</span>
-            <select v-model="role" class="rune-input">
-              <option value="student">學生</option>
-              <option value="teacher">教師</option>
-            </select>
+            <span>密碼</span>
+            <input
+              :value="password"
+              class="rune-input"
+              type="password"
+              :autocomplete="isLogin ? 'current-password' : 'new-password'"
+              required
+              @input="onPasswordInput"
+            />
           </label>
+
+          <ul v-if="!isLogin" class="password-rules">
+            <li :class="{ met: passwordRules.length }">至少 8 個字元</li>
+            <li :class="{ met: passwordRules.hasLetter }">包含英文字母</li>
+            <li :class="{ met: passwordRules.hasDigit }">包含數字</li>
+          </ul>
         </template>
-
-        <label class="auth-field">
-          <span>密碼</span>
-          <input
-            :value="password"
-            class="rune-input"
-            type="password"
-            :autocomplete="isLogin ? 'current-password' : 'new-password'"
-            required
-            @input="onPasswordInput"
-          />
-        </label>
-
-        <ul v-if="!isLogin" class="password-rules">
-          <li :class="{ met: passwordRules.length }">至少 8 個字元</li>
-          <li :class="{ met: passwordRules.hasLetter }">包含英文字母</li>
-          <li :class="{ met: passwordRules.hasDigit }">包含數字</li>
-        </ul>
 
         <div v-if="error" class="auth-error">{{ error }}</div>
 
         <button class="btn" type="submit" :disabled="loading">
-          {{ loading ? '請稍候…' : title }}
+          {{ loading ? '請稍候…' : (mfaRequired ? '驗證' : title) }}
         </button>
       </form>
 
-      <button class="btn toggle-btn" @click="toggleMode">
-        {{ isLogin ? '沒有帳號？前往註冊' : '已有帳號？前往登入' }}
-      </button>
+      <template v-if="mfaRequired">
+        <button class="btn toggle-btn" @click="handleCancelMfa">← 返回登入</button>
+      </template>
+      <template v-else>
+        <button class="btn toggle-btn" @click="toggleMode">
+          {{ isLogin ? '沒有帳號？前往註冊' : '已有帳號？前往登入' }}
+        </button>
+      </template>
 
-      <p v-if="isLogin" class="demo-hint">
+      <p v-if="isLogin && !mfaRequired" class="demo-hint">
         體驗帳號：<code>demo@mathdefense.local</code> / <code>Demo1234</code>
       </p>
 
-      <button class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
+      <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
     </div>
   </div>
 </template>
@@ -203,6 +246,14 @@ async function submit(): Promise<void> {
 .rune-input { width: 100%; }
 
 .auth-error { font-size: 11px; color: var(--enemy-red); }
+
+.mfa-hint {
+  font-size: 11px;
+  color: var(--axis);
+  opacity: 0.8;
+  margin: 0;
+  text-align: center;
+}
 
 .password-rules {
   list-style: none;

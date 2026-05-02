@@ -1,3 +1,4 @@
+import { reactive } from 'vue'
 import { Events, GamePhase } from '@/data/constants'
 import {
   MONTY_HALL_THRESHOLDS_BY_STAR,
@@ -90,7 +91,7 @@ export class MontyHallSystem implements GameSystem {
     const reward = MONTY_HALL_REWARD_POOL[
       Math.floor(Math.random() * MONTY_HALL_REWARD_POOL.length)
     ]
-    this.current = {
+    this.current = reactive<MontyHallState>({
       doorCount,
       prizeIndex,
       selectedDoor: null,
@@ -98,7 +99,7 @@ export class MontyHallSystem implements GameSystem {
       reward,
       phase: 'select',
       won: false,
-    }
+    })
   }
 
   private _revealDoor(_game: Game): void {

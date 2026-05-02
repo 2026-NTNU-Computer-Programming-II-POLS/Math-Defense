@@ -7,6 +7,8 @@ export interface TokenResponse {
   player_name: string
   role: string
   avatar_url: string | null
+  mfa_required?: boolean
+  mfa_token?: string | null
 }
 
 export interface MeResponse {
@@ -28,6 +30,9 @@ export const authService = {
   },
   login(email: string, password: string) {
     return api.post<TokenResponse>('/api/auth/login', { email, password })
+  },
+  mfaChallenge(mfaToken: string, code: string) {
+    return api.post<TokenResponse>('/api/auth/mfa/challenge', { mfa_token: mfaToken, code })
   },
   me() {
     return api.get<MeResponse>('/api/auth/me')
