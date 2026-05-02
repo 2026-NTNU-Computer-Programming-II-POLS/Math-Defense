@@ -41,13 +41,14 @@ export class TowerUpgradeSystem {
 
     const def = TOWER_DEFS[tower.type]
     if (!def) return
-    const tier = def.upgrades[tower.level - 1]
+    const oldLevel = tower.level
+    const tier = def.upgrades[oldLevel - 1]
     if (!tier) return
 
     game.changeGold(-cost)
     tower.upgradeSpend ??= 0
     tower.upgradeSpend += cost
-    tower.level++
+    tower.level = oldLevel + 1
 
     const mods = game.towerModifierProvider?.(tower.type) ?? {}
     const talentDmg = 1 + (mods['damage'] ?? 0)
@@ -62,7 +63,7 @@ export class TowerUpgradeSystem {
     tower.effectiveRange = tower.baseRange * tower.rangeBonus
     tower.talentMods = mods
     let cd = def.cooldown
-    for (let i = 0; i < tower.level - 1; i++) {
+    for (let i = 0; i < oldLevel; i++) {
       cd *= (1 - (def.upgrades[i]?.speedBonus ?? 0))
     }
     tower.cooldown = cd * (1 - talentSpeed)
