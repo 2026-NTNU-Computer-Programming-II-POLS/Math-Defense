@@ -18,7 +18,6 @@ from app.utils.security import hash_password
 logger = logging.getLogger(__name__)
 
 DEMO_EMAIL = "demo@mathdefense.local"
-DEMO_PASSWORD = "Demo1234"
 DEMO_PLAYER_NAME = "demo"
 
 
@@ -26,10 +25,20 @@ def _is_enabled() -> bool:
     return os.environ.get("SEED_DEMO_USER", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _demo_password() -> str | None:
+    """Return the demo user password from env, or None if unset (seed is skipped)."""
+    return os.environ.get("DEMO_SEED_PASSWORD") or None
+
+
 def ensure_demo_user(db: Session) -> None:
     """Create the demo user if SEED_DEMO_USER is enabled and it does not already exist."""
     if not _is_enabled():
         logger.debug("SEED_DEMO_USER not set — skipping demo seed")
+        return
+
+    password = _demo_password()
+    if password is None:
+        logger.warning("SEED_DEMO_USER=true but DEMO_SEED_PASSWORD is not set — skipping demo seed")
         return
 
     now = datetime.now(UTC)
@@ -46,7 +55,7 @@ def ensure_demo_user(db: Session) -> None:
             "email": DEMO_EMAIL,
             "player_name": DEMO_PLAYER_NAME,
             "role": "student",
-            "password_hash": hash_password(DEMO_PASSWORD),
+            "password_hash": hash_password(password),
             "created_at": now,
             "updated_at": now,
         },

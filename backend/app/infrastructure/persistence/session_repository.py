@@ -90,6 +90,7 @@ class SqlAlchemySessionRepository:
                 user_id=session.user_id,
                 star_rating=int(session.level),
                 initial_answer=session.initial_answer,
+                path_config=session.path_config,
                 status=session.status.value,
                 current_wave=session.current_wave,
                 gold=session.gold,
@@ -159,6 +160,7 @@ class SqlAlchemySessionRepository:
             started_at=_ensure_utc(row.started_at),
             ended_at=_ensure_utc(row.ended_at),
         )
+        session.path_config = row.path_config
         session.kill_value = row.kill_value
         session.cost_total = row.cost_total
         session.time_total = row.time_total

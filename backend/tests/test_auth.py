@@ -1,9 +1,8 @@
-def _reg(email, password="secret123", player_name=None, role="student"):
+def _reg(email, password="secret123", player_name=None):
     return {
         "email": email,
         "password": password,
         "player_name": player_name or email.split("@")[0],
-        "role": role,
     }
 
 

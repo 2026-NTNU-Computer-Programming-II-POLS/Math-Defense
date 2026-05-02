@@ -73,7 +73,7 @@ export class RadarTowerSystem {
       const enemyAngle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
       const angleDiff = Math.abs(normalizeAngle(enemyAngle - angle))
       if (angleDiff < aoeWidth) {
-        this._dealDamage(enemy, tower.effectiveDamage * arcBonus, game)
+        this._dealDamage(enemy, tower.effectiveDamage * arcBonus * dt, game)
       }
     }
   }

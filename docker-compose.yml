@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     # Pin container UID/GID to the typical Linux host dev user so files written
@@ -54,7 +54,7 @@ services:
       dockerfile: frontend/Dockerfile
       target: dev
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     environment:
       # Vite's dev-server proxy target for /api. Default in vite.config.ts is
       # http://localhost:8000, which only works when Vite runs on the host —

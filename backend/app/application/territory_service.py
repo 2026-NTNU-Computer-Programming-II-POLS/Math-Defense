@@ -115,8 +115,24 @@ class TerritoryApplicationService:
                 activities.append(a)
         return activities
 
-    def get_activity_detail(self, activity_id: str) -> dict:
+    def _verify_activity_access(
+        self,
+        activity: GrabbingTerritoryActivity,
+        user_id: str,
+        user_role: Role,
+    ) -> None:
+        """Ensure the caller may view this activity's detail or rankings."""
+        if user_role in (Role.ADMIN, Role.TEACHER):
+            return
+        if activity.class_id is None:
+            return
+        membership = self._class_repo.find_membership(activity.class_id, user_id)
+        if membership is None:
+            raise ActivityNotFoundError("Activity not found")
+
+    def get_activity_detail(self, activity_id: str, user_id: str, user_role: Role) -> dict:
         activity = self._get_activity_or_raise(activity_id)
+        self._verify_activity_access(activity, user_id, user_role)
         slots = self._territory_repo.find_slots_by_activity(activity_id)
         return {"activity": activity, "slots": slots}
 
@@ -155,15 +171,18 @@ class TerritoryApplicationService:
 
             score = self._validate_session(session_id, student_id, slot.star_rating)
 
+            if self._territory_repo.is_session_used(session_id):
+                raise InvalidSessionError("This session has already been used for a territory capture")
+
             slot.occupation = occ_from_db
 
-            raw_count = self._territory_repo.count_occupations_by_student(activity_id, student_id)
+            raw_count = self._territory_repo.count_occupations_by_student_for_update(activity_id, student_id)
             effective_count = GrabbingTerritoryActivity.effective_occupation_count(
                 raw_count, occ_from_db, student_id,
             )
 
             try:
-                occupation = activity.attempt_occupation(slot, student_id, score, effective_count)
+                occupation = activity.attempt_occupation(slot, student_id, score, effective_count, session_id)
             except ScoreNotHighEnoughError:
                 return {"seized": False, "occupation": occ_from_db}
 
@@ -180,12 +199,14 @@ class TerritoryApplicationService:
             )
         return {"seized": True, "occupation": occupation}
 
-    def get_activity_external_rankings(self, activity_id: str) -> list[dict]:
-        self._get_activity_or_raise(activity_id)
+    def get_activity_external_rankings(self, activity_id: str, user_id: str, user_role: Role) -> list[dict]:
+        activity = self._get_activity_or_raise(activity_id)
+        self._verify_activity_access(activity, user_id, user_role)
         return self._territory_repo.get_external_rankings(activity_id)
 
-    def get_activity_rankings(self, activity_id: str) -> list[dict]:
-        self._get_activity_or_raise(activity_id)
+    def get_activity_rankings(self, activity_id: str, user_id: str, user_role: Role) -> list[dict]:
+        activity = self._get_activity_or_raise(activity_id)
+        self._verify_activity_access(activity, user_id, user_role)
         slots = self._territory_repo.find_slots_by_activity(activity_id)
 
         student_scores: dict[str, float] = {}

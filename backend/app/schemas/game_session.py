@@ -1,5 +1,8 @@
+import json
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.constraints import (
     GOLD_MAX,
@@ -17,12 +20,23 @@ from app.domain.constraints import (
 )
 
 
+_PATH_CONFIG_MAX_BYTES = 10_240
+_PrepareFloat = Annotated[float, Field(ge=0, le=7200.0)]
+
+
 class SessionCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     star_rating: int = Field(ge=STAR_MIN, le=STAR_MAX)
     path_config: dict | None = None
     initial_answer: bool = False
+
+    @field_validator("path_config")
+    @classmethod
+    def path_config_size(cls, v: dict | None) -> dict | None:
+        if v is not None and len(json.dumps(v)) > _PATH_CONFIG_MAX_BYTES:
+            raise ValueError(f"path_config exceeds {_PATH_CONFIG_MAX_BYTES} byte limit")
+        return v
 
 
 class SessionUpdate(BaseModel):
@@ -58,9 +72,9 @@ class SessionEnd(BaseModel):
     time_total: float | None = Field(default=None, ge=0, le=7200.0)
     health_origin: int | None = Field(default=None, ge=HP_MIN, le=HP_MAX)
     health_final: int | None = Field(default=None, ge=HP_MIN, le=HP_MAX)
-    time_exclude_prepare: list[float] | None = Field(default=None, max_length=50)
+    time_exclude_prepare: list[_PrepareFloat] | None = Field(default=None, max_length=50)
     n_prep_phases: int | None = Field(default=None, ge=0, le=50)
-    total_score: float | None = Field(default=None, ge=0)
+    total_score: float | None = Field(default=None, ge=0, le=1_000_000)
 
 
 SESSION_OUT_SCHEMA_VERSION = 1

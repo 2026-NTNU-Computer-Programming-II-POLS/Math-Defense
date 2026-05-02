@@ -69,7 +69,7 @@ def get_activity_detail(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    detail = build_territory_service(db).get_activity_detail(activity_id)
+    detail = build_territory_service(db).get_activity_detail(activity_id, user.id, user.role)
     return ActivityDetailOut(
         activity=_activity_out(detail["activity"]),
         slots=[_slot_out(s) for s in detail["slots"]],
@@ -106,7 +106,7 @@ def get_activity_rankings(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return build_territory_service(db).get_activity_rankings(activity_id)
+    return build_territory_service(db).get_activity_rankings(activity_id, user.id, user.role)
 
 
 @router.get("/{activity_id}/external-rankings", response_model=list[ExternalRankingEntryOut])
@@ -117,7 +117,7 @@ def get_activity_external_rankings(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return build_territory_service(db).get_activity_external_rankings(activity_id)
+    return build_territory_service(db).get_activity_external_rankings(activity_id, user.id, user.role)
 
 
 @router.post("/{activity_id}/settle", status_code=status.HTTP_204_NO_CONTENT)

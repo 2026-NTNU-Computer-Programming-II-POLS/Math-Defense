@@ -35,22 +35,22 @@ export interface ChainRuleQuestion {
   gPrime: string
 }
 
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!
+function pickRandom<T>(arr: T[], rng: () => number): T {
+  return arr[Math.floor(rng() * arr.length)]!
 }
 
-function shuffle<T>(arr: T[]): T[] {
+function shuffle<T>(arr: T[], rng: () => number): T[] {
   const out = [...arr]
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rng() * (i + 1))
     ;[out[i], out[j]] = [out[j]!, out[i]!]
   }
   return out
 }
 
-export function generateChainRuleQuestion(): ChainRuleQuestion {
-  const f = pickRandom(OUTER_FUNCTIONS)
-  const g = pickRandom(INNER_FUNCTIONS)
+export function generateChainRuleQuestion(rng: () => number = Math.random): ChainRuleQuestion {
+  const f = pickRandom(OUTER_FUNCTIONS, rng)
+  const g = pickRandom(INNER_FUNCTIONS, rng)
 
   const compositeExpr = f.expr(g.expr)
   const fPrimeOfG = f.deriv(g.expr)
@@ -72,7 +72,7 @@ export function generateChainRuleQuestion(): ChainRuleQuestion {
 
   const distractorList = [...distractors].slice(0, 3)
 
-  const allChoices = shuffle([correctAnswer, ...distractorList])
+  const allChoices = shuffle([correctAnswer, ...distractorList], rng)
   const correctIndex = allChoices.indexOf(correctAnswer)
 
   return {

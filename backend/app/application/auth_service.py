@@ -82,7 +82,7 @@ class AuthApplicationService:
                 self._uow.commit()
             except IntegrityError as e:
                 raise DomainValueError("Email already registered") from e
-        token = create_access_token({"sub": user.id, "role": user.role.value})
+        token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
         return user, token
 
     def login(self, email: str, password: str) -> tuple[User, str]:
@@ -107,7 +107,7 @@ class AuthApplicationService:
                 raise InvalidCredentialsError("Invalid email or password")
             self._login_attempts.clear(email_lower)
             self._uow.commit()
-        token = create_access_token({"sub": user.id, "role": user.role.value})
+        token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
         return user, token
 
     def authenticate_token(self, token: str) -> User:
@@ -124,6 +124,9 @@ class AuthApplicationService:
         user = self._user_repo.find_by_id(user_id)
         if user is None:
             raise UserNotFoundError("User not found")
+        token_pv = payload.get("pv", 0)
+        if token_pv != user.password_version:
+            raise InvalidTokenError("Token has been invalidated by a password change")
         return user
 
     def change_password(self, user_id: str, current_password: str, new_password: str) -> None:
@@ -135,6 +138,7 @@ class AuthApplicationService:
             if not verify_password(current_password, user.password_hash):
                 raise InvalidCredentialsError("Current password is incorrect")
             user.password_hash = hash_password(new_password)
+            user.password_version += 1
             self._user_repo.save(user)
             self._uow.commit()
 

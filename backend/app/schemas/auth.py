@@ -14,9 +14,6 @@ _COMMON_PASSWORDS = frozenset({
     "test1234", "hello123", "changeme1", "trustno1", "starwars1",
 })
 
-_VALID_ROLES = frozenset({"admin", "teacher", "student"})
-
-
 def _validate_password_strength(v: str) -> str:
     if len(v) < 8:
         raise ValueError("Password must be at least 8 characters")
@@ -39,7 +36,6 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     player_name: str
-    role: str = "student"
 
     @field_validator("email")
     @classmethod
@@ -57,13 +53,6 @@ class RegisterRequest(BaseModel):
         v = v.strip()
         if len(v) < PLAYER_NAME_MIN_LENGTH or len(v) > PLAYER_NAME_MAX_LENGTH:
             raise ValueError(f"Player name must be {PLAYER_NAME_MIN_LENGTH}-{PLAYER_NAME_MAX_LENGTH} characters")
-        return v
-
-    @field_validator("role")
-    @classmethod
-    def role_valid(cls, v: str) -> str:
-        if v not in _VALID_ROLES:
-            raise ValueError(f"Role must be one of: {', '.join(sorted(_VALID_ROLES))}")
         return v
 
     @field_validator("password")

@@ -11,6 +11,7 @@ from app.domain.user.aggregate import User
 from app.factories import build_auth_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
+from app.middleware.csrf import mint_csrf_cookie
 from app.schemas.auth import AuthMeResponse, AvatarUpdateRequest, ChangePasswordRequest, LoginRequest, RegisterRequest, TokenResponse
 
 logger = logging.getLogger(__name__)
@@ -52,10 +53,11 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         email=req.email,
         password=req.password,
         player_name=req.player_name,
-        role=req.role,
+        role="student",
     )
     logger.info("User registered: id=%s", user.id)
     _set_auth_cookie(response, token)
+    mint_csrf_cookie(response)
     return TokenResponse(id=user.id, email=user.email, player_name=user.player_name, role=user.role.value, avatar_url=user.avatar_url)
 
 
@@ -65,6 +67,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     user, token = build_auth_service(db).login(req.email, req.password)
     logger.info("User logged in: id=%s", user.id)
     _set_auth_cookie(response, token)
+    mint_csrf_cookie(response)
     return TokenResponse(id=user.id, email=user.email, player_name=user.player_name, role=user.role.value, avatar_url=user.avatar_url)
 
 
@@ -85,6 +88,7 @@ def logout(
         except Exception:
             pass
     _clear_auth_cookie(response)
+    mint_csrf_cookie(response)
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

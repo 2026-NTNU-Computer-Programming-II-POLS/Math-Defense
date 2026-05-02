@@ -52,6 +52,7 @@ class TerritoryOccupation(Base):
     __tablename__ = "territory_occupations"
     __table_args__ = (
         UniqueConstraint("slot_id", name="uq_territory_occupation_slot"),
+        UniqueConstraint("session_id", name="uq_territory_occupation_session"),
         Index("ix_territory_occupations_student_id", "student_id"),
         Index("ix_territory_occupations_slot_id", "slot_id"),
     )
@@ -64,6 +65,7 @@ class TerritoryOccupation(Base):
         String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
     )
     score: Mapped[float] = mapped_column(Float, nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     occupied_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )

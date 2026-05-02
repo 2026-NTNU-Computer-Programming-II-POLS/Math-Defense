@@ -60,7 +60,7 @@ export const territoryService = {
   },
 
   listActivities(classId?: string) {
-    const params = classId ? `?class_id=${classId}` : ''
+    const params = classId ? `?class_id=${encodeURIComponent(classId)}` : ''
     return api.get<ActivityInfo[]>(`/api/activities${params}`)
   },
 

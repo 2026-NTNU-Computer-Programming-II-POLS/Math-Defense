@@ -100,7 +100,10 @@ export class LimitTowerSystem {
   private _applyLimitEffect(tower: Tower, result: LimitResult, game: Game): void {
     if (result.outcome === 'zero') {
       const idx = game.towers.findIndex((t) => t.id === tower.id)
-      if (idx >= 0) game.towers.splice(idx, 1)
+      if (idx >= 0) {
+        game.getSystem('buff')?.onTowerRemoved(game, tower.id)
+        game.towers.splice(idx, 1)
+      }
     } else if (result.outcome === 'constant') {
       tower.disabled = true
     }

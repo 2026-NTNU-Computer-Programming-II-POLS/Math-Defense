@@ -35,6 +35,7 @@ class SqlAlchemyUserRepository:
             row.avatar_url = user.avatar_url
             row.role = user.role.value
             row.password_hash = user.password_hash
+            row.password_version = user.password_version
         else:
             row = UserModel(
                 id=user.id,
@@ -43,6 +44,7 @@ class SqlAlchemyUserRepository:
                 avatar_url=user.avatar_url,
                 role=user.role.value,
                 password_hash=user.password_hash,
+                password_version=user.password_version,
                 created_at=user.created_at,
             )
             self._db.add(row)
@@ -58,6 +60,7 @@ class SqlAlchemyUserRepository:
             role=Role(row.role),
             password_hash=row.password_hash,
             created_at=_ensure_utc(row.created_at),
+            password_version=row.password_version or 0,
         )
 
 

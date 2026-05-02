@@ -27,7 +27,7 @@ def create_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = build_session_service(db).create_session(current_user.id, req.star_rating, initial_answer=req.initial_answer)
+    session = build_session_service(db).create_session(current_user.id, req.star_rating, initial_answer=req.initial_answer, path_config=req.path_config)
     return session_to_out(session)
 
 

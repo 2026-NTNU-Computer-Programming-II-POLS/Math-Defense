@@ -27,6 +27,7 @@ class User:
         password_hash: str,
         avatar_url: str | None = None,
         created_at: datetime | None = None,
+        password_version: int = 0,
     ) -> None:
         self.id = id
         self.email = email
@@ -35,6 +36,7 @@ class User:
         self.password_hash = password_hash
         self.avatar_url = avatar_url
         self.created_at = created_at or datetime.now(UTC)
+        self.password_version = password_version
 
     @classmethod
     def create(

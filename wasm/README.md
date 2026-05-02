@@ -94,7 +94,7 @@ All functions are exposed as C symbols prefixed with `_` (Emscripten convention)
 void matrix_multiply(const float *a, const float *b, float *result);
 ```
 
-Standard 2×2 matrix multiplication. `a`, `b`, `result` are flat 4-float arrays `[a00, a01, a10, a11]`. Used by the **Matrix Link** tower to compose rotation/scaling transformations.
+Standard 2×2 matrix multiplication. `a`, `b`, `result` are flat 4-float arrays `[a00, a01, a10, a11]`. Used by the **Matrix** tower to compose rotation/scaling transformations.
 
 ---
 
@@ -109,7 +109,7 @@ void calculate_trajectory(
 );
 ```
 
-Samples `y = ax² + bx + c` across `[x_start, x_end]` in steps of `step`. Writes the sample arrays and the number of points into `out_*` / `count` (the bridge caps at 1000 points). Used by the **Function Cannon** to draw the projectile arc and feed intersection tests.
+Samples `y = ax² + bx + c` across `[x_start, x_end]` in steps of `step`. Writes the sample arrays and the number of points into `out_*` / `count` (the bridge caps at 1000 points). **V1 legacy** — was used by the Function Cannon tower; retained in the WASM binary and exercised by WASM/JS parity tests. Not called by any V2 game system.
 
 ---
 
@@ -119,7 +119,7 @@ Samples `y = ax² + bx + c` across `[x_start, x_end]` in steps of `step`. Writes
 float sector_coverage(float radius, float angle_width);
 ```
 
-Area of a circular sector: `0.5 · r² · θ`. Used by the **Radar Sweep** tower for damage scaling by coverage.
+Area of a circular sector: `0.5 · r² · θ`. Used by the **Radar A** tower for damage scaling by coverage.
 
 ---
 
@@ -136,7 +136,7 @@ int point_in_sector(
 // returns: 1 inside, 0 outside
 ```
 
-Point-in-sector hit test. Core per-tick check for the **Radar Sweep** tower.
+Point-in-sector hit test. Core per-tick check for the **Radar A**, **Radar B**, and **Radar C** towers.
 
 ---
 
@@ -150,7 +150,7 @@ float numerical_integrate(
 );
 ```
 
-Approximates `∫[lo,hi] (ax² + bx + c) dx` using the trapezoid rule with `n` subdivisions. Result is the damage dealt by the **Integral Cannon**.
+Approximates `∫[lo,hi] (ax² + bx + c) dx` using the trapezoid rule with `n` subdivisions. Used by the **Calculus** tower to compute damage from the player's chosen function.
 
 ---
 
@@ -160,7 +160,7 @@ Approximates `∫[lo,hi] (ax² + bx + c) dx` using the trapezoid rule with `n` s
 float fourier_composite(float t, const float *freqs, const float *amps);
 ```
 
-Evaluates `Σᵢ aᵢ · sin(2π · fᵢ · t)` for three sine components (arrays of length 3). Drives the target-wave render and the **Fourier Shield** live preview.
+Evaluates `Σᵢ aᵢ · sin(2π · fᵢ · t)` for three sine components (arrays of length 3). **V1 legacy** — was used by the Fourier Shield tower; retained in the WASM binary and exercised by WASM/JS parity tests. Not called by any V2 game system.
 
 ---
 
@@ -175,7 +175,7 @@ float fourier_match(
 // returns: similarity score ∈ [0, 1]
 ```
 
-Compares two 3-component composites by sampling both at `samples` points and collapsing MSE to a `[0, 1]` similarity. `1.0` is a perfect match; determines whether the **Fourier Shield** boss phase ends.
+Compares two 3-component composites by sampling both at `samples` points and collapsing MSE to a `[0, 1]` similarity. `1.0` is a perfect match. **V1 legacy** — was used by the Fourier Shield boss phase; retained in the WASM binary and exercised by WASM/JS parity tests. Not called by any V2 game system.
 
 ---
 
@@ -191,7 +191,7 @@ int line_circle_intersect(
 // returns: intersection count (0, 1, or 2)
 ```
 
-Finds where `y = mx + b` meets a circle of radius `r` centred at `(cx, cy)`. Used by the **Function Cannon** to compute hit points against enemy collision circles.
+Finds where `y = mx + b` meets a circle of radius `r` centred at `(cx, cy)`. **V1 legacy** — was used by the Function Cannon to compute hit points against enemy collision circles; retained in the WASM binary and exercised by WASM/JS parity tests. Not called by any V2 game system.
 
 ---
 

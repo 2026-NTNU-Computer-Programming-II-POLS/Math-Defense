@@ -71,6 +71,7 @@ class GameSession:
         kills: int = 0,
         waves_survived: int = 0,
         initial_answer: bool = False,
+        path_config: dict | None = None,
         started_at: datetime | None = None,
         ended_at: datetime | None = None,
     ) -> None:
@@ -85,6 +86,7 @@ class GameSession:
         self.kills = kills
         self.waves_survived = waves_survived
         self.initial_answer = initial_answer
+        self.path_config = path_config
         self.kill_value: int | None = None
         self.cost_total: int | None = None
         self.time_total: float | None = None
@@ -97,13 +99,14 @@ class GameSession:
         self._events: list = []
 
     @classmethod
-    def create(cls, user_id: str, level: Level, initial_answer: bool = False) -> GameSession:
+    def create(cls, user_id: str, level: Level, initial_answer: bool = False, path_config: dict | None = None) -> GameSession:
         """Factory method — creates a new ACTIVE session"""
         session = cls(
             id=str(uuid.uuid4()),
             user_id=user_id,
             level=level,
             initial_answer=initial_answer,
+            path_config=path_config,
         )
         session._events.append(
             SessionCreated(session_id=session.id, user_id=user_id, level=int(level))

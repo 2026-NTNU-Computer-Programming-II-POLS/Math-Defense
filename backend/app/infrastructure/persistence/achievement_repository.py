@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import UTC
 
 from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session as DbSession
 
 from app.domain.achievement.aggregate import UserAchievement
@@ -32,15 +33,16 @@ class SqlAlchemyAchievementRepository:
         if row:
             row.achievement_id = achievement.achievement_id
             row.talent_points = achievement.talent_points
-        else:
-            row = AchievementModel(
-                id=achievement.id,
-                user_id=achievement.user_id,
-                achievement_id=achievement.achievement_id,
-                talent_points=achievement.talent_points,
-                unlocked_at=achievement.unlocked_at,
-            )
-            self._db.add(row)
+            self._db.flush()
+            return
+        stmt = pg_insert(AchievementModel).values(
+            id=achievement.id,
+            user_id=achievement.user_id,
+            achievement_id=achievement.achievement_id,
+            talent_points=achievement.talent_points,
+            unlocked_at=achievement.unlocked_at,
+        ).on_conflict_do_nothing(constraint="uq_user_achievement")
+        self._db.execute(stmt)
         self._db.flush()
 
     def delete_by_user(self, user_id: str) -> None:

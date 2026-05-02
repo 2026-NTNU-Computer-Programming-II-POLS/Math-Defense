@@ -68,7 +68,9 @@ class SqlAlchemyLeaderboardRepository:
         scores``), which uses the score index and costs O(per_page * log N)
         rather than O(N).
         """
-        count_q = self._db.query(func.count(LeaderboardEntryModel.id))
+        count_q = self._db.query(func.count(LeaderboardEntryModel.id)).filter(
+            LeaderboardEntryModel.user_id.isnot(None)
+        )
         if level is not None:
             count_q = count_q.filter(LeaderboardEntryModel.level == level)
         total = count_q.scalar() or 0
@@ -136,6 +138,7 @@ class SqlAlchemyLeaderboardRepository:
 
         count_q = (
             self._db.query(func.count(LeaderboardEntryModel.id))
+            .filter(LeaderboardEntryModel.user_id.isnot(None))
             .filter(LeaderboardEntryModel.user_id.in_(student_ids_q))
         )
         total = count_q.scalar() or 0

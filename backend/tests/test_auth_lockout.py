@@ -16,7 +16,7 @@ from app.models.login_attempt import LoginAttempt
 
 def _register(client, email: str = "lockme@test.local", password: str = "correct1") -> None:
     res = client.post("/api/auth/register", json={
-        "email": email, "password": password, "player_name": "lockme", "role": "student",
+        "email": email, "password": password, "player_name": "lockme",
     })
     assert res.status_code == 201
 

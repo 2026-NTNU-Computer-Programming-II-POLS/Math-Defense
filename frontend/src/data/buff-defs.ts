@@ -116,7 +116,7 @@ export const PURCHASABLE_BUFFS: BuffDef[] = [
     cost: 50,
     duration: 30,
     effectId: 'GOLD_MULTIPLIER_DOUBLE',
-    revertId: 'GOLD_MULTIPLIER_RESET',
+    revertId: 'GOLD_MULTIPLIER_DOUBLE_REVERT',
   },
 ]
 

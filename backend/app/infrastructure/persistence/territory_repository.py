@@ -145,11 +145,29 @@ class SqlAlchemyTerritoryRepository:
             .scalar()
         ) or 0
 
+    def count_occupations_by_student_for_update(self, activity_id: str, student_id: str) -> int:
+        rows = (
+            self._db.query(OccupationModel.id)
+            .join(SlotModel, OccupationModel.slot_id == SlotModel.id)
+            .filter(SlotModel.activity_id == activity_id, OccupationModel.student_id == student_id)
+            .with_for_update()
+            .all()
+        )
+        return len(rows)
+
+    def is_session_used(self, session_id: str) -> bool:
+        return (
+            self._db.query(OccupationModel.id)
+            .filter(OccupationModel.session_id == session_id)
+            .first()
+        ) is not None
+
     def save_occupation(self, occupation: TerritoryOccupation) -> None:
         row = self._db.query(OccupationModel).filter(OccupationModel.slot_id == occupation.slot_id).first()
         if row:
             row.student_id = occupation.student_id
             row.score = occupation.score
+            row.session_id = occupation.session_id
             row.occupied_at = occupation.occupied_at
         else:
             row = OccupationModel(
@@ -157,6 +175,7 @@ class SqlAlchemyTerritoryRepository:
                 slot_id=occupation.slot_id,
                 student_id=occupation.student_id,
                 score=occupation.score,
+                session_id=occupation.session_id,
                 occupied_at=occupation.occupied_at,
             )
             self._db.add(row)
@@ -247,6 +266,7 @@ class SqlAlchemyTerritoryRepository:
                 score=occ_row.score,
                 occupied_at=_ensure_utc(occ_row.occupied_at),
                 player_name=player_name,
+                session_id=occ_row.session_id,
             )
         return TerritorySlot(
             id=row.id,
@@ -265,6 +285,7 @@ class SqlAlchemyTerritoryRepository:
             student_id=row.student_id,
             score=row.score,
             occupied_at=_ensure_utc(row.occupied_at),
+            session_id=row.session_id,
         )
 
 

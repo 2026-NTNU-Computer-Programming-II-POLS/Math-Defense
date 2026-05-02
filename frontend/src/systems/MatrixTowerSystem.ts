@@ -7,6 +7,7 @@ import type { Tower, Enemy } from '@/entities/types'
 interface LaserState {
   targetIds: string[]
   rampTime: number
+  invalid: boolean
 }
 
 export class MatrixTowerSystem {
@@ -53,20 +54,25 @@ export class MatrixTowerSystem {
       processed.add(tower.id)
       processed.add(pair.id)
 
+      const pairKey = [tower.id, pair.id].sort().join(':')
+      let laser = this._lasers.get(pairKey)
+      if (!laser) {
+        laser = { targetIds: [], rampTime: 0, invalid: false }
+        this._lasers.set(pairKey, laser)
+      }
+
       const baseDamage = tower.x * pair.x + tower.y * pair.y
-      if (baseDamage <= 0) continue
+      if (baseDamage <= 0) {
+        laser.invalid = true
+        laser.targetIds = []
+        continue
+      }
+      laser.invalid = false
 
       const mods = tower.talentMods
       const upgradeRamp = tower.upgradeExtras?.['rampRate'] ?? 0
       const rampRate = 0.5 * (1 + (mods['damage_ramp'] ?? 0) + upgradeRamp)
       const count = 1 + Math.floor(mods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
-
-      const pairKey = [tower.id, pair.id].sort().join(':')
-      let laser = this._lasers.get(pairKey)
-      if (!laser) {
-        laser = { targetIds: [], rampTime: 0 }
-        this._lasers.set(pairKey, laser)
-      }
 
       // Remove dead targets from tracking list
       const aliveIds = laser.targetIds.filter(tid =>
