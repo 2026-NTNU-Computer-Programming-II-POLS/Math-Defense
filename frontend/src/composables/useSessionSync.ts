@@ -159,7 +159,15 @@ export function useSessionSync() {
       }
     }))
 
-    unsubs.push(() => { pendingLevel = null })
+    unsubs.push(() => {
+      pendingLevel = null
+      createGeneration = 0
+      sessionGeneration = 0
+      consecutiveUpdateFailures = 0
+      alertedForFailures = false
+      lastSyncedWave = -1
+      sessionId.value = null
+    })
 
     return unsubs
   }
