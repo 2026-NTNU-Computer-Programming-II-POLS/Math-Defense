@@ -52,12 +52,18 @@ export class CalculusTowerSystem {
   generatePresets(tower: Tower): MonomialPreset[] {
     const seed = hashStr(tower.id)
     const rng = mulberry32(seed)
-    const count = 3 + Math.floor(rng() * 3)
+    const MIN_PRESETS = 3
+    const PRESET_COUNT_RANGE = 3
+    const MIN_COEFFICIENT = 1
+    const COEFFICIENT_RANGE = 6
+    const MIN_EXPONENT = 1
+    const EXPONENT_RANGE = 4
+    const count = MIN_PRESETS + Math.floor(rng() * PRESET_COUNT_RANGE)
     const presets: MonomialPreset[] = []
 
     for (let i = 0; i < count; i++) {
-      const coeff = Math.floor(rng() * 6) + 1
-      const exp = Math.floor(rng() * 4) + 1
+      const coeff = Math.floor(rng() * COEFFICIENT_RANGE) + MIN_COEFFICIENT
+      const exp = Math.floor(rng() * EXPONENT_RANGE) + MIN_EXPONENT
       const isTrap = i === count - 1
 
       if (isTrap) {
