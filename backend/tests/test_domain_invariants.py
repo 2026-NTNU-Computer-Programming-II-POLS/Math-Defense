@@ -82,7 +82,27 @@ class TestRepositoryProtocolConformance:
         assert not isinstance(PartialRepo(), GameSessionRepository)
 
     def test_incomplete_leaderboard_repo_rejected(self):
-        class PartialRepo:
+        # LeaderboardRepository requires:
+        # - find_by_session_id
+        # - save
+        # - query_ranked_global
+        # - query_ranked_by_level
+        # - query_ranked_by_class
+        class OnlyFindBySessionId:
             def find_by_session_id(self, session_id): pass
-            # missing: save, query_ranked_global, query_ranked_by_level
-        assert not isinstance(PartialRepo(), LeaderboardRepository)
+
+        class MissingFindBySessionId:
+            def save(self, entry): pass
+            def query_ranked_global(self, limit=100): pass
+            def query_ranked_by_level(self, level, limit=100): pass
+            def query_ranked_by_class(self, player_class, limit=100): pass
+
+        class MissingQueryByClass:
+            def find_by_session_id(self, session_id): pass
+            def save(self, entry): pass
+            def query_ranked_global(self, limit=100): pass
+            def query_ranked_by_level(self, level, limit=100): pass
+
+        assert not isinstance(OnlyFindBySessionId(), LeaderboardRepository)
+        assert not isinstance(MissingFindBySessionId(), LeaderboardRepository)
+        assert not isinstance(MissingQueryByClass(), LeaderboardRepository)
