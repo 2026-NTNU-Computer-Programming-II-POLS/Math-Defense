@@ -61,11 +61,14 @@ async function submit(): Promise<void> {
 onMounted(async () => {
   try {
     classes.value = await classService.listClasses()
-    if (classes.value.length > 0) {
+    if (classes.value.length === 1) {
       selectedClassId.value = classes.value[0].id
+    } else {
+      selectedClassId.value = null
     }
   } catch {
     classes.value = []
+    selectedClassId.value = null
   } finally {
     classesLoaded.value = true
   }
