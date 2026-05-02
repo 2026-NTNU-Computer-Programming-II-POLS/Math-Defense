@@ -36,6 +36,14 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     player_name: str
+    role: str = "student"
+
+    @field_validator("role")
+    @classmethod
+    def role_valid(cls, v: str) -> str:
+        if v not in ("student", "teacher"):
+            raise ValueError("Role must be 'student' or 'teacher'")
+        return v
 
     @field_validator("email")
     @classmethod
@@ -122,6 +130,20 @@ class AuthMeResponse(BaseModel):
     role: str
     created_at: datetime
     avatar_url: str | None = None
+
+
+class UpdatePlayerNameRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    player_name: str
+
+    @field_validator("player_name")
+    @classmethod
+    def player_name_valid(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < PLAYER_NAME_MIN_LENGTH or len(v) > PLAYER_NAME_MAX_LENGTH:
+            raise ValueError(f"Player name must be {PLAYER_NAME_MIN_LENGTH}-{PLAYER_NAME_MAX_LENGTH} characters")
+        return v
 
 
 _ALLOWED_AVATAR_URLS = frozenset({

@@ -26,6 +26,10 @@ class GrabbingTerritoryActivity(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     settled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    settled_by: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )
@@ -37,6 +41,7 @@ class TerritorySlot(Base):
         Index("ix_territory_slots_activity_id", "activity_id"),
         CheckConstraint("star_rating BETWEEN 1 AND 5", name="ck_territory_slot_star_range"),
         CheckConstraint("slot_index >= 0", name="ck_territory_slot_index_nonneg"),
+        UniqueConstraint("activity_id", "slot_index", name="uq_territory_slot_activity_index"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -65,7 +70,22 @@ class TerritoryOccupation(Base):
         String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
     )
     score: Mapped[float] = mapped_column(Float, nullable=False)
-    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    session_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("game_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     occupied_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )
+
+
+class TerritorySessionUse(Base):
+    """Durable record of every session_id consumed for territory captures.
+
+    Kept separate from territory_occupations so displaced occupations (which
+    are deleted on counter-seize) cannot un-mark a session as used.
+    """
+    __tablename__ = "territory_session_uses"
+
+    session_id: Mapped[str] = mapped_column(String, primary_key=True)

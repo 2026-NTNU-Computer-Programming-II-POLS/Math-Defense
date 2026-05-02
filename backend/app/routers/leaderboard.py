@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.domain.errors import InvalidTokenError
 from app.domain.user.aggregate import User
-from app.factories import build_leaderboard_service
+from app.factories import build_class_service, build_leaderboard_service
 from app.limiter import limiter
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_current_user, get_current_user_optional
 from app.schemas.leaderboard import (
     LeaderboardEntryOut,
     LeaderboardResponse,
@@ -21,9 +22,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 
 
-# Intentionally unauthenticated: the leaderboard is a public feature.
-# Username enumeration risk is accepted by design; scores are server-side
-# authoritative so exposure of the list provides no exploitable attack surface.
+# Global and per-level views are public. The class-scoped view requires auth
+# and membership/ownership to prevent enumeration of class data by strangers.
 @router.get("", response_model=LeaderboardResponse)
 @limiter.limit("30/minute")
 def get_leaderboard(
@@ -33,7 +33,12 @@ def get_leaderboard(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    if class_id is not None:
+        if current_user is None:
+            raise InvalidTokenError("Authentication required to view class leaderboard")
+        build_class_service(db).verify_access(class_id, current_user.id, current_user.role)
     ranked, total = build_leaderboard_service(db).get_leaderboard(level, page, per_page, class_id=class_id)
     entries = [
         LeaderboardEntryOut(

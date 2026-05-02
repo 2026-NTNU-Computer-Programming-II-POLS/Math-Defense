@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
+import { useAuthStore } from '@/stores/authStore'
 import { classService, type ClassInfo } from '@/services/classService'
 
 const router = useRouter()
 const store = useTerritoryStore()
+const auth = useAuthStore()
 
 const title = ref('')
 const deadline = ref('')
@@ -14,6 +16,15 @@ const slots = ref<{ star_rating: number }[]>([{ star_rating: 1 }])
 const classes = ref<ClassInfo[]>([])
 const submitting = ref(false)
 const validationError = ref('')
+const classesLoaded = ref(false)
+
+// B-M-13: admins can always create; teachers need at least one class
+const hasNoClasses = computed(() => classesLoaded.value && !auth.isAdmin && classes.value.length === 0)
+
+const hasDuplicateStars = computed(() => {
+  const ratings = slots.value.map(s => s.star_rating)
+  return ratings.length !== new Set(ratings).size
+})
 
 function addSlot(): void {
   slots.value.push({ star_rating: 1 })
@@ -50,8 +61,13 @@ async function submit(): Promise<void> {
 onMounted(async () => {
   try {
     classes.value = await classService.listClasses()
+    if (classes.value.length > 0) {
+      selectedClassId.value = classes.value[0].id
+    }
   } catch {
     classes.value = []
+  } finally {
+    classesLoaded.value = true
   }
 })
 </script>
@@ -61,10 +77,17 @@ onMounted(async () => {
     <div class="setup-panel rune-panel">
       <h2 class="setup-title">Create Territory Activity</h2>
 
-      <div v-if="validationError" class="error-msg">{{ validationError }}</div>
+      <div v-if="hasNoClasses" class="error-msg">
+        You don't have any classes yet. Create a class first before setting up a territory activity.
+      </div>
+      <div v-else-if="validationError" class="error-msg">{{ validationError }}</div>
       <div v-else-if="store.errorCreate" class="error-msg">{{ store.errorCreate }}</div>
 
-      <form class="setup-form" @submit.prevent="submit">
+      <div v-if="hasNoClasses" class="form-actions">
+        <button class="btn back-btn" type="button" @click="router.push('/territory')">← Back</button>
+      </div>
+
+      <form v-if="!hasNoClasses" class="setup-form" @submit.prevent="submit">
         <div class="field">
           <label class="field-label">Title</label>
           <input v-model="title" type="text" class="rune-input" placeholder="Activity title" />
@@ -95,6 +118,7 @@ onMounted(async () => {
             </div>
           </div>
           <button type="button" class="btn-sm" @click="addSlot">+ Add Slot</button>
+          <div v-if="hasDuplicateStars" class="warn-msg">Multiple slots share the same star rating — students will face the same difficulty for those territories.</div>
         </div>
 
         <div class="form-actions">
@@ -133,6 +157,7 @@ onMounted(async () => {
 }
 
 .error-msg { font-size: 11px; color: var(--enemy-red); }
+.warn-msg { font-size: 10px; color: var(--gold); margin-top: 4px; }
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 

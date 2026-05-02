@@ -40,7 +40,7 @@ onMounted(async () => {
         <div class="section">
           <h3 class="section-title">My Classes ({{ classes.length }})</h3>
           <ul v-if="classes.length > 0" class="item-list">
-            <li v-for="c in classes" :key="c.id" class="item" @click="router.push('/classes')">
+            <li v-for="c in classes" :key="c.id" class="item" @click="router.push(`/classes?select=${c.id}`)">
               <span class="item-name">{{ c.name }}</span>
               <span v-if="c.join_code" class="item-meta">{{ c.join_code }}</span>
             </li>

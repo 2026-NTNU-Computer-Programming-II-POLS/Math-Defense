@@ -43,6 +43,10 @@ class AccountLockedError(DomainError):
     status_code = 429
 
 
+class AccountDisabledError(DomainError):
+    status_code = 403
+
+
 class InvalidTokenError(DomainError):
     status_code = 401
 
@@ -81,16 +85,16 @@ class DuplicateSubmissionError(DomainError):
 # ── Talent ──
 
 class InsufficientTalentPointsError(DomainError):
-    status_code = 400
+    status_code = 409
 
 
 class PrerequisiteNotMetError(DomainError):
-    status_code = 400
+    status_code = 409
 
 
 class MaxLevelReachedError(DomainError):
-    status_code = 400
+    status_code = 409
 
 
 class TalentNodeNotFoundError(DomainError):
-    status_code = 404
+    status_code = 409

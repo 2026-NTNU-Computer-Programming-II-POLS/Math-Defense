@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.exc import IntegrityError
 
 from app.domain.errors import (
+    AccountDisabledError,
     AccountLockedError,
     DomainValueError,
     InvalidCredentialsError,
@@ -105,6 +106,8 @@ class AuthApplicationService:
                 self._login_attempts.record_failure(email_lower)
                 self._uow.commit()
                 raise InvalidCredentialsError("Invalid email or password")
+            if not user.is_active:
+                raise AccountDisabledError("This account has been disabled")
             self._login_attempts.clear(email_lower)
             self._uow.commit()
         token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
@@ -124,6 +127,8 @@ class AuthApplicationService:
         user = self._user_repo.find_by_id(user_id)
         if user is None:
             raise UserNotFoundError("User not found")
+        if not user.is_active:
+            raise AccountDisabledError("This account has been disabled")
         token_pv = payload.get("pv", 0)
         if token_pv != user.password_version:
             raise InvalidTokenError("Token has been invalidated by a password change")
@@ -141,6 +146,17 @@ class AuthApplicationService:
             user.password_version += 1
             self._user_repo.save(user)
             self._uow.commit()
+
+    def update_player_name(self, user_id: str, player_name: str) -> User:
+        """Update the player's display name."""
+        with self._uow:
+            user = self._user_repo.find_by_id(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found")
+            user.player_name = player_name
+            self._user_repo.save(user)
+            self._uow.commit()
+        return user
 
     def update_avatar(self, user_id: str, avatar_url: str | None) -> User:
         """Persist the user's chosen avatar URL."""

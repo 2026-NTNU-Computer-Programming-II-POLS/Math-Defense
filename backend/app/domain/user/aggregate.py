@@ -28,6 +28,7 @@ class User:
         avatar_url: str | None = None,
         created_at: datetime | None = None,
         password_version: int = 0,
+        is_active: bool = True,
     ) -> None:
         self.id = id
         self.email = email
@@ -37,6 +38,7 @@ class User:
         self.avatar_url = avatar_url
         self.created_at = created_at or datetime.now(UTC)
         self.password_version = password_version
+        self.is_active = is_active
 
     @classmethod
     def create(

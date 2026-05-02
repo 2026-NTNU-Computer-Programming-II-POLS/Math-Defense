@@ -99,3 +99,76 @@ def test_leaderboard_filter_by_level(client):
     assert res.status_code == 200
     for entry in res.json()["entries"]:
         assert entry["level"] == 2
+
+
+# ── class_id parameter (D-3) ─────────────────────────────────────────────────
+
+def _register_teacher(db_session, name):
+    from app.factories import build_auth_service
+    _user, token = build_auth_service(db_session).register(
+        email=f"{name}@test.local",
+        password="secret123",
+        player_name=name,
+        role="teacher",
+    )
+    return token
+
+
+def test_class_leaderboard_requires_auth(client, db_session):
+    teacher_token = _register_teacher(db_session, "t_lb_auth")
+    class_id = client.post(
+        "/api/classes", json={"name": "LB Auth Class"},
+        headers=_auth_headers(teacher_token),
+    ).json()["id"]
+    res = client.get(f"/api/leaderboard?class_id={class_id}")
+    assert res.status_code in (401, 403, 422)
+
+
+def test_class_leaderboard_accessible_to_member(client, db_session):
+    teacher_token = _register_teacher(db_session, "t_lb_member")
+    student_token = _register_and_token(client, "s_lb_member")
+    class_res = client.post(
+        "/api/classes", json={"name": "LB Member Class"},
+        headers=_auth_headers(teacher_token),
+    )
+    class_id = class_res.json()["id"]
+    join_code = class_res.json()["join_code"]
+    client.post("/api/classes/join", json={"code": join_code}, headers=_auth_headers(student_token))
+
+    _create_completed_session(client, student_token, score=750)
+    res = client.get(f"/api/leaderboard?class_id={class_id}", headers=_auth_headers(student_token))
+    assert res.status_code == 200
+    assert "entries" in res.json()
+
+
+def test_class_leaderboard_rejects_non_member(client, db_session):
+    teacher_token = _register_teacher(db_session, "t_lb_reject")
+    outsider_token = _register_and_token(client, "s_lb_outsider")
+    class_id = client.post(
+        "/api/classes", json={"name": "LB Reject Class"},
+        headers=_auth_headers(teacher_token),
+    ).json()["id"]
+    res = client.get(f"/api/leaderboard?class_id={class_id}", headers=_auth_headers(outsider_token))
+    assert res.status_code == 403
+
+
+def test_class_leaderboard_only_includes_class_scores(client, db_session):
+    teacher_token = _register_teacher(db_session, "t_lb_scope")
+    s_in_token = _register_and_token(client, "s_lb_in")
+    s_out_token = _register_and_token(client, "s_lb_out")
+
+    class_res = client.post(
+        "/api/classes", json={"name": "LB Scope Class"},
+        headers=_auth_headers(teacher_token),
+    )
+    class_id = class_res.json()["id"]
+    client.post("/api/classes/join", json={"code": class_res.json()["join_code"]}, headers=_auth_headers(s_in_token))
+
+    _create_completed_session(client, s_in_token, score=600)
+    _create_completed_session(client, s_out_token, score=999)
+
+    res = client.get(f"/api/leaderboard?class_id={class_id}", headers=_auth_headers(s_in_token))
+    assert res.status_code == 200
+    player_names = [e["player_name"] for e in res.json()["entries"]]
+    assert "s_lb_in" in player_names
+    assert "s_lb_out" not in player_names

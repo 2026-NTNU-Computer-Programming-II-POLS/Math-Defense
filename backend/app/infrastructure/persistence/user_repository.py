@@ -23,9 +23,21 @@ class SqlAlchemyUserRepository:
         row = self._db.query(UserModel).filter(UserModel.id == user_id).first()
         return self._to_domain(row) if row else None
 
+    def find_by_ids(self, user_ids: list[str]) -> list[User]:
+        if not user_ids:
+            return []
+        rows = self._db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()
+        return [self._to_domain(r) for r in rows]
+
     def find_by_role(self, role: Role) -> list[User]:
         rows = self._db.query(UserModel).filter(UserModel.role == role.value).all()
         return [self._to_domain(r) for r in rows]
+
+    def find_by_role_paginated(self, role: Role, offset: int, limit: int) -> tuple[list[User], int]:
+        q = self._db.query(UserModel).filter(UserModel.role == role.value)
+        total = q.count()
+        rows = q.order_by(UserModel.created_at.desc()).offset(offset).limit(limit).all()
+        return [self._to_domain(r) for r in rows], total
 
     def save(self, user: User) -> None:
         row = self._db.query(UserModel).filter(UserModel.id == user.id).first()
@@ -34,6 +46,7 @@ class SqlAlchemyUserRepository:
             row.player_name = user.player_name
             row.avatar_url = user.avatar_url
             row.role = user.role.value
+            row.is_active = user.is_active
             row.password_hash = user.password_hash
             row.password_version = user.password_version
         else:
@@ -43,6 +56,7 @@ class SqlAlchemyUserRepository:
                 player_name=user.player_name,
                 avatar_url=user.avatar_url,
                 role=user.role.value,
+                is_active=user.is_active,
                 password_hash=user.password_hash,
                 password_version=user.password_version,
                 created_at=user.created_at,
@@ -58,6 +72,7 @@ class SqlAlchemyUserRepository:
             player_name=row.player_name,
             avatar_url=row.avatar_url,
             role=Role(row.role),
+            is_active=row.is_active if row.is_active is not None else True,
             password_hash=row.password_hash,
             created_at=_ensure_utc(row.created_at),
             password_version=row.password_version or 0,

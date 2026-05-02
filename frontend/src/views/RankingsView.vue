@@ -15,7 +15,7 @@ type TabId = typeof TAB_IDS[number]
 const TAB_LABELS: Record<TabId, string> = {
   global: 'Global',
   class: 'Class',
-  internal: 'Internal',
+  internal: 'Activity Rankings',
   external: 'External',
 }
 
@@ -38,6 +38,13 @@ const externalRankings = ref<ExternalRankingEntry[]>([])
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 
+// B-M-12: external rankings only exist for open (non-class-scoped) activities
+const filteredActivities = computed(() =>
+  activeTab.value === 'external'
+    ? activities.value.filter(a => a.class_id === null)
+    : activities.value
+)
+
 let inflight: AbortController | null = null
 let fetchId = 0
 
@@ -47,7 +54,7 @@ function cancelInflight(): void {
 }
 
 function className(classId: string): string {
-  return classes.value.find(c => c.id === classId)?.name ?? classId.slice(0, 8) + '…'
+  return classes.value.find(c => c.id === classId)?.name ?? 'Unknown Class'
 }
 
 async function loadGlobal(): Promise<void> {
@@ -147,6 +154,11 @@ function resetData(): void {
 function switchTab(tab: TabId): void {
   activeTab.value = tab
   resetData()
+  // B-M-12: clear selection if the currently selected activity is not valid for this tab
+  if (tab === 'external' && selectedActivityId.value) {
+    const a = activities.value.find(a => a.id === selectedActivityId.value)
+    if (a && a.class_id !== null) selectedActivityId.value = null
+  }
   if (tab === 'global') loadGlobal()
   else if (tab === 'class' && selectedClassId.value) loadClass()
   else if (tab === 'internal' && selectedActivityId.value) loadInternal()
@@ -216,7 +228,7 @@ onBeforeUnmount(cancelInflight)
     <div v-if="activeTab === 'internal' || activeTab === 'external'" class="rk-selector">
       <select v-model="selectedActivityId" class="rune-input">
         <option :value="null" disabled>Select an activity</option>
-        <option v-for="a in activities" :key="a.id" :value="a.id">{{ a.title }}</option>
+        <option v-for="a in filteredActivities" :key="a.id" :value="a.id">{{ a.title }}</option>
       </select>
     </div>
 
@@ -254,7 +266,7 @@ onBeforeUnmount(cancelInflight)
         <tbody>
           <tr v-for="r in territoryRankings" :key="r.student_id">
             <td class="rank">{{ r.rank }}</td>
-            <td class="player-name" :title="r.student_id">{{ r.student_id.slice(0, 8) }}…</td>
+            <td class="player-name">{{ r.player_name ?? '—' }}</td>
             <td class="score">{{ r.territory_value }}</td>
           </tr>
           <tr v-if="territoryRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>
@@ -271,7 +283,7 @@ onBeforeUnmount(cancelInflight)
         <tbody>
           <tr v-for="r in externalRankings" :key="r.class_id">
             <td class="rank">{{ r.rank }}</td>
-            <td class="player-name">{{ className(r.class_id) }}</td>
+            <td class="player-name">{{ r.class_name ?? className(r.class_id) }}</td>
             <td class="score">{{ r.avg_territory_value.toFixed(2) }}</td>
           </tr>
           <tr v-if="externalRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>

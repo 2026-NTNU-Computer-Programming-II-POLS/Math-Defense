@@ -6,6 +6,7 @@ export interface ClassInfo {
   teacher_id: string
   join_code?: string
   created_at: string
+  teacher_player_name?: string
 }
 
 export interface Membership {
@@ -13,6 +14,8 @@ export interface Membership {
   class_id: string
   student_id: string
   joined_at: string
+  player_name: string
+  email: string
 }
 
 export const classService = {
@@ -25,8 +28,14 @@ export const classService = {
   getClass(id: string) {
     return api.get<ClassInfo>(`/api/classes/${id}`)
   },
-  addStudent(classId: string, studentId: string) {
-    return api.post<Membership>(`/api/classes/${classId}/students`, { student_id: studentId })
+  renameClass(classId: string, name: string) {
+    return api.put<ClassInfo>(`/api/classes/${classId}`, { name })
+  },
+  deleteClass(classId: string) {
+    return api.delete<void>(`/api/classes/${classId}`)
+  },
+  addStudent(classId: string, email: string) {
+    return api.post<Membership>(`/api/classes/${classId}/students`, { email })
   },
   removeStudent(classId: string, studentId: string) {
     return api.delete<void>(`/api/classes/${classId}/students/${studentId}`)

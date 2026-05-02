@@ -56,6 +56,7 @@ def build_admin_service(db: "DbSession") -> AdminApplicationService:
     return AdminApplicationService(
         user_repo=SqlAlchemyUserRepository(db),
         class_repo=SqlAlchemyClassRepository(db),
+        uow=SqlAlchemyUnitOfWork(db),
     )
 
 
@@ -64,6 +65,7 @@ def build_class_service(db: "DbSession") -> ClassApplicationService:
         class_repo=SqlAlchemyClassRepository(db),
         user_repo=SqlAlchemyUserRepository(db),
         uow=SqlAlchemyUnitOfWork(db),
+        territory_repo=SqlAlchemyTerritoryRepository(db),
     )
 
 
