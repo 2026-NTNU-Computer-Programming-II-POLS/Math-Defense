@@ -180,7 +180,7 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 97 tests (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity)
+cd backend  && pytest              # 187 tests (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, avatar parity)
 cd frontend && npm test            # 26 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity)
 ```
 

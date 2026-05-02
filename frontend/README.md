@@ -97,7 +97,7 @@ frontend/
 │   │   ├── classService.ts         createClass, listClasses, joinByCode, deleteClass
 │   │   ├── adminService.ts         listTeachers, listClasses, listStudents
 │   │   ├── rankingService.ts       fetchRankings (4 ranking types)
-│   │   └── territoryService.ts     createActivity, listActivities, getActivity, occupySlot, getRankings
+│   │   └── territoryService.ts     createActivity, listActivities, getActivity, playTerritory, getRankings, settleActivity
 │   │
 │   ├── router/index.ts             Routes with RBAC guards (protected / admin / teacher / student sets)
 │   │
@@ -128,11 +128,9 @@ frontend/
 │   │   ├── movement/               Curve-path and piecewise-path movement strategies
 │   │   │   ├── movement-strategy.ts
 │   │   │   ├── movement-strategy-registry.ts
-│   │   │   ├── horizontal-movement-strategy.ts
+│   │   │   ├── arc-length.ts
 │   │   │   ├── vertical-movement-strategy.ts
-│   │   │   ├── linear-movement-strategy.ts
-│   │   │   ├── quadratic-movement-strategy.ts
-│   │   │   └── trig-movement-strategy.ts
+│   │   │   └── x-driven-movement-strategy.ts
 │   │   ├── path/                   Piecewise path construction + progress tracking
 │   │   │   ├── curve-path.ts             V2 CurvePath interface (separate from SegmentedPath)
 │   │   │   ├── spawn-calculator.ts       Curve-boundary intersections for enemy spawning
@@ -450,7 +448,7 @@ Panel visibility, selected tower type, build-hint step, modal state.
 | `classService.ts` | `createClass(name)`, `listClasses()`, `joinByCode(code)`, `deleteClass(id)` |
 | `adminService.ts` | `listTeachers()`, `listClasses()`, `listStudents()` |
 | `rankingService.ts` | `fetchRankings(type, options)` |
-| `territoryService.ts` | `createActivity(...)`, `listActivities()`, `getActivity(id)`, `occupySlot(id, slotId)`, `getRankings(id)` |
+| `territoryService.ts` | `createActivity(payload)`, `listActivities(classId?)`, `getActivity(id)`, `playTerritory(activityId, slotId, sessionId)`, `getRankings(activityId)`, `settleActivity(activityId)` |
 
 ---
 
@@ -543,7 +541,8 @@ src/engine/projections/project-path-panel.test.ts
 src/engine/render-helpers/tile-style.test.ts
 src/domain/level/level-layout-service.test.ts
 src/domain/level/placement-policy.test.ts
-src/domain/movement/*.test.ts             horizontal / vertical / linear / quadratic / trig strategies
+src/domain/movement/vertical-movement-strategy.test.ts
+src/domain/movement/x-driven-movement-strategy.test.ts
 src/domain/path/path-builder.test.ts
 src/domain/path/path-progress-tracker.test.ts
 src/domain/path/path-validator.test.ts
@@ -552,7 +551,7 @@ src/composables/useSessionSync.test.ts
 src/components/game/FunctionPanel.test.ts
 src/math/WasmBridge.test.ts                JS-only parity (fallback surface + numerical invariants)
 src/math/WasmBridge.wasm.test.ts           JS ↔ WASM parity under Node (requires math_engine.* built)
-src/systems/__tests__/*.test.ts            BuffSystem, CombatSystem, EconomySystem,
+src/systems/__tests__/*.test.ts            BuffSystem, BuffSystem.duration, CombatSystem, EconomySystem,
                                            MovementSystem, TowerPlacementSystem, WaveSystem
 ```
 

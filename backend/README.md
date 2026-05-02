@@ -103,7 +103,7 @@ backend/
 │   │   ├── talent.py              /api/talents
 │   │   ├── class_.py              /api/classes
 │   │   ├── admin.py               /api/admin
-│   │   └── territory.py           /api/territory
+│   │   └── territory.py           /api/activities
 │   │
 │   ├── db/database.py             Engine, Base, get_db() session factory
 │   ├── middleware/
@@ -127,8 +127,13 @@ backend/
 │   ├── test_value_objects.py              (15) — VO invariants
 │   ├── test_coverage_gaps.py              (12) — audit-driven edge cases
 │   ├── test_domain_invariants.py          (9)  — cross-aggregate invariant tests
-│   └── test_shared_constants_parity.py    (3)  — Python ↔ shared/game-constants.json parity
-│   # 97 tests total
+│   ├── test_shared_constants_parity.py    (3)  — Python ↔ shared/game-constants.json parity
+│   ├── test_achievement.py                (15) — achievement unlock / summary / isolation
+│   ├── test_talent.py                     (17) — talent tree allocate / reset / modifiers
+│   ├── test_class.py                      (21) — class CRUD, join, rename, student management
+│   ├── test_territory.py                  (36) — activity lifecycle, seize/counter-seize, cap, settlement
+│   └── test_avatar_parity.py              (1)  — backend ↔ frontend avatar whitelist parity
+│   # 187 tests total
 │
 ├── requirements.txt
 └── Dockerfile
@@ -269,16 +274,16 @@ Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| GET | `/api/achievements` | 30/min | All achievement definitions with caller's unlock status |
-| GET | `/api/achievements/summary` | 30/min | Unlock count, total talent points earned |
+| GET | `/api/achievements` | 60/min | All achievement definitions with caller's unlock status |
+| GET | `/api/achievements/summary` | 60/min | Unlock count, total talent points earned |
 
 ### Talents — `/api/talents`
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| GET | `/api/talents/tree` | 30/min | Full talent tree with caller's allocation levels |
-| GET | `/api/talents/modifiers` | 30/min | Aggregated per-tower-type modifiers (damage/range/speed/pet) |
-| POST | `/api/talents/allocate` | 30/min | Allocate one point to a node; raises if prereqs unmet or max level reached |
+| GET | `/api/talents` | 60/min | Full talent tree with caller's allocation levels |
+| GET | `/api/talents/modifiers` | 60/min | Aggregated per-tower-type modifiers (damage/range/speed/pet) |
+| POST | `/api/talents/{node_id}/allocate` | 30/min | Allocate one point to a node; raises if prereqs unmet or max level reached |
 | POST | `/api/talents/reset` | 10/min | Reset all allocations; refunds all points |
 
 ### Classes — `/api/classes`
@@ -286,10 +291,15 @@ Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default
 | Method | Path | Rate | Description |
 |---|---|---|---|
 | POST | `/api/classes` | 10/min | Create a class (teacher only) |
-| GET | `/api/classes` | 30/min | List caller's classes |
-| GET | `/api/classes/{id}` | 30/min | Class details |
+| GET | `/api/classes` | 30/min | List caller's classes (admin sees all) |
+| GET | `/api/classes/{id}` | 30/min | Class details (teacher: full view; student: safe view without join_code) |
+| PUT | `/api/classes/{id}` | 10/min | Rename class (teacher, must own) |
+| DELETE | `/api/classes/{id}` | 10/min | Delete class (teacher/admin, must own) |
 | POST | `/api/classes/join` | 10/min | Student joins by `join_code` |
-| DELETE | `/api/classes/{id}` | 10/min | Delete class (teacher/admin) |
+| POST | `/api/classes/{id}/regenerate-code` | 5/min | Regenerate join code; old code immediately invalid (teacher) |
+| POST | `/api/classes/{id}/students` | 30/min | Add a student by email directly (teacher, must own) |
+| GET | `/api/classes/{id}/students` | 30/min | List enrolled students (teacher/admin) |
+| DELETE | `/api/classes/{id}/students/{student_id}` | 30/min | Remove student; cascades territory occupations (teacher) |
 
 ### Admin — `/api/admin`
 
@@ -299,15 +309,17 @@ Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default
 | GET | `/api/admin/classes` | 30/min | List all classes (admin only) |
 | GET | `/api/admin/students` | 30/min | List all student accounts (admin only) |
 
-### Territory — `/api/territory`
+### Territory — `/api/activities`
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/territory` | 10/min | Create Grabbing Territory activity (teacher) |
-| GET | `/api/territory` | 30/min | List activities visible to caller |
-| GET | `/api/territory/{id}` | 30/min | Activity + slots + current occupations |
-| POST | `/api/territory/{id}/slots/{slot_id}/occupy` | 30/min | Attempt to occupy a slot (student; optimistic locking) |
-| GET | `/api/territory/{id}/rankings` | 30/min | Territory rankings by occupation count |
+| POST | `/api/activities` | 10/min | Create Grabbing Territory activity (teacher; optional `class_id` to scope) |
+| GET | `/api/activities` | 30/min | List activities visible to caller (optional `?class_id=` filter; 404 if not a member) |
+| GET | `/api/activities/{id}` | 30/min | Activity + slots + current occupations |
+| POST | `/api/activities/{id}/slots/{slot_id}/play` | 30/min | Seize or counter-seize a slot using a completed session (student; cap enforced) |
+| GET | `/api/activities/{id}/rankings` | 30/min | Territory rankings ordered by weighted occupation star-value |
+| GET | `/api/activities/{id}/external-rankings` | 30/min | Rankings for display outside the class (student IDs redacted) |
+| POST | `/api/activities/{id}/settle` | 5/min | Settle activity and lock it from further play (teacher, must own) |
 
 ---
 
@@ -405,9 +417,10 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # all 97 tests
+pytest                                      # all 187 tests
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
+pytest tests/test_territory.py -v           # territory integration tests
 ```
 
 The test suite targets a dedicated PostgreSQL database (the dev DB name with a `_test` suffix; auto-created on first run). Each test truncates all tables before it starts so the suite shares one connection pool without cross-test pollution. Notable coverage includes:
@@ -438,5 +451,15 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter).
 | `POST /sessions/{id}/abandon` | 30/min |
 | `GET /leaderboard` | 30/min |
 | `POST /leaderboard` | 10/min |
+| `GET /achievements` | 60/min |
+| `GET /achievements/summary` | 60/min |
+| `GET /talents` | 60/min |
+| `GET /talents/modifiers` | 60/min |
+| `POST /talents/{node_id}/allocate` | 30/min |
+| `POST /talents/reset` | 10/min |
+| `POST /activities` | 10/min |
+| `GET /activities` | 30/min |
+| `POST /activities/{id}/slots/{slot_id}/play` | 30/min |
+| `POST /activities/{id}/settle` | 5/min |
 
 Exceeding the limit returns `HTTP 429 Too Many Requests`.
