@@ -1,4 +1,4 @@
-def _reg(email, password="secret123", player_name=None):
+def _reg(email, password="xQ7!aPm2#vKz9", player_name=None):
     return {
         "email": email,
         "password": password,
@@ -22,7 +22,7 @@ def test_register_duplicate(client):
 
 def test_login(client):
     client.post("/api/auth/register", json=_reg("loginuser@test.local"))
-    res = client.post("/api/auth/login", json={"email": "loginuser@test.local", "password": "secret123"})
+    res = client.post("/api/auth/login", json={"email": "loginuser@test.local", "password": "xQ7!aPm2#vKz9"})
     assert res.status_code == 200
     assert "email" in res.json()
 

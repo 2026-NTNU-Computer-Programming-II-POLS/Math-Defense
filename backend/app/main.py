@@ -136,7 +136,15 @@ async def _request_validation_handler(
     # Pydantic field-level errors must surface with field names so the
     # frontend can map them back to inputs. Routing them through the generic
     # ValueError handler below would erase that structure (E1).
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    # exc.errors() may include a raw exception object in ctx["error"] which
+    # is not JSON serializable — convert it to a string first.
+    errors = []
+    for err in exc.errors():
+        e = dict(err)
+        if "ctx" in e and "error" in e["ctx"]:
+            e["ctx"] = {**e["ctx"], "error": str(e["ctx"]["error"])}
+        errors.append(e)
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(ValueError)
