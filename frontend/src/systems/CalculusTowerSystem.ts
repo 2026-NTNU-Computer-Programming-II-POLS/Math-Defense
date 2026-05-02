@@ -193,7 +193,10 @@ export class PetCombatSystem {
 
       if (!target) continue
 
-      if (!target.alive) { pet.targetId = null; continue }
+      if (!target.alive) {
+        pet.targetId = null
+        continue
+      }
       const owner = game.towers.find(t => t.id === pet.ownerId)
       if (!owner) continue
       this._dealDamage(target, owner.effectiveDamage * pet.abilityMod, game)
