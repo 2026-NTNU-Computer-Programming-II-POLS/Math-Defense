@@ -43,7 +43,7 @@ services:
       # shared_constants.py resolves /app/../shared → /shared at runtime.
       # Mounted read-only so backend can't mutate the JSON the frontend also imports.
       - ./shared:/shared:ro
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
         condition: service_healthy
