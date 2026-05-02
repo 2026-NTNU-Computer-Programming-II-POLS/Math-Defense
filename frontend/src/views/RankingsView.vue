@@ -156,8 +156,8 @@ function switchTab(tab: TabId): void {
   resetData()
   // B-M-12: clear selection if the currently selected activity is not valid for this tab
   if (tab === 'external' && selectedActivityId.value) {
-    const a = activities.value.find(a => a.id === selectedActivityId.value)
-    if (a && a.class_id !== null) selectedActivityId.value = null
+    const selectedActivity = activities.value.find(activity => activity.id === selectedActivityId.value)
+    if (selectedActivity && selectedActivity.class_id !== null) selectedActivityId.value = null
   }
   if (tab === 'global') loadGlobal()
   else if (tab === 'class' && selectedClassId.value) loadClass()
