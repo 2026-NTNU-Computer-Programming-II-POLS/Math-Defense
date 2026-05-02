@@ -77,10 +77,11 @@ export function useSessionSync() {
   function bind(game: Game): (() => void)[] {
     const unsubs: (() => void)[] = []
 
-    cleanupOrphanSession()
+    const cleanupPromise = cleanupOrphanSession()
 
     // LEVEL_START → create session
     unsubs.push(game.eventBus.on(Events.LEVEL_START, async (levelNum) => {
+      await cleanupPromise
       if (!authStore.isLoggedIn) return
       sessionId.value = null
       pendingLevel = levelNum as number
