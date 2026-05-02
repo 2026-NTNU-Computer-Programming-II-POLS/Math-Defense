@@ -18,7 +18,7 @@ export interface SplitContext {
 export const MAX_SPLIT_DEPTH = 2
 
 export function shouldSplit(enemy: Enemy): boolean {
-  return enemy.splitCount > 0 && enemy.splitChildType !== null && enemy.splitDepth < MAX_SPLIT_DEPTH
+  return enemy.alive && enemy.splitCount > 0 && enemy.splitChildType !== null && enemy.splitDepth < MAX_SPLIT_DEPTH
 }
 
 export function spawnChildren(
