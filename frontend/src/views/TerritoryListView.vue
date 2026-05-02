@@ -65,7 +65,7 @@ onMounted(() => store.loadActivities())
           v-for="a in pagedActivitiesWithStatus"
           :key="a.id"
           class="activity-item"
-          @click="router.push(`/territory/${a.id}`)"
+          @click="router.push({ name: 'territory-detail', params: { id: a.id } })"
         >
           <div class="activity-title">{{ a.title }}</div>
           <div class="activity-meta">
