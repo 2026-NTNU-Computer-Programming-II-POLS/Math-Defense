@@ -25,6 +25,12 @@ services:
       - "127.0.0.1:8000:8000"
     env_file:
       - .env
+    environment:
+      # Explicitly set environment variables to ensure they're loaded
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     # Pin container UID/GID to the typical Linux host dev user so files written
     # through the ./backend bind-mount below are owned by the host user instead
     # of root. The Dockerfile's `useradd --system app` picks a UID from the
@@ -37,7 +43,7 @@ services:
       # shared_constants.py resolves /app/../shared → /shared at runtime.
       # Mounted read-only so backend can't mutate the JSON the frontend also imports.
       - ./shared:/shared:ro
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     depends_on:
       postgres:
         condition: service_healthy

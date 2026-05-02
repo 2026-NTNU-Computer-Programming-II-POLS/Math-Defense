@@ -29,9 +29,10 @@ def upgrade() -> None:
     sa.CheckConstraint('current_level >= 1', name='ck_talent_level_min'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('user_id', 'talent_node_id', name='uq_user_talent_node')
+    sa.UniqueConstraint('user_id', 'talent_node_id', name='uq_user_talent_node'),
+    if_not_exists=True,
     )
-    op.create_index('ix_talent_allocation_user_id', 'talent_allocations', ['user_id'], unique=False)
+    op.create_index('ix_talent_allocation_user_id', 'talent_allocations', ['user_id'], unique=False, if_not_exists=True)
     op.create_table('user_achievements',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('user_id', sa.String(), nullable=False),
@@ -40,9 +41,10 @@ def upgrade() -> None:
     sa.Column('unlocked_at', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement')
+    sa.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement'),
+    if_not_exists=True,
     )
-    op.create_index('ix_user_achievement_user_id', 'user_achievements', ['user_id'], unique=False)
+    op.create_index('ix_user_achievement_user_id', 'user_achievements', ['user_id'], unique=False, if_not_exists=True)
     op.create_table('removed_class_memberships',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('class_id', sa.String(), nullable=False),
@@ -51,9 +53,10 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['class_id'], ['classes.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['student_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('class_id', 'student_id', name='uq_removed_memberships_class_student')
+    sa.UniqueConstraint('class_id', 'student_id', name='uq_removed_memberships_class_student'),
+    if_not_exists=True,
     )
-    op.create_index('ix_removed_memberships_student_id', 'removed_class_memberships', ['student_id'], unique=False)
+    op.create_index('ix_removed_memberships_student_id', 'removed_class_memberships', ['student_id'], unique=False, if_not_exists=True)
     # ### end Alembic commands ###
 
 
