@@ -131,7 +131,11 @@ export class CalculusTowerSystem {
   }
 
   private _formatCoeff(c: number): string {
-    if (Number.isInteger(c)) return c === 1 ? '' : c === -1 ? '-' : `${c}`
+    if (Number.isInteger(c)) {
+      if (c === 1) return ''
+      if (c === -1) return '-'
+      return `${c}`
+    }
     const frac = toFraction(c)
     return frac ? `(${frac})` : `${c.toFixed(2)}`
   }
