@@ -62,7 +62,7 @@ export class LimitTowerSystem {
             enemy.hp = Math.min(enemy.maxHp, enemy.hp + tower.effectiveDamage * Math.abs(result.value) * 0.5)
             continue
           case '-inf':
-            enemy.hp = Math.min(enemy.maxHp, enemy.hp + tower.effectiveDamage * 2)
+            enemy.hp = enemy.maxHp
             continue
           default: dmg = 0
         }
