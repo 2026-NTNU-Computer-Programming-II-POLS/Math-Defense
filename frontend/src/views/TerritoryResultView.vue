@@ -24,7 +24,9 @@ onMounted(async () => {
 
   const res = await store.playSlot(activityId.value, slotId.value, sessionId)
   if (res) {
-    result.value = { seized: res.seized, score: res.occupation?.score ?? null }
+    const rawScore = res.occupation?.score
+    const safeScore = typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore : null
+    result.value = { seized: res.seized, score: safeScore }
   }
   submitting.value = false
 })
