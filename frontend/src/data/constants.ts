@@ -110,9 +110,12 @@ export const Events = Object.freeze({
   MATRIX_PAIR_CHANGED:  'matrixPairChanged',
   LIMIT_ANSWER:         'limitAnswer',
   CALCULUS_OPERATION:    'calculusOperation',
+  CALCULUS_STATE_CHANGED:'calculusStateChanged',
   TOWER_UPGRADE:        'towerUpgrade',
+  TOWER_UPGRADED:       'towerUpgraded',
   TOWER_REFUND:         'towerRefund',
   TOWER_REFUND_RESULT:  'towerRefundResult',
+  TOWER_REMOVED:        'towerRemoved',
   PET_SPAWNED:          'petSpawned',
   PET_KILLED:           'petKilled',
 

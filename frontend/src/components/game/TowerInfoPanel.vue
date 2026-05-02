@@ -19,10 +19,12 @@ let _refundUnsub: (() => void) | null = null
 onUnmounted(() => { _refundUnsub?.() })
 
 const tower = computed(() => {
+  void gameStore.towerUpgradeTick          // invalidate on upgrade
   const id = uiStore.buildPanelTowerId
   if (!id) return null
   const engine = gameStore.getEngine()
-  return engine?.towers.find((t) => t.id === id) ?? null
+  const t = engine?.towers.find((t) => t.id === id)
+  return t ? { ...t } : null               // snapshot ensures Vue sees a new reference
 })
 
 watch(() => uiStore.buildPanelTowerId, () => { confirmingRefund.value = false })
@@ -37,7 +39,7 @@ const upgradeInfo = computed(() => {
   const engine = gameStore.getEngine()
   const sys = engine?.getSystem('towerUpgrade') as TowerUpgradeSystem | undefined
   if (!sys) return null
-  return sys.canUpgrade(t, engine!.state.gold)
+  return sys.canUpgrade(t, gameStore.gold)  // gameStore.gold is reactive; engine.state.gold is not
 })
 
 function upgrade() {

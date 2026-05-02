@@ -80,6 +80,7 @@ export class LimitTowerSystem {
       if (idx >= 0) {
         game.getSystem('buff')?.onTowerRemoved(game, tower.id)
         game.towers.splice(idx, 1)
+        game.eventBus.emit(Events.TOWER_REMOVED, { towerId: tower.id })
       }
     } else if (result.outcome === 'constant') {
       tower.disabled = true

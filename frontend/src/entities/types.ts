@@ -37,7 +37,7 @@ export interface Tower {
 
   // V2 fields
   magicMode?: MagicMode
-  magicFunctionIndex?: number
+  magicExpression?: string
   arcStart?: number
   arcEnd?: number
   arcRestrict?: boolean
@@ -59,6 +59,7 @@ export interface CalculusState {
   coefficient: number
   exponent: number
   currentExpr: string
+  opApplied: boolean
 }
 
 // ── Pet ──

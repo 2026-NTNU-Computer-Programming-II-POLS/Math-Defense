@@ -186,6 +186,10 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
       uiStore.setBuildHintStep(2)
     }))
 
+    unsubs.push(g.eventBus.on(Events.TOWER_REMOVED, ({ towerId }) => {
+      if (uiStore.buildPanelTowerId === towerId) uiStore.closeBuildPanel()
+    }))
+
     unsubs.push(g.eventBus.on(Events.PHASE_CHANGED, ({ from, to }) => {
       if (to === GamePhase.BUILD && g.state.wave > 0) {
         g.state.prepPhaseStart = g.time

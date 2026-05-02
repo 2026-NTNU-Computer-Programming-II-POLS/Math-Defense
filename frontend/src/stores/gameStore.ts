@@ -6,9 +6,8 @@ import { Events } from '@/data/constants'
 import type { ActiveBuffEntry } from '@/engine/GameState'
 import type { BuffCard } from '@/data/buff-defs'
 import type { PathSegmentView } from '@/engine/projections/project-path-panel'
+import type { CalculusState } from '@/entities/types'
 export type { PathSegmentView } from '@/engine/projections/project-path-panel'
-import { generateMagicCandidates, type MagicCandidate } from '@/domain/tower/magic-candidates'
-export type { MagicCandidate } from '@/domain/tower/magic-candidates'
 
 export interface PathPanelState {
   readonly segments: ReadonlyArray<PathSegmentView>
@@ -51,6 +50,12 @@ export const useGameStore = defineStore('game', () => {
 
   // V2 Active buffs
   const activeBuffs = shallowRef<ReadonlyArray<ActiveBuffEntry>>([])
+
+  // V2 Calculus tower states (reactive mirror of tower.calculusState per towerId)
+  const calculusStates = shallowRef<Record<string, CalculusState | null>>({})
+
+  // Increments on every successful tower upgrade — forces TowerInfoPanel to re-evaluate
+  const towerUpgradeTick = ref(0)
 
   // V2 Spell cooldowns
   const spellCooldowns = ref<Record<string, number>>({})
@@ -148,9 +153,20 @@ export const useGameStore = defineStore('game', () => {
         enemiesAlive.value = 0
         activeBuffs.value = []
         spellCooldowns.value = {}
+        calculusStates.value = {}
       }),
       game.eventBus.on(Events.ACTIVE_BUFFS_CHANGED, (buffs) => {
         activeBuffs.value = buffs
+      }),
+      game.eventBus.on(Events.TOWER_UPGRADED, () => { towerUpgradeTick.value++ }),
+      game.eventBus.on(Events.CALCULUS_STATE_CHANGED, ({ towerId, state }) => {
+        const next = { ...calculusStates.value }
+        if (state === null) {
+          delete next[towerId]
+        } else {
+          next[towerId] = state
+        }
+        calculusStates.value = next
       }),
     ]
   }
@@ -208,21 +224,15 @@ export const useGameStore = defineStore('game', () => {
     return _game
   }
 
-  function getMagicCandidates(towerId: string): MagicCandidate[] {
-    const tower = _game?.towers.find((t) => t.id === towerId)
-    if (!tower) return []
-    return generateMagicCandidates(towerId, tower.x, tower.y)
-  }
-
   return {
     phase, level, starRating, wave, totalWaves,
     gold, hp, maxHp, score, kills, cumulativeKillValue, enemiesAlive, buffCards,
     costTotal, healthOrigin, timeTotal, timeExcludePrepare,
     initialAnswer, pathsVisible, montyHallProgress,
-    activeBuffs, spellCooldowns,
+    activeBuffs, spellCooldowns, calculusStates, towerUpgradeTick,
     pathPanel,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, isMontyHall, hpPercent, activeTime,
-    bindEngine, unbindEngine, syncFromEngine, getEngine, getMagicCandidates,
+    bindEngine, unbindEngine, syncFromEngine, getEngine,
   }
 })

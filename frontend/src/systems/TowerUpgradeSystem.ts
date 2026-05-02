@@ -70,6 +70,7 @@ export class TowerUpgradeSystem {
     if (tier.extra) {
       tower.upgradeExtras = { ...(tower.upgradeExtras ?? {}), ...tier.extra }
     }
+    game.eventBus.emit(Events.TOWER_UPGRADED, { towerId: tower.id })
   }
 
   private _refund(towerId: string, game: Game): void {

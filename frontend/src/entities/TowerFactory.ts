@@ -52,7 +52,7 @@ export function createTower(
 
   if (type === TowerType.MAGIC) {
     tower.magicMode = 'debuff'
-    tower.magicFunctionIndex = -1
+    tower.magicExpression = ''
   }
 
   if (type === TowerType.RADAR_A || type === TowerType.RADAR_B || type === TowerType.RADAR_C) {

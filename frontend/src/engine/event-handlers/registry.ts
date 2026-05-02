@@ -116,7 +116,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
 
   // ── V2 tower events ──
   MAGIC_FUNCTION_SELECTED: [
-    { module: 'systems/MagicTowerSystem', handler: 'anonymous', purpose: 'Store selected function index on tower' },
+    { module: 'systems/MagicTowerSystem', handler: 'anonymous', purpose: 'Store player-entered expression on tower' },
   ],
   MAGIC_MODE_CHANGED: [
     { module: 'systems/MagicTowerSystem', handler: 'anonymous', purpose: 'Toggle debuff/buff mode on magic tower' },
@@ -133,8 +133,14 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   CALCULUS_OPERATION: [
     { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Apply calculus operation to tower state' },
   ],
+  CALCULUS_STATE_CHANGED: [
+    { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror calculus tower state to reactive store' },
+  ],
   TOWER_UPGRADE: [
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Upgrade tower level and stats' },
+  ],
+  TOWER_UPGRADED: [
+    { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Increment towerUpgradeTick to force TowerInfoPanel re-render' },
   ],
   TOWER_REFUND: [
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Refund tower cost and remove it' },
@@ -142,13 +148,16 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   TOWER_REFUND_RESULT: [
     { module: 'components/game/TowerInfoPanel', handler: 'once (confirmRefund)', purpose: 'Gate panel close on refund success; surface silent fail' },
   ],
+  TOWER_REMOVED: [
+    { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Close build panel when tower is system-removed' },
+  ],
   PET_SPAWNED:  [],
   PET_KILLED:   [],
 
   // ── Chain rule / boss ──
   CHAIN_RULE_START: [],
   CHAIN_RULE_ANSWER: [
-    { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Score chain rule answer' },
+    { module: 'systems/EnemyAbilitySystem', handler: 'anonymous', purpose: 'Score chain rule answer and apply boss split' },
   ],
   CHAIN_RULE_END: [],
   BOSS_SPLIT:    [],
@@ -190,13 +199,21 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
  * every entry here must also dispose its subscriptions on unmount / destroy.
  */
 export const EVENT_SUBSCRIBER_MODULES = Object.freeze([
-  'composables/useGameLoop',      // Vue onUnmounted
-  'composables/useSessionSync',   // Vue onUnmounted
-  'stores/gameStore',             // unbindEngine()
-  'systems/BuffSystem',           // destroy()
-  'systems/CombatSystem',         // destroy()
-  'systems/EconomySystem',        // destroy()
-  'systems/SpellSystem',          // destroy()
-  'systems/TowerPlacementSystem', // destroy()
-  'systems/WaveSystem',           // destroy()
+  'composables/useGameLoop',          // Vue onUnmounted
+  'composables/useSessionSync',       // Vue onUnmounted
+  'stores/gameStore',                 // unbindEngine()
+  'systems/BuffSystem',               // destroy()
+  'systems/CalculusTowerSystem',      // destroy()
+  'systems/CombatSystem',             // destroy()
+  'systems/EconomySystem',            // destroy()
+  'systems/EnemyAbilitySystem',       // destroy()
+  'systems/LimitTowerSystem',         // destroy()
+  'systems/MagicTowerSystem',         // destroy()
+  'systems/MatrixTowerSystem',        // destroy()
+  'systems/MontyHallSystem',          // destroy()
+  'systems/RadarTowerSystem',         // destroy()
+  'systems/SpellSystem',              // destroy()
+  'systems/TowerPlacementSystem',     // destroy()
+  'systems/TowerUpgradeSystem',       // destroy()
+  'systems/WaveSystem',               // destroy()
 ] as const)

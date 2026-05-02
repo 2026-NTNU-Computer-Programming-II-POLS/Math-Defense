@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
+import { CALCULUS_OP_COST } from '@/systems/CalculusTowerSystem'
 import type { CalculusTowerSystem, MonomialPreset } from '@/systems/CalculusTowerSystem'
 
 const props = defineProps<{ towerId: string }>()
@@ -20,7 +21,10 @@ const presets = computed((): MonomialPreset[] => {
   return sys?.generatePresets(t) ?? []
 })
 
-const hasState = computed(() => !!tower.value?.calculusState)
+const calcState = computed(() => gameStore.calculusStates[props.towerId] ?? null)
+const hasState = computed(() => !!calcState.value)
+const isChainOp = computed(() => !!calcState.value?.opApplied)
+const canAffordOp = computed(() => !isChainOp.value || gameStore.gold >= CALCULUS_OP_COST)
 
 function selectPreset(index: number) {
   const engine = gameStore.getEngine()
@@ -51,15 +55,18 @@ function applyOp(op: 'derivative' | 'derivative2' | 'integral') {
 
     <template v-else>
       <p class="current-fn">
-        Current: f(x) = {{ tower?.calculusState?.currentExpr }}
+        Current: f(x) = {{ calcState?.currentExpr }}
       </p>
       <p class="coeff-info">
-        C = {{ tower?.calculusState?.coefficient }}, n = {{ tower?.calculusState?.exponent }}
+        C = {{ calcState?.coefficient }}, n = {{ calcState?.exponent }}
+      </p>
+      <p v-if="isChainOp" class="chain-cost" :class="{ 'chain-cost--broke': !canAffordOp }">
+        Chain op: {{ CALCULUS_OP_COST }}g
       </p>
       <div class="op-btns">
-        <button class="btn" @click="applyOp('derivative')">f'</button>
-        <button class="btn" @click="applyOp('derivative2')">f''</button>
-        <button class="btn" @click="applyOp('integral')">∫f</button>
+        <button class="btn" :disabled="!canAffordOp" @click="applyOp('derivative')">f'</button>
+        <button class="btn" :disabled="!canAffordOp" @click="applyOp('derivative2')">f''</button>
+        <button class="btn" :disabled="!canAffordOp" @click="applyOp('integral')">∫f</button>
       </div>
     </template>
   </div>
@@ -72,6 +79,9 @@ function applyOp(op: 'derivative' | 'derivative2' | 'integral') {
 .preset-btn { font-size: 12px; padding: 8px; font-family: var(--font-mono); }
 .current-fn { font-size: 13px; color: var(--gold); margin: 0; font-family: var(--font-mono); }
 .coeff-info { font-size: 11px; color: #e8dcc8; margin: 0; }
+.chain-cost { font-size: 11px; color: var(--gold); margin: 0; }
+.chain-cost--broke { color: var(--hp-red); }
 .op-btns { display: flex; gap: 6px; }
 .op-btns .btn { flex: 1; font-size: 11px; padding: 8px; }
+.op-btns .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

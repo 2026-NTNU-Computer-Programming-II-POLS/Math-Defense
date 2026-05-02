@@ -1,5 +1,5 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
-import { generateMagicCandidates, type CurveFunction } from '@/domain/tower/magic-candidates'
+import { parseExpression, type CurveFunction } from '@/math/expressionParser'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 
@@ -10,16 +10,16 @@ const BUFF_ZONE_MULTIPLIER = 2
 
 export class MagicTowerSystem {
   private _unsubs: (() => void)[] = []
+  private _curveCache = new Map<string, { expr: string; fn: CurveFunction }>()
 
   init(game: Game): void {
     this.destroy()
     this._unsubs.push(
-      game.eventBus.on(Events.MAGIC_FUNCTION_SELECTED, ({ towerId, index }) => {
+      game.eventBus.on(Events.MAGIC_FUNCTION_SELECTED, ({ towerId, expression }) => {
         const tower = game.towers.find((t) => t.id === towerId)
         if (!tower || tower.type !== TowerType.MAGIC) return
-        const candidates = this.getCandidates(tower)
-        if (index < 0 || index >= candidates.length) return
-        tower.magicFunctionIndex = index
+        if (!parseExpression(expression)) return
+        tower.magicExpression = expression
         tower.configured = true
       }),
       game.eventBus.on(Events.MAGIC_MODE_CHANGED, ({ towerId, mode }) => {
@@ -34,17 +34,18 @@ export class MagicTowerSystem {
   destroy(): void {
     this._unsubs.forEach((fn) => fn())
     this._unsubs = []
-  }
-
-  getCandidates(tower: Tower) {
-    return generateMagicCandidates(tower.id, tower.x, tower.y)
+    this._curveCache.clear()
   }
 
   getTowerCurve(tower: Tower): CurveFunction | null {
-    const idx = tower.magicFunctionIndex ?? -1
-    if (idx < 0) return null
-    const candidates = this.getCandidates(tower)
-    return candidates[idx]?.fn ?? null
+    const expr = tower.magicExpression
+    if (!expr) return null
+    const cached = this._curveCache.get(tower.id)
+    if (cached && cached.expr === expr) return cached.fn
+    const fn = parseExpression(expr)
+    if (!fn) return null
+    this._curveCache.set(tower.id, { expr, fn })
+    return fn
   }
 
   update(dt: number, game: Game): void {
@@ -55,13 +56,13 @@ export class MagicTowerSystem {
     for (const t of game.towers) {
       if (t.magicBuff !== 1) {
         t.magicBuff = 1
-        t.effectiveDamage = t.baseDamage * t.damageBonus
+        t.effectiveDamage = t.baseDamage * t.damageBonus * t.magicBuff
       }
     }
 
     for (const tower of game.towers) {
       if (tower.type !== TowerType.MAGIC || tower.disabled || !tower.configured) continue
-      if (tower.magicFunctionIndex === undefined || tower.magicFunctionIndex < 0) continue
+      if (!tower.magicExpression) continue
 
       const fn = this.getTowerCurve(tower)
       if (!fn) continue

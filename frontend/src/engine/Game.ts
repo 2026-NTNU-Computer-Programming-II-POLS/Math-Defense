@@ -9,7 +9,7 @@ import { InputManager } from './InputManager'
 import { PhaseStateMachine } from './PhaseStateMachine'
 import { type GameState, createInitialState } from './GameState'
 import { GamePhase, Events, FIXED_DT } from '@/data/constants'
-import type { Tower, Enemy, Projectile, Pet, LimitResult } from '@/entities/types'
+import type { Tower, Enemy, Projectile, Pet, LimitResult, CalculusState } from '@/entities/types'
 import type { BuffCard } from '@/data/buff-defs'
 import type { MontyHallReward } from '@/data/monty-hall-defs'
 import type { ActiveBuffEntry } from './GameState'
@@ -93,15 +93,18 @@ export interface GameEvents {
   [Events.SEGMENT_CHANGED]:      SegmentChangedPayload
   [Events.PLACEMENT_REJECTED]:   { gx: number; gy: number; reason: PlacementRejectionReason }
 
-  [Events.MAGIC_FUNCTION_SELECTED]: { towerId: string; index: number }
+  [Events.MAGIC_FUNCTION_SELECTED]: { towerId: string; expression: string }
   [Events.MAGIC_MODE_CHANGED]:   { towerId: string; mode: 'debuff' | 'buff' }
   [Events.RADAR_ARC_CHANGED]:    { towerId: string; arcStart: number; arcEnd: number; restrict: boolean }
   [Events.MATRIX_PAIR_CHANGED]:  { towerId: string; pairId: string }
   [Events.LIMIT_ANSWER]:         { towerId: string; answer: LimitResult }
   [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: 'derivative' | 'derivative2' | 'integral' }
+  [Events.CALCULUS_STATE_CHANGED]:{ towerId: string; state: CalculusState | null }
   [Events.TOWER_UPGRADE]:        { towerId: string }
+  [Events.TOWER_UPGRADED]:       { towerId: string }
   [Events.TOWER_REFUND]:         { towerId: string }
   [Events.TOWER_REFUND_RESULT]:  { success: boolean }
+  [Events.TOWER_REMOVED]:        { towerId: string }
   [Events.PET_SPAWNED]:          Pet
   [Events.PET_KILLED]:           Pet
 

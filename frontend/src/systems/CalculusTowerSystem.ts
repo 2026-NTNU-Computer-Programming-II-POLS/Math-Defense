@@ -5,6 +5,8 @@ import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 
+export const CALCULUS_OP_COST = 50
+
 export interface MonomialPreset {
   coefficient: number
   exponent: number
@@ -33,12 +35,28 @@ export class CalculusTowerSystem {
             coefficient: preset.coefficient,
             exponent: preset.exponent,
             currentExpr: preset.expr,
+            opApplied: false,
           }
+          game.eventBus.emit(Events.CALCULUS_STATE_CHANGED, {
+            towerId: tower.id,
+            state: { ...tower.calculusState },
+          })
           return
         }
 
         if (payload.operation && tower.calculusState) {
+          if (tower.calculusState.opApplied) {
+            if (game.state.gold < CALCULUS_OP_COST) return
+            game.changeGold(-CALCULUS_OP_COST)
+            game.addCost(CALCULUS_OP_COST)
+          }
+          tower.calculusState.opApplied = true
           this._applyOperation(tower, payload.operation, game)
+          const stillExists = game.towers.includes(tower)
+          game.eventBus.emit(Events.CALCULUS_STATE_CHANGED, {
+            towerId: tower.id,
+            state: stillExists && tower.calculusState ? { ...tower.calculusState } : null,
+          })
         }
       }),
     )
@@ -101,6 +119,7 @@ export class CalculusTowerSystem {
       if (idx >= 0) {
         game.getSystem('buff')?.onTowerRemoved(game, tower.id)
         game.towers.splice(idx, 1)
+        game.eventBus.emit(Events.TOWER_REMOVED, { towerId: tower.id })
       }
       this._removePets(tower.id, game)
       return
