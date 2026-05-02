@@ -1,6 +1,6 @@
 """Add email verification and MFA columns
 
-Revision ID: c3d4e5f6a7b8
+Revision ID: d5e6f7a8b9c0
 Revises: 58cbdc857a81
 Create Date: 2026-05-02 06:00:00.000000
 
@@ -11,19 +11,17 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'c3d4e5f6a7b8'
+revision: str = 'd5e6f7a8b9c0'
 down_revision: Union[str, None] = '58cbdc857a81'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # New columns on users table
     op.add_column('users', sa.Column('is_email_verified', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('users', sa.Column('totp_secret', sa.String(length=64), nullable=True))
     op.add_column('users', sa.Column('mfa_enabled', sa.Boolean(), nullable=False, server_default='false'))
 
-    # New table for email verification tokens
     op.create_table(
         'email_verification_tokens',
         sa.Column('id', sa.String(), nullable=False),

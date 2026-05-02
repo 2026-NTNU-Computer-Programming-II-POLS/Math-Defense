@@ -43,7 +43,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     # nosec B202 - intentional: JWT in httponly cookie is the recommended SPA auth pattern
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
-        value=token,  # noqa: S311  # CodeQL: py/clear-text-storage-sensitive-data - JWT, not raw password
+        value=token,  # noqa: S311  # lgtm[py/clear-text-storage-sensitive-data] - JWT, not raw password; httponly+secure+samesite prevent client access
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",
