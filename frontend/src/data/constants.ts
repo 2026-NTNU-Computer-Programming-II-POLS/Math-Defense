@@ -112,6 +112,7 @@ export const Events = Object.freeze({
   CALCULUS_OPERATION:    'calculusOperation',
   TOWER_UPGRADE:        'towerUpgrade',
   TOWER_REFUND:         'towerRefund',
+  TOWER_REFUND_RESULT:  'towerRefundResult',
   PET_SPAWNED:          'petSpawned',
   PET_KILLED:           'petKilled',
 

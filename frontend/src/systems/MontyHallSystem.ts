@@ -144,6 +144,7 @@ export class MontyHallSystem implements GameSystem {
         reward.duration,
         reward.name,
         game,
+        true,
       )
     }
 

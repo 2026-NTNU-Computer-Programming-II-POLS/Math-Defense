@@ -1,9 +1,8 @@
-import { Events } from '@/data/constants'
+import { Events, GamePhase, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
 import { SPELL_MAP } from '@/data/spell-defs'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
+import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { Renderer } from '@/engine/Renderer'
-import type { Enemy } from '@/entities/types'
 
 function dist(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
@@ -40,58 +39,71 @@ export class SpellSystem implements GameSystem {
   }
 
   private _castSpell(spellId: string, x: number, y: number, targetId: string | undefined, game: Game): void {
+    if (game.state.phase !== GamePhase.WAVE) return
     const def = SPELL_MAP.get(spellId)
     if (!def) return
     if (!this.canCast(spellId, game)) return
+
+    // S-5: reject out-of-bounds target position before spending resources
+    if (def.radius !== undefined) {
+      if (x < GRID_MIN_X || x > GRID_MAX_X || y < GRID_MIN_Y || y > GRID_MAX_Y) return
+    }
 
     game.changeGold(-def.cost)
     game.addCost(def.cost)
     game.state.spellCooldowns[spellId] = def.cooldown
 
+    let hitCount = 0
     switch (def.id) {
       case 'fireball':
-        this._applyAreaDamage(x, y, def.radius!, def.damage!, game)
+        hitCount = this._applyAreaDamage(x, y, def.radius!, def.damage!, game)
         break
       case 'slow':
-        this._applyAreaSlow(x, y, def.radius!, def.slowFactor!, def.duration!, game)
+        hitCount = this._applyAreaSlow(x, y, def.radius!, def.slowFactor!, def.duration!, game)
         break
       case 'lightning':
         this._applySingleDamage(targetId, def.damage!, game)
+        hitCount = 1
         break
       case 'heal':
         this._applyTowerBoost(def.duration!, game)
+        hitCount = 1
         break
+    }
+
+    // S-8: refund AoE cost when no enemies were in range
+    if (hitCount === 0 && def.radius !== undefined) {
+      game.changeGold(def.cost)
+      game.addCost(-def.cost)
+      game.state.spellCooldowns[spellId] = 0
+      return
     }
 
     game.eventBus.emit(Events.SPELL_EFFECT, { spellId, x, y, radius: def.radius })
   }
 
-  private _applyAreaDamage(x: number, y: number, radius: number, damage: number, game: Game): void {
+  private _applyAreaDamage(x: number, y: number, radius: number, damage: number, game: Game): number {
+    let hits = 0
     const enemies = [...game.enemies]
     for (const enemy of enemies) {
       if (!enemy.alive) continue
-      if (dist(x, y, enemy.x, enemy.y) > radius) continue
-      const dmg = damage * game.state.enemyVulnerability
-      if (enemy.shield > 0) {
-        const absorbed = Math.min(enemy.shield, dmg)
-        enemy.shield -= absorbed
-        enemy.hp -= dmg - absorbed
-      } else {
-        enemy.hp -= dmg
-      }
-      if (enemy.hp <= 0) {
-        this._killEnemy(enemy, game)
-      }
+      if (dist(x, y, enemy.x, enemy.y) > radius) continue  // S-6: > means boundary is inclusive
+      hits++
+      applyDamage(enemy, damage, game)
     }
+    return hits
   }
 
-  private _applyAreaSlow(x: number, y: number, radius: number, factor: number, duration: number, game: Game): void {
+  private _applyAreaSlow(x: number, y: number, radius: number, factor: number, duration: number, game: Game): number {
+    let hits = 0
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
-      if (dist(x, y, enemy.x, enemy.y) > radius) continue
+      if (dist(x, y, enemy.x, enemy.y) > radius) continue  // S-6: > means boundary is inclusive
+      hits++
       enemy.slowFactor = Math.max(enemy.slowFactor, factor)
-      enemy.slowTimer = Math.max(enemy.slowTimer, duration)
+      enemy.slowTimer = duration
     }
+    return hits
   }
 
   private _applySingleDamage(targetId: string | undefined, damage: number, game: Game): void {
@@ -99,21 +111,14 @@ export class SpellSystem implements GameSystem {
       ? game.enemies.find((e) => e.id === targetId && e.alive)
       : game.enemies.find((e) => e.alive)
     if (!target) return
-    const dmg = damage * game.state.enemyVulnerability
-    if (target.shield > 0) {
-      const absorbed = Math.min(target.shield, dmg)
-      target.shield -= absorbed
-      target.hp -= dmg - absorbed
-    } else {
-      target.hp -= dmg
-    }
-    if (target.hp <= 0) {
-      this._killEnemy(target, game)
-    }
+    applyDamage(target, damage, game)
   }
 
   private _applyTowerBoost(duration: number, game: Game): void {
     const buffSys = game.getSystem('buff')
+    if (import.meta.env.DEV && !buffSys) {
+      console.warn('[SpellSystem] heal no-op: BuffSystem not registered')
+    }
     buffSys?.applyExternalBuff(
       'ALL_TOWERS_DAMAGE_MULTIPLY_1_5',
       'ALL_TOWERS_DAMAGE_DIVIDE_1_5',
@@ -123,23 +128,8 @@ export class SpellSystem implements GameSystem {
     )
   }
 
-  private _killEnemy(enemy: Enemy, game: Game): void {
-    enemy.hp = 0
-    enemy.alive = false
-    enemy.active = false
-    game.eventBus.emit(Events.ENEMY_KILLED, enemy)
-    if (shouldSplit(enemy)) {
-      spawnChildren(enemy, {
-        path: game.levelContext?.path ?? null,
-        onChildCreated: (child) => {
-          game.enemies.push(child)
-          game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-        },
-      })
-    }
-  }
-
   update(dt: number, game: Game): void {
+    if (game.state.phase !== GamePhase.WAVE) return
     const cds = game.state.spellCooldowns
     for (const id of Object.keys(cds)) {
       if (cds[id] > 0) {

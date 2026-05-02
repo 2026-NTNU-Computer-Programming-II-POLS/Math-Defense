@@ -1,6 +1,6 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
+import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 
@@ -18,6 +18,10 @@ export class MatrixTowerSystem {
     this.destroy()
     this._unsubs.push(
       game.eventBus.on(Events.MATRIX_PAIR_CHANGED, ({ towerId, pairId }) => {
+        for (const id of [towerId, pairId]) {
+          const staleKey = [...this._lasers.keys()].find(k => { const [a, b] = k.split(':'); return a === id || b === id })
+          if (staleKey) this._lasers.delete(staleKey)
+        }
         const tower = game.towers.find((t) => t.id === towerId)
         if (tower) tower.matrixPairId = pairId
         const pair = game.towers.find((t) => t.id === pairId)
@@ -142,33 +146,7 @@ export class MatrixTowerSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    if (!enemy.alive) return
-
-    let remaining = amount * game.state.enemyVulnerability
-    if (enemy.shield > 0) {
-      const absorbed = Math.min(enemy.shield, remaining)
-      enemy.shield -= absorbed
-      remaining -= absorbed
-    }
-    if (remaining > 0) {
-      enemy.hp -= remaining
-    }
-
-    if (enemy.hp <= 0) {
-      enemy.hp = 0
-      enemy.alive = false
-      enemy.active = false
-      game.eventBus.emit(Events.ENEMY_KILLED, enemy)
-      if (shouldSplit(enemy) && game.levelContext?.path) {
-        spawnChildren(enemy, {
-          path: game.levelContext.path,
-          onChildCreated: (child) => {
-            game.enemies.push(child)
-            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-          },
-        })
-      }
-    }
+    applyDamage(enemy, amount, game)
   }
 
   render(): void {}

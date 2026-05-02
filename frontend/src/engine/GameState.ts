@@ -8,6 +8,7 @@ export interface ActiveBuffEntry {
   revertId?: string
   remainingTime: number   // seconds remaining
   totalDuration: number   // original duration in seconds
+  survivesLevelStart?: boolean  // true for mid-wave rewards (e.g. Monty Hall) that must carry into the next wave
 }
 
 export interface GameState {

@@ -31,7 +31,7 @@ export class TowerUpgradeSystem {
     const tierIndex = tower.level - 1
     if (tierIndex >= def.upgrades.length) return { ok: false, cost: 0 }
     const tier = def.upgrades[tierIndex]
-    const cost = Math.round(def.cost * tier.costPercent)
+    const cost = Math.max(1, Math.round(def.cost * tier.costPercent))
     return { ok: gold >= cost, cost }
   }
 
@@ -45,7 +45,7 @@ export class TowerUpgradeSystem {
     if (!tier) return
 
     game.changeGold(-cost)
-    tower.cost += cost
+    tower.upgradeSpend = (tower.upgradeSpend ?? 0) + cost
     tower.level++
 
     const mods = game.towerModifierProvider?.(tower.type) ?? {}
@@ -72,11 +72,18 @@ export class TowerUpgradeSystem {
 
   private _refund(towerId: string, game: Game): void {
     const idx = game.towers.findIndex((t) => t.id === towerId)
-    if (idx < 0) return
+    if (idx < 0) {
+      console.warn(`[TowerUpgradeSystem] refund ignored: tower ${towerId} not found`)
+      game.eventBus.emit(Events.TOWER_REFUND_RESULT, { success: false })
+      return
+    }
     const tower = game.towers[idx]
     game.towers.splice(idx, 1)
-    game.changeGold(Math.floor(tower.cost / 2))
+    const base = Math.floor(tower.cost / 2) + Math.floor((tower.upgradeSpend ?? 0) / 2)
+    const refund = Math.round(base * game.state.goldMultiplier)
+    game.changeGold(refund)
     game.getSystem('buff')?.onTowerRemoved(game, towerId)
+    game.eventBus.emit(Events.TOWER_REFUND_RESULT, { success: true })
   }
 
   update(): void {}

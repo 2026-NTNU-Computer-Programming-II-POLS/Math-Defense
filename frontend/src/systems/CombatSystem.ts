@@ -1,6 +1,6 @@
 import { Events, GamePhase, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y, UNIT_PX } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
+import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
 
@@ -35,29 +35,7 @@ export class CombatSystem {
       if (!enemy.alive) continue
       if (enemy.dotTimer > 0) {
         enemy.dotTimer -= dt
-        const dotDmg = enemy.dotDamage * dt * game.state.enemyVulnerability
-        if (enemy.shield > 0) {
-          const absorbed = Math.min(enemy.shield, dotDmg)
-          enemy.shield -= absorbed
-          enemy.hp -= dotDmg - absorbed
-        } else {
-          enemy.hp -= dotDmg
-        }
-        if (enemy.hp <= 0) {
-          enemy.hp = 0
-          enemy.alive = false
-          enemy.active = false
-          game.eventBus.emit(Events.ENEMY_KILLED, enemy)
-          if (shouldSplit(enemy) && game.levelContext?.path) {
-            spawnChildren(enemy, {
-              path: game.levelContext.path,
-              onChildCreated: (child) => {
-                game.enemies.push(child)
-                game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-              },
-            })
-          }
-        }
+        applyDamage(enemy, enemy.dotDamage * dt, game)
         if (enemy.dotTimer <= 0) {
           enemy.dotDamage = 0
         }
@@ -114,35 +92,7 @@ export class CombatSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    if (!enemy.alive) return
-
-    let remaining = amount * game.state.enemyVulnerability
-    if (enemy.shield > 0) {
-      const absorbed = Math.min(enemy.shield, remaining)
-      enemy.shield -= absorbed
-      remaining -= absorbed
-    }
-
-    if (remaining > 0) {
-      enemy.hp -= remaining
-    }
-
-    if (enemy.hp <= 0) {
-      enemy.hp = 0
-      enemy.alive = false
-      enemy.active = false
-      game.eventBus.emit(Events.ENEMY_KILLED, enemy)
-
-      if (shouldSplit(enemy) && game.levelContext?.path) {
-        spawnChildren(enemy, {
-          path: game.levelContext.path,
-          onChildCreated: (child) => {
-            game.enemies.push(child)
-            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-          },
-        })
-      }
-    }
+    applyDamage(enemy, amount, game)
   }
 
   render(_renderer: unknown, _game: Game): void {}

@@ -7,6 +7,7 @@ import { Events } from '@/data/constants'
 const g = useGameStore()
 const castingSpell = ref<string | null>(null)
 let _unsubClick: (() => void) | null = null
+let _lastCastAt = 0
 
 onMounted(() => {
   const engine = g.getEngine()
@@ -52,8 +53,11 @@ function selectSpell(spellId: string): void {
 
 function castAtPosition(x: number, y: number): void {
   if (!castingSpell.value) return
+  const now = Date.now()
+  if (now - _lastCastAt < 150) return
   const engine = g.getEngine()
   if (!engine) return
+  _lastCastAt = now
   engine.eventBus.emit(Events.SPELL_CAST, {
     spellId: castingSpell.value,
     x, y,

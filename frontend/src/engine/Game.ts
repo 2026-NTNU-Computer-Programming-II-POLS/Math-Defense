@@ -101,6 +101,7 @@ export interface GameEvents {
   [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: 'derivative' | 'derivative2' | 'integral' }
   [Events.TOWER_UPGRADE]:        { towerId: string }
   [Events.TOWER_REFUND]:         { towerId: string }
+  [Events.TOWER_REFUND_RESULT]:  { success: boolean }
   [Events.PET_SPAWNED]:          Pet
   [Events.PET_KILLED]:           Pet
 
@@ -266,6 +267,9 @@ export class Game {
   // ── State operations ──
 
   changeGold(amount: number): void {
+    if (import.meta.env.DEV && amount < 0 && this.state.gold + amount < 0) {
+      console.warn(`[Game] gold underflow: attempted ${amount} from ${this.state.gold}`)
+    }
     this.state.gold = Math.max(0, this.state.gold + amount)
     this.eventBus.emit(Events.GOLD_CHANGED, this.state.gold)
   }
@@ -282,7 +286,7 @@ export class Game {
   }
 
   addCost(amount: number): void {
-    this.state.costTotal += amount
+    this.state.costTotal = Math.round(this.state.costTotal + amount)
     this.eventBus.emit(Events.COST_TOTAL_CHANGED, this.state.costTotal)
   }
 
@@ -297,6 +301,10 @@ export class Game {
 
   setPhase(to: GamePhase): void {
     const from = this.state.phase
+    // Self-heal: forceTransition can move _current without touching state.phase.
+    // Re-sync before attempting the transition so the machine always validates
+    // from the state the rest of the engine actually observes.
+    if (this.phase.current !== from) this.phase.forceTransition(from)
     if (!this.phase.transition(to)) return
     this.state.phase = to
     this.eventBus.emit(Events.PHASE_CHANGED, { from, to })
@@ -336,8 +344,8 @@ export class Game {
   }
 
   startWave(): void {
-    const ok = this.phase.canTransition(GamePhase.WAVE)
-    if (!ok) return
+    if (this.state.phase === GamePhase.WAVE) return
+    if (this.state.phase !== GamePhase.BUILD) return
     this.state.wave++
     // Transition phase first so listeners see correct phase on WAVE_START
     this.setPhase(GamePhase.WAVE)

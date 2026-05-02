@@ -139,6 +139,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   TOWER_REFUND: [
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Refund tower cost and remove it' },
   ],
+  TOWER_REFUND_RESULT: [
+    { module: 'components/game/TowerInfoPanel', handler: 'once (confirmRefund)', purpose: 'Gate panel close on refund success; surface silent fail' },
+  ],
   PET_SPAWNED:  [],
   PET_KILLED:   [],
 
@@ -193,6 +196,7 @@ export const EVENT_SUBSCRIBER_MODULES = Object.freeze([
   'systems/BuffSystem',           // destroy()
   'systems/CombatSystem',         // destroy()
   'systems/EconomySystem',        // destroy()
+  'systems/SpellSystem',          // destroy()
   'systems/TowerPlacementSystem', // destroy()
   'systems/WaveSystem',           // destroy()
 ] as const)

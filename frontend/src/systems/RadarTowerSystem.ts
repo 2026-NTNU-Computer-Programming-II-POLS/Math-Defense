@@ -1,6 +1,6 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
-import { shouldSplit, spawnChildren } from '@/domain/combat/SplitPolicy'
+import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy, Projectile } from '@/entities/types'
 
@@ -70,6 +70,7 @@ export class RadarTowerSystem {
       if (!enemy.alive) continue
       const d = distance(tower.x, tower.y, enemy.x, enemy.y)
       if (d > range) continue
+      if (tower.arcRestrict && !this._isInArc(tower, enemy)) continue
       const enemyAngle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
       const angleDiff = Math.abs(normalizeAngle(enemyAngle - angle))
       if (angleDiff < aoeWidth) {
@@ -97,7 +98,7 @@ export class RadarTowerSystem {
     tower.cooldownTimer = tower.cooldown
 
     const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
-    const critChance = tower.upgradeExtras?.['critChance'] ?? 0
+    const critChance = Math.min(1, tower.upgradeExtras?.['critChance'] ?? 0)
     const critDmgBonus = tower.upgradeExtras?.['critDamage'] ?? 0
     const targets = this._findTargets(tower, game, count)
     for (const target of targets) {
@@ -153,33 +154,7 @@ export class RadarTowerSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    if (!enemy.alive) return
-
-    let remaining = amount * game.state.enemyVulnerability
-    if (enemy.shield > 0) {
-      const absorbed = Math.min(enemy.shield, remaining)
-      enemy.shield -= absorbed
-      remaining -= absorbed
-    }
-    if (remaining > 0) {
-      enemy.hp -= remaining
-    }
-
-    if (enemy.hp <= 0) {
-      enemy.hp = 0
-      enemy.alive = false
-      enemy.active = false
-      game.eventBus.emit(Events.ENEMY_KILLED, enemy)
-      if (shouldSplit(enemy) && game.levelContext?.path) {
-        spawnChildren(enemy, {
-          path: game.levelContext.path,
-          onChildCreated: (child) => {
-            game.enemies.push(child)
-            game.eventBus.emit(Events.ENEMY_SPAWNED, child)
-          },
-        })
-      }
-    }
+    applyDamage(enemy, amount, game)
   }
 
   render(): void {}

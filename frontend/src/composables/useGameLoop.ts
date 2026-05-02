@@ -207,7 +207,11 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
     // V2: auto-start the generated level immediately after the engine boots.
     if (generatedLevel.value) {
       g.generatedLevel = generatedLevel.value
-      g.currentWaves = buildWavesForStar(generatedLevel.value.starRating)
+      const waves = buildWavesForStar(generatedLevel.value.starRating)
+      if (waves.length === 0) {
+        throw new Error(`[useGameLoop] buildWavesForStar(${generatedLevel.value.starRating}) returned no waves`)
+      }
+      g.currentWaves = waves
       g.startLevel(generatedLevel.value.starRating)
     }
     } catch (err) {

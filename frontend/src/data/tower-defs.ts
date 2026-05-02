@@ -1,5 +1,22 @@
 import { TowerType, Colors } from './constants'
 
+function validateTowerDefs(defs: Record<string, TowerDef>): void {
+  const allTypes = Object.values(TowerType) as string[]
+  for (const type of allTypes) {
+    const def = defs[type]
+    if (!def) throw new Error(`[tower-defs] missing definition for TowerType '${type}'`)
+    if (def.cost <= 0) throw new Error(`[tower-defs] ${type}: cost must be > 0 (got ${def.cost})`)
+    if (def.range <= 0) throw new Error(`[tower-defs] ${type}: range must be > 0 (got ${def.range})`)
+    if (def.damage < 0) throw new Error(`[tower-defs] ${type}: damage must be >= 0 (got ${def.damage})`)
+    if (def.upgrades.length === 0) throw new Error(`[tower-defs] ${type}: upgrades array is empty`)
+    for (let i = 0; i < def.upgrades.length; i++) {
+      const tier = def.upgrades[i]
+      if (tier.costPercent <= 0) throw new Error(`[tower-defs] ${type} tier ${i}: costPercent must be > 0`)
+      if (tier.speedBonus >= 1) throw new Error(`[tower-defs] ${type} tier ${i}: speedBonus must be < 1 to avoid zero/negative cooldown`)
+    }
+  }
+}
+
 export type MagicMode = 'debuff' | 'buff'
 
 export interface UpgradeTier {
@@ -143,3 +160,5 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     ],
   },
 }
+
+validateTowerDefs(TOWER_DEFS)
