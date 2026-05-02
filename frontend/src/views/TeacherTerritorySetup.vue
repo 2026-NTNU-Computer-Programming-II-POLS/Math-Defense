@@ -43,12 +43,19 @@ async function submit(): Promise<void> {
     validationError.value = 'Please set a deadline'
     return
   }
+
+  const parsedDeadline = new Date(deadline.value)
+  if (Number.isNaN(parsedDeadline.getTime())) {
+    validationError.value = 'Please enter a valid deadline'
+    return
+  }
+
   validationError.value = ''
   submitting.value = true
   try {
     const activity = await store.createActivity({
       title: title.value.trim(),
-      deadline: new Date(deadline.value).toISOString(),
+      deadline: parsedDeadline.toISOString(),
       class_id: selectedClassId.value,
       slots: slots.value.map((s) => ({ star_rating: s.star_rating })),
     })
@@ -164,6 +171,10 @@ onMounted(async () => {
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
+:root {
+  --min-touch-target: 44px;
+}
+
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field-label { font-size: 11px; color: var(--gold); }
 
@@ -183,7 +194,7 @@ onMounted(async () => {
 .btn-sm {
   font-size: 9px;
   padding: 2px 6px;
-  min-height: 44px;
+  min-height: var(--min-touch-target);
   display: inline-flex;
   align-items: center;
   background: none;
