@@ -39,11 +39,21 @@ const externalRankings = ref<ExternalRankingEntry[]>([])
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 
 // B-M-12: external rankings only exist for open (non-class-scoped) activities
-const filteredActivities = computed(() =>
-  activeTab.value === 'external'
-    ? activities.value.filter(a => a.class_id === null)
-    : activities.value
-)
+const filteredActivities = computed(() => {
+  if (activeTab.value === 'external') {
+    return activities.value.filter(a => a.class_id === null)
+  }
+
+  // C-10: internal rankings should only list class-scoped activities
+  // and, when selected, only those for the active class context.
+  if (activeTab.value === 'internal') {
+    return activities.value.filter(
+      a => a.class_id !== null && (!selectedClassId.value || a.class_id === selectedClassId.value)
+    )
+  }
+
+  return activities.value
+})
 
 let inflight: AbortController | null = null
 let fetchId = 0
