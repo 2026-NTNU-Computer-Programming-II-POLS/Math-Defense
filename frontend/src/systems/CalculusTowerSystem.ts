@@ -85,7 +85,8 @@ export class CalculusTowerSystem {
       newCoeff = state.coefficient * state.exponent * (state.exponent - 1)
       newExp = state.exponent - 2
     } else {
-      newCoeff = state.coefficient / (state.exponent + 1)
+      const integratedCoeff = state.coefficient / (state.exponent + 1)
+      newCoeff = Math.round(integratedCoeff * 1e12) / 1e12
       newExp = state.exponent + 1
     }
 
