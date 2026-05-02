@@ -65,8 +65,7 @@ class ClassApplicationService:
         cls_.verify_owner(user_id)
 
     def create_class(self, name: str, teacher_id: str) -> Class:
-        last_exc: Exception | None = None
-        for _ in range(3):
+        for attempt in range(3):
             cls_ = Class.create(name=name, teacher_id=teacher_id)
             try:
                 with self._uow:
@@ -76,8 +75,9 @@ class ClassApplicationService:
             except IntegrityError as exc:
                 if _is_name_conflict(exc):
                     raise ClassNameConflictError("A class with this name already exists") from exc
-                last_exc = exc
-        raise last_exc  # type: ignore[misc]
+                if attempt == 2:
+                    raise
+        raise RuntimeError("Unreachable")
 
     def get_class(self, class_id: str) -> Class:
         return self._get_class_or_raise(class_id)
@@ -197,14 +197,14 @@ class ClassApplicationService:
     def regenerate_join_code(self, class_id: str, requester_id: str, requester_role: Role) -> str:
         cls_ = self._get_class_or_raise(class_id)
         self._verify_owner_or_admin(cls_, requester_id, requester_role)
-        last_exc: Exception | None = None
-        for _ in range(3):
+        for attempt in range(3):
             cls_.regenerate_join_code()
             try:
                 with self._uow:
                     self._class_repo.save(cls_)
                     self._uow.commit()
                 return cls_.join_code
-            except IntegrityError as exc:
-                last_exc = exc
-        raise last_exc  # type: ignore[misc]
+            except IntegrityError:
+                if attempt == 2:
+                    raise
+        raise RuntimeError("Unreachable")
