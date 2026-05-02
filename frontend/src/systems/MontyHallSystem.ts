@@ -85,13 +85,14 @@ export class MontyHallSystem implements GameSystem {
     return true
   }
 
-  private _startEvent(doorCount: number, _game: Game): void {
-    const prizeIndex = Math.floor(Math.random() * doorCount)
+  private _startEvent(_doorCount: number, _game: Game): void {
+    const effectiveDoorCount = 3
+    const prizeIndex = Math.floor(Math.random() * effectiveDoorCount)
     const reward = MONTY_HALL_REWARD_POOL[
       Math.floor(Math.random() * MONTY_HALL_REWARD_POOL.length)
     ]
     this.current = {
-      doorCount,
+      doorCount: effectiveDoorCount,
       prizeIndex,
       selectedDoor: null,
       revealedDoors: [],
