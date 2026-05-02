@@ -86,6 +86,7 @@ def logout(
         try:
             build_auth_service(db).logout_token(token)
         except Exception:
+            # Ignored: clearing cookies on client side regardless of server-side state
             pass
     _clear_auth_cookie(response)
     mint_csrf_cookie(response)

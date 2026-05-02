@@ -326,5 +326,6 @@ class TerritoryApplicationService:
                     self._uow.commit()
                     count += 1
             except ActivityAlreadySettledError:
+                # Handled concurrently, safe to ignore
                 pass
         return count

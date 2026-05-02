@@ -100,10 +100,12 @@ async def lifespan(_app: FastAPI):
         try:
             await janitor
         except asyncio.CancelledError:
+            # Expected during shutdown
             pass
         try:
             await settlement
         except asyncio.CancelledError:
+            # Expected during shutdown
             pass
 
 
