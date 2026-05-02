@@ -39,6 +39,13 @@ class TestLeaderboardEntryInvariants:
                 kills=5, waves_survived=-2, session_id="s-1",
             )
 
+    def test_both_negative_kills_and_waves_rejected(self):
+        with pytest.raises(DomainValueError):
+            LeaderboardEntry.create_from_session(
+                user_id="u-1", level=1, score=100,
+                kills=-1, waves_survived=-2, session_id="s-1",
+            )
+
     def test_zero_kills_waves_allowed(self):
         entry = LeaderboardEntry.create_from_session(
             user_id="u-1", level=1, score=0,
