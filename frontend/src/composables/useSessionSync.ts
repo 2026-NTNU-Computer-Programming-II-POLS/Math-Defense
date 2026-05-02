@@ -186,6 +186,7 @@ export function useSessionSync() {
         initialAnswer: s.initialAnswer,
       })
       const result = await sessionService.end(id, {
+        score: totalScore,
         kills: s.kills,
         waves_survived: s.wave,
         kill_value: s.cumulativeKillValue,
