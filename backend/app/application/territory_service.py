@@ -204,14 +204,15 @@ class TerritoryApplicationService:
             raise InvalidSessionError("Game session not found")
         if session.status != SessionStatus.COMPLETED:
             raise InvalidSessionError("Game session is not completed")
-        if session.total_score is None or session.total_score < 0:
+        score = session.total_score if session.total_score is not None else float(session.score)
+        if score < 0:
             raise InvalidSessionError("Game session has no valid score")
         if int(session.level) != slot_star_rating:
             raise InvalidSessionError(
                 f"Session difficulty ({int(session.level)}) does not match "
                 f"slot requirement ({slot_star_rating})"
             )
-        return session.total_score
+        return score
 
     def play_territory(
         self,
