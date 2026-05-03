@@ -25,10 +25,3 @@ def record_audit_event(
         details=details_str,
     )
     db.add(log_entry)
-    # The caller (router or service) is typically responsible for committing the transaction
-    # via the UnitOfWork or dependency commit, but we commit here if we want to ensure
-    # audit logs are saved even on subsequent failures, though typically auth endpoints
-    # commit at the end. We'll just let the caller commit or explicitly commit here
-    # if it's safe. Wait, `auth.py` router doesn't explicitly commit, the service does.
-    # We will explicitly commit the audit log so it's saved.
-    db.commit()

@@ -41,6 +41,9 @@ from app.infrastructure.persistence.territory_repository import (
 from app.infrastructure.persistence.token_denylist_repository import (
     SqlAlchemyTokenDenylistRepository,
 )
+from app.infrastructure.persistence.refresh_token_repository import (
+    SqlAlchemyRefreshTokenRepository,
+)
 from app.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
@@ -56,6 +59,7 @@ def build_auth_service(db: "DbSession") -> AuthApplicationService:
         email_verification_repo=SqlAlchemyEmailVerificationRepository(db),
         email_svc=SmtpEmailService(settings),
         uow=SqlAlchemyUnitOfWork(db),
+        refresh_token_repo=SqlAlchemyRefreshTokenRepository(db),
     )
 
 

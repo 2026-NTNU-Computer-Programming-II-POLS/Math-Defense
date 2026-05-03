@@ -105,7 +105,7 @@ def test_leaderboard_filter_by_level(client):
 
 def _register_teacher(db_session, name):
     from app.factories import build_auth_service
-    _user, token = build_auth_service(db_session).register(
+    _user, token, _refresh = build_auth_service(db_session).register(
         email=f"{name}@test.local",
         password="secret123",
         player_name=name,

@@ -25,11 +25,11 @@ const REQUEST_TIMEOUT_MS = 10_000
 // so requests work without an external reverse proxy.
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
-const CSRF_COOKIE_NAME = 'csrf_token'
-const CSRF_HEADER_NAME = 'X-CSRF-Token'
+export const CSRF_COOKIE_NAME = 'csrf_token'
+export const CSRF_HEADER_NAME = 'X-CSRF-Token'
 const UNSAFE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
 
-function readCookie(name: string): string | null {
+export function readCookie(name: string): string | null {
   // document.cookie is "k=v; k2=v2"; pick by exact name.
   if (typeof document === 'undefined') return null
   const prefix = `${name}=`

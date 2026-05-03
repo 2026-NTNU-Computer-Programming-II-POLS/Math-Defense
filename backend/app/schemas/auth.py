@@ -79,7 +79,9 @@ class LoginRequest(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def password_max_length(cls, v: str) -> str:
+    def validate_password_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password too short")
         if len(v.encode("utf-8")) > 72:
             raise ValueError("Password is too long")
         return v
@@ -170,7 +172,6 @@ class AvatarUpdateRequest(BaseModel):
 
 
 class MFASetupResponse(BaseModel):
-    secret: str
     provisioning_uri: str
 
 

@@ -91,6 +91,7 @@ export class MovementSystem {
       )
       enemy.alive = false
       enemy.active = false
+      game.eventBus.emit(Events.ENEMY_KILLED, enemy)
       return
     }
     const strategy = getStrategy(segment.kind)

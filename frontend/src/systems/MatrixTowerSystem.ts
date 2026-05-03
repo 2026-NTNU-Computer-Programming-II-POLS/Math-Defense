@@ -31,6 +31,15 @@ export class MatrixTowerSystem {
         if (tower.type !== TowerType.MATRIX) return
         this._autoPair(tower, game)
       }),
+      game.eventBus.on(Events.TOWER_REFUND_RESULT, ({ towerId, success }) => {
+        if (!success || !towerId) return
+        for (const key of [...this._lasers.keys()]) {
+          const [a, b] = key.split(':')
+          if (a === towerId || b === towerId) this._lasers.delete(key)
+        }
+        const partner = game.towers.find(t => t.matrixPairId === towerId)
+        if (partner) partner.matrixPairId = null
+      }),
       game.eventBus.on(Events.LEVEL_START, () => {
         this._lasers.clear()
       }),

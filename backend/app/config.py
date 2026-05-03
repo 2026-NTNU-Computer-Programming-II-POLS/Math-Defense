@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     database_url: str
     secret_key: str  # Required — must be set via SECRET_KEY env var or .env file
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30  # 30 minutes
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 30
     # JWT iss/aud — bound into every issued token and required at decode time.
     # Pinning them closes the cross-service reuse gap if the HMAC secret ever
     # leaks to a sibling service signing JWTs with the same key.
@@ -70,8 +71,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "noreply@math-defense.app"
     smtp_tls: bool = True
-    # Base URL for constructing email verification links.
-    frontend_url: str = "http://localhost:5173"
+    # Base URL for constructing email verification links. Required — no default
+    # so production can't silently emit verification links pointing at localhost.
+    frontend_url: str
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -89,6 +91,14 @@ class Settings(BaseSettings):
                 )
         return origins
 
+    @field_validator("algorithm")
+    @classmethod
+    def validate_algorithm(cls, v: str) -> str:
+        allowed = {"HS256", "HS512"}
+        if v not in allowed:
+            raise ValueError(f"ALGORITHM must be one of {allowed}")
+        return v
+
     @field_validator("secret_key")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
@@ -101,6 +111,13 @@ class Settings(BaseSettings):
                 f"SECRET_KEY must be at least {_MIN_SECRET_KEY_LENGTH} characters; "
                 "a short key compromises JWT security"
             )
+        return v
+
+    @field_validator("frontend_url")
+    @classmethod
+    def validate_frontend_url(cls, v: str) -> str:
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("FRONTEND_URL must be an absolute http:// or https:// URL")
         return v
 
     @field_validator("database_url")

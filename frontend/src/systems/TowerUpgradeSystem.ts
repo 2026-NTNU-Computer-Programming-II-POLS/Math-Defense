@@ -86,7 +86,7 @@ export class TowerUpgradeSystem {
     const refund = Math.round(base * game.state.goldMultiplier)
     game.changeGold(refund)
     game.getSystem('buff')?.onTowerRemoved(game, towerId)
-    game.eventBus.emit(Events.TOWER_REFUND_RESULT, { success: true })
+    game.eventBus.emit(Events.TOWER_REFUND_RESULT, { success: true, towerId })
   }
 
   update(): void {}

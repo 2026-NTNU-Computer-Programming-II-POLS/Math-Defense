@@ -41,5 +41,18 @@ class EmailVerificationRepository(Protocol):
 
 
 @runtime_checkable
+class RefreshTokenRepository(Protocol):
+    def create(self, user_id: str, token_hash: str, expires_at: datetime) -> None: ...
+
+    def consume(self, token_hash: str) -> str | None:
+        """Mark token used (rotation) and return its user_id, or None if invalid/expired/used/revoked."""
+        ...
+
+    def revoke_all_for_user(self, user_id: str) -> None:
+        """Revoke every active refresh token for a user (e.g., on logout or password change)."""
+        ...
+
+
+@runtime_checkable
 class EmailService(Protocol):
     def send_verification_email(self, to: str, player_name: str, token: str) -> None: ...

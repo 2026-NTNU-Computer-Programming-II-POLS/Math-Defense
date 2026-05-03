@@ -1,6 +1,7 @@
 """AuthApplicationService — user registration, login, and token authentication"""
 from __future__ import annotations
 
+import hashlib
 import logging
 import secrets
 from datetime import datetime, timedelta, UTC
@@ -22,6 +23,7 @@ from app.domain.errors import (
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Email, Role
 from app.utils import totp as totp_utils
+from app.config import settings
 from app.utils.security import (
     hash_password,
     verify_password,
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
         EmailService,
         EmailVerificationRepository,
         LoginAttemptRepository,
+        RefreshTokenRepository,
         TokenDenylistRepository,
     )
     from app.domain.user.repository import UserRepository
@@ -56,6 +59,7 @@ class AuthApplicationService:
         email_verification_repo: EmailVerificationRepository,
         email_svc: EmailService,
         uow: SqlAlchemyUnitOfWork,
+        refresh_token_repo: RefreshTokenRepository | None = None,
     ) -> None:
         self._user_repo = user_repo
         self._login_attempts = login_attempt_repo
@@ -63,6 +67,18 @@ class AuthApplicationService:
         self._email_verification_repo = email_verification_repo
         self._email_svc = email_svc
         self._uow = uow
+        self._refresh_token_repo = refresh_token_repo
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _issue_refresh_token(self, user_id: str) -> str:
+        """Create a refresh token, persist its hash, and return the raw token."""
+        raw = secrets.token_hex(32)
+        token_hash = hashlib.sha256(raw.encode()).hexdigest()
+        expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+        if self._refresh_token_repo is not None:
+            self._refresh_token_repo.create(user_id, token_hash, expires_at)
+        return raw
 
     # ── Registration ────────────────────────────────────────────────────────
 
@@ -72,8 +88,8 @@ class AuthApplicationService:
         password: str,
         player_name: str,
         role: str = "student",
-    ) -> tuple[User, str]:
-        """Create a new user and issue an access token. Returns (user, token)."""
+    ) -> tuple[User, str, str]:
+        """Create a new user and issue tokens. Returns (user, access_token, refresh_token)."""
         try:
             email_vo = Email(email)
         except ValueError as e:
@@ -96,6 +112,7 @@ class AuthApplicationService:
             )
             self._user_repo.save(user)
             verification_token = self._create_verification_token(user.id)
+            refresh_token = self._issue_refresh_token(user.id)
             try:
                 self._uow.commit()
             except IntegrityError as e:
@@ -106,8 +123,8 @@ class AuthApplicationService:
         except Exception:
             logger.warning("Failed to send verification email for user %s", user.id)
 
-        token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
-        return user, token
+        access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
+        return user, access_token, refresh_token
 
     def _create_verification_token(self, user_id: str) -> str:
         """Generate a fresh token; invalidates any pending tokens for this user first."""
@@ -119,15 +136,16 @@ class AuthApplicationService:
 
     # ── Login ───────────────────────────────────────────────────────────────
 
-    def login(self, email: str, password: str) -> tuple[User, str, bool]:
-        """Authenticate credentials and issue an access token.
+    def login(self, email: str, password: str) -> tuple[User, str, bool, str | None]:
+        """Authenticate credentials and issue tokens.
 
-        Returns (user, token, mfa_required).
-        When mfa_required is True, token is a short-lived MFA challenge JWT;
-        the caller must verify a TOTP code via verify_mfa_challenge() to get
-        a full access token.
+        Returns (user, token, mfa_required, refresh_token).
+        When mfa_required is True, token is a short-lived MFA challenge JWT and
+        refresh_token is None; the caller must verify a TOTP code via
+        verify_mfa_challenge() to obtain a full access + refresh token pair.
         """
         email_lower = email.strip().lower()
+        refresh_token: str | None = None
         with self._uow:
             if self._login_attempts.is_locked(email_lower):
                 raise AccountLockedError(
@@ -148,6 +166,8 @@ class AuthApplicationService:
             if not user.is_active:
                 raise AccountDisabledError("This account has been disabled")
             self._login_attempts.clear(email_lower)
+            if not user.mfa_enabled:
+                refresh_token = self._issue_refresh_token(user.id)
             self._uow.commit()
 
         if user.mfa_enabled:
@@ -155,10 +175,11 @@ class AuthApplicationService:
                 {"sub": user.id, "role": user.role.value, "pv": user.password_version, "type": "mfa_challenge"},
                 expires_delta=timedelta(minutes=_MFA_CHALLENGE_TTL_MINUTES),
             )
-            return user, mfa_token, True
+            return user, mfa_token, True, None
 
-        token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
-        return user, token, False
+        assert refresh_token is not None
+        access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
+        return user, access_token, False, refresh_token
 
     # ── Token auth ──────────────────────────────────────────────────────────
 
@@ -186,18 +207,40 @@ class AuthApplicationService:
             raise InvalidTokenError("Token has been invalidated by a password change")
         return user
 
-    def logout_token(self, token: str) -> None:
-        """Revoke a token by adding its JTI to the deny-list."""
+    def logout_token(self, token: str, refresh_token: str | None = None) -> None:
+        """Revoke an access token and optionally its paired refresh token."""
         payload = decode_token(token)
-        if payload is None:
-            return
-        jti = payload.get("jti")
-        exp = payload.get("exp", 0)
-        if not jti:
-            return
         with self._uow:
-            self._token_denylist.deny(jti, float(exp))
+            if payload is not None:
+                jti = payload.get("jti")
+                exp = payload.get("exp", 0)
+                if jti:
+                    self._token_denylist.deny(jti, float(exp))
+            if refresh_token is not None and self._refresh_token_repo is not None:
+                token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+                user_id = self._refresh_token_repo.consume(token_hash)
+                if user_id is not None:
+                    self._refresh_token_repo.revoke_all_for_user(user_id)
             self._uow.commit()
+
+    def refresh_access_token(self, refresh_token: str) -> tuple[User, str, str]:
+        """Validate and rotate a refresh token; return (user, new_access_token, new_refresh_token)."""
+        if self._refresh_token_repo is None:
+            raise InvalidTokenError("Refresh tokens are not enabled")
+        token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+        with self._uow:
+            user_id = self._refresh_token_repo.consume(token_hash)
+            if user_id is None:
+                raise InvalidTokenError("Refresh token is invalid or expired")
+            user = self._user_repo.find_by_id(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found")
+            if not user.is_active:
+                raise AccountDisabledError("This account has been disabled")
+            new_refresh_token = self._issue_refresh_token(user.id)
+            self._uow.commit()
+        access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
+        return user, access_token, new_refresh_token
 
     # ── Profile mutations ───────────────────────────────────────────────────
 
@@ -315,8 +358,8 @@ class AuthApplicationService:
             self._user_repo.save(user)
             self._uow.commit()
 
-    def verify_mfa_challenge(self, mfa_token: str, code: str) -> tuple[User, str]:
-        """Complete MFA login: verify the challenge token + TOTP code, return full access token."""
+    def verify_mfa_challenge(self, mfa_token: str, code: str) -> tuple[User, str, str]:
+        """Complete MFA login: verify the challenge token + TOTP code, return (user, access_token, refresh_token)."""
         payload = decode_token(mfa_token)
         if payload is None or payload.get("type") != "mfa_challenge":
             raise InvalidTokenError("Invalid MFA challenge token")
@@ -335,5 +378,8 @@ class AuthApplicationService:
             raise MFANotSetupError("MFA is not enabled for this account")
         if not totp_utils.verify_code(user.totp_secret, code):
             raise InvalidMFACodeError("Invalid TOTP code")
-        token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
-        return user, token
+        with self._uow:
+            refresh_token = self._issue_refresh_token(user.id)
+            self._uow.commit()
+        access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
+        return user, access_token, refresh_token

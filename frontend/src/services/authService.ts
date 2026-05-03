@@ -1,4 +1,4 @@
-import { api } from './api'
+import { api, readCookie, CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './api'
 
 export interface TokenResponse {
   token_type: string
@@ -56,10 +56,8 @@ export const authService = {
     const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
     const url = base ? `${base}/api/auth/logout` : '/api/auth/logout'
     const headers: Record<string, string> = {}
-    if (typeof document !== 'undefined') {
-      const match = document.cookie.split(';').map((c) => c.trim()).find((c) => c.startsWith('csrf_token='))
-      if (match) headers['X-CSRF-Token'] = decodeURIComponent(match.slice('csrf_token='.length))
-    }
+    const csrf = readCookie(CSRF_COOKIE_NAME)
+    if (csrf) headers[CSRF_HEADER_NAME] = csrf
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10_000)
     return fetch(url, {

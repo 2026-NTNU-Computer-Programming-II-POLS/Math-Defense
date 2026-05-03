@@ -220,13 +220,13 @@ class SessionApplicationService:
         with self._uow:
             from app.shared_constants import INITIAL_HP
             session = self._session_repo.find_by_id(event.session_id, event.user_id)
-            hp_lost = 0
-            gold_remaining = 0
-            if session:
-                origin_hp = session.health_origin if session.health_origin is not None else INITIAL_HP
-                final_hp = session.health_final if session.health_final is not None else session.hp
-                hp_lost = max(0, origin_hp - final_hp)
-                gold_remaining = session.gold
+            if not session:
+                logger.warning("Session %s not found for achievement check; skipping", event.session_id)
+                return []
+            origin_hp = session.health_origin if session.health_origin is not None else INITIAL_HP
+            final_hp = session.health_final if session.health_final is not None else session.hp
+            hp_lost = max(0, origin_hp - final_hp)
+            gold_remaining = session.gold
             territories_held = 0
             territory_max_star = 0
             if self._territory_repo:
@@ -321,29 +321,26 @@ class SessionApplicationService:
         On mismatch, logs a warning and replaces the client value with the
         server-authoritative result so the DB always stores the canonical figure.
         """
-        try:
-            recomputed = recompute_total_score(
-                kill_value=session.kill_value,
-                time_total=session.time_total,
-                time_exclude_prepare=session.time_exclude_prepare,
-                cost_total=session.cost_total,
-                health_origin=session.health_origin,
-                health_final=session.health_final,
-                initial_answer=session.initial_answer,
-            )
-            if recomputed is None:
-                return
-            submitted = session.total_score
-            if submitted is not None:
-                tolerance = max(0.01, abs(recomputed) * 0.05)
-                if abs(recomputed - submitted) > tolerance:
-                    logger.warning(
-                        "total_score mismatch session=%s submitted=%.4f recomputed=%.4f; using server value",
-                        session.id, submitted, recomputed,
-                    )
-            session.total_score = recomputed
-        except Exception:
-            logger.exception("_verify_score failed for session=%s", session.id)
+        recomputed = recompute_total_score(
+            kill_value=session.kill_value,
+            time_total=session.time_total,
+            time_exclude_prepare=session.time_exclude_prepare,
+            cost_total=session.cost_total,
+            health_origin=session.health_origin,
+            health_final=session.health_final,
+            initial_answer=session.initial_answer,
+        )
+        if recomputed is None:
+            return
+        submitted = session.total_score
+        if submitted is not None:
+            tolerance = max(0.01, abs(recomputed) * 0.05)
+            if abs(recomputed - submitted) > tolerance:
+                logger.warning(
+                    "total_score mismatch session=%s submitted=%.4f recomputed=%.4f; using server value",
+                    session.id, submitted, recomputed,
+                )
+        session.total_score = recomputed
 
     def _abandon_and_commit(self, session: GameSession) -> None:
         session.abandon()

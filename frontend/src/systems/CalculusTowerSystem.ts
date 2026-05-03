@@ -167,15 +167,15 @@ export class CalculusTowerSystem {
   }
 
   private _removePets(ownerId: string, game: Game): void {
-    for (let i = game.pets.length - 1; i >= 0; i--) {
-      if (game.pets[i].ownerId === ownerId) {
-        game.pets[i].active = false
-        game.pets.splice(i, 1)
-      }
+    for (const pet of game.pets) {
+      if (pet.ownerId === ownerId) pet.active = false
     }
   }
 
-  update(_dt: number, _game: Game): void {}
+  update(_dt: number, game: Game): void {
+    game.pets = game.pets.filter(p => p.active)
+  }
+
   render(): void {}
 }
 
@@ -235,6 +235,7 @@ export class PetCombatSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
+    if (!enemy.alive) return
     applyDamage(enemy, amount, game)
   }
 

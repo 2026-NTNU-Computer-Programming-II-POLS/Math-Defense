@@ -7,18 +7,18 @@ export function useAuth() {
   const loading = ref(false)
   const error = ref('')
   const mfaRequired = ref(false)
-  const mfaToken = ref('')
+  let mfaToken = ''
 
   async function login(email: string, password: string): Promise<boolean> {
     loading.value = true
     error.value = ''
     mfaRequired.value = false
-    mfaToken.value = ''
+    mfaToken = ''
     try {
       const res = await authService.login(email, password)
       if (res.mfa_required && res.mfa_token) {
         mfaRequired.value = true
-        mfaToken.value = res.mfa_token
+        mfaToken = res.mfa_token
         return false
       }
       try {
@@ -52,7 +52,7 @@ export function useAuth() {
     loading.value = true
     error.value = ''
     try {
-      const res = await authService.mfaChallenge(mfaToken.value, code)
+      const res = await authService.mfaChallenge(mfaToken, code)
       try {
         const me = await authService.me()
         authStore.setUser({
@@ -72,7 +72,7 @@ export function useAuth() {
         })
       }
       mfaRequired.value = false
-      mfaToken.value = ''
+      mfaToken = ''
       return true
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Verification failed'
@@ -84,7 +84,7 @@ export function useAuth() {
 
   function cancelMfa(): void {
     mfaRequired.value = false
-    mfaToken.value = ''
+    mfaToken = ''
     error.value = ''
   }
 

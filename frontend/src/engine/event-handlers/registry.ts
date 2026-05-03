@@ -147,6 +147,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   ],
   TOWER_REFUND_RESULT: [
     { module: 'components/game/TowerInfoPanel', handler: 'once (confirmRefund)', purpose: 'Gate panel close on refund success; surface silent fail' },
+    { module: 'systems/MatrixTowerSystem',      handler: 'anonymous',            purpose: 'Clean up stale laser state and partner matrixPairId when a Matrix tower is sold' },
   ],
   TOWER_REMOVED: [
     { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Close build panel when tower is system-removed' },

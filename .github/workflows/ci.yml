@@ -45,6 +45,7 @@ jobs:
           # the DB on first run against the postgres admin DB.
           DATABASE_URL: postgresql+psycopg://mathdefense:changeme@localhost:5432/math_defense
           CORS_ORIGINS: http://localhost:5173
+          FRONTEND_URL: http://localhost:5173
         run: pytest -q
 
   frontend:

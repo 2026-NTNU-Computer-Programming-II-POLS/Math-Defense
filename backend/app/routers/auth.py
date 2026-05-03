@@ -1,7 +1,7 @@
 import hashlib
 import logging
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,8 @@ from app.factories import build_auth_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.middleware.csrf import mint_csrf_cookie
+
+REFRESH_COOKIE_NAME = "refresh_token"
 from app.schemas.auth import (
     AuthMeResponse,
     AvatarUpdateRequest,
@@ -38,17 +40,26 @@ def _anon(identifier: str) -> str:
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
-    # Token is a signed JWT (opaque credential), not a plaintext secret.
-    # httponly+secure flags prevent client-side access; transmission is TLS-only.
-    # nosec B202 - intentional: JWT in httponly cookie is the recommended SPA auth pattern
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
-        value=token,  # noqa: S311  # lgtm[py/clear-text-storage-sensitive-data] - JWT, not raw password; httponly+secure+samesite prevent client access
+        value=token,
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",
         max_age=settings.access_token_expire_minutes * 60,
         path="/api",
+    )
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        max_age=settings.refresh_token_expire_days * 86400,
+        path="/api/auth/refresh",
     )
 
 
@@ -62,10 +73,20 @@ def _clear_auth_cookie(response: Response) -> None:
     )
 
 
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/api/auth/refresh",
+    )
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register(request: Request, response: Response, req: RegisterRequest, db: Session = Depends(get_db)):
-    user, token = build_auth_service(db).register(
+    user, access_token, refresh_token = build_auth_service(db).register(
         email=req.email,
         password=req.password,
         player_name=req.player_name,
@@ -73,7 +94,8 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
     )
     logger.info("User registered: anon=%s", _anon(str(user.id)))
     record_audit_event(db, request, "REGISTER", user.id, {"email": req.email, "role": user.role.value})
-    _set_auth_cookie(response, token)
+    _set_auth_cookie(response, access_token)
+    _set_refresh_cookie(response, refresh_token)
     mint_csrf_cookie(response)
     return TokenResponse(
         id=user.id,
@@ -89,7 +111,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
 @limiter.limit("10/minute")
 def login(request: Request, response: Response, req: LoginRequest, db: Session = Depends(get_db)):
     try:
-        user, token, mfa_required = build_auth_service(db).login(req.email, req.password)
+        user, token, mfa_required, refresh_token = build_auth_service(db).login(req.email, req.password)
         if mfa_required:
             logger.info("MFA challenge issued: anon=%s", _anon(str(user.id)))
             record_audit_event(db, request, "LOGIN_MFA_REQUIRED", user.id, {"email": req.email})
@@ -104,6 +126,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         logger.info("User logged in: anon=%s", _anon(str(user.id)))
         record_audit_event(db, request, "LOGIN_SUCCESS", user.id, {"email": req.email})
         _set_auth_cookie(response, token)
+        _set_refresh_cookie(response, refresh_token)
         mint_csrf_cookie(response)
         return TokenResponse(
             id=user.id,
@@ -114,7 +137,8 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
             is_email_verified=user.is_email_verified,
         )
     except Exception as e:
-        record_audit_event(db, request, "LOGIN_FAILURE", None, {"email": req.email, "error": str(e)})
+        record_audit_event(db, request, "LOGIN_FAILURE", None, {"email": req.email, "error_type": type(e).__name__})
+        db.commit()
         raise
 
 
@@ -129,15 +153,37 @@ def logout(
     token = request.cookies.get(AUTH_COOKIE_NAME)
     if not token and credentials:
         token = credentials.credentials
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
     if token:
         try:
-            build_auth_service(db).logout_token(token)
+            build_auth_service(db).logout_token(token, refresh_token)
             record_audit_event(db, request, "LOGOUT", None, {"status": "success"})
         except Exception as exc:
             logger.debug("Logout token revocation failed; proceeding with client-side logout", exc_info=exc)
             record_audit_event(db, request, "LOGOUT", None, {"status": "failed_token_revocation"})
     _clear_auth_cookie(response)
+    _clear_refresh_cookie(response)
     mint_csrf_cookie(response)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("30/minute")
+def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+    raw_refresh = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not raw_refresh:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token")
+    user, access_token, new_refresh_token = build_auth_service(db).refresh_access_token(raw_refresh)
+    _set_auth_cookie(response, access_token)
+    _set_refresh_cookie(response, new_refresh_token)
+    mint_csrf_cookie(response)
+    return TokenResponse(
+        id=user.id,
+        email=user.email,
+        player_name=user.player_name,
+        role=user.role.value,
+        avatar_url=user.avatar_url,
+        is_email_verified=user.is_email_verified,
+    )
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -242,9 +288,9 @@ def mfa_setup(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    secret, provisioning_uri = build_auth_service(db).setup_mfa(current_user.id)
+    _secret, provisioning_uri = build_auth_service(db).setup_mfa(current_user.id)
     record_audit_event(db, request, "MFA_SETUP_INITIATED", current_user.id)
-    return MFASetupResponse(secret=secret, provisioning_uri=provisioning_uri)
+    return MFASetupResponse(provisioning_uri=provisioning_uri)
 
 
 @router.post("/mfa/confirm", status_code=status.HTTP_204_NO_CONTENT)
@@ -282,10 +328,11 @@ def mfa_challenge(
     db: Session = Depends(get_db),
 ):
     try:
-        user, token = build_auth_service(db).verify_mfa_challenge(req.mfa_token, req.code)
+        user, access_token, refresh_token = build_auth_service(db).verify_mfa_challenge(req.mfa_token, req.code)
         logger.info("MFA challenge passed: anon=%s", _anon(str(user.id)))
         record_audit_event(db, request, "LOGIN_SUCCESS_MFA", user.id)
-        _set_auth_cookie(response, token)
+        _set_auth_cookie(response, access_token)
+        _set_refresh_cookie(response, refresh_token)
         mint_csrf_cookie(response)
         return TokenResponse(
             id=user.id,
@@ -296,5 +343,6 @@ def mfa_challenge(
             is_email_verified=user.is_email_verified,
         )
     except Exception as e:
-        record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error": str(e)})
+        record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": type(e).__name__})
+        db.commit()
         raise

@@ -103,7 +103,7 @@ export interface GameEvents {
   [Events.TOWER_UPGRADE]:        { towerId: string }
   [Events.TOWER_UPGRADED]:       { towerId: string }
   [Events.TOWER_REFUND]:         { towerId: string }
-  [Events.TOWER_REFUND_RESULT]:  { success: boolean }
+  [Events.TOWER_REFUND_RESULT]:  { success: boolean; towerId?: string }
   [Events.TOWER_REMOVED]:        { towerId: string }
   [Events.PET_SPAWNED]:          Pet
   [Events.PET_KILLED]:           Pet

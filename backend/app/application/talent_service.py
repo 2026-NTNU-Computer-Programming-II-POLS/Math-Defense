@@ -36,8 +36,9 @@ class TalentApplicationService:
         total = 0
         for alloc in allocations_list:
             node_def = TALENT_NODE_DEFS.get(alloc.talent_node_id)
-            if node_def:
-                total += node_def.cost_per_level * alloc.current_level
+            if not node_def:
+                raise ValueError(f"Talent node '{alloc.talent_node_id}' has no definition — data integrity error")
+            total += node_def.cost_per_level * alloc.current_level
         return total
 
     def get_tree(self, user_id: str) -> dict:
@@ -89,8 +90,8 @@ class TalentApplicationService:
             raise TalentNodeNotFoundError(f"Unknown talent node: {talent_node_id}")
 
         with self._uow:
-            earned = self._achievement_repo.sum_talent_points(user_id)
             alloc_list = self._talent_repo.find_by_user_for_update(user_id)
+            earned = self._achievement_repo.sum_talent_points(user_id)
             spent = self._calculate_spent_points(alloc_list)
             available = earned - spent
 

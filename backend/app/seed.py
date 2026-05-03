@@ -62,6 +62,6 @@ def ensure_demo_user(db: Session) -> None:
     )
     db.commit()
     if result.rowcount:
-        logger.info("Seeded demo user: %s", DEMO_EMAIL)
+        logger.info("Seeded demo user (role: student)")
     else:
         logger.debug("Demo user already exists — skipping seed")

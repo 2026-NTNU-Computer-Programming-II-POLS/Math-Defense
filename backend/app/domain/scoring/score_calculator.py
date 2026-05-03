@@ -27,6 +27,7 @@ def recompute_total_score(
         return None
 
     prep_sum = sum(time_exclude_prepare)
+    # Clamp to 0.001 to prevent ZeroDivisionError from timing precision errors
     active_time = max(0.001, time_total - prep_sum)
 
     s1 = kill_value / active_time
