@@ -143,7 +143,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         )
     except Exception as e:
         record_audit_event(db, request, "LOGIN_FAILURE", None, {"email": req.email, "error_type": type(e).__name__})
-        db.commit()
+        db.rollback()
         raise
 
 
