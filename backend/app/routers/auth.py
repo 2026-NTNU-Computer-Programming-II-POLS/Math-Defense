@@ -40,7 +40,9 @@ def _anon(identifier: str) -> str:
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
+    # token is a signed JWT — not a plaintext credential.
+    # httponly+secure+samesite attributes prevent JS access and transmission over plain HTTP.
+    response.set_cookie(  # codeql[py/clear-text-storage-sensitive-data]
         key=AUTH_COOKIE_NAME,
         value=token,
         httponly=True,
@@ -52,7 +54,10 @@ def _set_auth_cookie(response: Response, token: str) -> None:
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
+    # token is a cryptographically random opaque token (secrets.token_hex); only its
+    # SHA-256 hash is stored server-side. httponly+secure+samesite+path-scoped attributes
+    # prevent JS access and restrict transmission scope.
+    response.set_cookie(  # codeql[py/clear-text-storage-sensitive-data]
         key=REFRESH_COOKIE_NAME,
         value=token,
         httponly=True,
