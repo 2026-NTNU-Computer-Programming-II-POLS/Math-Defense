@@ -76,6 +76,16 @@ class SessionEnd(BaseModel):
     n_prep_phases: int | None = Field(default=None, ge=0, le=50)
     total_score: float | None = Field(default=None, ge=0, le=1_000_000)
 
+    @model_validator(mode="after")
+    def prep_sum_le_time_total(self) -> "SessionEnd":
+        if self.time_exclude_prepare is not None and self.time_total is not None:
+            prep_sum = sum(self.time_exclude_prepare)
+            if prep_sum > self.time_total + 0.001:
+                raise ValueError(
+                    "sum(time_exclude_prepare) must not exceed time_total"
+                )
+        return self
+
 
 SESSION_OUT_SCHEMA_VERSION = 1
 

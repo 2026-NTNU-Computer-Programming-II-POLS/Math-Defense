@@ -53,7 +53,7 @@ export class EconomySystem implements GameSystem {
         const star = game.state.starRating
         const startingGold = economy.startingGoldByStar[String(star)] ?? 200
         game.state.gold = startingGold
-        game.state.healthOrigin = game.state.hp
+        // healthOrigin is already set to INITIAL_HP by createInitialState(); no override needed here.
         game.eventBus.emit(Events.GOLD_CHANGED, game.state.gold)
       }),
     )

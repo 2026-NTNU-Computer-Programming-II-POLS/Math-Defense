@@ -51,11 +51,11 @@ _reg(AchievementDef("combat_single_30", "Wave Crusher", "Kill 30 enemies in one 
 _reg(AchievementDef("combat_single_80", "Massacre", "Kill 80 enemies in one session", "combat", "single_session_kills", 80, 2))
 
 # ── Scoring ──
-_reg(AchievementDef("score_1000", "Score Seeker", "Achieve total score over 1,000", "scoring", "total_score", 1000, 1))
-_reg(AchievementDef("score_10000", "Score Hunter", "Achieve total score over 10,000", "scoring", "total_score", 10000, 2))
-_reg(AchievementDef("score_50000", "Score Master", "Achieve total score over 50,000", "scoring", "total_score", 50000, 3))
-_reg(AchievementDef("score_single_2000", "High Scorer", "Score over 2,000 in one session", "scoring", "single_session_score", 2000, 1))
-_reg(AchievementDef("score_single_5000", "Top Scorer", "Score over 5,000 in one session", "scoring", "single_session_score", 5000, 2))
+_reg(AchievementDef("score_1000", "Score Seeker", "Achieve total score of 1,000 or more", "scoring", "total_score", 1000, 1))
+_reg(AchievementDef("score_10000", "Score Hunter", "Achieve total score of 10,000 or more", "scoring", "total_score", 10000, 2))
+_reg(AchievementDef("score_50000", "Score Master", "Achieve total score of 50,000 or more", "scoring", "total_score", 50000, 3))
+_reg(AchievementDef("score_single_2000", "High Scorer", "Score 2,000 or more in one session", "scoring", "single_session_score", 2000, 1))
+_reg(AchievementDef("score_single_5000", "Top Scorer", "Score 5,000 or more in one session", "scoring", "single_session_score", 5000, 2))
 
 # ── Survival ──
 _reg(AchievementDef("survival_no_damage", "Untouchable", "Complete a level without losing HP", "survival", "perfect_run", True, 3))

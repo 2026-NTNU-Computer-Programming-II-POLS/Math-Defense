@@ -25,11 +25,11 @@ export const ACHIEVEMENT_DEFS: Record<string, AchievementDef> = {
   combat_single_30:   { id: 'combat_single_30', name: 'Wave Crusher', description: 'Kill 30 enemies in one session', category: 'combat', talentPoints: 1, icon: '⚔' },
   combat_single_80:   { id: 'combat_single_80', name: 'Massacre', description: 'Kill 80 enemies in one session', category: 'combat', talentPoints: 2, icon: '⚔' },
 
-  score_1000:         { id: 'score_1000', name: 'Score Seeker', description: 'Achieve total score over 1,000', category: 'scoring', talentPoints: 1, icon: '★' },
-  score_10000:        { id: 'score_10000', name: 'Score Hunter', description: 'Achieve total score over 10,000', category: 'scoring', talentPoints: 2, icon: '★' },
-  score_50000:        { id: 'score_50000', name: 'Score Master', description: 'Achieve total score over 50,000', category: 'scoring', talentPoints: 3, icon: '★' },
-  score_single_2000:  { id: 'score_single_2000', name: 'High Scorer', description: 'Score over 2,000 in one session', category: 'scoring', talentPoints: 1, icon: '★' },
-  score_single_5000:  { id: 'score_single_5000', name: 'Top Scorer', description: 'Score over 5,000 in one session', category: 'scoring', talentPoints: 2, icon: '★' },
+  score_1000:         { id: 'score_1000', name: 'Score Seeker', description: 'Achieve total score of 1,000 or more', category: 'scoring', talentPoints: 1, icon: '★' },
+  score_10000:        { id: 'score_10000', name: 'Score Hunter', description: 'Achieve total score of 10,000 or more', category: 'scoring', talentPoints: 2, icon: '★' },
+  score_50000:        { id: 'score_50000', name: 'Score Master', description: 'Achieve total score of 50,000 or more', category: 'scoring', talentPoints: 3, icon: '★' },
+  score_single_2000:  { id: 'score_single_2000', name: 'High Scorer', description: 'Score 2,000 or more in one session', category: 'scoring', talentPoints: 1, icon: '★' },
+  score_single_5000:  { id: 'score_single_5000', name: 'Top Scorer', description: 'Score 5,000 or more in one session', category: 'scoring', talentPoints: 2, icon: '★' },
 
   survival_no_damage: { id: 'survival_no_damage', name: 'Untouchable', description: 'Complete a level without losing HP', category: 'survival', talentPoints: 3, icon: '♥' },
   survival_waves_3:   { id: 'survival_waves_3', name: 'Wave Rider', description: 'Survive 3 waves in one session', category: 'survival', talentPoints: 1, icon: '♥' },

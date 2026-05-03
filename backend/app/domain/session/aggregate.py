@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta, UTC
 
 from app.domain.constraints import (
-    GOLD_MAX, HP_MAX, MAX_SCORE_DELTA, MAX_WAVE, SCORE_MAX,
+    GOLD_MAX, HP_MAX, MAX_SCORE_DELTA, MAX_WAVE, SCORE_MAX, TOTAL_SCORE_MAX,
     LEVEL_MAX_SCORES, LEVEL_MAX_KILLS, LEVEL_MAX_WAVES,
 )
 from app.domain.errors import DomainValueError, InvalidStatusTransitionError, SessionNotActiveError
@@ -244,7 +244,7 @@ class GameSession:
         if time_exclude_prepare is not None:
             self.time_exclude_prepare = [max(0.0, t) for t in time_exclude_prepare]
         if total_score is not None:
-            self.total_score = max(0.0, total_score)
+            self.total_score = min(max(0.0, total_score), TOTAL_SCORE_MAX)
 
     def abandon(self) -> None:
         """Abandon session — idempotent (no-op if already ended)"""

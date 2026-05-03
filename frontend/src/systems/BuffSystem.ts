@@ -113,6 +113,7 @@ const effectStrategies: Record<string, EffectFn> = {
     if (g.towers.length > 0) {
       const last = g.towers[g.towers.length - 1]
       g.changeGold(last.cost)
+      g.addCost(-last.cost)
     }
   },
   ORIGIN_EXPLOSION: (g) => {

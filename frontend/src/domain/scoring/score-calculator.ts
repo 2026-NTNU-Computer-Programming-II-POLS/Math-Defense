@@ -1,3 +1,8 @@
+// Design notes:
+//   killValue=0  → totalScore is always 0 (0**x = 0). Zero-kill runs score nothing by design.
+//   costTotal=0  → s2=0, k=0.7*s1 (no-tower penalty). Penalised 30% of s1 by design.
+//   mUsed is a debug field only; the backend anti-cheat verifier does not track it.
+
 export interface ScoreInput {
   killValue: number
   timeTotal: number               // seconds
@@ -35,7 +40,13 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
     k = 0.5 * s1 + 0.5 * s2
   }
 
-  const exponentDenom = Math.max(1, 1 + (2 + input.healthOrigin - input.healthFinal - input.initialAnswer))
+  const rawExponentDenom = 1 + (2 + input.healthOrigin - input.healthFinal - input.initialAnswer)
+  if (rawExponentDenom < 1) {
+    console.warn(
+      `score-calculator: impossible HP delta (healthFinal=${input.healthFinal} > healthOrigin=${input.healthOrigin}); clamping exponentDenom ${rawExponentDenom} → 1`,
+    )
+  }
+  const exponentDenom = Math.max(1, rawExponentDenom)
   const exponent = 1 / exponentDenom
   const totalScore = Math.pow(Math.max(0, k), exponent)
 

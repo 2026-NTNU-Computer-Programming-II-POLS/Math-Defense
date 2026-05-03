@@ -23,6 +23,7 @@ class SessionCompleted:
     score: int
     kills: int
     waves_survived: int
+    total_score: float | None = None
 
 
 @dataclass(frozen=True)

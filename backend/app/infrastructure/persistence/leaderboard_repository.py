@@ -79,7 +79,8 @@ class SqlAlchemyLeaderboardRepository:
 
         L2 = aliased(LeaderboardEntryModel)
         higher_distinct = select(func.count(func.distinct(L2.score))).where(
-            L2.score > LeaderboardEntryModel.score
+            L2.score > LeaderboardEntryModel.score,
+            L2.user_id.isnot(None),
         )
         if level is not None:
             higher_distinct = higher_distinct.where(L2.level == level)
@@ -149,6 +150,7 @@ class SqlAlchemyLeaderboardRepository:
         higher_distinct = (
             select(func.count(func.distinct(L2.score)))
             .where(L2.score > LeaderboardEntryModel.score)
+            .where(L2.user_id.isnot(None))
             .where(L2.user_id.in_(student_ids_q))
         )
         rank_col = (higher_distinct.correlate(LeaderboardEntryModel).scalar_subquery() + 1).label("rank")

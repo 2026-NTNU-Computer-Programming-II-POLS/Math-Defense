@@ -1,6 +1,7 @@
 """SessionApplicationService — Orchestrates GameSession Use Cases"""
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import TYPE_CHECKING
 
@@ -139,6 +140,7 @@ class SessionApplicationService:
                     score=session.score,
                     kills=session.kills,
                     waves_survived=session.waves_survived,
+                    total_score=session.total_score,
                 )
                 try:
                     with self._uow:
@@ -168,12 +170,14 @@ class SessionApplicationService:
             self._verify_score(session)
             self._session_repo.save(session)
 
-            # Snapshot events before commit so a durable copy survives the
-            # aggregate going out of scope. Do NOT clear yet — clearing belongs
-            # after a successful handler dispatch (D-6), but because dispatch
-            # runs in its own UoW after commit (D-5), the in-memory aggregate is
-            # discarded with the request anyway.
-            pending_events = session.collect_events()
+            # Snapshot events and backfill total_score now that _verify_score has
+            # set the authoritative value. The aggregate emits SessionCompleted
+            # during complete() before total_score is known, so we patch it here.
+            pending_events = [
+                dataclasses.replace(e, total_score=session.total_score)
+                if isinstance(e, SessionCompleted) else e
+                for e in session.collect_events()
+            ]
 
             self._uow.commit()
             logger.info(
@@ -331,10 +335,19 @@ class SessionApplicationService:
             initial_answer=session.initial_answer,
         )
         if recomputed is None:
+            if session.total_score is not None:
+                logger.warning(
+                    "total_score submitted but V2 fields incomplete session=%s; discarding client value",
+                    session.id,
+                )
+                session.total_score = None
             return
         submitted = session.total_score
         if submitted is not None:
-            tolerance = max(0.01, abs(recomputed) * 0.05)
+            # Frontend rounds totalScore to 4 decimal places; max rounding error is 5e-5.
+            # Tolerance of 0.0005 gives a 10x safety margin over rounding without accepting
+            # significant manipulation at either extreme of the score range.
+            tolerance = 0.0005
             if abs(recomputed - submitted) > tolerance:
                 logger.warning(
                     "total_score mismatch session=%s submitted=%.4f recomputed=%.4f; using server value",
