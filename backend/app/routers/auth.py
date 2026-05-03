@@ -34,9 +34,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def _anon(identifier: str) -> str:
+def _anon(identifier: object) -> str:
     """Stable, short fingerprint so logs stay correlatable without leaking PII."""
-    return hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:10]
+    return hashlib.sha256(str(identifier).encode("utf-8")).hexdigest()[:10]
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -97,7 +97,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         player_name=req.player_name,
         role=req.role,
     )
-    logger.info("User registered: anon=%s", _anon(str(user.id)))
+    logger.info("User registered: anon=%s", _anon(user.id))
     record_audit_event(db, request, "REGISTER", user.id, {"email": req.email, "role": user.role.value})
     _set_auth_cookie(response, access_token)
     _set_refresh_cookie(response, refresh_token)
