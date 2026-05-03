@@ -347,7 +347,22 @@ def mfa_challenge(
             avatar_url=user.avatar_url,
             is_email_verified=user.is_email_verified,
         )
-    except Exception as e:
+    except HTTPException as e:
         record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": type(e).__name__})
         db.commit()
         raise
+    except ValueError:
+        record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": "ValueError"})
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid MFA token or code",
+        )
+    except Exception as e:
+        logger.exception("Unexpected MFA challenge error")
+        record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": type(e).__name__})
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
