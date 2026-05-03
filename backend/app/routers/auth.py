@@ -12,8 +12,6 @@ from app.factories import build_auth_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.middleware.csrf import mint_csrf_cookie
-
-REFRESH_COOKIE_NAME = "refresh_token"
 from app.schemas.auth import (
     AuthMeResponse,
     AvatarUpdateRequest,
@@ -29,14 +27,16 @@ from app.schemas.auth import (
 )
 from app.infrastructure.audit_logger import record_audit_event
 
+REFRESH_COOKIE_NAME = "refresh_token"
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def _anon(identifier: str) -> str:
+def _anon(identifier: object) -> str:
     """Stable, short fingerprint so logs stay correlatable without leaking PII."""
-    return hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:10]
+    return hashlib.sha256(str(identifier).encode("utf-8")).hexdigest()[:10]
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -97,7 +97,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         player_name=req.player_name,
         role=req.role,
     )
-    logger.info("User registered: anon=%s", _anon(str(user.id)))
+    logger.info("User registered: anon=%s", _anon(user.id))
     record_audit_event(db, request, "REGISTER", user.id, {"email": req.email, "role": user.role.value})
     _set_auth_cookie(response, access_token)
     _set_refresh_cookie(response, refresh_token)
@@ -143,7 +143,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         )
     except Exception as e:
         record_audit_event(db, request, "LOGIN_FAILURE", None, {"email": req.email, "error_type": type(e).__name__})
-        db.commit()
+        db.rollback()
         raise
 
 
@@ -347,7 +347,22 @@ def mfa_challenge(
             avatar_url=user.avatar_url,
             is_email_verified=user.is_email_verified,
         )
-    except Exception as e:
+    except HTTPException as e:
         record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": type(e).__name__})
         db.commit()
         raise
+    except ValueError:
+        record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": "ValueError"})
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid MFA token or code",
+        )
+    except Exception as e:
+        logger.exception("Unexpected MFA challenge error")
+        record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": type(e).__name__})
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
