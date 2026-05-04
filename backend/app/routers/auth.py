@@ -12,8 +12,6 @@ from app.factories import build_auth_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.middleware.csrf import mint_csrf_cookie
-
-REFRESH_COOKIE_NAME = "refresh_token"
 from app.schemas.auth import (
     AuthMeResponse,
     AvatarUpdateRequest,
@@ -29,14 +27,16 @@ from app.schemas.auth import (
 )
 from app.infrastructure.audit_logger import record_audit_event
 
+REFRESH_COOKIE_NAME = "refresh_token"
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def _anon(identifier: str) -> str:
+def _anon(identifier: object) -> str:
     """Stable, short fingerprint so logs stay correlatable without leaking PII."""
-    return hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:10]
+    return hashlib.sha256(str(identifier).encode("utf-8")).hexdigest()[:10]
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:

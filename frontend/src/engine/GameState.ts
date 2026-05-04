@@ -33,8 +33,9 @@ export interface GameState {
 
   // V2 Timing
   timeTotal: number                 // seconds since level start
-  timeExcludePrepare: number[]      // duration of each preparation phase
-  prepPhaseStart: number            // timestamp when current prep phase started (0 if not in prep)
+  timeExcludePrepare: number[]      // duration of each prep or UI-pause phase (subtracted from timeTotal for scoring)
+  prepPhaseStart: number            // timestamp when current BUILD phase started (0 if not in BUILD)
+  pausePhaseStart: number           // timestamp when current MONTY_HALL or CHAIN_RULE phase started (0 if not paused)
 
   // V2 Initial Answer
   initialAnswer: 0 | 1
@@ -83,6 +84,7 @@ export function createInitialState(): GameState {
     timeTotal: 0,
     timeExcludePrepare: [],
     prepPhaseStart: 0,
+    pausePhaseStart: 0,
     initialAnswer: 0,
     pathsVisible: false,
     montyHallNextIndex: 0,

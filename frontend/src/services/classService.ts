@@ -32,13 +32,13 @@ export const classService = {
     return api.put<ClassInfo>(`/api/classes/${classId}`, { name })
   },
   deleteClass(classId: string) {
-    return api.delete<void>(`/api/classes/${classId}`)
+    return api.delete(`/api/classes/${classId}`)
   },
   addStudent(classId: string, email: string) {
     return api.post<Membership>(`/api/classes/${classId}/students`, { email })
   },
   removeStudent(classId: string, studentId: string) {
-    return api.delete<void>(`/api/classes/${classId}/students/${studentId}`)
+    return api.delete(`/api/classes/${classId}/students/${studentId}`)
   },
   listStudents(classId: string) {
     return api.get<Membership[]>(`/api/classes/${classId}/students`)

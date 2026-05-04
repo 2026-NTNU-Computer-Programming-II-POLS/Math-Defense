@@ -11,7 +11,10 @@ let _lastCastAt = 0
 
 onMounted(() => {
   const engine = g.getEngine()
-  if (!engine) return
+  if (!engine) {
+    if (import.meta.env.DEV) console.warn('[SpellBar] engine not ready at mount — spell click events will not be registered')
+    return
+  }
   _unsubClick = engine.eventBus.on(Events.CANVAS_CLICK, ({ game: gp }) => {
     if (!castingSpell.value) return
     castAtPosition(gp.x, gp.y)

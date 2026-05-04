@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { TOWER_DEFS } from '@/data/tower-defs'
-import { TowerType, Events } from '@/data/constants'
+import { TowerType } from '@/data/constants'
 import type { TowerUpgradeSystem } from '@/systems/TowerUpgradeSystem'
 import MagicModePanel from './MagicModePanel.vue'
 import RadarConfigPanel from './RadarConfigPanel.vue'
@@ -43,10 +43,9 @@ const upgradeInfo = computed(() => {
 })
 
 function upgrade() {
-  const engine = gameStore.getEngine()
   const t = tower.value
-  if (!engine || !t) return
-  engine.eventBus.emit(Events.TOWER_UPGRADE, { towerId: t.id })
+  if (!t) return
+  gameStore.requestTowerUpgrade(t.id)
 }
 
 function close() {
@@ -62,16 +61,14 @@ function cancelRefund() {
 }
 
 function confirmRefund() {
-  const engine = gameStore.getEngine()
   const t = tower.value
-  if (!engine || !t) return
+  if (!t) return
   _refundUnsub?.()
-  _refundUnsub = engine.eventBus.once(Events.TOWER_REFUND_RESULT, ({ success }) => {
+  _refundUnsub = gameStore.requestTowerRefund(t.id, (success) => {
     _refundUnsub = null
     confirmingRefund.value = false
     if (success) uiStore.closeBuildPanel()
   })
-  engine.eventBus.emit(Events.TOWER_REFUND, { towerId: t.id })
 }
 
 const canRefund = computed(() => gameStore.isBuilding)

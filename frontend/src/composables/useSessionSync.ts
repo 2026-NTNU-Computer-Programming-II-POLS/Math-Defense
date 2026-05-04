@@ -34,6 +34,9 @@ export function useSessionSync() {
   let alertedForFailures = false
   let lastSyncedWave = -1
 
+  type PendingWrite = { snapshot: WaveEndSnapshot; gen: number }
+  const pending = ref<PendingWrite | null>(null)
+
   async function createSessionWithRetry(_levelNum: number, gen: number, game: Game): Promise<string | null> {
     for (let attempt = 0; attempt <= MAX_CREATE_RETRIES; attempt++) {
       if (gen !== createGeneration) return null
@@ -93,8 +96,7 @@ export function useSessionSync() {
     }))
 
     // WAVE_END → update session with V2 payload
-    type PendingWrite = { snapshot: WaveEndSnapshot; gen: number }
-    const pending = ref<PendingWrite | null>(null)
+    pending.value = null
     unsubs.push(game.eventBus.on(Events.WAVE_END, async (snapshot) => {
       if (!sessionId.value) return
       pending.value = { snapshot, gen: sessionGeneration }

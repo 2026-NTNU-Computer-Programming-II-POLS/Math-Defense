@@ -1,4 +1,3 @@
-import { reactive } from 'vue'
 import { Events, GamePhase } from '@/data/constants'
 import {
   MONTY_HALL_THRESHOLDS_BY_STAR,
@@ -31,19 +30,22 @@ export class MontyHallSystem implements GameSystem {
       }),
 
       game.eventBus.on(Events.MONTY_HALL_TRIGGER, ({ doorCount, thresholdIndex }) => {
-        this._startEvent(doorCount, game)
+        this._startEvent(doorCount)
         game.state.montyHallNextIndex = thresholdIndex + 1
+        game.eventBus.emit(Events.MONTY_HALL_STATE_CHANGED, this._snapshot())
       }),
 
       game.eventBus.on(Events.MONTY_HALL_DOOR_SELECTED, (doorIndex) => {
         if (!this.current || this.current.phase !== 'select') return
         this.current.selectedDoor = doorIndex
-        this._revealDoor(game)
+        this._revealDoor()
+        game.eventBus.emit(Events.MONTY_HALL_STATE_CHANGED, this._snapshot())
       }),
 
       game.eventBus.on(Events.MONTY_HALL_SWITCH_DECISION, (doSwitch) => {
         if (!this.current || this.current.phase !== 'switch') return
         this._resolveSwitch(doSwitch, game)
+        game.eventBus.emit(Events.MONTY_HALL_STATE_CHANGED, this._snapshot())
       }),
 
       game.eventBus.on(Events.LEVEL_START, () => {
@@ -86,12 +88,17 @@ export class MontyHallSystem implements GameSystem {
     return true
   }
 
-  private _startEvent(doorCount: number, _game: Game): void {
+  private _snapshot(): MontyHallState | null {
+    if (!this.current) return null
+    return { ...this.current, revealedDoors: [...this.current.revealedDoors] }
+  }
+
+  private _startEvent(doorCount: number): void {
     const prizeIndex = Math.floor(Math.random() * doorCount)
     const reward = MONTY_HALL_REWARD_POOL[
       Math.floor(Math.random() * MONTY_HALL_REWARD_POOL.length)
     ]
-    this.current = reactive<MontyHallState>({
+    this.current = {
       doorCount,
       prizeIndex,
       selectedDoor: null,
@@ -99,10 +106,10 @@ export class MontyHallSystem implements GameSystem {
       reward,
       phase: 'select',
       won: false,
-    })
+    }
   }
 
-  private _revealDoor(_game: Game): void {
+  private _revealDoor(): void {
     if (!this.current || this.current.selectedDoor === null) return
     const { doorCount, prizeIndex, selectedDoor } = this.current
 
@@ -157,6 +164,7 @@ export class MontyHallSystem implements GameSystem {
 
   finishEvent(game: Game): void {
     this.current = null
+    game.eventBus.emit(Events.MONTY_HALL_STATE_CHANGED, null)
     game.setPhase(GamePhase.BUILD)
   }
 

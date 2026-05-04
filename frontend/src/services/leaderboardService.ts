@@ -22,11 +22,4 @@ export const leaderboardService = {
     if (level != null) params.set('level', String(level))
     return api.get<LeaderboardResponse>(`/api/leaderboard?${params}`, { signal })
   },
-  submit(payload: {
-    kills: number
-    waves_survived: number
-    session_id: string
-  }) {
-    return api.post<{ id: string; score: number }>('/api/leaderboard', payload)
-  },
 }

@@ -140,6 +140,8 @@ export const Events = Object.freeze({
   COST_TOTAL_CHANGED:   'costTotalChanged',
 
   ACTIVE_BUFFS_CHANGED: 'activeBuffsChanged',
+
+  MONTY_HALL_STATE_CHANGED: 'montyHallStateChanged',
 } as const)
 
 // ── Color palette ──

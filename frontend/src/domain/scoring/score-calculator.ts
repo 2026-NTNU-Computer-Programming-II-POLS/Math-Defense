@@ -40,6 +40,11 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
     k = 0.5 * s1 + 0.5 * s2
   }
 
+  // Invariant: healthOrigin must equal INITIAL_HP (set by createInitialState in GameState.ts).
+  // Under normal game rules healthFinal ≤ healthOrigin, so rawExponentDenom ≥ 2 and the clamp
+  // below never fires. The only path to rawExponentDenom < 1 is backend data that reports a
+  // session-end HP above the session-start HP — impossible without a mechanic that raises maxHp
+  // beyond INITIAL_HP, which does not exist.
   const rawExponentDenom = 1 + (2 + input.healthOrigin - input.healthFinal - input.initialAnswer)
   if (rawExponentDenom < 1) {
     console.warn(

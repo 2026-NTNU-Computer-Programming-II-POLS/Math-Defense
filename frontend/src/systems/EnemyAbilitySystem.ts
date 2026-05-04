@@ -84,6 +84,8 @@ export class EnemyAbilitySystem implements GameSystem {
     const { boss, question } = this._pendingChainRule
     this._pendingChainRule = null
 
+    // chainRuleAnsweredCorrectly MUST be set before emitting ENEMY_KILLED:
+    // _onEnemyKilled reads this flag synchronously to decide whether to split.
     boss.chainRuleAnsweredCorrectly = payload.correct
 
     if (payload.correct) {

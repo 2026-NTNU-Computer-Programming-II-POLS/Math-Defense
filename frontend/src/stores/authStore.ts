@@ -160,5 +160,6 @@ export const useAuthStore = defineStore('auth', () => {
     init,
     updateAvatar,
     updatePlayerName,
+    stopProbe: stopTokenProbe,
   }
 })

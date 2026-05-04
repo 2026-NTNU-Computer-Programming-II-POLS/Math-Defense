@@ -92,7 +92,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
     const g = new Game(canvas)
 
     const talentStore = useTalentStore()
-    g.towerModifierProvider = (towerType) => talentStore.getTowerModifiers(towerType as any)
+    g.towerModifierProvider = (towerType) => talentStore.getTowerModifiers(towerType)
 
     try {
     const placement = new TowerPlacementSystem()
@@ -132,6 +132,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
 
     const systems: [string, import('@/engine/Game').GameSystem][] = [
       ['placement', placement],
+      ['enemyAbility', new EnemyAbilitySystem()],
       ['combat', new CombatSystem()],
       ['movement', movement],
       ['wave', new WaveSystem()],
@@ -144,7 +145,6 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
       ['calculusTower', new CalculusTowerSystem()],
       ['petCombat', new PetCombatSystem()],
       ['towerUpgrade', new TowerUpgradeSystem()],
-      ['enemyAbility', new EnemyAbilitySystem()],
       ['spell', new SpellSystem()],
       ['montyHall', new MontyHallSystem()],
       ['enemyRenderer', new EnemyRenderer()],
@@ -199,6 +199,15 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
         g.state.timeExcludePrepare.push(duration)
         g.state.prepPhaseStart = 0
       }
+      // Track MONTY_HALL and CHAIN_RULE as UI-pause phases so their duration is
+      // excluded from activeTime = timeTotal - sum(timeExcludePrepare).
+      if (to === GamePhase.MONTY_HALL || to === GamePhase.CHAIN_RULE) {
+        g.state.pausePhaseStart = g.time
+      }
+      if ((from === GamePhase.MONTY_HALL || from === GamePhase.CHAIN_RULE) && g.state.pausePhaseStart > 0) {
+        g.state.timeExcludePrepare.push(g.time - g.state.pausePhaseStart)
+        g.state.pausePhaseStart = 0
+      }
     }))
 
     unsubs.push(...bindSession(g))
@@ -219,6 +228,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
       g.startLevel(generatedLevel.value.starRating)
     }
     } catch (err) {
+      gameStore.unbindEngine()
       try { g.destroy() } catch { /* ignore cascading teardown failures */ }
       unsubs.splice(0).forEach((fn) => { try { fn() } catch { /* ignore */ } })
       throw err

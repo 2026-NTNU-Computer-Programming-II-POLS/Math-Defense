@@ -203,9 +203,13 @@ export function numericalIntegrate(
   let sum = 0
   for (let i = 0; i <= n; i++) {
     const x = lo + i * h
+    // math_engine.c line 167 applies fabsf(y) per sample; mirrored here.
     const y = Math.abs(a * x * x + b * x + c)
     sum += i === 0 || i === n ? y : 2 * y
   }
+  // math_engine.c line 176 applies fabsf to the final result; mirrored here.
+  // Since all y values above are non-negative, sum is always >= 0, so this
+  // Math.abs is redundant — kept for exact parity with the WASM implementation.
   return Math.abs((sum * h) / 2)
 }
 

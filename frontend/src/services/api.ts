@@ -166,8 +166,9 @@ async function requestOnce<T>(
     throw new ApiError(res.status, body.detail ?? res.statusText)
   }
 
-  // 204 No Content
-  if (res.status === 204) return undefined as T
+  // 204 No Content — no body to parse; callers must type T as void/undefined.
+  // The double cast through unknown makes the intentional unsafety explicit.
+  if (res.status === 204) return undefined as unknown as T
   return res.json() as Promise<T>
 }
 
@@ -188,7 +189,7 @@ export const api = {
   patch<T>(path: string, body: unknown, opts: ApiOptions = {}) {
     return request<T>(path, { method: 'PATCH', body: JSON.stringify(body), signal: opts.signal })
   },
-  delete<T>(path: string, opts: ApiOptions = {}) {
-    return request<T>(path, { method: 'DELETE', signal: opts.signal })
+  delete(path: string, opts: ApiOptions = {}): Promise<void> {
+    return request<void>(path, { method: 'DELETE', signal: opts.signal })
   },
 }

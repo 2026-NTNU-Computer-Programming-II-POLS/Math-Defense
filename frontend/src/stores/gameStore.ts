@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, shallowRef, computed } from 'vue'
-import { GamePhase } from '@/data/constants'
+import { GamePhase, Events } from '@/data/constants'
 import type { Game } from '@/engine/Game'
-import { Events } from '@/data/constants'
 import type { ActiveBuffEntry } from '@/engine/GameState'
 import type { BuffCard } from '@/data/buff-defs'
 import type { PathSegmentView } from '@/engine/projections/project-path-panel'
 import type { CalculusState } from '@/entities/types'
+import type { MontyHallState, MontyHallSystem } from '@/systems/MontyHallSystem'
 export type { PathSegmentView } from '@/engine/projections/project-path-panel'
 
 export interface PathPanelState {
@@ -47,6 +47,7 @@ export const useGameStore = defineStore('game', () => {
 
   // V2 Monty Hall
   const montyHallProgress = ref(0)
+  const montyHallState = ref<MontyHallState | null>(null)
 
   // V2 Active buffs
   const activeBuffs = shallowRef<ReadonlyArray<ActiveBuffEntry>>([])
@@ -150,10 +151,14 @@ export const useGameStore = defineStore('game', () => {
         initialAnswer.value = game.state.initialAnswer
         pathsVisible.value = game.state.pathsVisible
         montyHallProgress.value = 0
+        montyHallState.value = null
         enemiesAlive.value = 0
         activeBuffs.value = []
         spellCooldowns.value = {}
         calculusStates.value = {}
+      }),
+      game.eventBus.on(Events.MONTY_HALL_STATE_CHANGED, (state) => {
+        montyHallState.value = state
       }),
       game.eventBus.on(Events.ACTIVE_BUFFS_CHANGED, (buffs) => {
         activeBuffs.value = buffs
@@ -224,15 +229,46 @@ export const useGameStore = defineStore('game', () => {
     return _game
   }
 
+  function requestTowerUpgrade(towerId: string): void {
+    _game?.eventBus.emit(Events.TOWER_UPGRADE, { towerId })
+  }
+
+  function requestTowerRefund(towerId: string, onResult: (success: boolean) => void): () => void {
+    if (!_game) return () => {}
+    const unsub = _game.eventBus.once(Events.TOWER_REFUND_RESULT, ({ success }) => { onResult(success) })
+    _game.eventBus.emit(Events.TOWER_REFUND, { towerId })
+    return unsub
+  }
+
+  function selectBuffCard(cardId: string): void {
+    _game?.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
+  }
+
+  function selectMontyHallDoor(index: number): void {
+    _game?.eventBus.emit(Events.MONTY_HALL_DOOR_SELECTED, index)
+  }
+
+  function decideMontyHallSwitch(doSwitch: boolean): void {
+    _game?.eventBus.emit(Events.MONTY_HALL_SWITCH_DECISION, doSwitch)
+  }
+
+  function finishMontyHall(): void {
+    if (!_game) return
+    const sys = _game.getSystem('montyHall') as MontyHallSystem | undefined
+    sys?.finishEvent(_game)
+  }
+
   return {
     phase, level, starRating, wave, totalWaves,
     gold, hp, maxHp, score, kills, cumulativeKillValue, enemiesAlive, buffCards,
     costTotal, healthOrigin, timeTotal, timeExcludePrepare,
-    initialAnswer, pathsVisible, montyHallProgress,
+    initialAnswer, pathsVisible, montyHallProgress, montyHallState,
     activeBuffs, spellCooldowns, calculusStates, towerUpgradeTick,
     pathPanel,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, isMontyHall, hpPercent, activeTime,
     bindEngine, unbindEngine, syncFromEngine, getEngine,
+    requestTowerUpgrade, requestTowerRefund, selectBuffCard,
+    selectMontyHallDoor, decideMontyHallSwitch, finishMontyHall,
   }
 })

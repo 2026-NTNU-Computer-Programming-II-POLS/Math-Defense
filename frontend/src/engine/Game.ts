@@ -8,10 +8,11 @@ import { Renderer } from './Renderer'
 import { InputManager } from './InputManager'
 import { PhaseStateMachine } from './PhaseStateMachine'
 import { type GameState, createInitialState } from './GameState'
-import { GamePhase, Events, FIXED_DT } from '@/data/constants'
+import { GamePhase, Events, FIXED_DT, type TowerType } from '@/data/constants'
 import type { Tower, Enemy, Projectile, Pet, LimitResult, CalculusState } from '@/entities/types'
 import type { BuffCard } from '@/data/buff-defs'
 import type { MontyHallReward } from '@/data/monty-hall-defs'
+import type { MontyHallState } from '@/systems/MontyHallSystem'
 import type { ActiveBuffEntry } from './GameState'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { PathProgressTracker, SegmentChangedPayload } from '@/domain/path/path-progress-tracker'
@@ -129,6 +130,8 @@ export interface GameEvents {
   [Events.COST_TOTAL_CHANGED]:   number
 
   [Events.ACTIVE_BUFFS_CHANGED]: ReadonlyArray<ActiveBuffEntry>
+
+  [Events.MONTY_HALL_STATE_CHANGED]: MontyHallState | null
 }
 
 export type GameEventBus = EventBus<GameEvents>
@@ -225,7 +228,7 @@ export class Game {
    */
   hoveredSegmentId: string | null = null
 
-  towerModifierProvider: ((towerType: string) => Record<string, number>) | null = null
+  towerModifierProvider: ((towerType: TowerType) => Record<string, number>) | null = null
 
   // Game time in seconds (used for animation)
   time = 0

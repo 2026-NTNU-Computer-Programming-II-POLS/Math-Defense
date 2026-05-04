@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { Events, GamePhase } from '@/data/constants'
+import { GamePhase } from '@/data/constants'
 
 const gameStore = useGameStore()
 
@@ -18,8 +18,6 @@ const GUARD_FAILSAFE_MS = 10_000
 const selectingCardId = ref<string | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 let previousFocus: HTMLElement | null = null
-let unsubBuffResult: (() => void) | null = null
-let unsubPhase: (() => void) | null = null
 let guardTimer: number | null = null
 
 function clearGuard(): void {
@@ -75,30 +73,18 @@ function onHotkey(event: KeyboardEvent): void {
   selectCard(card.id)
 }
 
+watch(() => gameStore.phase, (_, from) => {
+  if (from === GamePhase.BUFF_SELECT) clearGuard()
+})
+
 onMounted(async () => {
   previousFocus = document.activeElement as HTMLElement | null
   await nextTick()
   const first = panelRef.value?.querySelector<HTMLButtonElement>('button:not([disabled])')
   first?.focus()
-
-  const game = gameStore.getEngine()
-  if (!game) return
-  unsubBuffResult = game.eventBus.on(Events.BUFF_RESULT, () => {
-    clearGuard()
-  })
-  // Defensive belt-and-braces: if BUFF_RESULT is somehow never fired but the
-  // engine leaves the BUFF_SELECT phase anyway, release the guard so the
-  // next buff round isn't pre-blocked.
-  unsubPhase = game.eventBus.on(Events.PHASE_CHANGED, ({ from }) => {
-    if (from === GamePhase.BUFF_SELECT) clearGuard()
-  })
 })
 
 onUnmounted(() => {
-  unsubBuffResult?.()
-  unsubBuffResult = null
-  unsubPhase?.()
-  unsubPhase = null
   clearGuard()
   // Restore pre-panel focus (A-7)
   const target = previousFocus
@@ -121,20 +107,16 @@ watch(cards, (v) => {
 
 function selectCard(cardId: string): void {
   if (selectingCardId.value !== null) return
-  const game = gameStore.getEngine()
-  if (!game) return
   selectingCardId.value = cardId
   armGuardFailsafe()
-  game.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
+  gameStore.selectBuffCard(cardId)
 }
 
 function skipBuff(): void {
   if (selectingCardId.value !== null) return
-  const game = gameStore.getEngine()
-  if (!game) return
   selectingCardId.value = ''
   armGuardFailsafe()
-  game.eventBus.emit(Events.BUFF_CARD_SELECTED, '')
+  gameStore.selectBuffCard('')
 }
 </script>
 
@@ -169,7 +151,7 @@ function skipBuff(): void {
           <div class="card-desc">{{ card.description }}</div>
           <div class="card-footer">
             <span v-if="card.isCurse" class="card-reward">
-              + {{ (card as { goldReward?: number }).goldReward ?? 0 }} Gold
+              + {{ card.goldReward ?? 0 }} Gold
             </span>
             <span v-else class="card-cost">
               {{ card.cost > 0 ? `⬡ ${card.cost}` : 'Free' }}

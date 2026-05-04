@@ -1,19 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { Events } from '@/data/constants'
-import type { MontyHallSystem } from '@/systems/MontyHallSystem'
 
 const g = useGameStore()
 const resultTimeout = ref(false)
 const dialogRef = ref<HTMLElement | null>(null)
 
-const mhState = computed(() => {
-  const engine = g.getEngine()
-  if (!engine) return null
-  const sys = engine.getSystem('montyHall') as MontyHallSystem | undefined
-  return sys?.current ?? null
-})
+const mhState = computed(() => g.montyHallState)
 
 const doors = computed(() => {
   const state = mhState.value
@@ -27,6 +20,7 @@ const doors = computed(() => {
 })
 
 watch(mhState, (val) => {
+  if (typeof window === 'undefined') return
   window.removeEventListener('keydown', handleKey)
   if (val) {
     nextTick(() => dialogRef.value?.querySelector<HTMLElement>('button:not([disabled])')?.focus())
@@ -59,23 +53,16 @@ function handleKey(e: KeyboardEvent) {
 }
 
 function selectDoor(index: number): void {
-  const engine = g.getEngine()
-  if (!engine) return
-  engine.eventBus.emit(Events.MONTY_HALL_DOOR_SELECTED, index)
+  g.selectMontyHallDoor(index)
 }
 
 function decideSwitchOrKeep(doSwitch: boolean): void {
-  const engine = g.getEngine()
-  if (!engine) return
-  engine.eventBus.emit(Events.MONTY_HALL_SWITCH_DECISION, doSwitch)
+  g.decideMontyHallSwitch(doSwitch)
   resultTimeout.value = true
 }
 
 function close(): void {
-  const engine = g.getEngine()
-  if (!engine) return
-  const sys = engine.getSystem('montyHall') as MontyHallSystem | undefined
-  sys?.finishEvent(engine)
+  g.finishMontyHall()
   resultTimeout.value = false
 }
 </script>
