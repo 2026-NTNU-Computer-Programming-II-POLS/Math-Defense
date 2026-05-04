@@ -7,13 +7,26 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 _MIN_DEADLINE_BUFFER = timedelta(minutes=5)
 _PATH_CONFIG_MAX_BYTES = 10_240
+_PATH_CONFIG_MAX_DEPTH = 5
 _TITLE_INVALID_RE = re.compile(r'[\x00-\x1f\x7f​-‍  ﻿]')
+
+
+def _check_depth(obj: Any, max_depth: int, current: int = 0) -> None:
+    if current > max_depth:
+        raise ValueError(f"path_config nesting exceeds depth limit of {max_depth}")
+    if isinstance(obj, dict):
+        for v in obj.values():
+            _check_depth(v, max_depth, current + 1)
+    elif isinstance(obj, list):
+        for item in obj:
+            _check_depth(item, max_depth, current + 1)
 
 
 class PathConfig(BaseModel):
     """Shape of a territory slot's path configuration.
 
     Extra fields are allowed so the game can extend this without API changes.
+    Size and nesting depth are bounded to prevent unbounded JSON storage.
     """
     model_config = ConfigDict(extra="allow")
 
@@ -27,8 +40,11 @@ class SlotDefinition(BaseModel):
     @field_validator("path_config", mode="before")
     @classmethod
     def path_config_size(cls, v: Any) -> Any:
-        if v is not None and isinstance(v, dict) and len(json.dumps(v)) > _PATH_CONFIG_MAX_BYTES:
-            raise ValueError(f"path_config exceeds {_PATH_CONFIG_MAX_BYTES} byte limit")
+        if v is not None and isinstance(v, dict):
+            serialised = json.dumps(v)
+            if len(serialised) > _PATH_CONFIG_MAX_BYTES:
+                raise ValueError(f"path_config exceeds {_PATH_CONFIG_MAX_BYTES} byte limit")
+            _check_depth(v, _PATH_CONFIG_MAX_DEPTH)
         return v
 
 

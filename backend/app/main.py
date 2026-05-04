@@ -17,7 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
 from app.db.database import engine, SessionLocal
-from app.domain.errors import DomainError
+from app.domain.errors import AccountLockedError, DomainError
 from app.domain.session.aggregate import set_stale_cutoff_hours
 from app.infrastructure.login_guard import purge_stale as purge_stale_login_attempts
 from app.infrastructure.scheduler import territory_settlement_task
@@ -66,6 +66,7 @@ async def _auth_store_janitor() -> None:
             with SessionLocal() as db:
                 purge_expired_denied_tokens(db)
                 purge_stale_login_attempts(db)
+                db.commit()
         except Exception:
             logger.exception("Auth-store janitor iteration failed")
 
@@ -126,7 +127,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 async def _domain_error_handler(_request: Request, exc: DomainError) -> JSONResponse:
     # DomainError subclasses carry their own status_code; pluck it and surface
     # the message. Unhandled bugs still fall through to Starlette's default 500.
-    return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
+    headers = {}
+    if isinstance(exc, AccountLockedError) and exc.retry_after_seconds is not None:
+        headers["Retry-After"] = str(exc.retry_after_seconds)
+    return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)}, headers=headers)
 
 
 @app.exception_handler(RequestValidationError)

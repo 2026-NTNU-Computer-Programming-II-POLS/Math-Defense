@@ -3,12 +3,15 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
 from app.domain.class_.aggregate import Class, ClassMembership, RemovedMembership
+from app.domain.errors import ConstraintViolationError
 from app.models.class_ import Class as ClassModel
 from app.models.class_membership import ClassMembership as MembershipModel
 from app.models.removed_class_membership import RemovedClassMembership as RemovedModel
+from app.utils.integrity import extract_constraint_name
 
 
 class SqlAlchemyClassRepository:
@@ -61,7 +64,15 @@ class SqlAlchemyClassRepository:
                 created_at=cls_.created_at,
             )
             self._db.add(row)
-        self._db.flush()
+        self._flush()
+
+    def _flush(self) -> None:
+        try:
+            self._db.flush()
+        except IntegrityError as e:
+            raise ConstraintViolationError(
+                str(e), constraint_name=extract_constraint_name(e)
+            ) from e
 
     def delete(self, class_id: str) -> None:
         self._db.query(ClassModel).filter(ClassModel.id == class_id).delete()
@@ -97,7 +108,7 @@ class SqlAlchemyClassRepository:
             joined_at=membership.joined_at,
         )
         self._db.add(row)
-        self._db.flush()
+        self._flush()
 
     def delete_membership(self, class_id: str, student_id: str) -> None:
         self._db.query(MembershipModel).filter(

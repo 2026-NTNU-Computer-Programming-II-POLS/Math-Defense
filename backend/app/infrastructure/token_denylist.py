@@ -57,6 +57,6 @@ def purge_expired(db: DbSession) -> None:
     """Remove entries whose JWT would have expired anyway.
 
     Intended for a scheduled job (e.g. cron/APS) rather than the request path.
+    Does NOT commit. The caller owns the transaction boundary.
     """
     db.execute(delete(DeniedToken).where(DeniedToken.expires_at <= _now()))
-    db.commit()

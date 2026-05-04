@@ -45,8 +45,6 @@ class TerritoryRepository(Protocol):
 
     def count_occupations_by_student_for_update(self, activity_id: str, student_id: str) -> int: pass
 
-    def acquire_student_activity_lock(self, activity_id: str, student_id: str) -> None: pass
-
     def is_session_used(self, session_id: str) -> bool: pass
 
     def record_session_use(self, session_id: str) -> None: pass

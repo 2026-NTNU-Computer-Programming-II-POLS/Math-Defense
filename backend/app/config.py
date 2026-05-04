@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     @field_validator("algorithm")
     @classmethod
     def validate_algorithm(cls, v: str) -> str:
-        allowed = {"HS256", "HS512"}
+        allowed = {"HS256", "HS512", "RS256"}
         if v not in allowed:
             raise ValueError(f"ALGORITHM must be one of {allowed}")
         return v

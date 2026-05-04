@@ -87,7 +87,7 @@ def end_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = build_session_service(db).end_session(
+    result = build_session_service(db).end_session(
         str(session_id),
         current_user.id,
         score=req.score,
@@ -101,4 +101,4 @@ def end_session(
         time_exclude_prepare=req.time_exclude_prepare,
         total_score=req.total_score,
     )
-    return session_to_out(session)
+    return session_to_out(result.session, result.newly_unlocked)

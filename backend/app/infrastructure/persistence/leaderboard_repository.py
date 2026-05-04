@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession, aliased
 
+from app.domain.errors import ConstraintViolationError
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.leaderboard.view import RankedLeaderboardEntry
 from app.domain.value_objects import Level, Score
 from app.models.class_membership import ClassMembership as MembershipModel
 from app.models.leaderboard import LeaderboardEntry as LeaderboardEntryModel
 from app.models.user import User
+from app.utils.integrity import extract_constraint_name
 
 
 class SqlAlchemyLeaderboardRepository:
@@ -35,7 +38,15 @@ class SqlAlchemyLeaderboardRepository:
             created_at=entry.created_at,
         )
         self._db.add(row)
-        self._db.flush()
+        self._flush()
+
+    def _flush(self) -> None:
+        try:
+            self._db.flush()
+        except IntegrityError as e:
+            raise ConstraintViolationError(
+                str(e), constraint_name=extract_constraint_name(e)
+            ) from e
 
     def query_ranked_global(
         self,

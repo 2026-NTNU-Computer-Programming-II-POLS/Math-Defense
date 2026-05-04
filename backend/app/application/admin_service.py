@@ -9,9 +9,9 @@ from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 
 if TYPE_CHECKING:
+    from app.application.ports import UnitOfWork
     from app.domain.class_.repository import ClassRepository
     from app.domain.user.repository import UserRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 
 class AdminApplicationService:
@@ -20,7 +20,7 @@ class AdminApplicationService:
         self,
         user_repo: UserRepository,
         class_repo: ClassRepository,
-        uow: SqlAlchemyUnitOfWork | None = None,
+        uow: UnitOfWork | None = None,
     ) -> None:
         self._user_repo = user_repo
         self._class_repo = class_repo

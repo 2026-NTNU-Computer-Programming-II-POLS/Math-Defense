@@ -16,7 +16,7 @@ class SqlAlchemyLoginAttemptRepository:
     def __init__(self, db: DbSession) -> None:
         self._db = db
 
-    def is_locked(self, username: str) -> bool:
+    def is_locked(self, username: str) -> "datetime | None":
         return login_guard.is_locked(self._db, username)
 
     def record_failure(self, username: str) -> None:

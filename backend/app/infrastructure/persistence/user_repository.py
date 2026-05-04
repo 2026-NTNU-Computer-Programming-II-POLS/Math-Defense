@@ -3,11 +3,14 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
+from app.domain.errors import ConstraintViolationError
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 from app.models.user import User as UserModel
+from app.utils.integrity import extract_constraint_name
 
 
 class SqlAlchemyUserRepository:
@@ -52,6 +55,7 @@ class SqlAlchemyUserRepository:
             row.is_email_verified = user.is_email_verified
             row.totp_secret = user.totp_secret
             row.mfa_enabled = user.mfa_enabled
+            row.totp_last_used_at = user.totp_last_used_at
         else:
             row = UserModel(
                 id=user.id,
@@ -66,9 +70,18 @@ class SqlAlchemyUserRepository:
                 is_email_verified=user.is_email_verified,
                 totp_secret=user.totp_secret,
                 mfa_enabled=user.mfa_enabled,
+                totp_last_used_at=user.totp_last_used_at,
             )
             self._db.add(row)
-        self._db.flush()
+        self._flush()
+
+    def _flush(self) -> None:
+        try:
+            self._db.flush()
+        except IntegrityError as e:
+            raise ConstraintViolationError(
+                str(e), constraint_name=extract_constraint_name(e)
+            ) from e
 
     @staticmethod
     def _to_domain(row: UserModel) -> User:
@@ -85,6 +98,7 @@ class SqlAlchemyUserRepository:
             is_email_verified=row.is_email_verified if row.is_email_verified is not None else False,
             totp_secret=row.totp_secret,
             mfa_enabled=row.mfa_enabled if row.mfa_enabled is not None else False,
+            totp_last_used_at=_ensure_utc(row.totp_last_used_at),
         )
 
 

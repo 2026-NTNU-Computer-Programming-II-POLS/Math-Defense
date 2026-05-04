@@ -84,6 +84,14 @@ class SessionEnd(BaseModel):
                 raise ValueError(
                     "sum(time_exclude_prepare) must not exceed time_total"
                 )
+        if (
+            self.n_prep_phases is not None
+            and self.time_exclude_prepare is not None
+            and self.n_prep_phases != len(self.time_exclude_prepare)
+        ):
+            raise ValueError(
+                "n_prep_phases must equal len(time_exclude_prepare)"
+            )
         return self
 
 

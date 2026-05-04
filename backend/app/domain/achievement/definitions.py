@@ -70,6 +70,11 @@ _reg(AchievementDef("efficiency_low_spend", "Frugal Commander", "Complete a sess
 _reg(AchievementDef("explore_star_1", "First Steps", "Complete a 1-star level", "exploration", "level_cleared_at_star", 1, 1))
 _reg(AchievementDef("explore_star_3", "Intermediate", "Complete a 3-star level", "exploration", "level_cleared_at_star", 3, 1))
 _reg(AchievementDef("explore_star_5", "Expert", "Complete a 5-star level", "exploration", "level_cleared_at_star", 5, 2))
+# max_star_cleared fills the progression gaps at star 2 and star 4:
+# these fire as long as the player has cleared ANY level at or above the threshold,
+# so skipping straight to star-5 still grants both milestones.
+_reg(AchievementDef("explore_reach_star_2", "Rising Challenger", "Clear a level at difficulty 2 or higher", "exploration", "max_star_cleared", 2, 1))
+_reg(AchievementDef("explore_reach_star_4", "Hardened Veteran", "Clear a level at difficulty 4 or higher", "exploration", "max_star_cleared", 4, 2))
 _reg(AchievementDef("explore_all_stars", "Cartographer", "Play at every star rating (1-5)", "exploration", "all_stars_played", True, 3))
 _reg(AchievementDef("explore_sessions_5", "Regular", "Complete 5 sessions", "exploration", "total_sessions", 5, 1))
 _reg(AchievementDef("explore_sessions_20", "Dedicated", "Complete 20 sessions", "exploration", "total_sessions", 20, 2))

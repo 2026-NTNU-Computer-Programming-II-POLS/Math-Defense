@@ -28,7 +28,7 @@ class SqlAlchemySessionRepository:
         # Row-level lock prevents the TOCTOU race between the duplicate-submission
         # check and the leaderboard insert. On SQLite with_for_update is a no-op,
         # but the DB-level unique constraint on leaderboard.session_id is the
-        # fallback safety net (callers should also catch IntegrityError).
+        # fallback safety net (callers should catch ConstraintViolationError).
         row = self._db.query(GameSessionModel).filter(
             GameSessionModel.id == session_id,
             GameSessionModel.user_id == user_id,

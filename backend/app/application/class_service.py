@@ -4,8 +4,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError
-
 from app.domain.class_.aggregate import Class, ClassMembership, RemovedMembership
 from app.domain.class_.errors import (
     ClassNameConflictError,
@@ -17,23 +15,19 @@ from app.domain.class_.errors import (
     StudentNotInClassError,
     StudentRemovedFromClassError,
 )
-from app.domain.errors import PermissionDeniedError
+from app.domain.errors import ConstraintViolationError, PermissionDeniedError
 from app.domain.user.value_objects import Role
 
 if TYPE_CHECKING:
+    from app.application.ports import UnitOfWork
     from app.domain.class_.repository import ClassRepository
     from app.domain.territory.repository import TerritoryRepository
     from app.domain.user.repository import UserRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
 
 
-def _is_name_conflict(exc: IntegrityError) -> bool:
-    try:
-        return exc.orig.diag.constraint_name == "uq_classes_teacher_name"  # type: ignore[union-attr]
-    except AttributeError:
-        return "uq_classes_teacher_name" in str(exc.orig)
+_CLASS_NAME_UNIQUE_CONSTRAINT = "uq_classes_teacher_name"
 
 
 class ClassApplicationService:
@@ -42,7 +36,7 @@ class ClassApplicationService:
         self,
         class_repo: ClassRepository,
         user_repo: UserRepository,
-        uow: SqlAlchemyUnitOfWork,
+        uow: UnitOfWork,
         territory_repo: TerritoryRepository | None = None,
     ) -> None:
         self._class_repo = class_repo
@@ -71,8 +65,8 @@ class ClassApplicationService:
                     self._class_repo.save(cls_)
                     self._uow.commit()
                 return cls_
-            except IntegrityError as exc:
-                if _is_name_conflict(exc):
+            except ConstraintViolationError as exc:
+                if exc.constraint_name == _CLASS_NAME_UNIQUE_CONSTRAINT:
                     raise ClassNameConflictError("A class with this name already exists") from exc
                 if attempt == 2:
                     raise
@@ -97,6 +91,18 @@ class ClassApplicationService:
         ids = [m.class_id for m in memberships]
         return self._class_repo.find_by_ids(ids)
 
+    def list_classes_for_student_with_teachers(self, student_id: str):
+        classes = self.list_classes_for_student(student_id)
+        teacher_ids = list({c.teacher_id for c in classes})
+        teachers = {u.id: u for u in self._user_repo.find_by_ids(teacher_ids)}
+        return [(c, teachers.get(c.teacher_id)) for c in classes]
+
+    def get_class_for_student_with_teacher(self, class_id: str, student_id: str):
+        self.verify_access(class_id, student_id, Role.STUDENT)
+        cls_ = self._get_class_or_raise(class_id)
+        teacher = self._user_repo.find_by_id(cls_.teacher_id)
+        return cls_, teacher
+
     def add_student(self, class_id: str, student_email: str, requester_id: str, requester_role: Role) -> ClassMembership:
         cls_ = self._get_class_or_raise(class_id)
         self._verify_owner_or_admin(cls_, requester_id, requester_role)
@@ -118,7 +124,7 @@ class ClassApplicationService:
                 # Teacher explicitly re-adding a removed student clears the blocklist.
                 self._class_repo.delete_removed_membership(class_id, student_id)
                 self._uow.commit()
-            except IntegrityError as e:
+            except ConstraintViolationError as e:
                 raise StudentAlreadyInClassError("Student is already in this class") from e
         return membership
 
@@ -146,12 +152,23 @@ class ClassApplicationService:
             self._uow.commit()
         logger.info("Student %s removed from class %s", student_id, class_id)
 
+    def add_student_with_user(self, class_id: str, student_email: str, requester_id: str, requester_role: Role):
+        membership = self.add_student(class_id, student_email, requester_id, requester_role)
+        user = self._user_repo.find_by_id(membership.student_id)
+        return membership, user
+
     def list_students_in_class(self, class_id: str, requester_id: str, requester_role: Role) -> list[ClassMembership]:
         # Intentional: a teacher can only roster their own class. There is no
         # cross-teacher sharing by design. Admin sees all via the bypass above.
         cls_ = self._get_class_or_raise(class_id)
         self._verify_owner_or_admin(cls_, requester_id, requester_role, is_read_op=True)
         return self._class_repo.find_memberships_by_class(class_id)
+
+    def list_students_with_users(self, class_id: str, requester_id: str, requester_role: Role):
+        memberships = self.list_students_in_class(class_id, requester_id, requester_role)
+        student_ids = [m.student_id for m in memberships]
+        users = {u.id: u for u in self._user_repo.find_by_ids(student_ids)}
+        return [(m, users.get(m.student_id)) for m in memberships]
 
     def join_by_code(self, code: str, student_id: str, student_role: Role = Role.STUDENT) -> ClassMembership:
         if student_role != Role.STUDENT:
@@ -168,7 +185,7 @@ class ClassApplicationService:
             try:
                 self._class_repo.save_membership(membership)
                 self._uow.commit()
-            except IntegrityError as e:
+            except ConstraintViolationError as e:
                 raise StudentAlreadyInClassError("You are already in this class") from e
         return membership
 
@@ -187,8 +204,8 @@ class ClassApplicationService:
             try:
                 self._class_repo.save(cls_)
                 self._uow.commit()
-            except IntegrityError as exc:
-                if _is_name_conflict(exc):
+            except ConstraintViolationError as exc:
+                if exc.constraint_name == _CLASS_NAME_UNIQUE_CONSTRAINT:
                     raise ClassNameConflictError("A class with this name already exists") from exc
                 raise
         return cls_
@@ -203,7 +220,7 @@ class ClassApplicationService:
                     self._class_repo.save(cls_)
                     self._uow.commit()
                 return cls_.join_code
-            except IntegrityError:
+            except ConstraintViolationError:
                 if attempt == 2:
                     raise
         raise RuntimeError("Unreachable")

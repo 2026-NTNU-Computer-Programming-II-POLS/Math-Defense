@@ -5,10 +5,9 @@ import logging
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError
-
 from app.domain.constraints import LEVEL_MAX_KILLS, LEVEL_MAX_WAVES
 from app.domain.errors import (
+    ConstraintViolationError,
     DuplicateSubmissionError,
     PermissionDeniedError,
     SessionValidationError,
@@ -16,12 +15,11 @@ from app.domain.errors import (
 from app.domain.value_objects import Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.leaderboard.view import RankedLeaderboardEntry
-from app.utils.integrity import is_constraint_violation
 
 if TYPE_CHECKING:
+    from app.application.ports import UnitOfWork
     from app.domain.leaderboard.repository import LeaderboardRepository
     from app.domain.session.repository import GameSessionRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +30,7 @@ class LeaderboardApplicationService:
         self,
         leaderboard_repo: LeaderboardRepository,
         session_repo: GameSessionRepository,
-        uow: SqlAlchemyUnitOfWork,
+        uow: UnitOfWork,
     ) -> None:
         self._leaderboard_repo = leaderboard_repo
         self._session_repo = session_repo
@@ -111,15 +109,15 @@ class LeaderboardApplicationService:
                 waves_survived=session.waves_survived,
                 session_id=session_id,
             )
-            self._leaderboard_repo.save(entry)
             try:
+                self._leaderboard_repo.save(entry)
                 self._uow.commit()
-            except IntegrityError as e:
+            except ConstraintViolationError as e:
                 # Belt-and-braces behind the row-lock in find_by_id_for_update:
                 # a duplicate submission that slips past the lock still trips
                 # the unique constraint. Match the exact constraint so unrelated
                 # FK violations don't get silently mis-mapped to 409.
-                if is_constraint_violation(e, constraint_name="uq_leaderboard_session_id"):
+                if e.constraint_name == "uq_leaderboard_session_id":
                     raise DuplicateSubmissionError("Score already submitted for this session") from e
                 raise
 

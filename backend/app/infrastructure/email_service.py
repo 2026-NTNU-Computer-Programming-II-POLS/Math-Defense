@@ -45,12 +45,12 @@ class SmtpEmailService:
 
     def send_verification_email(self, to: str, player_name: str, token: str) -> None:
         safe_name = html_lib.escape(player_name)
-        link = f"{self._settings.frontend_url}/verify-email?token={token}"
+        safe_link = html_lib.escape(f"{self._settings.frontend_url}/verify-email?token={token}")
         body = f"""
         <p>Hi {safe_name},</p>
         <p>Please verify your email address by clicking the link below.
         The link expires in 24 hours.</p>
-        <p><a href="{link}">Verify my email</a></p>
+        <p><a href="{safe_link}">Verify my email</a></p>
         <p>If you did not create an account, you can ignore this message.</p>
         """
         self._send(to, "Verify your Math Defense email", body)

@@ -24,10 +24,11 @@ from app.middleware.auth import AUTH_COOKIE_NAME
 CSRF_COOKIE_NAME = "csrf_token"
 CSRF_HEADER_NAME = "x-csrf-token"
 _UNSAFE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
-# Endpoints that can't have a CSRF cookie yet (login/register mint the auth
-# cookie; logout is best-effort). Cross-site forging these is not a CSRF
-# concern because there is no prior authenticated session to abuse.
-_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register", "/api/auth/logout"}
+# Endpoints that can't have a CSRF cookie yet: login and register both arrive
+# before the auth cookie (and the CSRF cookie) exist, so there is no
+# prior authenticated session to abuse. Logout is intentionally NOT exempt:
+# a cross-site POST that logs a victim out disrupts their session.
+_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register"}
 
 
 def mint_csrf_cookie(response) -> None:

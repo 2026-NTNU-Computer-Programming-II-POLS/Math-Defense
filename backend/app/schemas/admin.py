@@ -15,6 +15,8 @@ class UserSummaryOut(BaseModel):
 
 
 class SetUserActiveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     is_active: bool
 
 

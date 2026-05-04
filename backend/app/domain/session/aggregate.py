@@ -246,6 +246,15 @@ class GameSession:
         if total_score is not None:
             self.total_score = min(max(0.0, total_score), TOTAL_SCORE_MAX)
 
+    def override_total_score(self, value: float | None) -> None:
+        """Server-side authoritative override of total_score.
+
+        Used by the anti-cheat pipeline after recomputing the score server-side.
+        Bypasses record_scoring_context so the recomputed value is never clamped
+        against the client-submitted one.
+        """
+        self.total_score = value
+
     def abandon(self) -> None:
         """Abandon session — idempotent (no-op if already ended)"""
         if not self.is_active:

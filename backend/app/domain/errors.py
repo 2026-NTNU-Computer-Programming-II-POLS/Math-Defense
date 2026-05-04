@@ -42,6 +42,10 @@ class InvalidCredentialsError(DomainError):
 class AccountLockedError(DomainError):
     status_code = 429
 
+    def __init__(self, message: str = "", retry_after_seconds: int | None = None) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
 
 class AccountDisabledError(DomainError):
     status_code = 403
@@ -52,7 +56,7 @@ class InvalidTokenError(DomainError):
 
 
 class UserNotFoundError(DomainError):
-    status_code = 401
+    status_code = 403
 
 
 class EmailNotVerifiedError(DomainError):
@@ -114,3 +118,24 @@ class MaxLevelReachedError(DomainError):
 
 class TalentNodeNotFoundError(DomainError):
     status_code = 409
+
+
+# ── Persistence (infrastructure boundary) ──
+
+class PersistenceError(DomainError):
+    """Raised by the UoW when the persistence layer encounters an unrecoverable error."""
+    status_code = 500
+
+
+class ConstraintViolationError(PersistenceError):
+    """Raised when a unique or FK constraint is violated at commit/flush time.
+
+    `constraint_name` is the database-level constraint identifier
+    (e.g. 'uq_leaderboard_session_id'). Application services inspect this
+    field to decide which domain error to surface to the caller.
+    """
+    status_code = 409
+
+    def __init__(self, message: str = "", *, constraint_name: str | None = None) -> None:
+        super().__init__(message)
+        self.constraint_name = constraint_name

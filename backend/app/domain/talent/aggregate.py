@@ -29,6 +29,11 @@ class TalentAllocation:
             current_level=1,
         )
 
-    def upgrade(self) -> None:
+    def upgrade(self, max_level: int) -> None:
+        from app.domain.errors import MaxLevelReachedError
+        if self.current_level >= max_level:
+            raise MaxLevelReachedError(
+                f"Node {self.talent_node_id} already at max level {max_level}"
+            )
         self.current_level += 1
         self.updated_at = datetime.now(UTC)

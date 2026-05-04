@@ -32,6 +32,7 @@ class User:
         is_email_verified: bool = False,
         totp_secret: str | None = None,
         mfa_enabled: bool = False,
+        totp_last_used_at: datetime | None = None,
     ) -> None:
         self.id = id
         self.email = email
@@ -45,6 +46,7 @@ class User:
         self.is_email_verified = is_email_verified
         self.totp_secret = totp_secret
         self.mfa_enabled = mfa_enabled
+        self.totp_last_used_at = totp_last_used_at
 
     @classmethod
     def create(

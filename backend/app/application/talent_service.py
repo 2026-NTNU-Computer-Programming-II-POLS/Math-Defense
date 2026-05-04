@@ -14,9 +14,9 @@ from app.domain.talent.aggregate import TalentAllocation
 from app.domain.talent.definitions import TALENT_NODE_DEFS, get_all_nodes
 
 if TYPE_CHECKING:
+    from app.application.ports import UnitOfWork
     from app.domain.achievement.repository import AchievementRepository
     from app.domain.talent.repository import TalentRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class TalentApplicationService:
         self,
         talent_repo: TalentRepository,
         achievement_repo: AchievementRepository,
-        uow: SqlAlchemyUnitOfWork,
+        uow: UnitOfWork,
     ) -> None:
         self._talent_repo = talent_repo
         self._achievement_repo = achievement_repo
@@ -119,7 +119,7 @@ class TalentApplicationService:
                     )
 
             if existing:
-                existing.upgrade()
+                existing.upgrade(node_def.max_level)
                 self._talent_repo.save(existing)
             else:
                 alloc = TalentAllocation.create(user_id, talent_node_id)

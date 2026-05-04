@@ -6,9 +6,8 @@ import logging
 from datetime import datetime, timedelta, UTC
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.exc import IntegrityError
-
 from app.domain.class_.errors import ClassNotFoundError
+from app.domain.errors import ConstraintViolationError
 from app.domain.territory.aggregate import GrabbingTerritoryActivity
 from app.domain.territory.errors import (
     ActivityAlreadySettledError,
@@ -25,10 +24,10 @@ from app.domain.value_objects import SessionStatus
 _MIN_DEADLINE_BUFFER = timedelta(minutes=5)
 
 if TYPE_CHECKING:
+    from app.application.ports import UnitOfWork
     from app.domain.session.repository import GameSessionRepository
     from app.domain.territory.repository import TerritoryRepository
     from app.domain.class_.repository import ClassRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ class TerritoryApplicationService:
         territory_repo: TerritoryRepository,
         class_repo: ClassRepository,
         session_repo: GameSessionRepository,
-        uow: SqlAlchemyUnitOfWork,
+        uow: UnitOfWork,
     ) -> None:
         self._territory_repo = territory_repo
         self._class_repo = class_repo
@@ -252,9 +251,6 @@ class TerritoryApplicationService:
 
             slot.occupation = occ_from_db
 
-            # B-M-1: advisory lock serializes parallel plays by the same student
-            # so both cannot read count=N and both proceed to insert.
-            self._territory_repo.acquire_student_activity_lock(activity_id, student_id)
             raw_count = self._territory_repo.count_occupations_by_student_for_update(activity_id, student_id)
             effective_count = GrabbingTerritoryActivity.effective_occupation_count(
                 raw_count, occ_from_db, student_id,
@@ -266,14 +262,14 @@ class TerritoryApplicationService:
                 return {"seized": False, "occupation": None}
 
             try:
-                # B-H-6: record_session_use flush can raise IntegrityError if two concurrent
-                # plays pass the is_session_used check then both race to insert; treat as
-                # "session already used". save_occupation is also here to catch slot-unique
-                # violations (B-C-3) in one handler.
+                # B-H-6: record_session_use flush can raise ConstraintViolationError if two
+                # concurrent plays pass the is_session_used check then both race to insert;
+                # treat as "session already used". save_occupation is also here to catch
+                # slot-unique violations (B-C-3) in one handler.
                 self._territory_repo.record_session_use(session_id)
                 self._territory_repo.save_occupation(occupation)
                 self._uow.commit()
-            except IntegrityError:
+            except ConstraintViolationError:
                 return {"seized": False, "occupation": None}
 
             displaced = occ_from_db is not None and occ_from_db.student_id != occupation.student_id

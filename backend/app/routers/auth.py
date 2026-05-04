@@ -98,7 +98,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         role=req.role,
     )
     logger.info("User registered: anon=%s", _anon(str(user.id)))
-    record_audit_event(db, request, "REGISTER", user.id, {"email": req.email, "role": user.role.value})
+    record_audit_event(request, "REGISTER", user.id, {"email": req.email, "role": user.role.value})
     _set_auth_cookie(response, access_token)
     _set_refresh_cookie(response, refresh_token)
     mint_csrf_cookie(response)
@@ -119,7 +119,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         user, token, mfa_required, refresh_token = build_auth_service(db).login(req.email, req.password)
         if mfa_required:
             logger.info("MFA challenge issued: anon=%s", _anon(str(user.id)))
-            record_audit_event(db, request, "LOGIN_MFA_REQUIRED", user.id, {"email": req.email})
+            record_audit_event(request, "LOGIN_MFA_REQUIRED", user.id, {"email": req.email})
             return TokenResponse(
                 id="",
                 email="",
@@ -129,7 +129,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
                 mfa_token=token,
             )
         logger.info("User logged in: anon=%s", _anon(str(user.id)))
-        record_audit_event(db, request, "LOGIN_SUCCESS", user.id, {"email": req.email})
+        record_audit_event(request, "LOGIN_SUCCESS", user.id, {"email": req.email})
         _set_auth_cookie(response, token)
         _set_refresh_cookie(response, refresh_token)
         mint_csrf_cookie(response)
@@ -142,8 +142,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
             is_email_verified=user.is_email_verified,
         )
     except Exception as e:
-        record_audit_event(db, request, "LOGIN_FAILURE", None, {"email": req.email, "error_type": type(e).__name__})
-        db.commit()
+        record_audit_event(request, "LOGIN_FAILURE", None, {"email": req.email, "error_type": type(e).__name__})
         raise
 
 
@@ -162,10 +161,10 @@ def logout(
     if token:
         try:
             build_auth_service(db).logout_token(token, refresh_token)
-            record_audit_event(db, request, "LOGOUT", None, {"status": "success"})
+            record_audit_event(request, "LOGOUT", None, {"status": "success"})
         except Exception as exc:
             logger.debug("Logout token revocation failed; proceeding with client-side logout", exc_info=exc)
-            record_audit_event(db, request, "LOGOUT", None, {"status": "failed_token_revocation"})
+            record_audit_event(request, "LOGOUT", None, {"status": "failed_token_revocation"})
     _clear_auth_cookie(response)
     _clear_refresh_cookie(response)
     mint_csrf_cookie(response)
@@ -201,7 +200,7 @@ def change_password(
 ):
     build_auth_service(db).change_password(current_user.id, req.current_password, req.new_password)
     logger.info("Password changed: id=%s", current_user.id)
-    record_audit_event(db, request, "PASSWORD_CHANGE", current_user.id)
+    record_audit_event(request, "PASSWORD_CHANGE", current_user.id)
 
 
 @router.get("/me", response_model=AuthMeResponse)
@@ -294,7 +293,7 @@ def mfa_setup(
     db: Session = Depends(get_db),
 ):
     _secret, provisioning_uri = build_auth_service(db).setup_mfa(current_user.id)
-    record_audit_event(db, request, "MFA_SETUP_INITIATED", current_user.id)
+    record_audit_event(request, "MFA_SETUP_INITIATED", current_user.id)
     return MFASetupResponse(provisioning_uri=provisioning_uri)
 
 
@@ -308,7 +307,7 @@ def mfa_confirm(
 ):
     build_auth_service(db).confirm_mfa(current_user.id, req.code)
     logger.info("MFA enabled: id=%s", current_user.id)
-    record_audit_event(db, request, "MFA_ENABLED", current_user.id)
+    record_audit_event(request, "MFA_ENABLED", current_user.id)
 
 
 @router.post("/mfa/disable", status_code=status.HTTP_204_NO_CONTENT)
@@ -321,7 +320,7 @@ def mfa_disable(
 ):
     build_auth_service(db).disable_mfa(current_user.id, req.current_password)
     logger.info("MFA disabled: id=%s", current_user.id)
-    record_audit_event(db, request, "MFA_DISABLED", current_user.id)
+    record_audit_event(request, "MFA_DISABLED", current_user.id)
 
 
 @router.post("/mfa/challenge", response_model=TokenResponse)
@@ -335,7 +334,7 @@ def mfa_challenge(
     try:
         user, access_token, refresh_token = build_auth_service(db).verify_mfa_challenge(req.mfa_token, req.code)
         logger.info("MFA challenge passed: anon=%s", _anon(str(user.id)))
-        record_audit_event(db, request, "LOGIN_SUCCESS_MFA", user.id)
+        record_audit_event(request, "LOGIN_SUCCESS_MFA", user.id)
         _set_auth_cookie(response, access_token)
         _set_refresh_cookie(response, refresh_token)
         mint_csrf_cookie(response)
@@ -348,6 +347,5 @@ def mfa_challenge(
             is_email_verified=user.is_email_verified,
         )
     except Exception as e:
-        record_audit_event(db, request, "MFA_CHALLENGE_FAILURE", None, {"error_type": type(e).__name__})
-        db.commit()
+        record_audit_event(request, "MFA_CHALLENGE_FAILURE", None, {"error_type": type(e).__name__})
         raise

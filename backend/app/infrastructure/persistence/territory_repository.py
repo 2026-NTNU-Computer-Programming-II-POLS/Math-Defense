@@ -4,8 +4,10 @@ from __future__ import annotations
 from datetime import datetime, UTC
 
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
+from app.domain.errors import ConstraintViolationError
 from app.domain.territory.aggregate import (
     GrabbingTerritoryActivity,
     TerritorySlot,
@@ -20,6 +22,7 @@ from app.models.territory import (
     TerritorySessionUse as SessionUseModel,
 )
 from app.models.user import User as UserModel
+from app.utils.integrity import extract_constraint_name
 
 
 class SqlAlchemyTerritoryRepository:
@@ -179,6 +182,13 @@ class SqlAlchemyTerritoryRepository:
         ) or 0
 
     def count_occupations_by_student_for_update(self, activity_id: str, student_id: str) -> int:
+        # B-M-1: advisory lock on (activity, student) pair prevents two parallel
+        # requests by the same student from both reading count=N and both inserting.
+        # Acquired here as an implementation detail; callers need not know about PG advisory locks.
+        self._db.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:a)::int, hashtext(:s)::int)"),
+            {"a": activity_id, "s": student_id},
+        )
         rows = (
             self._db.query(OccupationModel.id)
             .join(SlotModel, OccupationModel.slot_id == SlotModel.id)
@@ -187,14 +197,6 @@ class SqlAlchemyTerritoryRepository:
             .all()
         )
         return len(rows)
-
-    def acquire_student_activity_lock(self, activity_id: str, student_id: str) -> None:
-        # B-M-1: advisory lock on (activity, student) pair prevents two parallel
-        # requests by the same student from both reading count=4 and both inserting.
-        self._db.execute(
-            text("SELECT pg_advisory_xact_lock(hashtext(:a)::int, hashtext(:s)::int)"),
-            {"a": activity_id, "s": student_id},
-        )
 
     def is_session_used(self, session_id: str) -> bool:
         return (
@@ -205,7 +207,7 @@ class SqlAlchemyTerritoryRepository:
 
     def record_session_use(self, session_id: str) -> None:
         self._db.merge(SessionUseModel(session_id=session_id))
-        self._db.flush()
+        self._flush()
 
     def save_occupation(self, occupation: TerritoryOccupation) -> None:
         row = self._db.query(OccupationModel).filter(OccupationModel.slot_id == occupation.slot_id).first()
@@ -224,7 +226,15 @@ class SqlAlchemyTerritoryRepository:
                 occupied_at=occupation.occupied_at,
             )
             self._db.add(row)
-        self._db.flush()
+        self._flush()
+
+    def _flush(self) -> None:
+        try:
+            self._db.flush()
+        except IntegrityError as e:
+            raise ConstraintViolationError(
+                str(e), constraint_name=extract_constraint_name(e)
+            ) from e
 
     def delete_occupation(self, slot_id: str) -> None:
         self._db.query(OccupationModel).filter(OccupationModel.slot_id == slot_id).delete()

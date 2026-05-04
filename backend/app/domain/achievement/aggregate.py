@@ -22,6 +22,12 @@ class UserAchievement:
 
     @classmethod
     def create(cls, user_id: str, achievement_id: str, talent_points: int) -> UserAchievement:
+        if not user_id:
+            raise ValueError("user_id must not be empty")
+        if not achievement_id:
+            raise ValueError("achievement_id must not be empty")
+        if talent_points < 0:
+            raise ValueError("talent_points must not be negative")
         return cls(
             id=str(uuid.uuid4()),
             user_id=user_id,

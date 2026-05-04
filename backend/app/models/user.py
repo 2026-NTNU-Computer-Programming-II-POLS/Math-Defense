@@ -24,6 +24,7 @@ class User(Base):
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    totp_last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )

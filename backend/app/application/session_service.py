@@ -3,26 +3,36 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-
-from app.domain.errors import SessionNotFoundError, SessionStaleError
+from app.domain.errors import (
+    ConstraintViolationError,
+    PersistenceError,
+    SessionNotFoundError,
+    SessionStaleError,
+)
 from app.domain.value_objects import Level, Score, GameResult, SessionStatus
 from app.domain.session.aggregate import GameSession
 from app.domain.session.events import SessionCompleted
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.scoring.score_calculator import recompute_total_score
-from app.utils.integrity import is_constraint_violation
-
 if TYPE_CHECKING:
     from app.application.achievement_service import AchievementApplicationService
+    from app.application.ports import UnitOfWork
     from app.domain.session.repository import GameSessionRepository
     from app.domain.leaderboard.repository import LeaderboardRepository
     from app.domain.territory.repository import TerritoryRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EndSessionResult:
+    """Return value of end_session, carrying both the session and any newly unlocked achievements."""
+    session: GameSession
+    newly_unlocked: list[dict]
+
 
 # Name of the partial-unique index guaranteeing at most one ACTIVE session per user.
 # Keep in sync with app/models/game_session.py.
@@ -39,7 +49,7 @@ class SessionApplicationService:
         self,
         session_repo: GameSessionRepository,
         leaderboard_repo: LeaderboardRepository,
-        uow: SqlAlchemyUnitOfWork,
+        uow: UnitOfWork,
         achievement_svc: AchievementApplicationService | None = None,
         territory_repo: TerritoryRepository | None = None,
     ) -> None:
@@ -57,8 +67,8 @@ class SessionApplicationService:
         for attempt in range(2):
             try:
                 return self._create_session_once(user_id, level, initial_answer, path_config)
-            except IntegrityError as e:
-                if attempt == 1 or not _is_active_session_conflict(e):
+            except ConstraintViolationError as e:
+                if attempt == 1 or e.constraint_name != _ACTIVE_SESSION_UNIQUE_INDEX:
                     raise
                 logger.info("create_session race: retrying after abandoning concurrent active session user=%s", user_id)
         raise RuntimeError("unreachable")
@@ -122,10 +132,10 @@ class SessionApplicationService:
         health_final: int | None = None,
         time_exclude_prepare: list[float] | None = None,
         total_score: float | None = None,
-    ) -> GameSession:
+    ) -> EndSessionResult:
         pending_events: list = []
         with self._uow:
-            session = self._session_repo.find_by_id(session_id, user_id)
+            session = self._session_repo.find_by_id_for_update(session_id, user_id)
             if not session:
                 raise SessionNotFoundError("Session not found")
             # Idempotent retry: if the session is already completed, return it.
@@ -146,9 +156,9 @@ class SessionApplicationService:
                     with self._uow:
                         self._handle_session_completed(catch_up)
                         self._uow.commit()
-                except SQLAlchemyError:
+                except PersistenceError:
                     logger.exception("leaderboard catch-up failed session=%s", session.id)
-                return session
+                return EndSessionResult(session=session, newly_unlocked=[])
             self._ensure_not_stale_or_abandon(session)
             result = GameResult(
                 score=Score(score),
@@ -190,11 +200,11 @@ class SessionApplicationService:
         # already-committed session. Idempotency in _handle_session_completed
         # makes retries (via end_session catch-up or background sweeper) safe.
         newly_unlocked = self._dispatch_post_commit(pending_events)
-        session._newly_unlocked_achievements = [
+        newly_unlocked_dicts = [
             {"id": a.achievement_id, "talent_points": a.talent_points}
             for a in newly_unlocked
         ]
-        return session
+        return EndSessionResult(session=session, newly_unlocked=newly_unlocked_dicts)
 
     def _dispatch_post_commit(self, events: list) -> list:
         newly_unlocked: list = []
@@ -205,7 +215,7 @@ class SessionApplicationService:
                 with self._uow:
                     self._handle_session_completed(event)
                     self._uow.commit()
-            except SQLAlchemyError:
+            except PersistenceError:
                 logger.exception(
                     "post-commit dispatch failed session=%s", event.session_id
                 )
@@ -340,7 +350,7 @@ class SessionApplicationService:
                     "total_score submitted but V2 fields incomplete session=%s; discarding client value",
                     session.id,
                 )
-                session.total_score = None
+                session.override_total_score(None)
             return
         submitted = session.total_score
         if submitted is not None:
@@ -353,19 +363,9 @@ class SessionApplicationService:
                     "total_score mismatch session=%s submitted=%.4f recomputed=%.4f; using server value",
                     session.id, submitted, recomputed,
                 )
-        session.total_score = recomputed
+        session.override_total_score(recomputed)
 
     def _abandon_and_commit(self, session: GameSession) -> None:
         session.abandon()
         self._session_repo.save(session)
         self._uow.commit()
-
-
-def _is_active_session_conflict(err: IntegrityError) -> bool:
-    """Return True iff err was raised by the one-active-session-per-user unique index.
-
-    FK, check, or unrelated unique violations indicate a real bug and must
-    surface — so we match on the exact constraint/index name rather than
-    any broader heuristic.
-    """
-    return is_constraint_violation(err, constraint_name=_ACTIVE_SESSION_UNIQUE_INDEX)

@@ -8,8 +8,7 @@ from app.domain.session.aggregate import GameSession
 from app.schemas.game_session import SessionOut
 
 
-def session_to_out(session: GameSession) -> SessionOut:
-    achievements = getattr(session, "_newly_unlocked_achievements", [])
+def session_to_out(session: GameSession, newly_unlocked: list[dict] | None = None) -> SessionOut:
     return SessionOut(
         id=session.id,
         star_rating=int(session.level),
@@ -20,5 +19,5 @@ def session_to_out(session: GameSession) -> SessionOut:
         score=session.score,
         started_at=session.started_at,
         ended_at=session.ended_at,
-        newly_unlocked_achievements=achievements,
+        newly_unlocked_achievements=newly_unlocked or [],
     )

@@ -7,7 +7,6 @@ from app.db.database import get_db
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 from app.factories import build_class_service
-from app.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, require_role
 from app.schemas.class_ import (
@@ -50,11 +49,7 @@ def list_classes(
         return [_class_out(c) for c in svc.list_all_classes()]
     if user.is_teacher:
         return [_class_out(c) for c in svc.list_classes_for_teacher(user.id)]
-    classes = svc.list_classes_for_student(user.id)
-    user_repo = SqlAlchemyUserRepository(db)
-    teacher_ids = list({c.teacher_id for c in classes})
-    teachers = {u.id: u for u in user_repo.find_by_ids(teacher_ids)}
-    return [_class_out_student(c, teachers.get(c.teacher_id)) for c in classes]
+    return [_class_out_student(c, teacher) for c, teacher in svc.list_classes_for_student_with_teachers(user.id)]
 
 
 @router.post("/join", response_model=MembershipOut, status_code=status.HTTP_201_CREATED)
@@ -81,9 +76,7 @@ def get_class(
     # Teachers/admins get the full view gated by ownership.
     svc = build_class_service(db)
     if user.role == Role.STUDENT:
-        svc.verify_access(class_id, user.id, user.role)
-        cls_ = svc.get_class(class_id)
-        teacher = SqlAlchemyUserRepository(db).find_by_id(cls_.teacher_id)
+        cls_, teacher = svc.get_class_for_student_with_teacher(class_id, user.id)
         return _class_out_student(cls_, teacher)
     cls_ = svc.get_class_for_owner(class_id, user.id, user.role)
     return _class_out(cls_)
@@ -124,13 +117,12 @@ def add_student(
     user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
-    membership = build_class_service(db).add_student(
+    membership, student = build_class_service(db).add_student_with_user(
         class_id=class_id,
         student_email=req.email,
         requester_id=user.id,
         requester_role=user.role,
     )
-    student = SqlAlchemyUserRepository(db).find_by_id(membership.student_id)
     return _membership_out(membership, student)
 
 
@@ -159,11 +151,8 @@ def list_students(
     user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    memberships = build_class_service(db).list_students_in_class(class_id, user.id, user.role)
-    user_repo = SqlAlchemyUserRepository(db)
-    student_ids = [m.student_id for m in memberships]
-    users = {u.id: u for u in user_repo.find_by_ids(student_ids)}
-    return [_membership_out(m, users.get(m.student_id)) for m in memberships]
+    pairs = build_class_service(db).list_students_with_users(class_id, user.id, user.role)
+    return [_membership_out(m, u) for m, u in pairs]
 
 
 @router.post("/{class_id}/regenerate-code", response_model=dict)

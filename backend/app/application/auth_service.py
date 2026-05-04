@@ -7,9 +7,8 @@ import secrets
 from datetime import datetime, timedelta, UTC
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError
-
 from app.domain.errors import (
+    ConstraintViolationError,
     AccountDisabledError,
     AccountLockedError,
     DomainValueError,
@@ -39,14 +38,18 @@ if TYPE_CHECKING:
         RefreshTokenRepository,
         TokenDenylistRepository,
     )
+    from app.application.ports import UnitOfWork
     from app.domain.user.repository import UserRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
 
 _DUMMY_PASSWORD_HASH = hash_password("__timing_equaliser__")
 _EMAIL_VERIFICATION_TTL_HOURS = 24
 _MFA_CHALLENGE_TTL_MINUTES = 5
+# TOTP valid_window=1 means codes from t-1, t, t+1 periods are accepted
+# (3 × 30 s = 90 s). Reject any code within this window of the last accepted
+# one to prevent replay attacks on intercepted TOTP codes.
+_TOTP_REPLAY_WINDOW_SECS = 90
 
 
 class AuthApplicationService:
@@ -58,7 +61,7 @@ class AuthApplicationService:
         token_denylist_repo: TokenDenylistRepository,
         email_verification_repo: EmailVerificationRepository,
         email_svc: EmailService,
-        uow: SqlAlchemyUnitOfWork,
+        uow: UnitOfWork,
         refresh_token_repo: RefreshTokenRepository | None = None,
     ) -> None:
         self._user_repo = user_repo
@@ -110,12 +113,15 @@ class AuthApplicationService:
                 role=role_enum,
                 password_hash=password_hash,
             )
-            self._user_repo.save(user)
+            try:
+                self._user_repo.save(user)
+            except ConstraintViolationError:
+                raise DomainValueError("Email already registered")
             verification_token = self._create_verification_token(user.id)
             refresh_token = self._issue_refresh_token(user.id)
             try:
                 self._uow.commit()
-            except IntegrityError as e:
+            except ConstraintViolationError as e:
                 raise DomainValueError("Email already registered") from e
 
         try:
@@ -147,10 +153,12 @@ class AuthApplicationService:
         email_lower = email.strip().lower()
         refresh_token: str | None = None
         with self._uow:
-            if self._login_attempts.is_locked(email_lower):
+            locked_until = self._login_attempts.is_locked(email_lower)
+            if locked_until is not None:
+                retry_after = max(0, int((locked_until - datetime.now(UTC)).total_seconds()))
                 raise AccountLockedError(
-                    "Account temporarily locked due to too many failed attempts. "
-                    "Try again in a few minutes."
+                    f"Account temporarily locked. Try again in {retry_after} seconds.",
+                    retry_after_seconds=retry_after,
                 )
 
             user = self._user_repo.find_by_email(email_lower)
@@ -339,6 +347,11 @@ class AuthApplicationService:
                 raise MFAAlreadyEnabledError("MFA is already enabled for this account")
             if not totp_utils.verify_code(user.totp_secret, code):
                 raise InvalidMFACodeError("Invalid TOTP code")
+            now = datetime.now(UTC)
+            if user.totp_last_used_at is not None:
+                if (now - user.totp_last_used_at).total_seconds() < _TOTP_REPLAY_WINDOW_SECS:
+                    raise InvalidMFACodeError("TOTP code already used — wait for the next window")
+            user.totp_last_used_at = now
             user.mfa_enabled = True
             self._user_repo.save(user)
             self._uow.commit()
@@ -355,6 +368,7 @@ class AuthApplicationService:
                 raise InvalidCredentialsError("Current password is incorrect")
             user.mfa_enabled = False
             user.totp_secret = None
+            user.totp_last_used_at = None
             self._user_repo.save(user)
             self._uow.commit()
 
@@ -378,7 +392,13 @@ class AuthApplicationService:
             raise MFANotSetupError("MFA is not enabled for this account")
         if not totp_utils.verify_code(user.totp_secret, code):
             raise InvalidMFACodeError("Invalid TOTP code")
+        now = datetime.now(UTC)
+        if user.totp_last_used_at is not None:
+            if (now - user.totp_last_used_at).total_seconds() < _TOTP_REPLAY_WINDOW_SECS:
+                raise InvalidMFACodeError("TOTP code already used — wait for the next window")
         with self._uow:
+            user.totp_last_used_at = now
+            self._user_repo.save(user)
             refresh_token = self._issue_refresh_token(user.id)
             self._uow.commit()
         access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
