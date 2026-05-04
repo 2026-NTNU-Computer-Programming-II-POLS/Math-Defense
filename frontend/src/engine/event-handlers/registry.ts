@@ -181,6 +181,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/MontyHallSystem', handler: 'anonymous', purpose: 'Resolve final door and award reward' },
   ],
   MONTY_HALL_RESULT: [],
+  MONTY_HALL_STATE_CHANGED: [
+    { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror Monty Hall state snapshot to reactive store' },
+  ],
 
   // ── Shop / economy ──
   SHOP_PURCHASE: [
