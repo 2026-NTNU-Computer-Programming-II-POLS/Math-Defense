@@ -68,6 +68,7 @@ frontend/
 │   │       ├── CalculusPanel.vue   Calculus tower: derivative/integral function picker
 │   │       ├── ChainRulePanel.vue  Boss Type-B chain-rule challenge overlay (KaTeX)
 │   │       ├── MontyHallPanel.vue  Monty Hall event overlay (doors, reveal, switch)
+│   │       ├── TargetingModePanel.vue Per-tower targeting-mode picker (closest / strongest / first / last)
 │   │       ├── AchievementToast.vue Toast for newly-unlocked achievements after session end
 │   │       ├── BuffCardPanel.vue   (Legacy V1 — buff card draw overlay; superseded by ShopPanel)
 │   │       ├── FunctionPanel.vue   (Legacy V1 — quadratic a/b/c input)
@@ -77,6 +78,7 @@ frontend/
 │   ├── composables/
 │   │   ├── useGameLoop.ts          Mount/unmount engine, inject systems, wire UI bridges, talent modifiers
 │   │   ├── useSessionSync.ts       Bridge engine lifecycle ↔ backend session API (V2 payload)
+│   │   ├── useCanvasPlot.ts        Canvas plotting helper for KaTeX-adjacent function previews
 │   │   ├── useAuth.ts              Reactive auth helpers (email-based; role checks)
 │   │   └── useLeaderboard.ts       Leaderboard fetch helpers
 │   │
@@ -109,6 +111,7 @@ frontend/
 │   │   ├── InputManager.ts         Canvas mouse → game-unit coord events
 │   │   ├── Renderer.ts             Canvas-2D drawing primitives
 │   │   ├── level-context.ts        Per-level runtime context (curve path, movement strategy, tile style)
+│   │   ├── generated-level-context.ts  Per-level runtime context for procedurally generated curves
 │   │   ├── event-handlers/
 │   │   │   └── registry.ts         EVENT_HANDLER_REGISTRY — index of every EventBus subscription
 │   │   ├── projections/
@@ -118,10 +121,11 @@ frontend/
 │   │
 │   ├── domain/                     Domain policies (shared across systems)
 │   │   ├── combat/
-│   │   │   └── SplitSlimePolicy.ts     Single source for Split enemy split rules
+│   │   │   └── SplitPolicy.ts          Single source for Split enemy split rules
 │   │   ├── level/
 │   │   │   ├── level-generator.ts      Reverse-endpoint curve generation algorithm
 │   │   │   ├── distractor-generator.ts Plausible wrong answers for Initial Answer
+│   │   │   ├── decoy-generator.ts      Decoy curve generation for Initial Answer screen
 │   │   │   ├── level-layout-service.ts Builds SegmentedPath + placement rules for a level definition
 │   │   │   ├── path-group-defs.ts      7 runtime path group definitions
 │   │   │   └── placement-policy.ts     Grid-cell → can-place decision shared by preview and click handler
@@ -143,8 +147,6 @@ frontend/
 │   │   │   └── legal-positions.ts        Grid intersection point legality computation
 │   │   ├── scoring/
 │   │   │   └── score-calculator.ts       S1/S2/K/TotalScore formula (mirrors backend)
-│   │   ├── tower/
-│   │   │   └── magic-candidates.ts       Function curve generation (polynomial/trig/log) for Magic tower
 │   │   └── formatters.ts           Centralised presentation formatters (formatScore, etc.)
 │   │
 │   ├── systems/                    ECS systems — pure update logic
@@ -178,7 +180,9 @@ frontend/
 │   ├── entities/
 │   │   ├── types.ts                Tower, Enemy, Projectile, Pet, TowerPreview interfaces (V2 fields)
 │   │   ├── TowerFactory.ts         Build towers from tower-defs; accepts optional talent modifiers
-│   │   └── EnemyFactory.ts         Build enemies from enemy-defs (V2: split/helper/boss config)
+│   │   ├── EnemyFactory.ts         Build enemies from enemy-defs (V2: split/helper/boss config)
+│   │   ├── PetFactory.ts           Build Pet projectile entities for the Calculus tower
+│   │   └── towers/                 Reserved for per-tower entity helpers
 │   │
 │   ├── math/
 │   │   ├── WasmBridge.ts           initWasm, RAII float buffers, JS fallbacks
@@ -191,6 +195,7 @@ frontend/
 │   │   ├── intersection-solver.ts  Pair/all-curves intersection finding with domain-safe evaluation
 │   │   ├── limit-evaluator.ts      Limit question generation with exhaustive outcome handling
 │   │   ├── chain-rule-generator.ts Chain rule question generation (pure, no game imports)
+│   │   ├── expressionParser.ts     Parser for user-entered math expressions (Calculus / function input)
 │   │   └── wasm/                   Compiled WASM assets (generated — do not edit)
 │   │       ├── math_engine.js
 │   │       ├── math_engine.wasm
@@ -514,7 +519,7 @@ npm install
 npm run dev        # Vite dev server at http://localhost:5173
 npm run build      # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
 npm run preview    # Preview the production build
-npm test           # Vitest — 26 test files
+npm test           # Vitest — 28 test files
 npm run test:watch # Vitest in watch mode
 ```
 
@@ -551,8 +556,9 @@ src/composables/useSessionSync.test.ts
 src/components/game/FunctionPanel.test.ts
 src/math/WasmBridge.test.ts                JS-only parity (fallback surface + numerical invariants)
 src/math/WasmBridge.wasm.test.ts           JS ↔ WASM parity under Node (requires math_engine.* built)
-src/systems/__tests__/*.test.ts            BuffSystem, BuffSystem.duration, CombatSystem, EconomySystem,
-                                           MovementSystem, TowerPlacementSystem, WaveSystem
+src/systems/__tests__/*.test.ts            BuffSystem, BuffSystem.duration, BuffSystem.effects,
+                                           CombatSystem, EconomySystem, MovementSystem,
+                                           TowerPlacementSystem, TowerUpgradeSystem, WaveSystem
 ```
 
 Vitest is configured with `happy-dom` so systems can be tested without a real browser. The WASM-bridge test files split responsibilities: `WasmBridge.test.ts` pins the JS fallback's behaviour without loading the binary, and `WasmBridge.wasm.test.ts` loads the compiled module under Node to assert numerical parity (skipped if the WASM build is absent).

@@ -122,18 +122,19 @@ backend/
 │   ├── test_auth_lockout.py               (3)  — per-account lockout window
 │   ├── test_token_denylist.py             (3)  — JWT JTI revocation after logout
 │   ├── test_game_session.py               (11)
-│   ├── test_leaderboard.py                (6)
+│   ├── test_leaderboard.py                (10)
 │   ├── test_session_aggregate.py          (30) — pure aggregate unit tests
 │   ├── test_value_objects.py              (15) — VO invariants
 │   ├── test_coverage_gaps.py              (12) — audit-driven edge cases
-│   ├── test_domain_invariants.py          (9)  — cross-aggregate invariant tests
+│   ├── test_domain_invariants.py          (10) — cross-aggregate invariant tests
 │   ├── test_shared_constants_parity.py    (3)  — Python ↔ shared/game-constants.json parity
+│   ├── test_score_verify.py               (4)  — server-side score recomputation vs client claim
 │   ├── test_achievement.py                (15) — achievement unlock / summary / isolation
 │   ├── test_talent.py                     (17) — talent tree allocate / reset / modifiers
 │   ├── test_class.py                      (21) — class CRUD, join, rename, student management
 │   ├── test_territory.py                  (36) — activity lifecycle, seize/counter-seize, cap, settlement
 │   └── test_avatar_parity.py              (1)  — backend ↔ frontend avatar whitelist parity
-│   # 187 tests total
+│   # 196 tests total
 │
 ├── requirements.txt
 └── Dockerfile
@@ -417,7 +418,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # all 187 tests
+pytest                                      # all 196 tests
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 pytest tests/test_territory.py -v           # territory integration tests
