@@ -19,6 +19,15 @@ export class CalculusTowerSystem {
   init(game: Game): void {
     this.destroy()
     this._unsubs.push(
+      game.eventBus.on(Events.TOWER_UPGRADED, ({ towerId }) => {
+        const tower = game.towers.find((t) => t.id === towerId)
+        if (tower && tower.type === TowerType.CALCULUS) this._respawnPets(tower, game)
+      }),
+      game.eventBus.on(Events.ACTIVE_BUFFS_CHANGED, () => {
+        for (const t of game.towers) {
+          if (t.type === TowerType.CALCULUS) this._respawnPets(t, game)
+        }
+      }),
       game.eventBus.on(Events.CALCULUS_OPERATION, (payload: {
         towerId: string
         presetIndex?: number
@@ -143,13 +152,31 @@ export class CalculusTowerSystem {
     tower.configured = true
     tower.disabled = false
 
+    this._respawnPets(tower, game)
+  }
+
+  private _respawnPets(tower: Tower, game: Game): void {
+    const state = tower.calculusState
+    if (!state || tower.disabled) return
+    if (state.coefficient === 0 || state.exponent === 0) return
+
     this._removePets(tower.id, game)
     const combinedMods = {
       ...tower.talentMods,
       pet_hp: (tower.talentMods['pet_hp'] ?? 0) + (tower.upgradeExtras?.['petHp'] ?? 0),
       pet_count: (tower.talentMods['pet_count'] ?? 0) + (tower.upgradeExtras?.['petCount'] ?? 0),
     }
-    const pets = spawnPets(tower.id, tower.x, tower.y, tower.effectiveRange, newCoeff, newExp, combinedMods)
+    const towerDmgMult = tower.damageBonus * tower.magicBuff
+    const pets = spawnPets(
+      tower.id,
+      tower.x,
+      tower.y,
+      tower.effectiveRange,
+      state.coefficient,
+      state.exponent,
+      combinedMods,
+      towerDmgMult,
+    )
     game.pets.push(...pets)
     for (const pet of pets) {
       game.eventBus.emit(Events.PET_SPAWNED, pet)
@@ -227,9 +254,7 @@ export class PetCombatSystem {
         pet.targetId = null
         continue
       }
-      const owner = game.towers.find(t => t.id === pet.ownerId)
-      if (!owner) continue
-      this._dealDamage(target, owner.effectiveDamage * pet.abilityMod, game)
+      this._dealDamage(target, pet.damage, game)
       if (!target.alive) pet.targetId = null
     }
   }

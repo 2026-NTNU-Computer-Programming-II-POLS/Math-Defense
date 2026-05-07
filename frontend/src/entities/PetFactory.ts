@@ -17,6 +17,7 @@ export function spawnPets(
   coefficient: number,
   exponent: number,
   mods: Record<string, number> = {},
+  towerDamageMultiplier = 1,
 ): Pet[] {
   if (coefficient === 0 || exponent === 0) return []
 
@@ -26,7 +27,7 @@ export function spawnPets(
   const count = (isInteger ? coefficient : 1) + bonusCount
   const abilityMod = isInteger ? 1 : Math.abs(coefficient)
 
-  const dmgMult = 1 + (mods['pet_damage'] ?? 0)
+  const dmgMult = (1 + (mods['pet_damage'] ?? 0)) * towerDamageMultiplier
   const speedMult = 1 - (mods['pet_attack_speed'] ?? 0)
   const hpMult = 1 + (mods['pet_hp'] ?? 0)
 

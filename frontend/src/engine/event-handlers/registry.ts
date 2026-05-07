@@ -141,6 +141,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   ],
   TOWER_UPGRADED: [
     { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Increment towerUpgradeTick to force TowerInfoPanel re-render' },
+    { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Respawn Calculus pets so upgrade extras and stat bonuses propagate' },
   ],
   TOWER_REFUND: [
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Refund tower cost and remove it' },
@@ -195,6 +196,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   // ── Active buffs mirror ──
   ACTIVE_BUFFS_CHANGED: [
     { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror active buffs to reactive store' },
+    { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Respawn Calculus pets so global tower-buff multipliers propagate to pet damage' },
   ],
 })
 
