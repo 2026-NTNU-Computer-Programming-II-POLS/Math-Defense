@@ -203,6 +203,11 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror active buffs to reactive store' },
     { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Respawn Calculus pets so global tower-buff multipliers propagate to pet damage' },
   ],
+
+  // ── Pedagogy ──
+  PRINCIPLE_SHOW: [
+    { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Surface principle overlay for the given principle id' },
+  ],
 })
 
 /**

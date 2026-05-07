@@ -94,7 +94,7 @@ function goToLeaderboard(): void {
                 :key="k"
                 class="chip"
               >
-                {{ k }} ∈ [{{ rng[0] }}, {{ rng[1] }}]
+                <template v-if="rng">{{ k }} ∈ [{{ rng[0] }}, {{ rng[1] }}]</template>
               </span>
             </dd>
           </template>

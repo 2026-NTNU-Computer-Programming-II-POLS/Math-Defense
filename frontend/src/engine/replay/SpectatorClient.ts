@@ -33,11 +33,13 @@ export interface SpectatorCallbacks {
 export class SpectatorClient {
   private _ws: WebSocket | null = null
   private _disposed = false
+  private readonly _sessionId: string
+  private readonly _cb: SpectatorCallbacks
 
-  constructor(
-    private readonly _sessionId: string,
-    private readonly _cb: SpectatorCallbacks,
-  ) {}
+  constructor(sessionId: string, cb: SpectatorCallbacks) {
+    this._sessionId = sessionId
+    this._cb = cb
+  }
 
   start(): void {
     if (this._ws || this._disposed) return
