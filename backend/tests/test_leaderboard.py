@@ -172,3 +172,75 @@ def test_class_leaderboard_only_includes_class_scores(client, db_session):
     player_names = [e["player_name"] for e in res.json()["entries"]]
     assert "s_lb_in" in player_names
     assert "s_lb_out" not in player_names
+
+
+# ── personal-best history (GET /api/leaderboard/me) ──────────────────────────
+
+
+def test_personal_history_requires_auth(client):
+    res = client.get("/api/leaderboard/me")
+    assert res.status_code == 401
+
+
+def test_personal_history_returns_only_own_data(client):
+    """user A submits two sessions; user B submits one — A's /me returns only A's two."""
+    token_a = _register_and_token(client, "pb_a")
+    token_b = _register_and_token(client, "pb_b")
+    _create_completed_session(client, token_a, score=400)
+    _create_completed_session(client, token_a, score=600)
+    _create_completed_session(client, token_b, score=999)
+
+    res = client.get("/api/leaderboard/me", headers=_auth_headers(token_a))
+    assert res.status_code == 200
+    entries = res.json()["entries"]
+    assert len(entries) == 2
+    scores = [e["score"] for e in entries]
+    assert sorted(scores) == [400, 600]
+    # 999 was submitted by user B; it must not leak into A's personal history
+    assert 999 not in scores
+
+
+def test_get_user_history_orders_by_completed_at_desc(client):
+    """Repo contract: history is newest-first so the timeline UI can render
+    directly. created_at must be non-increasing."""
+    token = _register_and_token(client, "pb_order")
+    _create_completed_session(client, token, score=300)
+    _create_completed_session(client, token, score=500)
+    _create_completed_session(client, token, score=400)
+
+    res = client.get("/api/leaderboard/me", headers=_auth_headers(token))
+    assert res.status_code == 200
+    entries = res.json()["entries"]
+    assert len(entries) == 3
+    timestamps = [e["created_at"] for e in entries]
+    assert timestamps == sorted(timestamps, reverse=True)
+
+
+def test_personal_history_marks_personal_bests(client):
+    """A submission is a PB iff it strictly exceeds every prior submission's
+    score (chronologically). The first submission is always a PB."""
+    token = _register_and_token(client, "pb_marks")
+    _create_completed_session(client, token, score=300)  # PB (first)
+    _create_completed_session(client, token, score=200)  # not a PB
+    _create_completed_session(client, token, score=500)  # PB
+
+    res = client.get("/api/leaderboard/me", headers=_auth_headers(token))
+    assert res.status_code == 200
+    entries = res.json()["entries"]
+    by_score = {e["score"]: e["is_personal_best"] for e in entries}
+    assert by_score == {500: True, 200: False, 300: True}
+
+
+def test_personal_history_filters_by_level(client):
+    """Level filter scopes the timeline so other levels are excluded."""
+    token = _register_and_token(client, "pb_level")
+    _create_completed_session(client, token, level=1, score=300, waves_survived=3)
+    # Level 2's wave cap is 4 — keep within the per-level ceiling
+    _create_completed_session(client, token, level=2, score=999, kills=50, waves_survived=4)
+
+    res = client.get("/api/leaderboard/me?level=1", headers=_auth_headers(token))
+    assert res.status_code == 200
+    entries = res.json()["entries"]
+    assert len(entries) == 1
+    assert entries[0]["level"] == 1
+    assert entries[0]["score"] == 300

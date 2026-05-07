@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
 import { sessionService } from '@/services/sessionService'
+import { achievementService } from '@/services/achievementService'
 import { ApiError } from '@/services/api'
 import { Events, GamePhase } from '@/data/constants'
 import type { Game, WaveEndSnapshot } from '@/engine/Game'
@@ -10,6 +11,28 @@ import { calculateScore } from '@/domain/scoring/score-calculator'
 const MAX_CREATE_RETRIES = 2
 const RETRY_DELAY_MS = 1000
 const UPDATE_FAIL_ALERT_THRESHOLD = 3
+
+// Backlog §23 — ChallengeView.vue writes the active challenge id here before
+// navigating to /level-select; this composable reads it on session creation
+// and clears it after a successful create. Kept in sessionStorage rather than
+// a Pinia store so a hard reload mid-flow drops the binding cleanly.
+const CHALLENGE_ID_STORAGE_KEY = 'mg_active_challenge_id'
+
+function readActiveChallengeId(): string | null {
+  try {
+    return sessionStorage.getItem(CHALLENGE_ID_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function clearActiveChallengeId(): void {
+  try {
+    sessionStorage.removeItem(CHALLENGE_ID_STORAGE_KEY)
+  } catch {
+    // sessionStorage may be unavailable in private mode; non-critical.
+  }
+}
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -27,6 +50,15 @@ export function useSessionSync() {
   const lastCompletedSessionId = ref<string | null>(null)
   const syncing = ref(false)
   const newlyUnlockedAchievements = ref<UnlockedAchievement[]>([])
+  // Backlog §20 — mirrors the server-confirmed practice_mode flag on the
+  // active session. GameView reads this to render the practice badge during
+  // WAVE/BUILD; ScoreResultView reads it to show the leaderboard-ineligible
+  // notice on the run summary.
+  const isPracticeMode = ref(false)
+  // Backlog §23 — non-null when the run was launched from a challenge deep-
+  // link. ScoreResultView reads this to surface a "View challenge ranking"
+  // CTA instead of the global leaderboard link.
+  const activeChallengeId = ref<string | null>(null)
   let pendingLevel: number | null = null
   let createGeneration = 0
   let sessionGeneration = 0
@@ -41,10 +73,17 @@ export function useSessionSync() {
     for (let attempt = 0; attempt <= MAX_CREATE_RETRIES; attempt++) {
       if (gen !== createGeneration) return null
       try {
+        const challengeId = readActiveChallengeId()
         const session = await sessionService.create(
           game.state.starRating,
           undefined,
           game.state.initialAnswer === 1,
+          uiStore.sliderFallbackEnabled,
+          challengeId,
+          // Backlog §24 — persist the seed so a Replay can reconstruct the
+          // exact same RNG stream when re-driving the engine against the
+          // recorded event log.
+          game.seed,
         )
         if (gen !== createGeneration) {
           sessionService.abandon(session.id).catch((err) =>
@@ -52,6 +91,13 @@ export function useSessionSync() {
           )
           return null
         }
+        // Reflect the server-confirmed flag (server is authoritative — it
+        // could in principle reject practice_mode for a tournament account).
+        isPracticeMode.value = !!session.practice_mode
+        activeChallengeId.value = session.challenge_id ?? null
+        // Single-shot: a successful create consumes the stored challenge_id so
+        // the next freshly-launched run isn't accidentally tagged.
+        clearActiveChallengeId()
         return session.id
       } catch (e) {
         console.warn(`[SessionSync] Create attempt ${attempt + 1} failed:`, e)
@@ -86,6 +132,7 @@ export function useSessionSync() {
     unsubs.push(game.eventBus.on(Events.LEVEL_START, async (levelNum) => {
       if (!authStore.isLoggedIn) return
       sessionId.value = null
+      isPracticeMode.value = false
       pendingLevel = levelNum as number
       const gen = ++createGeneration
       const id = await createSessionWithRetry(pendingLevel, gen, game)
@@ -202,6 +249,9 @@ export function useSessionSync() {
       })
       if (result.newly_unlocked_achievements?.length) {
         newlyUnlockedAchievements.value = result.newly_unlocked_achievements
+        // Drop the cached unlocked-id set so panels (e.g. MagicModePanel's
+        // curve-family gate) see freshly-unlocked achievements on next read.
+        achievementService.invalidateUnlockedIds()
       }
       lastCompletedSessionId.value = id
       sessionId.value = null
@@ -211,5 +261,14 @@ export function useSessionSync() {
     }
   }
 
-  return { sessionId, lastCompletedSessionId, newlyUnlockedAchievements, bind }
+  return {
+    sessionId,
+    lastCompletedSessionId,
+    newlyUnlockedAchievements,
+    isPracticeMode,
+    activeChallengeId,
+    bind,
+  }
 }
+
+export { CHALLENGE_ID_STORAGE_KEY }

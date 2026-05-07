@@ -2,6 +2,7 @@
 import pytest
 from datetime import datetime, timedelta, UTC
 
+from app.domain.errors import DomainValueError
 from app.domain.value_objects import SessionStatus, Level, Score, GameResult
 from app.domain.session.aggregate import (
     GameSession,
@@ -49,6 +50,14 @@ class TestCreate:
         session = GameSession.create("user-1", Level(1))
         session.clear_events()
         assert session.collect_events() == []
+
+    def test_create_defaults_practice_mode_false(self):
+        session = GameSession.create("user-1", Level(1))
+        assert session.practice_mode is False
+
+    def test_create_with_practice_mode(self):
+        session = GameSession.create("user-1", Level(1), practice_mode=True)
+        assert session.practice_mode is True
 
 
 # ── Update progress ──
@@ -289,3 +298,51 @@ class TestForbiddenTransitionMatrix:
         session = GameSession(id="s-1", user_id="u-1", level=Level(1))
         session._transition_to(SessionStatus.ABANDONED)
         assert session.status == SessionStatus.ABANDONED
+
+
+# ── Reflection (Articulation Prompt, spec §2) ──
+
+class TestRecordReflection:
+    def _completed(self) -> GameSession:
+        s = GameSession.create("u-1", Level(1))
+        s.complete(GameResult(Score(100), kills=1, waves_survived=1))
+        return s
+
+    def test_attach_reflection_on_completed(self):
+        s = self._completed()
+        s.record_reflection("I focused on chokepoints.")
+        assert s.reflection_text == "I focused on chokepoints."
+
+    def test_reflection_rejected_on_active(self):
+        s = GameSession.create("u-1", Level(1))
+        with pytest.raises(SessionNotActiveError):
+            s.record_reflection("anything")
+
+    def test_reflection_rejected_on_abandoned(self):
+        s = GameSession.create("u-1", Level(1))
+        s.abandon()
+        with pytest.raises(SessionNotActiveError):
+            s.record_reflection("anything")
+
+    def test_reflection_overwrites_previous(self):
+        s = self._completed()
+        s.record_reflection("first")
+        s.record_reflection("second")
+        assert s.reflection_text == "second"
+
+    def test_empty_reflection_clears_text(self):
+        s = self._completed()
+        s.record_reflection("first")
+        s.record_reflection("   ")  # whitespace == skip
+        assert s.reflection_text is None
+
+    def test_reflection_too_long_raises(self):
+        s = self._completed()
+        with pytest.raises(DomainValueError):
+            s.record_reflection("a" * (GameSession.REFLECTION_MAX_LENGTH + 1))
+
+    def test_reflection_at_max_length_allowed(self):
+        s = self._completed()
+        text = "a" * GameSession.REFLECTION_MAX_LENGTH
+        s.record_reflection(text)
+        assert s.reflection_text == text

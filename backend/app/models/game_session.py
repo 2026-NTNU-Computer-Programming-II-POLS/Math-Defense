@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, Index, CheckConstraint, text, Enum as SAEnum
+from sqlalchemy import BigInteger, String, Integer, Float, Boolean, DateTime, ForeignKey, Index, CheckConstraint, text, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
@@ -25,9 +25,19 @@ class GameSession(Base):
     user_id: Mapped[str] = mapped_column(
         String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
     )
+    # Backlog §23 — set when this session was launched from a challenge deep-link.
+    # ON DELETE SET NULL so soft-deleting a challenge doesn't cascade to history.
+    challenge_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("challenges.id", ondelete="SET NULL"), nullable=True,
+    )
     star_rating: Mapped[int] = mapped_column(Integer, nullable=False)
     path_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     initial_answer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Backlog §20 — slider-fallback / practice mode flag. Server filters these
+    # out of the global leaderboard but still awards achievements & talent points.
+    practice_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false"),
+    )
     status: Mapped[str] = mapped_column(
         SAEnum(SessionStatus, values_callable=lambda e: [m.value for m in e]),
         default=SessionStatus.ACTIVE.value,
@@ -45,5 +55,14 @@ class GameSession(Base):
     health_final: Mapped[int | None] = mapped_column(Integer, nullable=True)
     time_exclude_prepare: Mapped[list | None] = mapped_column(JSON, nullable=True)
     total_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reflection_text: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    # Backlog §24 — per-session deterministic RNG seed forwarded by the client
+    # at session creation. Persisted so the Replay/Spectate playback can rebuild
+    # the same mulberry32 stream and re-drive the engine against the stored
+    # session_events log. BigInteger because the client emits a 32-bit unsigned
+    # value (Date.now() & 0xffffffff in fallback paths) that does not fit in a
+    # SQL INTEGER on every backend dialect; nullable for legacy rows and for
+    # callers that don't support replay.
+    rng_seed: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

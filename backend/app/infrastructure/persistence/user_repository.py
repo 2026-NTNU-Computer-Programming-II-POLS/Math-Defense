@@ -56,6 +56,7 @@ class SqlAlchemyUserRepository:
             row.totp_secret = user.totp_secret
             row.mfa_enabled = user.mfa_enabled
             row.totp_last_used_at = user.totp_last_used_at
+            row.ia_recent_accuracy = user.ia_recent_accuracy
         else:
             row = UserModel(
                 id=user.id,
@@ -71,6 +72,7 @@ class SqlAlchemyUserRepository:
                 totp_secret=user.totp_secret,
                 mfa_enabled=user.mfa_enabled,
                 totp_last_used_at=user.totp_last_used_at,
+                ia_recent_accuracy=user.ia_recent_accuracy,
             )
             self._db.add(row)
         self._flush()
@@ -99,6 +101,7 @@ class SqlAlchemyUserRepository:
             totp_secret=row.totp_secret,
             mfa_enabled=row.mfa_enabled if row.mfa_enabled is not None else False,
             totp_last_used_at=_ensure_utc(row.totp_last_used_at),
+            ia_recent_accuracy=row.ia_recent_accuracy if row.ia_recent_accuracy is not None else 0.0,
         )
 
 

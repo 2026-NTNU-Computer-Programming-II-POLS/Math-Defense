@@ -3,9 +3,14 @@
  * MatrixInputPanel — 2×2 matrix visual input
  * Arranges 4 input fields in matrix layout and displays the determinant live.
  * Calls WasmBridge.matrixMultiply() to compute the transform preview.
+ *
+ * Backlog §20 — when uiStore.sliderFallbackEnabled is true, swaps the typed
+ * number inputs for range sliders. Same -5..5 bounds, same emit shape, so
+ * the parent MatrixTowerSystem treats both modes identically.
  */
 import { computed } from 'vue'
 import { matrixMultiply } from '@/math/WasmBridge'
+import { useUiStore } from '@/stores/uiStore'
 
 const props = defineProps<{
   params: Record<string, number>
@@ -14,6 +19,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update', key: string, value: number): void
 }>()
+
+const uiStore = useUiStore()
+const sliderFallback = computed(() => uiStore.sliderFallbackEnabled)
 
 const det = computed(() => {
   const { a00 = 1, a01 = 0, a10 = 0, a11 = 1 } = props.params
@@ -52,6 +60,18 @@ const fields = [
       <div class="matrix-cells">
         <div v-for="field in fields" :key="field.key" class="matrix-cell">
           <input
+            v-if="sliderFallback"
+            type="range"
+            class="matrix-slider"
+            :aria-label="`Matrix row ${field.row + 1} column ${field.col + 1} (${field.label})`"
+            :value="params[field.key] ?? (field.key === 'a00' || field.key === 'a11' ? 1 : 0)"
+            min="-5"
+            max="5"
+            step="0.1"
+            @input="onInput(field.key, $event)"
+          />
+          <input
+            v-else
             type="number"
             class="rune-input matrix-input"
             :aria-label="`Matrix row ${field.row + 1} column ${field.col + 1} (${field.label})`"
@@ -62,6 +82,9 @@ const fields = [
             @input="onInput(field.key, $event)"
           />
           <span class="cell-label">{{ field.label }}</span>
+          <span v-if="sliderFallback" class="cell-value">
+            {{ (params[field.key] ?? (field.key === 'a00' || field.key === 'a11' ? 1 : 0)).toFixed(1) }}
+          </span>
         </div>
       </div>
       <span class="bracket right">]</span>
@@ -137,10 +160,22 @@ const fields = [
   font-size: 13px;
 }
 
+.matrix-slider {
+  width: 60px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
 .cell-label {
   font-size: 9px;
   color: var(--gold);
   font-style: italic;
+}
+
+.cell-value {
+  font-size: 10px;
+  color: #e8dcc8;
+  font-family: var(--font-mono);
 }
 
 .matrix-info {

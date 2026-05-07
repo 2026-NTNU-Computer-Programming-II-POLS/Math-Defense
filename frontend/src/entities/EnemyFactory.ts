@@ -59,6 +59,8 @@ export function createEnemy(
 
     chainRuleTriggered: false,
     chainRuleAnsweredCorrectly: null,
+    // Sampled by EnemyAbilitySystem on ENEMY_SPAWNED if def.triggerHpRange exists.
+    chainRuleTriggerFraction: 0,
 
     slowFactor: 0,
     slowTimer: 0,

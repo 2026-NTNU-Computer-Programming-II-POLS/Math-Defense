@@ -46,3 +46,21 @@ class LeaderboardResponse(BaseModel):
 
     entries: list[LeaderboardEntryOut]
     total: int
+
+
+class PersonalHistoryEntryOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    level: int
+    score: int
+    kills: int
+    waves_survived: int
+    created_at: datetime
+    is_personal_best: bool
+
+
+class PersonalHistoryOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    entries: list[PersonalHistoryEntryOut]

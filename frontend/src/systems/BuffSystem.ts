@@ -126,7 +126,8 @@ const effectStrategies: Record<string, EffectFn> = {
   DISABLE_RANDOM_TOWER: (g) => {
     const active = g.towers.filter((t) => !t.disabled)
     if (active.length > 0) {
-      active[Math.floor(Math.random() * active.length)].disabled = true
+      // game.rng (seeded) keeps this deterministic for replay (Backlog §24).
+      active[Math.floor(g.rng() * active.length)].disabled = true
     }
   },
   ENABLE_DISABLED_TOWER: (g) => {

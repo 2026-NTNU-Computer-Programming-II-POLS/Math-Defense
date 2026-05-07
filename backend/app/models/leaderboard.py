@@ -13,6 +13,7 @@ class LeaderboardEntry(Base):
         Index("ix_leaderboard_level_score", "level", "score"),
         Index("ix_leaderboard_score", "score"),
         Index("ix_leaderboard_created_at", "created_at"),
+        Index("ix_leaderboard_challenge_id", "challenge_id"),
         CheckConstraint("level BETWEEN 1 AND 5", name="ck_leaderboard_level_range"),
     )
 
@@ -25,4 +26,9 @@ class LeaderboardEntry(Base):
     kills: Mapped[int] = mapped_column(Integer, nullable=False)
     waves_survived: Mapped[int] = mapped_column(Integer, nullable=False)
     session_id: Mapped[str | None] = mapped_column(String, ForeignKey("game_sessions.id", ondelete="SET NULL"), nullable=True)
+    # Backlog §23 — non-NULL when entry comes from a challenge run; queried via
+    # query_ranked_by_challenge so global / per-level leaderboards still work.
+    challenge_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("challenges.id", ondelete="SET NULL"), nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

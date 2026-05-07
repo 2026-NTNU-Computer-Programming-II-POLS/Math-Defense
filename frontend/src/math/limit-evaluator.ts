@@ -103,6 +103,31 @@ function generateDistractors(correct: LimitResult, rng: () => number): LimitResu
   return choices
 }
 
+// Star ≥ 4 typed-entry parser. Accepts ±inf / infinity, integers, decimals, DNE.
+// Whitespace tolerant, case-insensitive. Returns the full LimitResult so the
+// caller can compare value (not just outcome) against the canonical answer.
+export function parseLimitAnswer(input: string): LimitResult | null {
+  const raw = input.trim().toLowerCase()
+  if (!raw) return null
+
+  if (raw === 'dne') return { outcome: 'constant', value: 0 }
+
+  if (raw === '+inf' || raw === 'inf' || raw === '+infinity' || raw === 'infinity') {
+    return { outcome: '+inf', value: Infinity }
+  }
+  if (raw === '-inf' || raw === '-infinity') {
+    return { outcome: '-inf', value: -Infinity }
+  }
+
+  // Strip a leading '+' so Number('+3') and Number('3') behave the same.
+  const num = Number(raw.replace(/^\+/, ''))
+  if (!Number.isFinite(num)) return null
+
+  if (num === 0) return { outcome: 'zero', value: 0 }
+  if (num > 0) return { outcome: '+c', value: num }
+  return { outcome: '-c', value: num }
+}
+
 export function outcomeLabel(r: LimitResult): string {
   switch (r.outcome) {
     case '+inf': return '+∞ (max damage)'

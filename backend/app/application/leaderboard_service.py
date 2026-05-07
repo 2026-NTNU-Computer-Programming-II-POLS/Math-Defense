@@ -14,7 +14,7 @@ from app.domain.errors import (
 )
 from app.domain.value_objects import Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
-from app.domain.leaderboard.view import RankedLeaderboardEntry
+from app.domain.leaderboard.view import PersonalHistoryEntry, RankedLeaderboardEntry
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
@@ -42,12 +42,51 @@ class LeaderboardApplicationService:
         page: int,
         per_page: int,
         class_id: str | None = None,
+        challenge_id: str | None = None,
     ) -> tuple[list[RankedLeaderboardEntry], int]:
+        if challenge_id is not None:
+            return self._leaderboard_repo.query_ranked_by_challenge(
+                challenge_id, page, per_page
+            )
         if class_id is not None:
             return self._leaderboard_repo.query_ranked_by_class(class_id, page, per_page)
         if level is None:
             return self._leaderboard_repo.query_ranked_global(page, per_page)
         return self._leaderboard_repo.query_ranked_by_level(level, page, per_page)
+
+    def get_user_history(
+        self,
+        user_id: str,
+        level: int | None = None,
+    ) -> list[PersonalHistoryEntry]:
+        """Personal-best timeline: every entry the user has, newest first,
+        with an ``is_personal_best`` flag set on entries that beat every
+        prior submission (within the same level filter, if any).
+
+        The repository returns rows in DESC order for caller convenience;
+        we walk them in chronological (ASC) order to compute the rolling
+        max, then re-emit in the original DESC order.
+        """
+        history = self._leaderboard_repo.get_user_history(user_id, level)
+        chronological = list(reversed(history))
+        running_best = -1
+        pb_ids: set[str] = set()
+        for entry in chronological:
+            if entry.score.value > running_best:
+                running_best = entry.score.value
+                pb_ids.add(entry.id)
+        return [
+            PersonalHistoryEntry(
+                id=entry.id,
+                level=int(entry.level),
+                score=entry.score.value,
+                kills=entry.kills,
+                waves_survived=entry.waves_survived,
+                created_at=entry.created_at,
+                is_personal_best=entry.id in pb_ids,
+            )
+            for entry in history
+        ]
 
     def submit_score(
         self,
@@ -69,6 +108,11 @@ class LeaderboardApplicationService:
                 raise PermissionDeniedError("Not authorized to access this session")
             if session.status != SessionStatus.COMPLETED:
                 raise SessionValidationError("Session is not completed")
+            # Backlog §20: practice-mode sessions are leaderboard-ineligible.
+            if getattr(session, "practice_mode", False):
+                raise SessionValidationError(
+                    "Practice-mode sessions are not eligible for the leaderboard"
+                )
 
             # Cross-validate client-reported ancillary stats against server
             # state. `score` and `level` are taken directly from the session

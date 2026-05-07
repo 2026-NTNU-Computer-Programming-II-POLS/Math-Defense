@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 
 from app.domain.achievement.aggregate import UserAchievement
-from app.domain.achievement.definitions import ACHIEVEMENT_DEFS, get_all_defs
+from app.domain.achievement.definitions import ACHIEVEMENT_DEFS, AchievementDef, get_all_defs
 from app.domain.achievement import policy as achievement_policy
+from app.domain.season.aggregate import Season
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
     from app.domain.achievement.repository import AchievementRepository
+    from app.domain.season.repository import SeasonRepository
     from app.domain.session.repository import GameSessionRepository, CumulativeStats
 
 logger = logging.getLogger(__name__)
@@ -22,15 +25,20 @@ class AchievementApplicationService:
         achievement_repo: AchievementRepository,
         session_repo: GameSessionRepository,
         uow: UnitOfWork,
+        season_repo: SeasonRepository | None = None,
     ) -> None:
         self._achievement_repo = achievement_repo
         self._session_repo = session_repo
         self._uow = uow
+        self._season_repo = season_repo
 
     def get_all_for_user(self, user_id: str) -> list[dict]:
         unlocked = {a.achievement_id: a for a in self._achievement_repo.find_by_user(user_id)}
+        seasons_by_id = self._load_seasons()
+        now = datetime.now(UTC)
         result = []
         for d in get_all_defs():
+            season_info = self._season_info_for_def(d, seasons_by_id, now)
             result.append({
                 "id": d.id,
                 "name": d.name,
@@ -39,6 +47,17 @@ class AchievementApplicationService:
                 "talent_points": d.talent_points,
                 "unlocked": d.id in unlocked,
                 "unlocked_at": unlocked[d.id].unlocked_at.isoformat() if d.id in unlocked else None,
+                "season_id": d.season_id,
+                "season_active": season_info["active"] if season_info else False,
+                "season_starts_at": (
+                    season_info["starts_at"].isoformat()
+                    if season_info and season_info["starts_at"] else None
+                ),
+                "season_ends_at": (
+                    season_info["ends_at"].isoformat()
+                    if season_info and season_info["ends_at"] else None
+                ),
+                "season_name": season_info["name"] if season_info else None,
             })
         return result
 
@@ -68,6 +87,8 @@ class AchievementApplicationService:
     ) -> list[UserAchievement]:
         unlocked_ids = {a.achievement_id for a in self._achievement_repo.find_by_user(user_id)}
         stats = self._session_repo.get_cumulative_stats(user_id)
+        seasons_by_id = self._load_seasons()
+        now = datetime.now(UTC)
         newly_unlocked: list[UserAchievement] = []
 
         for d in get_all_defs():
@@ -78,9 +99,66 @@ class AchievementApplicationService:
                 session_star, session_hp_lost, session_gold_remaining,
                 territories_held, territory_max_star,
             ):
-                achievement = UserAchievement.create(user_id, d.id, d.talent_points)
+                points = self._award_points(d, seasons_by_id, now)
+                achievement = UserAchievement.create(user_id, d.id, points)
                 self._achievement_repo.save(achievement)
                 newly_unlocked.append(achievement)
-                logger.info("Achievement unlocked: user=%s achievement=%s", user_id, d.id)
+                logger.info(
+                    "Achievement unlocked: user=%s achievement=%s points=%d (base=%d)",
+                    user_id, d.id, points, d.talent_points,
+                )
 
         return newly_unlocked
+
+    def _load_seasons(self) -> dict[str, Season]:
+        if self._season_repo is None:
+            return {}
+        return {s.season_id: s for s in self._season_repo.find_all()}
+
+    def _award_points(
+        self, d: AchievementDef, seasons_by_id: dict[str, Season], now: datetime
+    ) -> int:
+        if self._is_season_active(d, seasons_by_id, now):
+            return d.talent_points * Season.SEASON_REWARD_MULTIPLIER
+        return d.talent_points
+
+    @staticmethod
+    def _is_season_active(
+        d: AchievementDef, seasons_by_id: dict[str, Season], now: datetime
+    ) -> bool:
+        if d.season_id is None:
+            return False
+        admin = seasons_by_id.get(d.season_id)
+        if admin is not None:
+            return admin.is_active(now)
+        if d.season_starts_at is not None and d.season_ends_at is not None:
+            return d.season_starts_at <= now < d.season_ends_at
+        return False
+
+    @staticmethod
+    def _season_info_for_def(
+        d: AchievementDef, seasons_by_id: dict[str, Season], now: datetime
+    ) -> dict | None:
+        if d.season_id is None:
+            return None
+        admin = seasons_by_id.get(d.season_id)
+        if admin is not None:
+            return {
+                "active": admin.is_active(now),
+                "starts_at": admin.starts_at,
+                "ends_at": admin.ends_at,
+                "name": admin.name,
+            }
+        if d.season_starts_at is not None and d.season_ends_at is not None:
+            return {
+                "active": d.season_starts_at <= now < d.season_ends_at,
+                "starts_at": d.season_starts_at,
+                "ends_at": d.season_ends_at,
+                "name": d.season_id,
+            }
+        return {
+            "active": False,
+            "starts_at": None,
+            "ends_at": None,
+            "name": d.season_id,
+        }

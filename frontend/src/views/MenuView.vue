@@ -46,6 +46,8 @@ const auth = useAuthStore()
 
     <footer class="menu-footer">
       <span>程式設計（二）期末專題 · 2026</span>
+      <span class="menu-footer-sep">·</span>
+      <a class="menu-footer-link" href="#" @click.prevent="router.push({ name: 'about' })">無障礙聲明</a>
     </footer>
   </div>
 </template>
@@ -117,5 +119,20 @@ const auth = useAuthStore()
   font-size: 10px;
   color: var(--grid-line);
   letter-spacing: 2px;
+}
+
+.menu-footer-sep {
+  margin: 0 6px;
+}
+
+.menu-footer-link {
+  color: var(--grid-line);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.menu-footer-link:hover,
+.menu-footer-link:focus-visible {
+  color: var(--gold);
 }
 </style>

@@ -24,6 +24,9 @@ class SessionCompleted:
     kills: int
     waves_survived: int
     total_score: float | None = None
+    # Backlog §23: when set, the leaderboard entry is tagged with this id so
+    # it ranks under the challenge-specific view, not the global / per-level one.
+    challenge_id: str | None = None
 
 
 @dataclass(frozen=True)

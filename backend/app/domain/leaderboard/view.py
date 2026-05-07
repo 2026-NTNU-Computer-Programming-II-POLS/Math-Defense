@@ -21,3 +21,17 @@ class RankedLeaderboardEntry:
     kills: int
     waves_survived: int
     created_at: datetime
+
+
+@dataclass(frozen=True)
+class PersonalHistoryEntry:
+    """Personal-best timeline view — like a leaderboard entry without rank,
+    but with an ``is_personal_best`` flag computed chronologically by the
+    application service (rolling max over scores in submission order)."""
+    id: str
+    level: int
+    score: int
+    kills: int
+    waves_survived: int
+    created_at: datetime
+    is_personal_best: bool

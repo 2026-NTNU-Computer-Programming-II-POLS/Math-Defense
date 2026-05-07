@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
-from app.factories import build_class_service
+from app.factories import build_class_service, build_session_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, require_role
 from app.schemas.class_ import (
     AddStudentRequest,
     ClassOut,
     ClassOutStudent,
+    ClassReflectionOut,
     CreateClassRequest,
     JoinClassRequest,
     MembershipOut,
@@ -153,6 +154,35 @@ def list_students(
 ):
     pairs = build_class_service(db).list_students_with_users(class_id, user.id, user.role)
     return [_membership_out(m, u) for m, u in pairs]
+
+
+@router.get("/{class_id}/reflections", response_model=list[ClassReflectionOut])
+@limiter.limit("30/minute")
+def list_class_reflections(
+    request: Request,
+    class_id: str,
+    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    pairs = build_class_service(db).list_students_with_users(class_id, user.id, user.role)
+    student_users = {m.student_id: u for m, u in pairs}
+    if not student_users:
+        return []
+    sessions = build_session_service(db).list_reflections_for_users(
+        list(student_users.keys())
+    )
+    return [
+        ClassReflectionOut(
+            session_id=s.id,
+            student_id=s.user_id,
+            student_name=(student_users[s.user_id].player_name if student_users.get(s.user_id) else ""),
+            star_rating=int(s.level),
+            score=s.score,
+            reflection_text=s.reflection_text or "",
+            ended_at=s.ended_at,
+        )
+        for s in sessions
+    ]
 
 
 @router.post("/{class_id}/regenerate-code", response_model=dict)

@@ -17,6 +17,10 @@ export interface MeResponse {
   player_name: string
   role: string
   avatar_url: string | null
+  is_email_verified?: boolean
+  mfa_enabled?: boolean
+  ia_unlock_earned?: boolean
+  ia_recent_accuracy?: number
 }
 
 export const authService = {

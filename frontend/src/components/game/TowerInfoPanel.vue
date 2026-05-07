@@ -217,6 +217,10 @@ const showTargetingMode = computed(() => {
     </div>
 
     <p class="math-concept">{{ towerDef.mathConcept }}</p>
+    <p class="exam-relevance">
+      <span class="exam-label">On the exam</span>
+      {{ towerDef.examRelevance }}
+    </p>
 
     <!-- Type-specific panels -->
     <MagicModePanel v-if="tower.type === TowerType.MAGIC" :tower-id="tower.id" />
@@ -365,6 +369,25 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
 .bd-total > span:last-child { color: var(--gold-bright); font-weight: bold; }
 
 .math-concept { font-size: 10px; color: var(--axis); letter-spacing: 1px; margin: 0; }
+.exam-relevance {
+  font-size: 10px;
+  color: #c8b894;
+  line-height: 1.45;
+  margin: 0;
+  padding: 6px 8px;
+  background: rgba(255, 215, 0, 0.06);
+  border-left: 2px solid var(--gold);
+  border-radius: 0 4px 4px 0;
+}
+.exam-label {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: bold;
+}
 
 .panel-actions { display: flex; gap: 8px; }
 .refund-btn {

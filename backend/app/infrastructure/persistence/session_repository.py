@@ -83,6 +83,7 @@ class SqlAlchemySessionRepository:
             row.health_final = session.health_final
             row.time_exclude_prepare = session.time_exclude_prepare
             row.total_score = session.total_score
+            row.reflection_text = session.reflection_text
             row.ended_at = ended_at
         else:
             row = GameSessionModel(
@@ -90,6 +91,9 @@ class SqlAlchemySessionRepository:
                 user_id=session.user_id,
                 star_rating=int(session.level),
                 initial_answer=session.initial_answer,
+                practice_mode=session.practice_mode,
+                challenge_id=session.challenge_id,
+                rng_seed=session.rng_seed,
                 path_config=session.path_config,
                 status=session.status.value,
                 current_wave=session.current_wave,
@@ -105,6 +109,7 @@ class SqlAlchemySessionRepository:
                 health_final=session.health_final,
                 time_exclude_prepare=session.time_exclude_prepare,
                 total_score=session.total_score,
+                reflection_text=session.reflection_text,
                 started_at=started_at,
                 ended_at=ended_at,
             )
@@ -114,6 +119,56 @@ class SqlAlchemySessionRepository:
     def save_all(self, sessions: list[GameSession]) -> None:
         for s in sessions:
             self.save(s)
+
+    def find_reflections_for_users(
+        self, user_ids: list[str], limit: int = 100
+    ) -> list[GameSession]:
+        if not user_ids:
+            return []
+        rows = (
+            self._db.query(GameSessionModel)
+            .filter(
+                GameSessionModel.user_id.in_(user_ids),
+                GameSessionModel.status == SessionStatus.COMPLETED.value,
+                GameSessionModel.reflection_text.isnot(None),
+            )
+            .order_by(GameSessionModel.ended_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [self._to_domain(r) for r in rows]
+
+    def compute_ia_recent_accuracy(self, user_id: str, window: int = 10) -> float:
+        # Last ``window`` completed sessions ordered by ended_at DESC, with
+        # started_at as a tiebreaker so rapid sequential ends (microsecond
+        # collisions in tests, clock skew on retries) still order in the
+        # direction of "more recent first". Empty history returns 0.0 so
+        # new players see full label scaffolding.
+        rows = (
+            self._db.query(GameSessionModel.initial_answer)
+            .filter(
+                GameSessionModel.user_id == user_id,
+                GameSessionModel.status == SessionStatus.COMPLETED.value,
+            )
+            .order_by(
+                GameSessionModel.ended_at.desc(),
+                GameSessionModel.started_at.desc(),
+            )
+            .limit(window)
+            .all()
+        )
+        if not rows:
+            return 0.0
+        correct = sum(1 for r in rows if bool(r[0]))
+        return correct / len(rows)
+
+    def has_correct_ia_session(self, user_id: str) -> bool:
+        # initial_answer is a Boolean column set once at creation; status is
+        # not part of the predicate (see protocol docstring for rationale).
+        return self._db.query(GameSessionModel.id).filter(
+            GameSessionModel.user_id == user_id,
+            GameSessionModel.initial_answer.is_(True),
+        ).first() is not None
 
     def get_cumulative_stats(self, user_id: str) -> CumulativeStats:
         completed = SessionStatus.COMPLETED.value
@@ -157,6 +212,9 @@ class SqlAlchemySessionRepository:
             kills=row.kills,
             waves_survived=row.waves_survived,
             initial_answer=bool(row.initial_answer),
+            practice_mode=bool(row.practice_mode),
+            challenge_id=row.challenge_id,
+            rng_seed=row.rng_seed,
             started_at=_ensure_utc(row.started_at),
             ended_at=_ensure_utc(row.ended_at),
         )
@@ -168,6 +226,7 @@ class SqlAlchemySessionRepository:
         session.health_final = row.health_final
         session.time_exclude_prepare = row.time_exclude_prepare
         session.total_score = row.total_score
+        session.reflection_text = row.reflection_text
         return session
 
 

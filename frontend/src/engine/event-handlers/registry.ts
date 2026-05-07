@@ -33,16 +33,18 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
 > = Object.freeze({
   // ── Phase / lifecycle ──
   PHASE_CHANGED: [
-    { module: 'stores/gameStore',             handler: 'anonymous', purpose: 'Mirror phase into reactive store' },
-    { module: 'composables/useSessionSync',   handler: 'anonymous', purpose: 'Detect game-over transition' },
-    { module: 'systems/TowerPlacementSystem', handler: 'anonymous', purpose: 'Clear placement preview on phase change' },
+    { module: 'stores/gameStore',                  handler: 'anonymous', purpose: 'Mirror phase into reactive store' },
+    { module: 'composables/useSessionSync',        handler: 'anonymous', purpose: 'Detect game-over transition' },
+    { module: 'systems/TowerPlacementSystem',      handler: 'anonymous', purpose: 'Clear placement preview on phase change' },
+    { module: 'composables/useKeyboardPlacement',  handler: 'anonymous', purpose: 'Show/hide keyboard cursor on BUILD entry/exit (§19)' },
   ],
   LEVEL_START: [
-    { module: 'composables/useGameLoop',    handler: 'anonymous',   purpose: 'Generate path function for the level' },
-    { module: 'composables/useSessionSync', handler: 'anonymous',   purpose: 'Create backend session + pin sessionGeneration' },
-    { module: 'systems/BuffSystem',         handler: 'anonymous',   purpose: 'Reset buff tracking + revert tower-scoped buffs' },
-    { module: 'systems/CombatSystem',       handler: 'anonymous',   purpose: 'Reset shield / combat transient state' },
-    { module: 'stores/gameStore',           handler: 'anonymous',   purpose: 'Reset level-scoped UI state' },
+    { module: 'composables/useGameLoop',           handler: 'anonymous', purpose: 'Generate path function for the level' },
+    { module: 'composables/useSessionSync',        handler: 'anonymous', purpose: 'Create backend session + pin sessionGeneration' },
+    { module: 'systems/BuffSystem',                handler: 'anonymous', purpose: 'Reset buff tracking + revert tower-scoped buffs' },
+    { module: 'systems/CombatSystem',              handler: 'anonymous', purpose: 'Reset shield / combat transient state' },
+    { module: 'stores/gameStore',                  handler: 'anonymous', purpose: 'Reset level-scoped UI state' },
+    { module: 'composables/useKeyboardPlacement',  handler: 'anonymous', purpose: 'Recompute LegalPositionSet + reset cursor (§19)' },
   ],
   LEVEL_END: [
     { module: 'composables/useSessionSync', handler: 'endSession',  purpose: 'Finalize backend session' },
@@ -209,6 +211,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
  */
 export const EVENT_SUBSCRIBER_MODULES = Object.freeze([
   'composables/useGameLoop',          // Vue onUnmounted
+  'composables/useKeyboardPlacement', // Vue onBeforeUnmount
   'composables/useSessionSync',       // Vue onUnmounted
   'stores/gameStore',                 // unbindEngine()
   'systems/BuffSystem',               // destroy()

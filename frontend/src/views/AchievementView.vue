@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { achievementService, type AchievementOut } from '@/services/achievementService'
 import { ACHIEVEMENT_CATEGORIES } from '@/data/achievement-defs'
 
+const SEASONAL = 'seasonal' as const
 const router = useRouter()
 const achievements = ref<AchievementOut[]>([])
 const loading = ref(true)
@@ -13,8 +14,24 @@ const selectedCategory = ref<string | null>(null)
 const PAGE_SIZE = 20
 const page = ref(1)
 
+const seasonalAchievements = computed(() =>
+  achievements.value.filter(a => a.season_id),
+)
+
+const hasSeasonal = computed(() => seasonalAchievements.value.length > 0)
+
+const activeSeasonBanner = computed(() => {
+  const a = seasonalAchievements.value.find(x => x.season_active && x.season_ends_at)
+  if (!a) return null
+  return {
+    name: a.season_name ?? a.season_id,
+    endsAt: a.season_ends_at as string,
+  }
+})
+
 const filtered = computed(() => {
   if (!selectedCategory.value) return achievements.value
+  if (selectedCategory.value === SEASONAL) return seasonalAchievements.value
   return achievements.value.filter(a => a.category === selectedCategory.value)
 })
 
@@ -29,6 +46,10 @@ const unlockedCount = computed(() => achievements.value.filter(a => a.unlocked).
 const totalPoints = computed(() =>
   achievements.value.filter(a => a.unlocked).reduce((sum, a) => sum + a.talent_points, 0),
 )
+
+function formatEndDate(iso: string): string {
+  return new Date(iso).toLocaleDateString()
+}
 
 onMounted(async () => {
   try {
@@ -63,6 +84,16 @@ onMounted(async () => {
         :class="['btn', 'filter-btn', { active: selectedCategory === cat.id }]"
         @click="selectedCategory = cat.id"
       >{{ cat.label }}</button>
+      <button
+        v-if="hasSeasonal"
+        :class="['btn', 'filter-btn', 'seasonal-btn', { active: selectedCategory === SEASONAL }]"
+        @click="selectedCategory = SEASONAL"
+      >Seasonal</button>
+    </div>
+
+    <div v-if="activeSeasonBanner" class="season-banner">
+      <span class="season-banner-title">★ {{ activeSeasonBanner.name }} — 2× rewards active</span>
+      <span class="season-banner-end">ends {{ formatEndDate(activeSeasonBanner.endsAt) }}</span>
     </div>
 
     <div v-if="loading" class="ach-loading">Loading...</div>
@@ -72,15 +103,27 @@ onMounted(async () => {
       <div
         v-for="a in paginated"
         :key="a.id"
-        :class="['ach-card', { unlocked: a.unlocked, locked: !a.unlocked }]"
+        :class="['ach-card', {
+          unlocked: a.unlocked,
+          locked: !a.unlocked,
+          'season-active': a.season_id && a.season_active,
+          'season-archived': a.season_id && !a.season_active,
+        }]"
       >
         <div class="ach-icon">{{ a.unlocked ? '&#10003;' : '&#9679;' }}</div>
         <div class="ach-info">
-          <div class="ach-name">{{ a.name }}</div>
+          <div class="ach-name">
+            {{ a.name }}
+            <span v-if="a.season_id && a.season_active" class="season-pill">SEASONAL 2×</span>
+            <span v-else-if="a.season_id" class="season-pill archived">PAST SEASON</span>
+          </div>
           <div class="ach-desc">{{ a.description }}</div>
           <div class="ach-meta">
-            <span class="ach-tp">+{{ a.talent_points }} TP</span>
-            <span v-if="a.unlocked && a.unlocked_at" class="ach-date">
+            <span class="ach-tp">+{{ a.season_active ? a.talent_points * 2 : a.talent_points }} TP</span>
+            <span v-if="a.season_id && a.season_ends_at" class="ach-date">
+              {{ a.season_active ? 'ends' : 'ended' }} {{ formatEndDate(a.season_ends_at) }}
+            </span>
+            <span v-else-if="a.unlocked && a.unlocked_at" class="ach-date">
               {{ new Date(a.unlocked_at).toLocaleDateString() }}
             </span>
           </div>
@@ -193,4 +236,36 @@ onMounted(async () => {
 }
 
 .page-info { font-size: 11px; color: var(--axis); }
+
+.season-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--gold);
+  background: rgba(212, 168, 64, 0.1);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.season-banner-title { color: var(--gold); letter-spacing: 1px; }
+.season-banner-end { color: var(--axis); }
+
+.seasonal-btn { letter-spacing: 1px; }
+
+.ach-card.season-active { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(212, 168, 64, 0.4) inset; }
+.ach-card.season-archived { border-style: dashed; opacity: 0.7; }
+
+.season-pill {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: 2px;
+}
+
+.season-pill.archived { border-color: var(--axis); color: var(--axis); }
 </style>

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { talentService, type TalentTreeOut, type TalentNodeOut } from '@/services/talentService'
+import { recommendationService } from '@/services/recommendationService'
 import { TowerType } from '@/data/constants'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { useTalentStore } from '@/stores/talentStore'
@@ -14,6 +15,25 @@ const loadError = ref('')
 const allocError = ref('')
 const allocatingNodeId = ref<string | null>(null)
 const allocating = computed(() => allocatingNodeId.value !== null)
+// Pedagogical_Backlog_Spec §28: highlight the talent root tied to the
+// player's lowest competency. Same dismiss key as LevelSelectView so the
+// two surfaces share one autonomy preference.
+const recommendedNodeId = ref<string | null>(null)
+const recommendedCompetency = ref<string | null>(null)
+const RECOMMENDATION_DISMISS_KEY = 'recommendation:dismissed'
+const recommendationDismissed = ref<boolean>(
+  typeof localStorage !== 'undefined'
+    && localStorage.getItem(RECOMMENDATION_DISMISS_KEY) === '1',
+)
+const showRecommendation = computed(
+  () => recommendedNodeId.value !== null && !recommendationDismissed.value,
+)
+function dismissRecommendation() {
+  recommendationDismissed.value = true
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(RECOMMENDATION_DISMISS_KEY, '1')
+  }
+}
 
 const TOWER_ORDER: TowerType[] = [
   TowerType.MAGIC, TowerType.RADAR_A, TowerType.RADAR_B, TowerType.RADAR_C,
@@ -78,6 +98,16 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  // Recommendation is best-effort; the talent tree must render with no
+  // highlight if the call fails.
+  try {
+    const rec = await recommendationService.me()
+    recommendedNodeId.value = rec.talent_node_id
+    recommendedCompetency.value = rec.lowest_competency
+  } catch {
+    recommendedNodeId.value = null
+    recommendedCompetency.value = null
+  }
 })
 </script>
 
@@ -99,6 +129,24 @@ onMounted(async () => {
     <div v-else-if="loadError" class="talent-error">{{ loadError }}</div>
     <template v-else>
       <div v-if="allocError" class="talent-alloc-error">{{ allocError }}</div>
+      <div
+        v-if="showRecommendation"
+        class="talent-recommendation"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="rec-text">
+          Suggested focus:
+          <strong>{{ recommendedCompetency }}</strong>
+          — try the highlighted node first.
+        </span>
+        <button
+          type="button"
+          class="rec-dismiss"
+          aria-label="Dismiss suggestion"
+          @click="dismissRecommendation"
+        >×</button>
+      </div>
       <div class="talent-towers">
       <div v-for="tw in TOWER_ORDER" :key="tw" class="tower-section">
         <h3 class="tower-name" :style="{ color: TOWER_DEFS[tw]?.color }">
@@ -113,6 +161,7 @@ onMounted(async () => {
               available: canAllocate(node),
               locked: !canAllocate(node) && node.current_level < node.max_level,
               loading: allocatingNodeId === node.id,
+              recommended: showRecommendation && recommendedNodeId === node.id,
             }]"
             @click="canAllocate(node) && allocate(node.id)"
           >
@@ -206,6 +255,40 @@ onMounted(async () => {
 
 .talent-node.locked { opacity: 0.4; }
 .talent-node.loading { opacity: 0.6; cursor: wait; }
+
+.talent-node.recommended {
+  /* Override .locked dimming so the highlighted root remains visible even
+     when the user has no points to spend. */
+  opacity: 1;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold), 0 0 12px rgba(212, 168, 64, 0.45);
+}
+
+.talent-recommendation {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(212, 168, 64, 0.12);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: 4px;
+  padding: 0.5rem 0.8rem;
+  font-size: 12px;
+}
+
+.rec-text strong { color: var(--gold); letter-spacing: 1px; }
+
+.rec-dismiss {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.rec-dismiss:hover { opacity: 0.7; }
 
 .node-name { font-size: 11px; color: #e8dcc8; margin-bottom: 4px; }
 .node-level { font-size: 13px; color: var(--gold); margin-bottom: 4px; }

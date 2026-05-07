@@ -1,6 +1,7 @@
 import { EnemyType, Events, GamePhase } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { createEnemy } from '@/entities/EnemyFactory'
+import { ENEMY_DEFS } from '@/data/enemy-defs'
 import { generateChainRuleQuestion, type ChainRuleQuestion } from '@/math/chain-rule-generator'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
@@ -20,7 +21,19 @@ export class EnemyAbilitySystem implements GameSystem {
       game.eventBus.on(Events.ENEMY_KILLED, (enemy) => {
         this._onEnemyKilled(enemy, game)
       }),
+      // Backlog §25: sample the per-spawn HP-trigger fraction once, here,
+      // using game.rng so the draw is replayable.
+      game.eventBus.on(Events.ENEMY_SPAWNED, (enemy) => {
+        this._sampleTriggerFraction(enemy, game)
+      }),
     )
+  }
+
+  private _sampleTriggerFraction(enemy: Enemy, game: Game): void {
+    const range = ENEMY_DEFS[enemy.type]?.triggerHpRange
+    if (!range) return
+    const [lo, hi] = range
+    enemy.chainRuleTriggerFraction = lo + (hi - lo) * game.rng()
   }
 
   destroy(): void {
@@ -43,8 +56,16 @@ export class EnemyAbilitySystem implements GameSystem {
         this._tickMinionSpawn(dt, enemy, game)
       }
 
-      if (enemy.type === EnemyType.BOSS_B && !enemy.chainRuleTriggered && enemy.hp <= enemy.maxHp * 0.5) {
-        this._triggerChainRule(enemy, game)
+      if (enemy.type === EnemyType.BOSS_B && !enemy.chainRuleTriggered) {
+        // Backstop: if ENEMY_SPAWNED was missed (e.g. boss spawned before
+        // this system's init ran), sample now so the ability can never be
+        // permanently skipped — fulfils §25 acceptance "never skip".
+        if (enemy.chainRuleTriggerFraction <= 0) {
+          this._sampleTriggerFraction(enemy, game)
+        }
+        if (enemy.hp <= enemy.maxHp * enemy.chainRuleTriggerFraction) {
+          this._triggerChainRule(enemy, game)
+        }
       }
     }
   }
@@ -72,7 +93,10 @@ export class EnemyAbilitySystem implements GameSystem {
 
   private _triggerChainRule(boss: Enemy, game: Game): void {
     boss.chainRuleTriggered = true
-    const question = generateChainRuleQuestion()
+    // Pass game.rng so the boss-A2 chain-rule question is replayable
+    // (Backlog §24). Without this, generateChainRuleQuestion's default
+    // Math.random would diverge between record and replay.
+    const question = generateChainRuleQuestion(game.rng)
     this._pendingChainRule = { boss, question }
 
     game.setPhase(GamePhase.CHAIN_RULE)
@@ -103,7 +127,7 @@ export class EnemyAbilitySystem implements GameSystem {
     if (enemy.type !== EnemyType.BOSS_B) return
     if (enemy.chainRuleAnsweredCorrectly === true) return
 
-    const question = generateChainRuleQuestion()
+    const question = generateChainRuleQuestion(game.rng)
     this._splitBoss(enemy, question, game)
   }
 

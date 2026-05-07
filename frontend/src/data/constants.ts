@@ -143,6 +143,9 @@ export const Events = Object.freeze({
   ACTIVE_BUFFS_CHANGED: 'activeBuffsChanged',
 
   MONTY_HALL_STATE_CHANGED: 'montyHallStateChanged',
+
+  // Pedagogy: post-wave principle-surfacing overlay (Backlog item #1)
+  PRINCIPLE_SHOW:        'principleShow',
 } as const)
 
 // ── Color palette ──

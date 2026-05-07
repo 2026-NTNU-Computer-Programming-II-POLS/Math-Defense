@@ -3,9 +3,12 @@ import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useGameLoop } from '@/composables/useGameLoop'
+import { useKeyboardPlacement } from '@/composables/useKeyboardPlacement'
 import { GamePhase } from '@/data/constants'
 import { formatScore } from '@/domain/formatters'
+import { iaAccuracyToLabelOpacity } from '@/math/curve-renderer'
 
 import HUD from '@/components/game/HUD.vue'
 import TowerBar from '@/components/game/TowerBar.vue'
@@ -19,10 +22,24 @@ import ChainRulePanel from '@/components/game/ChainRulePanel.vue'
 import StartWaveButton from '@/components/game/StartWaveButton.vue'
 import Modal from '@/components/common/Modal.vue'
 import AchievementToast from '@/components/game/AchievementToast.vue'
+import PrincipleOverlay from '@/components/game/PrincipleOverlay.vue'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const uiStore = useUiStore()
+const authStore = useAuthStore()
+
+// Concrete-fading on Star-1 path rendering (spec §17): the curve renderer
+// reads gameStore.pathLabelOpacity at draw time. Star ≥ 2 always renders
+// without labels — that matches pre-§17 behaviour. New players see full
+// labels because authStore defaults ia_recent_accuracy to 0.
+watch(
+  () => [gameStore.starRating, authStore.user?.ia_recent_accuracy ?? 0] as const,
+  ([star, acc]) => {
+    gameStore.pathLabelOpacity = star === 1 ? iaAccuracyToLabelOpacity(acc) : 0
+  },
+  { immediate: true },
+)
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
@@ -40,10 +57,25 @@ const _territoryContext = _rawTerritoryCtx
   ? (() => { try { return JSON.parse(_rawTerritoryCtx) as { activityId: string; slotId: string } } catch { return null } })()
   : null
 
-const { game, ready, loadError, retry, newlyUnlockedAchievements, lastCompletedSessionId } = useGameLoop(canvasRef, {
+// Replay/Spectate determinism (Backlog §24): the seed travels via
+// LevelSelectView → InitialAnswerView → here. Falling back to Date.now() is
+// only for the rare case where state is lost on a hard reload — that run
+// won't be replayable, but the game still boots.
+const _seed = (typeof history.state?.seed === 'number') ? history.state.seed : Date.now()
+
+const {
+  game, ready, loadError, retry, newlyUnlockedAchievements, lastCompletedSessionId,
+  currentPrincipleId, clearPrinciple, restoreFromCheckpoint, isPracticeMode,
+} = useGameLoop(canvasRef, {
   generatedLevel: _generatedLevel,
   iaResult: _iaResult,
+  seed: _seed,
 })
+
+// §19 keyboard placement (WCAG 2.2 SC 2.1.1). Composable owns its own
+// listener lifecycle; gating by BUILD phase happens inside the handler so
+// a single registration covers the whole view.
+useKeyboardPlacement(game)
 
 function navigateHome(): void {
   router.push({ name: 'menu' }).catch((err) => {
@@ -120,15 +152,34 @@ watch(() => gameStore.hp, (hp) => {
   prevHp.value = hp
 })
 
+// §12: at Star-5 with a captured checkpoint, defer to the inline retry
+// dialog instead of the standard Game Over modal, so the player can
+// resume from the last cleared wave.
+const checkpointDialogVisible = ref(false)
 watch(() => gameStore.phase, (phase) => {
-  if (phase === GamePhase.GAME_OVER) {
-    uiStore.showModal(
-      'Game Over',
-      `Survived ${gameStore.wave} waves · Score: ${formatScore(gameStore.score)}`,
-      navigateAfterLoss,
-    )
+  if (phase !== GamePhase.GAME_OVER) return
+  if (gameStore.starRating === 5 && gameStore.lastCheckpoint) {
+    checkpointDialogVisible.value = true
+    return
   }
+  uiStore.showModal(
+    'Game Over',
+    `Survived ${gameStore.wave} waves · Score: ${formatScore(gameStore.score)}`,
+    navigateAfterLoss,
+  )
 })
+
+function onRetryCheckpoint(): void {
+  const cp = gameStore.lastCheckpoint
+  if (!cp) return
+  checkpointDialogVisible.value = false
+  restoreFromCheckpoint(cp)
+}
+
+function onAbandonCheckpoint(): void {
+  checkpointDialogVisible.value = false
+  navigateAfterLoss()
+}
 
 // U-1: pause / resume. The game loop is owned by the engine via
 // `Game.start/stop` which already cancels its RAF cleanly. Pausing outside
@@ -223,7 +274,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="shellRef" class="game-shell">
+  <div ref="shellRef" class="game-shell" :data-star="gameStore.starRating">
     <!-- R-5: on portrait phones the 1280×720 world scales down to an
          unusably small strip. Ask the user to rotate — the rest of the
          game stays rendered underneath so landscape resumes instantly. -->
@@ -263,7 +314,16 @@ onBeforeUnmount(() => {
 
     <div v-if="ready" class="game-overlay">
       <AchievementToast :achievements="newlyUnlockedAchievements" />
+      <PrincipleOverlay :principle-id="currentPrincipleId" @dismiss="clearPrinciple" />
       <HUD />
+      <!-- Backlog §20 — practice-mode badge persists for the entire WAVE/BUILD
+           session so the player never forgets the run is leaderboard-ineligible. -->
+      <div
+        v-if="isPracticeMode"
+        class="practice-badge"
+        role="status"
+        aria-live="polite"
+      >Practice mode — leaderboard ineligible</div>
       <BuildHint />
 
       <!-- Build Phase -->
@@ -283,11 +343,41 @@ onBeforeUnmount(() => {
       <!-- Score Result (Victory) -->
       <ScoreResultView
         v-if="gameStore.phase === GamePhase.LEVEL_END"
+        :session-id="lastCompletedSessionId"
+        :practice-mode="isPracticeMode"
         @close="navigateAfterGame"
       />
 
       <!-- Chain Rule Challenge (Boss Type-B) -->
       <ChainRulePanel />
+
+      <!-- §12: Star-5 checkpoint retry dialog -->
+      <div
+        v-if="checkpointDialogVisible && gameStore.lastCheckpoint"
+        class="checkpoint-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="checkpoint-title"
+      >
+        <div class="checkpoint-box">
+          <h3 id="checkpoint-title" class="checkpoint-title">Game Over</h3>
+          <p class="checkpoint-stat">
+            Survived {{ gameStore.wave }} waves · Score: {{ formatScore(gameStore.score) }}
+          </p>
+          <p class="checkpoint-hint">
+            Star-5 — retry from your last cleared wave?<br>
+            <span class="checkpoint-practice">Checkpoint runs are flagged as practice (not eligible for class leaderboards).</span>
+          </p>
+          <div class="checkpoint-actions">
+            <button class="btn-checkpoint primary" @click="onRetryCheckpoint">
+              Retry from Wave {{ gameStore.lastCheckpoint.waveIndex }}
+            </button>
+            <button class="btn-checkpoint" @click="onAbandonCheckpoint">
+              Give Up
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Modal -->
       <Modal v-if="uiStore.modalVisible" />
@@ -315,7 +405,7 @@ onBeforeUnmount(() => {
 .game-shell {
   position: fixed;
   inset: 0;
-  background: #0b0a12;
+  background: var(--bg-base);
 }
 
 .game-view {
@@ -393,7 +483,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: #0b0a12;
+  background: var(--bg-base);
   color: var(--gold);
   font-family: var(--font-mono);
   text-align: center;
@@ -440,6 +530,98 @@ onBeforeUnmount(() => {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--gold);
+}
+
+/* §12: Star-5 checkpoint retry dialog */
+.checkpoint-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  font-family: var(--font-mono);
+}
+.checkpoint-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 40px;
+  background: var(--panel-bg);
+  border: 1px solid var(--gold);
+  box-shadow: var(--panel-shadow);
+  max-width: 460px;
+  text-align: center;
+}
+.checkpoint-title {
+  margin: 0;
+  font-size: 20px;
+  color: var(--gold-bright);
+  letter-spacing: 4px;
+}
+.checkpoint-stat {
+  margin: 0;
+  font-size: 13px;
+  color: #e8dcc8;
+}
+.checkpoint-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--axis);
+  line-height: 1.5;
+}
+.checkpoint-practice {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--gold-dim);
+  font-style: italic;
+}
+.checkpoint-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+.btn-checkpoint {
+  padding: 8px 20px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 4px;
+  background: rgba(212, 168, 64, 0.1);
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.btn-checkpoint:hover {
+  background: rgba(212, 168, 64, 0.25);
+}
+.btn-checkpoint.primary {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+  background: rgba(212, 168, 64, 0.25);
+}
+.btn-checkpoint.primary:hover {
+  background: rgba(212, 168, 64, 0.4);
+}
+
+/* Backlog §20 — practice-mode badge */
+.practice-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 10px;
+  background: rgba(144, 104, 200, 0.18);
+  border: 1px solid #9068c8;
+  border-radius: 4px;
+  color: #c8a4ff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  z-index: var(--z-overlay);
+  pointer-events: none;
 }
 
 </style>

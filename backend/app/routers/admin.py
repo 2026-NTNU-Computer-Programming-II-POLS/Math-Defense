@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.domain.errors import DomainValueError
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
-from app.factories import build_admin_service
+from app.factories import build_admin_service, build_season_service
 from app.limiter import limiter
 from app.middleware.auth import require_role
 from app.schemas.admin import ClassSummaryOut, PaginatedClassesOut, PaginatedUsersOut, SetUserActiveRequest, UserSummaryOut
+from app.schemas.season import SeasonCreateRequest, SeasonOut
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -65,6 +67,42 @@ def set_user_active(
 ):
     u = build_admin_service(db).set_user_active(user_id, req.is_active)
     return _to_user_out(u)
+
+
+@router.post("/seasons", response_model=SeasonOut)
+@limiter.limit("30/minute")
+def create_season(
+    request: Request,
+    req: SeasonCreateRequest,
+    _user: User = Depends(require_role(Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """Promote a set of achievements (those tagged with `season_id`) as a
+    time-bounded season. Reward is doubled while the window is active. Spec:
+    docs/Pedagogical_Backlog_Spec.md §22.
+    """
+    try:
+        build_season_service(db).upsert_season(
+            season_id=req.season_id,
+            name=req.name,
+            starts_at=req.starts_at,
+            ends_at=req.ends_at,
+        )
+    except ValueError as exc:
+        raise DomainValueError(str(exc))
+    seasons = build_season_service(db).list_seasons()
+    match = next((s for s in seasons if s["season_id"] == req.season_id), None)
+    return SeasonOut(**(match or {"season_id": req.season_id, "name": req.name}))
+
+
+@router.get("/seasons", response_model=list[SeasonOut])
+@limiter.limit("60/minute")
+def list_seasons_admin(
+    request: Request,
+    _user: User = Depends(require_role(Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    return [SeasonOut(**s) for s in build_season_service(db).list_seasons()]
 
 
 def _to_user_out(u: User, classes_joined_count: int = 0) -> UserSummaryOut:

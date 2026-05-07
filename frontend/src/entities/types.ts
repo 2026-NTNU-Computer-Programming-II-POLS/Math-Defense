@@ -130,6 +130,9 @@ export interface Enemy {
 
   chainRuleTriggered: boolean
   chainRuleAnsweredCorrectly: boolean | null
+  // Backlog §25: per-spawn HP fraction at which the chain-rule ability fires.
+  // 0 means "no HP-gated ability"; populated for Boss-B from triggerHpRange.
+  chainRuleTriggerFraction: number
 
   slowFactor: number
   slowTimer: number

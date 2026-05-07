@@ -25,6 +25,8 @@ erDiagram
         boolean is_email_verified   "DEFAULT false"
         string  totp_secret         "nullable"
         boolean mfa_enabled         "DEFAULT false"
+        datetime totp_last_used_at  "nullable — TOTP replay guard"
+        float   ia_recent_accuracy  "DEFAULT 0.0 — last-10 IA fraction"
         datetime created_at
         datetime updated_at         "auto-update"
     }
@@ -47,9 +49,11 @@ erDiagram
     game_sessions {
         string  id                   PK  "UUID"
         string  user_id              FK  "→ users.id CASCADE"
+        string  challenge_id         FK  "→ challenges.id SET NULL, nullable"
         int     star_rating              "CHECK 1–5"
         json    path_config              "nullable"
         boolean initial_answer           "DEFAULT false"
+        boolean practice_mode            "DEFAULT false — excluded from leaderboard"
         string  status                   "enum: active|completed|abandoned"
         int     current_wave             "DEFAULT 0"
         int     gold                     "DEFAULT INITIAL_GOLD (200)"
@@ -64,6 +68,8 @@ erDiagram
         int     health_final             "nullable"
         json    time_exclude_prepare     "nullable"
         float   total_score              "nullable"
+        string  reflection_text          "nullable, ≤2000 chars"
+        bigint  rng_seed                 "nullable — replay determinism seed"
         datetime started_at
         datetime ended_at                "nullable"
     }
@@ -76,6 +82,7 @@ erDiagram
         int     kills
         int     waves_survived
         string  session_id     FK  "→ game_sessions.id SET NULL, UNIQUE"
+        string  challenge_id   FK  "→ challenges.id SET NULL, nullable"
         datetime created_at
     }
 
@@ -140,6 +147,82 @@ erDiagram
         int     failures             "DEFAULT 0"
         datetime window_started_at
         datetime locked_until        "nullable"
+        int     lockout_count        "DEFAULT 0 — exponential-backoff counter"
+    }
+
+    refresh_tokens {
+        string  id          PK  "UUID"
+        string  user_id     FK  "→ users.id CASCADE"
+        string  token_hash  UK  "64-char SHA-256 hex"
+        datetime expires_at
+        boolean used            "DEFAULT false"
+        boolean revoked         "DEFAULT false"
+    }
+
+    user_competency_state {
+        string  user_id     PK,FK "→ users.id CASCADE — composite PK"
+        string  competency  PK    "32-char domain code — composite PK"
+        float   alpha             "Beta posterior; DEFAULT 1.0"
+        float   beta              "Beta posterior; DEFAULT 1.0"
+        datetime updated_at       "auto-update"
+    }
+
+    seasons {
+        string  season_id   PK   "≤64-char slug"
+        string  name             "NOT NULL"
+        datetime starts_at
+        datetime ends_at         "CHECK ends_at > starts_at"
+        datetime created_at
+    }
+
+    challenges {
+        string  id          PK   "UUID"
+        string  teacher_id  FK   "→ users.id CASCADE"
+        string  title            "≤120 chars"
+        string  description      "≤500 chars; DEFAULT ''"
+        jsonb   constraints      "Serialised ChallengeConstraints DSL"
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at      "nullable — soft delete"
+    }
+
+    session_events {
+        bigint  id          PK   "BIGSERIAL"
+        string  session_id  FK   "→ game_sessions.id CASCADE"
+        int     seq              "monotonic per session; UNIQUE(session_id, seq)"
+        float   ts               "game-time seconds since startLevel"
+        string  event_type       "≤64 chars"
+        jsonb   payload          "nullable — GameEvents shape"
+        datetime created_at
+    }
+
+    study_enrollments {
+        string  user_id        PK,FK "→ users.id CASCADE — composite PK"
+        string  study_id       PK    "≤64-char study slug — composite PK"
+        string  group               "single char A|B"
+        int     dosage_seconds      "DEFAULT 0 — cumulative play time"
+        datetime enrolled_at
+    }
+
+    study_probe_attempts {
+        int     id          PK   "BIGSERIAL"
+        string  user_id     FK   "→ users.id CASCADE"
+        string  study_id         "≤64 chars"
+        string  form             "pre|post|delay; UNIQUE(user_id, study_id, form)"
+        int     score            "0–10"
+        jsonb   responses        "per-item record"
+        datetime submitted_at
+    }
+
+    study_affect_responses {
+        int     id          PK   "BIGSERIAL"
+        string  user_id     FK   "→ users.id CASCADE"
+        string  study_id         "≤64 chars"
+        string  phase            "pre|post; UNIQUE(user_id, study_id, phase)"
+        float   anxiety_mean     "Likert mean ∈ [1,5]"
+        float   motivation_mean  "Likert mean ∈ [1,5]"
+        jsonb   responses        "raw item Likerts"
+        datetime submitted_at
     }
 
     denied_tokens {
@@ -175,6 +258,19 @@ erDiagram
     users                           ||--o{ territory_occupations           : "occupies (student_id)"
     users                           ||--o{ removed_class_memberships       : "removed_from (student_id)"
     users                           ||--o{ email_verification_tokens       : "verifies_via (user_id)"
+    users                           ||--o{ refresh_tokens                  : "rotates (user_id)"
+    users                           ||--o{ user_competency_state           : "knows (user_id)"
+    users                           ||--o{ challenges                      : "authors (teacher_id)"
+    users                           ||--o{ study_enrollments               : "enrolls (user_id)"
+    users                           ||--o{ study_probe_attempts            : "submits (user_id)"
+    users                           ||--o{ study_affect_responses          : "rates (user_id)"
+
+    %% ── Challenge mode ──────────────────────────────────────────────────────
+    challenges                      |o--o{ game_sessions                   : "scoped (challenge_id)"
+    challenges                      |o--o{ leaderboard_entries             : "ranks (challenge_id)"
+
+    %% ── Replay / spectate ───────────────────────────────────────────────────
+    game_sessions                   ||--o{ session_events                  : "recorded (session_id)"
 
     %% ── Territory activity authorship & settlement ──────────────────────────
     users                           ||--o{ grabbing_territory_activities   : "creates (teacher_id)"
@@ -216,6 +312,8 @@ Central identity table. Stores authentication credentials, MFA state, and profil
 | `is_email_verified` | `Boolean` | NO | DEFAULT `false` |
 | `totp_secret` | `String(64)` | YES | — |
 | `mfa_enabled` | `Boolean` | NO | DEFAULT `false` |
+| `totp_last_used_at` | `DateTime(tz)` | YES | TOTP step-replay guard — set on every accepted code |
+| `ia_recent_accuracy` | `Float` | NO | DEFAULT `0.0`; rolling fraction of last 10 IA-correct sessions (drives Star-1 concrete-fading on the path renderer) |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated on write |
 
@@ -265,9 +363,11 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 |---|---|---|---|
 | `id` | `String` (UUID) | NO | PK |
 | `user_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
+| `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **SET NULL** — non-NULL only when launched from a challenge deep-link |
 | `star_rating` | `Integer` | NO | `CHECK (1 ≤ star_rating ≤ 5)` |
 | `path_config` | `JSON` | YES | ≤ 10 240 bytes, app-layer validated |
 | `initial_answer` | `Boolean` | NO | DEFAULT `false` |
+| `practice_mode` | `Boolean` | NO | DEFAULT `false`; SERVER DEFAULT `false`. Set when slider-fallback is in use; the leaderboard query filters these out but achievement/talent awards still fire |
 | `status` | `Enum` | NO | `active \| completed \| abandoned`; DEFAULT `active` |
 | `current_wave` | `Integer` | NO | DEFAULT `0` |
 | `gold` | `Integer` | NO | DEFAULT `INITIAL_GOLD` (200, from `shared/game-constants.json`) |
@@ -282,6 +382,8 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `health_final` | `Integer` | YES | — |
 | `time_exclude_prepare` | `JSON` | YES | list of per-wave time floats |
 | `total_score` | `Float` | YES | — |
+| `reflection_text` | `String(2000)` | YES | Free-text reflection captured after a winning wave (articulation prompt) |
+| `rng_seed` | `BigInteger` | YES | Per-session deterministic RNG seed forwarded by the client at session creation; replayed by `EventPlayer` to rebuild the mulberry32 stream. `BigInteger` because the client emits a 32-bit unsigned value that does not fit in every dialect's `INTEGER`. NULL on legacy rows / clients that do not opt into replay |
 | `started_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `ended_at` | `DateTime(tz)` | YES | set on completion / abandonment |
 
@@ -303,10 +405,11 @@ Top scores per user per difficulty level. FKs are `SET NULL` so history survives
 | `kills` | `Integer` | NO | — |
 | `waves_survived` | `Integer` | NO | — |
 | `session_id` | `String` (FK) | YES | → `game_sessions.id` ON DELETE **SET NULL**; UNIQUE |
+| `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **SET NULL**; non-NULL when the originating session was launched from a challenge. Per-challenge ranks are served by `query_ranked_by_challenge` so global / per-level boards still work |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `CHECK(1 ≤ level ≤ 5)` (`ck_leaderboard_level_range`), `UNIQUE(session_id)` (`uq_leaderboard_session_id`)  
-**Indexes:** `ix_leaderboard_user_id`, `ix_leaderboard_level_score (level, score)`, `ix_leaderboard_score`, `ix_leaderboard_created_at`
+**Indexes:** `ix_leaderboard_user_id`, `ix_leaderboard_level_score (level, score)`, `ix_leaderboard_score`, `ix_leaderboard_created_at`, `ix_leaderboard_challenge_id`
 
 ---
 
@@ -435,6 +538,7 @@ Per-account brute-force lockout tracker. Persisted in Postgres so lockouts survi
 | `failures` | `Integer` | NO | SERVER DEFAULT `0` |
 | `window_started_at` | `DateTime(tz)` | NO | — |
 | `locked_until` | `DateTime(tz)` | YES | `NULL` = not locked |
+| `lockout_count` | `Integer` | NO | SERVER DEFAULT `0`; counts consecutive lockouts to drive the exponential-backoff window (5 min → 15 min → 1 h → 24 h) |
 
 **Indexes:** `ix_login_attempts_locked_until`
 
@@ -469,9 +573,149 @@ One-use tokens e-mailed during registration and re-verification flows.
 
 ---
 
+### `refresh_tokens`
+
+Long-lived rotating refresh tokens that mint short-lived access tokens. Stored as a SHA-256 hash so a leaked DB cannot replay raw values. Rotation marks the consumed row `used=true` and issues a fresh row in the same transaction.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `String` (UUID) | NO | PK |
+| `user_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
+| `token_hash` | `String(64)` | NO | UNIQUE — 64-char SHA-256 hex |
+| `expires_at` | `DateTime(tz)` | NO | — |
+| `used` | `Boolean` | NO | SERVER DEFAULT `false` |
+| `revoked` | `Boolean` | NO | SERVER DEFAULT `false` |
+
+**Indexes:** `ix_refresh_tokens_user_id`, `ix_refresh_tokens_expires_at`
+
+---
+
+### `user_competency_state`
+
+Bayesian stealth-assessment posteriors. One Beta distribution per (user, competency); evidence events from session play update `(α, β)` in the application layer (`AssessmentApplicationService`). Composite primary key matches the access pattern in `SqlAlchemyCompetencyStateRepository` and removes the need for a synthetic id column.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `user_id` | `String` (FK) | NO | PK component; → `users.id` ON DELETE **CASCADE** |
+| `competency` | `String(32)` | NO | PK component — competency code (e.g. `polynomial_curves`, `radar_targeting`) |
+| `alpha` | `Float` | NO | DEFAULT `1.0` (uniform prior) |
+| `beta` | `Float` | NO | DEFAULT `1.0` (uniform prior) |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated |
+
+---
+
+### `seasons`
+
+Time-bounded season definitions. Achievement scoring multiplies talent-point payouts based on whether the unlock falls inside any season window. Admin-managed via `/api/seasons`.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `season_id` | `String(64)` | NO | PK — slug |
+| `name` | `String(120)` | NO | — |
+| `starts_at` | `DateTime(tz)` | NO | — |
+| `ends_at` | `DateTime(tz)` | NO | — |
+| `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+
+**Constraints:** `CHECK(ends_at > starts_at)` (`ck_seasons_window`)
+
+---
+
+### `challenges`
+
+Teacher-authored constrained game modes. `constraints` is a JSONB blob serialised from `ChallengeConstraints` (allowed towers, wave count, target score, magic-coefficient bounds, forbidden mechanics). Soft-deleted via `deleted_at` so historical leaderboard rows can still resolve `challenge_id`.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `String` (UUID) | NO | PK |
+| `teacher_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
+| `title` | `String(120)` | NO | — |
+| `description` | `String(500)` | NO | DEFAULT `''` |
+| `constraints` | `JSONB` | NO | Serialised `ChallengeConstraints` DSL |
+| `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+| `deleted_at` | `DateTime(tz)` | YES | NULL = active; non-NULL = soft-deleted |
+
+**Indexes:** `ix_challenges_teacher_id`, `ix_challenges_created_at`
+
+---
+
+### `session_events`
+
+Append-only event log for deterministic Replay and live Spectate. Each row is one frontend `EventBus` emission captured by `EventRecorder`. `seq` is assigned by the recorder client-side so out-of-order arrivals still replay in firing order, and `ts` is **game-time** (seconds since `startLevel`) — not wall-clock — to match the determinism contract.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `BigInteger` | NO | PK; BIGSERIAL |
+| `session_id` | `String` (FK) | NO | → `game_sessions.id` ON DELETE **CASCADE** |
+| `seq` | `Integer` | NO | Monotonic per session |
+| `ts` | `Float` | NO | Game-time seconds since `startLevel` |
+| `event_type` | `String(64)` | NO | Matches a key in the frontend `GameEvents` map |
+| `payload` | `JSONB` | YES | Event payload (shape varies by `event_type`) |
+| `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+
+**Constraints:** `UNIQUE(session_id, seq)` (`uq_session_event_seq`) — lets the recorder flush idempotently  
+**Indexes:** `ix_session_event_session_id`
+
+---
+
+### `study_enrollments`
+
+Empirical Validity Probe enrollment cache. One row per (user, study). `group` is the deterministic A/B label computed at enrollment via the hash-based `assign_group()` and persisted so the export never has to re-derive it. `dosage_seconds` accumulates when sessions end during the study window.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `user_id` | `String` (FK) | NO | PK component; → `users.id` ON DELETE **CASCADE** |
+| `study_id` | `String(64)` | NO | PK component |
+| `group` | `String(1)` | NO | `A` or `B` |
+| `dosage_seconds` | `Integer` | NO | SERVER DEFAULT `0` |
+| `enrolled_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+
+**Constraints:** `UNIQUE(user_id, study_id)` (`uq_study_enrollment`)
+
+---
+
+### `study_probe_attempts`
+
+Per-form probe submissions. The same user submits up to three forms per study (`pre` / `post` / `delay`). `responses` stores the per-item record verbatim so item-level statistics can be recomputed later if the answer key evolves.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `Integer` | NO | PK; autoincrement |
+| `user_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
+| `study_id` | `String(64)` | NO | — |
+| `form` | `String(8)` | NO | `pre` \| `post` \| `delay` (app-layer enum, not a Postgres type) |
+| `score` | `Integer` | NO | `0–10` |
+| `responses` | `JSONB` | NO | `[{"item_id": "...", "selected": "B", "correct": true}, ...]` |
+| `submitted_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+
+**Constraints:** `UNIQUE(user_id, study_id, form)` (`uq_study_probe_form`)
+
+---
+
+### `study_affect_responses`
+
+Likert affect surveys (anxiety + intrinsic motivation, IMI subscale). Two phases per study (`pre` / `post`). Subscale means are stored alongside the raw item ratings so subscales can be recomputed without re-prompting participants.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `Integer` | NO | PK; autoincrement |
+| `user_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
+| `study_id` | `String(64)` | NO | — |
+| `phase` | `String(8)` | NO | `pre` \| `post` |
+| `anxiety_mean` | `Float` | NO | Mean of anxiety Likert items ∈ `[1, 5]` |
+| `motivation_mean` | `Float` | NO | Mean of IMI intrinsic-motivation items ∈ `[1, 5]` |
+| `responses` | `JSONB` | NO | Raw item-level Likerts (subscale recomputation) |
+| `submitted_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+
+**Constraints:** `UNIQUE(user_id, study_id, phase)` (`uq_study_affect_phase`)
+
+---
+
 ### `audit_logs`
 
-Append-only security event log. `user_id` is a plain string with **no FK constraint** so audit records survive user deletion.
+Append-only security event log written by `app.infrastructure.audit_logger.record_audit_event` in its own isolated SQLAlchemy session so audit rows commit independently of the surrounding business transaction. `user_id` is a plain string with **no FK constraint** so audit records survive user deletion.
+
+> **Schema gap (known)**: no Alembic migration creates this table. The ORM model (`app/models/audit_log.py`) and writer infrastructure exist, but the writer swallows insertion errors as warnings — meaning audit events are silently dropped on databases that have not been pre-provisioned with the table out-of-band. To bring this fully online, add a migration that creates `audit_logs` with the columns/indexes below.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -523,6 +767,7 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `ix_leaderboard_level_score` | `leaderboard_entries` | `(level, score)` | BTREE |
 | `ix_leaderboard_score` | `leaderboard_entries` | `score` | BTREE |
 | `ix_leaderboard_created_at` | `leaderboard_entries` | `created_at` | BTREE |
+| `ix_leaderboard_challenge_id` | `leaderboard_entries` | `challenge_id` | BTREE |
 | `ix_user_achievement_user_id` | `user_achievements` | `user_id` | BTREE |
 | `ix_talent_allocation_user_id` | `talent_allocations` | `user_id` | BTREE |
 | `ix_gt_activities_teacher_id` | `grabbing_territory_activities` | `teacher_id` | BTREE |
@@ -535,6 +780,11 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `ix_login_attempts_locked_until` | `login_attempts` | `locked_until` | BTREE |
 | `ix_denied_tokens_expires_at` | `denied_tokens` | `expires_at` | BTREE |
 | `ix_email_verification_tokens_user_id` | `email_verification_tokens` | `user_id` | BTREE |
+| `ix_refresh_tokens_user_id` | `refresh_tokens` | `user_id` | BTREE |
+| `ix_refresh_tokens_expires_at` | `refresh_tokens` | `expires_at` | BTREE |
+| `ix_challenges_teacher_id` | `challenges` | `teacher_id` | BTREE |
+| `ix_challenges_created_at` | `challenges` | `created_at` | BTREE |
+| `ix_session_event_session_id` | `session_events` | `session_id` | BTREE |
 | `ix_audit_logs_user_id` | `audit_logs` | `user_id` | BTREE |
 | `ix_audit_logs_event_type` | `audit_logs` | `event_type` | BTREE |
 
@@ -544,8 +794,8 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 
 | Policy | Used for | Rationale |
 |---|---|---|
-| **CASCADE** | Most student/class/session references | Deleting a parent cleans up all child rows automatically |
-| **SET NULL** | `leaderboard_entries.user_id`, `leaderboard_entries.session_id`, `territory_occupations.session_id`, `grabbing_territory_activities.settled_by` | Preserve history / audit trail when the referenced entity is removed |
+| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id` | Deleting a parent cleans up all child rows automatically |
+| **SET NULL** | `leaderboard_entries.user_id`, `leaderboard_entries.session_id`, `leaderboard_entries.challenge_id`, `game_sessions.challenge_id`, `territory_occupations.session_id`, `grabbing_territory_activities.settled_by` | Preserve history / audit trail when the referenced entity is removed |
 | **RESTRICT** | `classes.teacher_id` | Prevents teacher deletion while they own active classes |
 | *(none / soft)* | `audit_logs.user_id`, `territory_session_uses.session_id` | Intentionally unlinked — must survive all referent deletions |
 
@@ -601,5 +851,20 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `m7b8c9d0e1f2` | Territory data integrity — `settled_at/settled_by`, slot uniqueness |
 | `58cbdc857a81` | Fix dropped tables (recreate `talent_allocations`, `user_achievements`, `removed_class_memberships`) |
 | `d5e6f7a8b9c0` | Email verification + MFA (`totp_secret`, `mfa_enabled`, `email_verification_tokens`) |
+| `e7f8a9b0c1d2` | Refresh tokens table (`refresh_tokens`) — rotating refresh-token store, hashed |
+| `f2a3b4c5d6e7` | TOTP replay guard column (`users.totp_last_used_at`) |
+| `n8c9d0e1f2a3` | Reflection text column (`game_sessions.reflection_text`) |
+| `o9d0e1f2a3b4` | Bayesian competency state table (`user_competency_state`) |
+| `p0e1f2a3b4c5` | Initial-Answer rolling accuracy column (`users.ia_recent_accuracy`) |
+| `q1f2a3b4c5d6` | Practice mode flag (`game_sessions.practice_mode`) |
+| `a3b4c5d6e7f8` | Lockout exponential-backoff counter (`login_attempts.lockout_count`) |
+| `r2a3b4c5d6e7` | **Merge migration** for branched chain (`q1f2a3b4c5d6` + `a3b4c5d6e7f8`) — also adds the `seasons` table |
+| `s3b4c5d6e7f8` | `challenges` table + `challenge_id` columns on `game_sessions` and `leaderboard_entries` |
+| `t4c5d6e7f8a9` | Replay foundation — `game_sessions.rng_seed` + append-only `session_events` table |
+| `u5d6e7f8a9b0` | Empirical Validity Probe — `study_enrollments` / `study_probe_attempts` / `study_affect_responses` (current head) |
 
-> **History**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create. The email verification + MFA migration was given a distinct revision `d5e6f7a8b9c0` (revising `58cbdc857a81`) and is the current head.
+> **Branched history**: After `q1f2a3b4c5d6` (gameplay branch — practice mode) and `a3b4c5d6e7f8` (auth branch — lockout backoff) shipped on parallel branches, `r2a3b4c5d6e7` is a merge migration whose `down_revision` is the tuple `(q1f2a3b4c5d6, a3b4c5d6e7f8)`. It also creates the `seasons` table in the same revision. Subsequent revisions (`s3b4c5d6e7f8`, `t4c5d6e7f8a9`, `u5d6e7f8a9b0`) form a linear chain on top.
+
+> **Earlier history**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create.
+
+> **`audit_logs`**: see the per-table note above — the model and writer exist but no Alembic migration creates the table.

@@ -9,6 +9,7 @@ import { InputManager } from './InputManager'
 import { PhaseStateMachine } from './PhaseStateMachine'
 import { type GameState, createInitialState } from './GameState'
 import { GamePhase, Events, FIXED_DT, type TowerType } from '@/data/constants'
+import { mulberry32 } from '@/math/MathUtils'
 import type { Tower, Enemy, Projectile, Pet, LimitResult, CalculusState, TargetingMode } from '@/entities/types'
 import type { BuffCard } from '@/data/buff-defs'
 import type { MontyHallReward } from '@/data/monty-hall-defs'
@@ -133,6 +134,8 @@ export interface GameEvents {
   [Events.ACTIVE_BUFFS_CHANGED]: ReadonlyArray<ActiveBuffEntry>
 
   [Events.MONTY_HALL_STATE_CHANGED]: MontyHallState | null
+
+  [Events.PRINCIPLE_SHOW]:           { id: import('@/data/principle-defs').PrincipleId }
 }
 
 export type GameEventBus = EventBus<GameEvents>
@@ -229,10 +232,39 @@ export class Game {
    */
   hoveredSegmentId: string | null = null
 
+  /**
+   * Keyboard placement cursor (Pedagogical Backlog §19, WCAG 2.2 SC 2.1.1).
+   * `useKeyboardPlacement` writes this in BUILD phase as the player navigates
+   * with arrow keys; `TowerRenderer` reads it to draw a focus ring on the
+   * lattice point. Cleared outside BUILD so the cursor never bleeds into WAVE.
+   */
+  keyboardCursor: { gx: number; gy: number } | null = null
+
   towerModifierProvider: ((towerType: TowerType) => Record<string, number>) | null = null
 
   // Game time in seconds (used for animation)
   time = 0
+
+  /**
+   * Per-session deterministic RNG. All non-physics randomness in game logic
+   * (buff effects, Monty-Hall door selection, Radar crit roll, chain-rule
+   * question generation) MUST go through this rather than `Math.random()`.
+   * The Replay/Spectate feature (Pedagogical Backlog §24) relies on this
+   * invariant: re-instantiating the engine with the same `seed` and the same
+   * input event stream must reproduce the run within ε = 0.0005.
+   *
+   * Seeded from {@link setSeed}. Defaults to a `Math.random()`-bridged stream
+   * so callers that haven't been migrated yet still get *some* RNG; running
+   * without a seed forfeits replayability for that session.
+   */
+  rng: () => number = Math.random
+
+  /**
+   * Seed used to initialise {@link rng}. Persisted on the server-side
+   * GameSession at create time so a replay can reconstruct the same RNG
+   * stream from a stored event log.
+   */
+  seed: number | null = null
 
   private _systems = new Map<string, GameSystem>()
   private _running = false
@@ -254,6 +286,19 @@ export class Game {
 
   on<K extends keyof GameEvents>(event: K, cb: (p: GameEvents[K]) => void) {
     return this.eventBus.on(event, cb)
+  }
+
+  /**
+   * Replace the per-session RNG with a stream derived from `seed`.
+   *
+   * Call this BEFORE {@link startLevel} so the LEVEL_START handlers and the
+   * very first system tick see the seeded stream. Re-calling mid-level is
+   * legal but resets the stream — replayers do exactly that to put the
+   * engine back in lockstep with a stored event log.
+   */
+  setSeed(seed: number): void {
+    this.seed = seed >>> 0
+    this.rng = mulberry32(this.seed)
   }
 
   // ── System management ──

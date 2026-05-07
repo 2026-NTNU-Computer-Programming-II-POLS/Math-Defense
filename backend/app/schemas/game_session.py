@@ -30,6 +30,15 @@ class SessionCreate(BaseModel):
     star_rating: int = Field(ge=STAR_MIN, le=STAR_MAX)
     path_config: dict | None = None
     initial_answer: bool = False
+    # Backlog §20 — opt-in slider-fallback / practice mode. Excluded from the
+    # global leaderboard; achievements & talent points still award.
+    practice_mode: bool = False
+    # Backlog §23 — set when the session is launched from a challenge deep-link.
+    challenge_id: str | None = None
+    # Backlog §24 — per-session RNG seed for replay. 32-bit unsigned range
+    # (matches the mulberry32 input on the frontend). Nullable so non-replay
+    # clients (legacy tests, third-party tooling) can still create sessions.
+    rng_seed: int | None = Field(default=None, ge=0, le=4_294_967_295)
 
     @field_validator("path_config")
     @classmethod
@@ -95,6 +104,12 @@ class SessionEnd(BaseModel):
         return self
 
 
+class ReflectionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(default="", max_length=2000)
+
+
 SESSION_OUT_SCHEMA_VERSION = 1
 
 
@@ -117,4 +132,18 @@ class SessionOut(BaseModel):
     score: int
     started_at: datetime
     ended_at: datetime | None = None
+    # Backlog §20 — surfaced so the HUD can render the practice badge and the
+    # ScoreResult view can warn that the run is leaderboard-ineligible.
+    practice_mode: bool = False
+    # Backlog §23 — surfaced so the client can hide the leaderboard CTA on
+    # ScoreResult and instead deep-link to the challenge ranking.
+    challenge_id: str | None = None
+    # Backlog §24 — per-session RNG seed forwarded to the Replay player so
+    # game.rng can be re-seeded before re-driving the engine.
+    rng_seed: int | None = None
     newly_unlocked_achievements: list[UnlockedAchievementOut] = []
+    # Player's rolling IA accuracy snapshot at the moment the session was
+    # served. The frontend curve renderer reads it at level start to decide
+    # the y-axis label opacity (concrete-fading, spec §17). The router fills
+    # this from the authenticated user; it is not a property of the session.
+    ia_recent_accuracy: float = 0.0

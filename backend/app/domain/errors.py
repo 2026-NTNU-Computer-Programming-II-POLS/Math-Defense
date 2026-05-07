@@ -29,6 +29,16 @@ class InvalidStatusTransitionError(DomainError):
     status_code = 409
 
 
+class Star5LockedError(DomainError):
+    """Raised when a user attempts to start a Star-5 session before satisfying
+    the Initial-Answer unlock requirement (Habgood & Ainsworth 2011 — see
+    docs/Pedagogical_Backlog_Spec.md §5)."""
+    status_code = 403
+
+    def __init__(self, message: str = "STAR_5_LOCKED") -> None:
+        super().__init__(message)
+
+
 # ── Auth ──
 
 class UsernameTakenError(DomainError):
@@ -99,6 +109,18 @@ class PermissionDeniedError(DomainError):
 
 
 class DuplicateSubmissionError(DomainError):
+    status_code = 409
+
+
+# ── Challenge ──
+
+class ChallengeNotFoundError(DomainError):
+    status_code = 404
+
+
+class ChallengeImmutableError(DomainError):
+    """Constraints cannot be edited once the challenge has been played
+    (see Pedagogical_Backlog_Spec.md §23.4)."""
     status_code = 409
 
 

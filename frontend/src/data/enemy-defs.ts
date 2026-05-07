@@ -31,6 +31,10 @@ export interface EnemyDef {
   split?: SplitConfig
   helper?: HelperConfig
   minion?: MinionConfig
+  // Backlog §25: HP-fraction window in which an HP-gated boss ability fires.
+  // Sampled uniformly per spawn so timing varies but the ability never gets
+  // skipped. Bounds must be inside (0, 1). Currently only Boss-B uses this.
+  triggerHpRange?: [number, number]
 }
 
 export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
@@ -130,5 +134,6 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
       interval: 8,
       type: EnemyType.FAST,
     },
+    triggerHpRange: [0.45, 0.55],
   },
 }

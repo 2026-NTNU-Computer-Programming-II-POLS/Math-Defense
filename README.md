@@ -43,16 +43,26 @@ Browser
   └─ Vue 3 SPA
        ├─ Pinia stores (reactivity bridge)
        ├─ Game Engine (ECS-style systems, Canvas rendering, fixed 60 FPS)
+       │    ├─ Audio AssetManager (HTMLAudioElement SFX, mute/volume)
+       │    ├─ EventRecorder / EventPlayer / SpectatorClient (replay + live spectate)
        │    └─ WasmBridge → math_engine.wasm (C, Emscripten) with JS fallback
        └─ Services → FastAPI Backend
                           ├─ Routers (thin controllers — auth/sessions/leaderboard/
-                          │           achievements/talents/classes/admin/territory)
+                          │           achievements/seasons/talents/classes/admin/
+                          │           territory/assessment/recommendation/challenge/
+                          │           replay/study)
                           ├─ Global exception handlers → HTTP status from DomainError.status_code
                           ├─ Application Services (Auth / Session / Leaderboard /
-                          │   Achievement / Talent / Class / Admin / Territory)
+                          │   Achievement / Season / Talent / Class / Admin /
+                          │   Territory / Assessment / Recommender / Challenge /
+                          │   Replay / Study)
                           ├─ Domain Aggregates (User, GameSession, LeaderboardEntry,
-                          │   Achievement, Talent, Class, Territory)
+                          │   Achievement, Talent, Class, Territory, Season,
+                          │   Challenge) + Bayesian competency state
                           └─ SQLAlchemy Repositories → PostgreSQL
+                                  ↑
+                                  └─ scheduler (territory settlement)
+                                  └─ spectate hub (in-process WS fan-out)
 ```
 
 ---
@@ -180,8 +190,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 196 tests (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, avatar parity)
-cd frontend && npm test            # 28 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity)
+cd backend  && pytest              # 315 tests across 23 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository)
+cd frontend && npm test            # 41 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).

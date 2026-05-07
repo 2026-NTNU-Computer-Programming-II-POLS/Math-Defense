@@ -49,9 +49,32 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    // Backlog §24 — Replay/Spectate Mode. The :sessionId is a UUID (the
+    // recorded session); the view fetches the seed + event log and re-drives
+    // the engine deterministically.
+    path: '/replay/:sessionId',
+    name: 'replay',
+    component: () => import('@/views/ReplayView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    // Backlog §24 Phase D — live spectate. WebSocket-driven; receives a
+    // historical snapshot followed by live events as the recorded session
+    // flushes them server-side.
+    path: '/spectate/:sessionId',
+    name: 'spectate',
+    component: () => import('@/views/SpectateView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/auth',
     name: 'auth',
     component: () => import('@/views/AuthView.vue'),
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: () => import('@/views/AboutView.vue'),
   },
   {
     path: '/profile',
@@ -120,6 +143,24 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresRole: 'teacher' },
   },
   {
+    path: '/teacher/challenges',
+    name: 'challenge-builder',
+    component: () => import('@/views/ChallengeBuilder.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' },
+  },
+  {
+    path: '/challenge/:id',
+    name: 'challenge-view',
+    component: () => import('@/views/ChallengeView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/challenge/:id/leaderboard',
+    name: 'challenge-leaderboard',
+    component: () => import('@/views/ChallengeLeaderboardView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/admin/teachers',
     name: 'admin-teachers',
     component: () => import('@/views/AdminView.vue'),
@@ -136,6 +177,26 @@ const routes: RouteRecordRaw[] = [
     name: 'admin-students',
     component: () => import('@/views/AdminView.vue'),
     meta: { requiresAuth: true, requiresRole: 'admin' },
+  },
+  {
+    path: '/admin/seasons',
+    name: 'admin-seasons',
+    component: () => import('@/views/AdminView.vue'),
+    meta: { requiresAuth: true, requiresRole: 'admin' },
+  },
+  {
+    // Backlog §27 — Empirical Validity Probe runner. ?study_id=...&form=pre|post|delay
+    path: '/study/probe',
+    name: 'study-probe',
+    component: () => import('@/views/StudyProbeView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    // Backlog §27 — Affect Likert survey. ?study_id=...&phase=pre|post
+    path: '/study/affect',
+    name: 'study-affect',
+    component: () => import('@/views/AffectSurveyView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',

@@ -11,6 +11,7 @@ from app.domain.errors import (
     PersistenceError,
     SessionNotFoundError,
     SessionStaleError,
+    Star5LockedError,
 )
 from app.domain.value_objects import Level, Score, GameResult, SessionStatus
 from app.domain.session.aggregate import GameSession
@@ -19,10 +20,13 @@ from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.scoring.score_calculator import recompute_total_score
 if TYPE_CHECKING:
     from app.application.achievement_service import AchievementApplicationService
+    from app.application.assessment_service import AssessmentApplicationService
     from app.application.ports import UnitOfWork
+    from app.domain.challenge.repository import ChallengeRepository
     from app.domain.session.repository import GameSessionRepository
     from app.domain.leaderboard.repository import LeaderboardRepository
     from app.domain.territory.repository import TerritoryRepository
+    from app.domain.user.repository import UserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,16 @@ class EndSessionResult:
     """Return value of end_session, carrying both the session and any newly unlocked achievements."""
     session: GameSession
     newly_unlocked: list[dict]
+
+
+@dataclass
+class AttachReflectionResult:
+    """Return value of attach_reflection. ``overwritten`` is True when the
+    submission replaced a non-empty prior reflection — callers (the router)
+    use this flag to emit an audit-log entry."""
+    session: GameSession
+    overwritten: bool
+    previous_text: str | None
 
 
 # Name of the partial-unique index guaranteeing at most one ACTIVE session per user.
@@ -52,29 +66,68 @@ class SessionApplicationService:
         uow: UnitOfWork,
         achievement_svc: AchievementApplicationService | None = None,
         territory_repo: TerritoryRepository | None = None,
+        assessment_svc: AssessmentApplicationService | None = None,
+        user_repo: UserRepository | None = None,
+        challenge_repo: ChallengeRepository | None = None,
     ) -> None:
         self._session_repo = session_repo
         self._leaderboard_repo = leaderboard_repo
         self._uow = uow
         self._achievement_svc = achievement_svc
         self._territory_repo = territory_repo
+        self._assessment_svc = assessment_svc
+        self._user_repo = user_repo
+        # Backlog §23 — optional so legacy unit tests can construct the service
+        # without challenges. End-session validates the wave_count override only
+        # when this dependency is present.
+        self._challenge_repo = challenge_repo
 
-    def create_session(self, user_id: str, level: int, initial_answer: bool = False, path_config: dict | None = None) -> GameSession:
+    def create_session(
+        self,
+        user_id: str,
+        level: int,
+        initial_answer: bool = False,
+        path_config: dict | None = None,
+        practice_mode: bool = False,
+        challenge_id: str | None = None,
+        rng_seed: int | None = None,
+    ) -> GameSession:
         # Under PG, find_active_by_user holds a row lock via with_for_update, so the
         # race between concurrent creates is closed. The retry here is defence-in-depth
         # for the case where no row exists yet (FOR UPDATE has nothing to lock) and
         # two inserts both reach the unique partial index simultaneously.
         for attempt in range(2):
             try:
-                return self._create_session_once(user_id, level, initial_answer, path_config)
+                return self._create_session_once(
+                    user_id, level, initial_answer, path_config, practice_mode,
+                    challenge_id, rng_seed,
+                )
             except ConstraintViolationError as e:
                 if attempt == 1 or e.constraint_name != _ACTIVE_SESSION_UNIQUE_INDEX:
                     raise
                 logger.info("create_session race: retrying after abandoning concurrent active session user=%s", user_id)
         raise RuntimeError("unreachable")
 
-    def _create_session_once(self, user_id: str, level: int, initial_answer: bool = False, path_config: dict | None = None) -> GameSession:
+    def _create_session_once(
+        self,
+        user_id: str,
+        level: int,
+        initial_answer: bool = False,
+        path_config: dict | None = None,
+        practice_mode: bool = False,
+        challenge_id: str | None = None,
+        rng_seed: int | None = None,
+    ) -> GameSession:
         with self._uow:
+            # 0. Star-5 personal lock (Habgood & Ainsworth 2011): the user must
+            # have completed the Initial-Answer phase correctly at any star
+            # rating at least once before Star-5 becomes selectable. Teacher-
+            # curated Grabbing Territory slots intentionally bypass this gate
+            # because slot creation never reaches this code path; see the
+            # docstring on app.application.territory_service for the carve-out.
+            if level == 5 and not self._session_repo.has_correct_ia_session(user_id):
+                raise Star5LockedError()
+
             # 1. Abandon stale sessions
             stale = self._session_repo.find_stale_sessions(user_id)
             for s in stale:
@@ -88,7 +141,15 @@ class SessionApplicationService:
                 self._session_repo.save(existing)
 
             # 3. Create new session
-            session = GameSession.create(user_id, Level(level), initial_answer=initial_answer, path_config=path_config)
+            session = GameSession.create(
+                user_id,
+                Level(level),
+                initial_answer=initial_answer,
+                path_config=path_config,
+                practice_mode=practice_mode,
+                challenge_id=challenge_id,
+                rng_seed=rng_seed,
+            )
             self._session_repo.save(session)
             self._uow.commit()
             return session
@@ -165,7 +226,12 @@ class SessionApplicationService:
                 kills=kills,
                 waves_survived=waves_survived,
             )
-            session.complete(result)
+            # Backlog §23 — when this session was launched from a challenge,
+            # narrow the wave cap to the challenge's wave_count. Server-side
+            # enforcement: a tampered client cannot bypass the per-challenge
+            # ceiling.
+            wave_cap_override = self._challenge_wave_cap(session.challenge_id)
+            session.complete(result, wave_cap_override=wave_cap_override)
             session.record_scoring_context(
                 kill_value=kill_value,
                 cost_total=cost_total,
@@ -179,6 +245,13 @@ class SessionApplicationService:
             # before committing so the DB always stores the canonical figure.
             self._verify_score(session)
             self._session_repo.save(session)
+
+            # Recompute the rolling-10 IA accuracy and persist it on the user
+            # aggregate so the next level start can drive concrete-fading on
+            # the path renderer (spec §17). Lives in the same UoW as the
+            # session save: if it fails, the whole end_session is retried via
+            # the COMPLETED-status idempotent path on the next attempt.
+            self._refresh_ia_recent_accuracy(user_id)
 
             # Snapshot events and backfill total_score now that _verify_score has
             # set the authoritative value. The aggregate emits SessionCompleted
@@ -219,6 +292,7 @@ class SessionApplicationService:
                 logger.exception(
                     "post-commit dispatch failed session=%s", event.session_id
                 )
+            unlocked: list = []
             try:
                 unlocked = self._check_achievements(event)
                 newly_unlocked.extend(unlocked)
@@ -226,7 +300,24 @@ class SessionApplicationService:
                 logger.exception(
                     "achievement check failed session=%s", event.session_id
                 )
+            # Stealth-assessment update (Pedagogical_Backlog_Spec.md §8): each
+            # newly-unlocked achievement is positive evidence for the
+            # competencies its Q-matrix row loads on. Failures here must not
+            # roll back the achievement insert — the assessment service runs
+            # in its own UoW for that reason.
+            try:
+                self._record_assessment_events(event.user_id, unlocked)
+            except Exception:
+                logger.exception(
+                    "assessment update failed session=%s", event.session_id
+                )
         return newly_unlocked
+
+    def _record_assessment_events(self, user_id: str, unlocked: list) -> None:
+        if not self._assessment_svc or not unlocked:
+            return
+        events = [(a.achievement_id, True) for a in unlocked]
+        self._assessment_svc.record_events(user_id, events)
 
     def _check_achievements(self, event: SessionCompleted) -> list:
         if not self._achievement_svc:
@@ -276,6 +367,39 @@ class SessionApplicationService:
                 return None
             return session
 
+    def list_reflections_for_users(
+        self, user_ids: list[str], limit: int = 100
+    ) -> list[GameSession]:
+        """Read-only: most-recent completed sessions with reflections for a
+        set of users. Caller is responsible for the access-control check
+        (typically: teacher owns the class containing these users)."""
+        return self._session_repo.find_reflections_for_users(user_ids, limit=limit)
+
+    def attach_reflection(
+        self, session_id: str, user_id: str, text: str
+    ) -> AttachReflectionResult:
+        """Attach a post-wave reflection to a completed session.
+
+        Enforces ownership (404 on cross-user access) and the domain
+        invariant that reflections require COMPLETED status. Overwriting an
+        existing non-empty reflection is allowed but reported back to the
+        caller so an audit-log entry can be emitted.
+        """
+        with self._uow:
+            session = self._session_repo.find_by_id(session_id, user_id)
+            if not session:
+                raise SessionNotFoundError("Session not found")
+            previous = session.reflection_text
+            session.record_reflection(text)
+            self._session_repo.save(session)
+            self._uow.commit()
+            overwritten = bool(previous) and previous != session.reflection_text
+            return AttachReflectionResult(
+                session=session,
+                overwritten=overwritten,
+                previous_text=previous,
+            )
+
     def abandon_session(self, session_id: str, user_id: str) -> GameSession:
         """Abandon an active session on the owner's explicit request.
 
@@ -294,7 +418,18 @@ class SessionApplicationService:
             return session
 
     def _handle_session_completed(self, event: SessionCompleted) -> None:
-        """Handle session completed event — auto-create leaderboard entry (idempotent)"""
+        """Handle session completed event — auto-create leaderboard entry (idempotent).
+
+        Practice-mode sessions (Backlog §20) are excluded from the global
+        leaderboard. The session row stays authoritative; we just don't emit
+        a LeaderboardEntry for it.
+        """
+        # Re-read the session to learn whether the run was practice_mode. The
+        # event payload is the public domain message and we keep that surface
+        # narrow rather than threading practice_mode through every consumer.
+        session = self._session_repo.find_by_id(event.session_id, event.user_id)
+        if session is not None and session.practice_mode:
+            return
         existing = self._leaderboard_repo.find_by_session_id(event.session_id)
         if existing:
             return
@@ -305,8 +440,22 @@ class SessionApplicationService:
             kills=event.kills,
             waves_survived=event.waves_survived,
             session_id=event.session_id,
+            # Backlog §23 — read from the server-side session aggregate, not
+            # the event payload, so a tampered end-payload cannot misroute the
+            # entry into a challenge ranking it doesn't belong to.
+            challenge_id=session.challenge_id if session is not None else None,
         )
         self._leaderboard_repo.save(entry)
+
+    def _challenge_wave_cap(self, challenge_id: str | None) -> int | None:
+        """Look up the wave_count for a challenge, or None when no challenge
+        is attached or the challenge_repo dependency is absent (legacy callers)."""
+        if challenge_id is None or self._challenge_repo is None:
+            return None
+        challenge = self._challenge_repo.find_by_id(challenge_id)
+        if challenge is None or challenge.is_deleted:
+            return None
+        return challenge.constraints.wave_count
 
     def _get_session(self, session_id: str, user_id: str) -> GameSession:
         session = self._session_repo.find_by_id(session_id, user_id)
@@ -364,6 +513,21 @@ class SessionApplicationService:
                     session.id, submitted, recomputed,
                 )
         session.override_total_score(recomputed)
+
+    def _refresh_ia_recent_accuracy(self, user_id: str) -> None:
+        """Recompute and persist the rolling-10 IA accuracy on the user.
+
+        Runs inside the same UoW as session.save so the value lands together
+        with the just-completed session row. The user_repo dependency is
+        optional — if absent, we skip silently (e.g. service constructed in
+        a unit test without a user_repo)."""
+        if self._user_repo is None:
+            return
+        user = self._user_repo.find_by_id(user_id)
+        if user is None:
+            return
+        user.ia_recent_accuracy = self._session_repo.compute_ia_recent_accuracy(user_id)
+        self._user_repo.save(user)
 
     def _abandon_and_commit(self, session: GameSession) -> None:
         session.abandon()

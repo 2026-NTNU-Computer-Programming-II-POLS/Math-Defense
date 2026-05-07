@@ -29,6 +29,8 @@ export function useAuth() {
           player_name: me.player_name,
           role: me.role as UserRole,
           avatar_url: me.avatar_url ?? null,
+          ia_unlock_earned: me.ia_unlock_earned ?? false,
+          ia_recent_accuracy: me.ia_recent_accuracy ?? 0,
         })
       } catch {
         authStore.setUser({
@@ -37,6 +39,8 @@ export function useAuth() {
           player_name: res.player_name ?? '',
           role: (res.role as UserRole) ?? 'student',
           avatar_url: res.avatar_url ?? null,
+          ia_unlock_earned: false,
+          ia_recent_accuracy: 0,
         })
       }
       return true
@@ -61,6 +65,8 @@ export function useAuth() {
           player_name: me.player_name,
           role: me.role as UserRole,
           avatar_url: me.avatar_url ?? null,
+          ia_unlock_earned: me.ia_unlock_earned ?? false,
+          ia_recent_accuracy: me.ia_recent_accuracy ?? 0,
         })
       } catch {
         authStore.setUser({
@@ -69,6 +75,8 @@ export function useAuth() {
           player_name: res.player_name ?? '',
           role: (res.role as UserRole) ?? 'student',
           avatar_url: res.avatar_url ?? null,
+          ia_unlock_earned: false,
+          ia_recent_accuracy: 0,
         })
       }
       mfaRequired.value = false
@@ -106,6 +114,8 @@ export function useAuth() {
           player_name: me.player_name,
           role: me.role as UserRole,
           avatar_url: me.avatar_url ?? null,
+          ia_unlock_earned: me.ia_unlock_earned ?? false,
+          ia_recent_accuracy: me.ia_recent_accuracy ?? 0,
         })
       } catch {
         authStore.setUser({
@@ -114,6 +124,8 @@ export function useAuth() {
           player_name: res.player_name ?? playerName,
           role: (res.role as UserRole) ?? 'student',
           avatar_url: res.avatar_url ?? null,
+          ia_unlock_earned: false,
+          ia_recent_accuracy: 0,
         })
       }
       return true

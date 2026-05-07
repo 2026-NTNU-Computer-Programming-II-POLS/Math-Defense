@@ -33,6 +33,7 @@ class User:
         totp_secret: str | None = None,
         mfa_enabled: bool = False,
         totp_last_used_at: datetime | None = None,
+        ia_recent_accuracy: float = 0.0,
     ) -> None:
         self.id = id
         self.email = email
@@ -47,6 +48,15 @@ class User:
         self.totp_secret = totp_secret
         self.mfa_enabled = mfa_enabled
         self.totp_last_used_at = totp_last_used_at
+        # Rolling Initial-Answer accuracy over the last 10 completed sessions
+        # (0.0–1.0). Drives concrete-fading on the Star-1 path renderer
+        # (spec §17). Recomputed by the session-service at end_session.
+        self.ia_recent_accuracy = ia_recent_accuracy
+        # Derived progression flag, hydrated by the application layer from the
+        # session repository when the profile is read. False until at least one
+        # session records a correct Initial-Answer phase. See the Star-5 unlock
+        # gate in app.application.session_service.
+        self.ia_unlock_earned: bool = False
 
     @classmethod
     def create(

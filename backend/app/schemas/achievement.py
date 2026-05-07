@@ -11,6 +11,11 @@ class AchievementOut(BaseModel):
     talent_points: int
     unlocked: bool
     unlocked_at: str | None = None
+    season_id: str | None = None
+    season_active: bool = False
+    season_starts_at: str | None = None
+    season_ends_at: str | None = None
+    season_name: str | None = None
 
 
 class AchievementSummaryOut(BaseModel):

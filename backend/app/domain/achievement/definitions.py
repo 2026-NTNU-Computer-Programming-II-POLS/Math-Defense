@@ -21,6 +21,7 @@ Condition types:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 
@@ -34,6 +35,13 @@ class AchievementDef:
     condition_value: Any
     talent_points: int
     icon: str = ""
+    # Seasonal-set membership (Pedagogical_Backlog_Spec.md §22): when set, the
+    # achievement is part of a time-bounded season. Reward is doubled while the
+    # season is active. Static dates here serve as defaults; admin-configured
+    # Season rows override the window at runtime.
+    season_id: str | None = None
+    season_starts_at: datetime | None = None
+    season_ends_at: datetime | None = None
 
 
 ACHIEVEMENT_DEFS: dict[str, AchievementDef] = {}
@@ -53,7 +61,7 @@ _reg(AchievementDef("combat_single_80", "Massacre", "Kill 80 enemies in one sess
 # ── Scoring ──
 _reg(AchievementDef("score_1000", "Score Seeker", "Achieve total score of 1,000 or more", "scoring", "total_score", 1000, 1))
 _reg(AchievementDef("score_10000", "Score Hunter", "Achieve total score of 10,000 or more", "scoring", "total_score", 10000, 2))
-_reg(AchievementDef("score_50000", "Score Master", "Achieve total score of 50,000 or more", "scoring", "total_score", 50000, 3))
+_reg(AchievementDef("score_50000", "50K Scorer", "Achieve total score of 50,000 or more", "scoring", "total_score", 50000, 3))
 _reg(AchievementDef("score_single_2000", "High Scorer", "Score 2,000 or more in one session", "scoring", "single_session_score", 2000, 1))
 _reg(AchievementDef("score_single_5000", "Top Scorer", "Score 5,000 or more in one session", "scoring", "single_session_score", 5000, 2))
 
@@ -79,6 +87,16 @@ _reg(AchievementDef("explore_all_stars", "Cartographer", "Play at every star rat
 _reg(AchievementDef("explore_sessions_5", "Regular", "Complete 5 sessions", "exploration", "total_sessions", 5, 1))
 _reg(AchievementDef("explore_sessions_20", "Dedicated", "Complete 20 sessions", "exploration", "total_sessions", 20, 2))
 
+# ── Curve-family unlocks (Pedagogical_Backlog_Spec.md §6) ──
+# Magic tower starts polynomial-only; trig and log functions are gated behind
+# clearing a level at the corresponding difficulty so newcomers face one curve
+# family at a time (Sweller/van Merrienboer/Paas pre-training principle).
+# Uses max_star_cleared (cumulative) rather than level_cleared_at_star so
+# existing players who already cleared the threshold pre-feature unlock on
+# their next session completion, satisfying the spec's retroactive guarantee.
+_reg(AchievementDef("unlock_trig_curves", "Trig Initiate", "Unlock trig functions (sin/cos/tan) in the magic tower by clearing a Star-1 level", "exploration", "max_star_cleared", 1, 1))
+_reg(AchievementDef("unlock_log_curves",  "Log Initiate",  "Unlock log functions (log/ln) in the magic tower by clearing a Star-2 level", "exploration", "max_star_cleared", 2, 1))
+
 # ── Territory ──
 _reg(AchievementDef("territory_first", "Land Grabber", "Hold a territory", "territory", "territories_seized", 1, 1))
 _reg(AchievementDef("territory_three", "Expansionist", "Hold 3 territories", "territory", "territories_seized", 3, 2))
@@ -88,3 +106,7 @@ _reg(AchievementDef("territory_five_star", "Star Realm", "Hold a 5-star territor
 
 def get_all_defs() -> list[AchievementDef]:
     return list(ACHIEVEMENT_DEFS.values())
+
+
+def get_seasonal_defs() -> list[AchievementDef]:
+    return [d for d in ACHIEVEMENT_DEFS.values() if d.season_id]

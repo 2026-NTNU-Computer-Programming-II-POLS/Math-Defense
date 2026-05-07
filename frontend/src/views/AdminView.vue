@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { adminService, type UserSummary, type ClassSummary } from '@/services/adminService'
+import { seasonService, type SeasonOut } from '@/services/seasonService'
 
 const router = useRouter()
 const route = useRoute()
@@ -9,17 +10,23 @@ const route = useRoute()
 const teachers = ref<UserSummary[]>([])
 const students = ref<UserSummary[]>([])
 const classes = ref<ClassSummary[]>([])
+const seasons = ref<SeasonOut[]>([])
 const loading = ref(false)
 const error = ref('')
 const searchQuery = ref('')
 
-type Tab = 'teachers' | 'classes' | 'students'
+type Tab = 'teachers' | 'classes' | 'students' | 'seasons'
 const activeTab = computed<Tab>(() => {
   const name = route.name as string | undefined
   if (name === 'admin-classes') return 'classes'
   if (name === 'admin-students') return 'students'
+  if (name === 'admin-seasons') return 'seasons'
   return 'teachers'
 })
+
+const seasonForm = ref({ season_id: '', name: '', starts_at: '', ends_at: '' })
+const seasonFormError = ref('')
+const seasonFormSubmitting = ref(false)
 
 function matchesSearch(text: string): boolean {
   if (!searchQuery.value) return true
@@ -46,6 +53,8 @@ async function loadData(): Promise<void> {
       teachers.value = await adminService.getTeachers()
     } else if (activeTab.value === 'classes') {
       classes.value = await adminService.getClasses()
+    } else if (activeTab.value === 'seasons') {
+      seasons.value = await seasonService.listAdmin()
     } else {
       students.value = await adminService.getStudents()
     }
@@ -53,6 +62,34 @@ async function loadData(): Promise<void> {
     error.value = e instanceof Error ? e.message : 'Failed to load data'
   } finally {
     loading.value = false
+  }
+}
+
+async function submitSeason(): Promise<void> {
+  seasonFormError.value = ''
+  if (!seasonForm.value.season_id || !seasonForm.value.name
+      || !seasonForm.value.starts_at || !seasonForm.value.ends_at) {
+    seasonFormError.value = 'All fields required'
+    return
+  }
+  if (seasonForm.value.ends_at <= seasonForm.value.starts_at) {
+    seasonFormError.value = 'ends_at must be after starts_at'
+    return
+  }
+  seasonFormSubmitting.value = true
+  try {
+    await seasonService.create({
+      season_id: seasonForm.value.season_id,
+      name: seasonForm.value.name,
+      starts_at: new Date(seasonForm.value.starts_at).toISOString(),
+      ends_at: new Date(seasonForm.value.ends_at).toISOString(),
+    })
+    seasonForm.value = { season_id: '', name: '', starts_at: '', ends_at: '' }
+    await loadData()
+  } catch (e) {
+    seasonFormError.value = e instanceof Error ? e.message : 'Failed to create season'
+  } finally {
+    seasonFormSubmitting.value = false
   }
 }
 
@@ -71,14 +108,14 @@ onMounted(loadData)
 
       <div class="tab-bar">
         <button
-          v-for="tab in (['teachers', 'classes', 'students'] as Tab[])"
+          v-for="tab in (['teachers', 'classes', 'students', 'seasons'] as Tab[])"
           :key="tab"
           class="tab-btn"
           :class="{ active: activeTab === tab }"
           :disabled="loading"
           @click="switchTab(tab); loadData()"
         >
-          {{ { teachers: '教師', classes: '班級', students: '學生' }[tab] }}
+          {{ { teachers: '教師', classes: '班級', students: '學生', seasons: '賽季' }[tab] }}
         </button>
       </div>
 
@@ -125,6 +162,40 @@ onMounted(loadData)
           {{ searchQuery ? 'No results' : '尚無學生' }}
         </li>
       </ul>
+
+      <!-- Seasons -->
+      <section v-if="activeTab === 'seasons' && !loading" class="seasons-section">
+        <form class="season-form" @submit.prevent="submitSeason">
+          <h3 class="season-form-title">建立 / 更新賽季</h3>
+          <input v-model="seasonForm.season_id" class="rune-input" placeholder="season_id (e.g. spring_2026)" />
+          <input v-model="seasonForm.name" class="rune-input" placeholder="display name" />
+          <label class="season-label">起始 <input v-model="seasonForm.starts_at" class="rune-input" type="datetime-local" /></label>
+          <label class="season-label">結束 <input v-model="seasonForm.ends_at" class="rune-input" type="datetime-local" /></label>
+          <div v-if="seasonFormError" class="error-msg">{{ seasonFormError }}</div>
+          <button class="btn" type="submit" :disabled="seasonFormSubmitting">
+            {{ seasonFormSubmitting ? '儲存中…' : '儲存賽季' }}
+          </button>
+        </form>
+
+        <ul class="item-list">
+          <li v-for="s in seasons" :key="s.season_id" class="item-row season-row">
+            <div>
+              <span class="item-name">{{ s.name }}</span>
+              <span class="season-id-hint"> · {{ s.season_id }}</span>
+              <span v-if="s.active" class="season-pill">ACTIVE</span>
+              <span v-else-if="s.archived" class="season-pill archived">ARCHIVED</span>
+              <span v-else class="season-pill upcoming">UPCOMING</span>
+            </div>
+            <div class="item-detail">
+              {{ s.starts_at ? new Date(s.starts_at).toLocaleDateString() : '—' }}
+              →
+              {{ s.ends_at ? new Date(s.ends_at).toLocaleDateString() : '—' }}
+              <span v-if="s.achievement_ids.length"> · {{ s.achievement_ids.length }} achievements</span>
+            </div>
+          </li>
+          <li v-if="seasons.length === 0" class="empty">尚無賽季</li>
+        </ul>
+      </section>
 
       <button class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
     </div>
@@ -196,4 +267,33 @@ onMounted(loadData)
 }
 
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+
+.seasons-section { display: flex; flex-direction: column; gap: 12px; }
+
+.season-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--axis);
+}
+
+.season-form-title { font-size: 11px; color: var(--gold); letter-spacing: 2px; margin: 0 0 4px; }
+.season-label { font-size: 10px; color: var(--axis); display: flex; flex-direction: column; gap: 2px; }
+.season-row { flex-direction: column; gap: 4px; align-items: flex-start; }
+
+.season-id-hint { font-size: 10px; color: var(--axis); opacity: 0.6; }
+
+.season-pill {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: 2px;
+}
+
+.season-pill.archived { border-color: var(--axis); color: var(--axis); }
+.season-pill.upcoming { border-color: var(--axis); color: var(--axis); opacity: 0.7; }
 </style>

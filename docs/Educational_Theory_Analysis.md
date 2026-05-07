@@ -10,7 +10,7 @@
 
 *Math Defense* is a tower-defense game in which seven tower types are not merely flavoured by mathematics but **constituted by it**: the slope and intercept of a polynomial determine a Magic-tower zone; the start and end angles of a 1.5×-bonus arc shape every Radar tower's effective firing zone; the dot product of two paired Matrix-tower coordinate vectors produces Matrix-tower damage; a derivative or integral spawns Calculus-tower pets; a multiple-choice limit picks a Limit-tower's effect; a Monty-Hall door choice between waves rewards correct conditional-probability reasoning; and a Boss Type-B fight is gated by a chain-rule challenge. Random function paths, a 1–5 star rating system, an "Initial Answer" pre-wave endpoint identification, time-based spells and buffs, an S1/S2/K/TotalScore formula, a 25-achievement set, a 19-node talent tree, and a teacher-curated *Grabbing Territory* classroom-competition mode complete the loop.
 
-The design is, at the level of intent, a near-canonical implementation of **intrinsic integration** (Habgood & Ainsworth, 2011), layered with **productive failure** (Kapur, 2008, 2014, 2016), **variation-theoretic random instances** (Marton, 2015), **cognitive-load-respecting phase segmentation** (Sweller, van Merriënboer, & Paas, 2019), and **self-determination-aligned progression** (Ryan, Rigby, & Przybylski, 2006). The achievement-and-telemetry layer is, structurally, a **stealth assessment** in the sense of Shute (2011), and the teacher-curated Grabbing Territory mode satisfies most of the cognitive-apprenticeship cycle (Collins, Brown, & Newman, 1989).
+The design is, at the level of intent, a near-canonical implementation of **intrinsic integration** (Habgood & Ainsworth, 2011), layered with **productive failure** (Kapur, 2008, 2014, 2016), **variation-theoretic random instances** (Marton, 2015), **cognitive-load-respecting phase segmentation** (Sweller, van Merriënboer, & Paas, 2019), and **self-determination-aligned progression** (Ryan, Rigby, & Przybylski, 2006). The achievement-and-telemetry layer is now a **fully realised stealth assessment** in the sense of Shute (2011) — declared Q-matrix, Beta competency posteriors per user, teacher-facing dashboard surfacing, and an adaptive star/talent recommender — and the combination of teacher-curated Grabbing Territory, deterministic Replay/Spectate, and a post-wave articulation prompt now satisfies **all six** steps of the cognitive-apprenticeship cycle (Collins, Brown, & Newman, 1989).
 
 This document maps each mechanic to the relevant theory, identifies both strengths and threats to learning effectiveness, re-examines four under-noticed subsystems (Grabbing Territory, the Class system as differentiated-instruction infrastructure, server-side score verification as assessment-validity infrastructure, and the project's identity as a Programming-II final by a mixed-seniority team), and closes with a minimum-defensible empirical-validity plan and three highest-leverage design refinements.
 
@@ -55,7 +55,7 @@ This contrasts sharply with the four competitor titles surveyed in the original 
 
 > **Green flag.** The architecture invariant ("all game state changes go through events; no `as any` casts; renderers use public system APIs") prevents shortcut UI paths that would let a player bypass the math input. Per-phase update-system gating (`if (game.state.phase !== GamePhase.WAVE) return` in `RadarTowerSystem`/`MatrixTowerSystem`) keeps math evaluation and combat resolution in their respective phases, even though no explicit "lock parameters at wave start" mechanism is implemented in the current codebase — re-configuration events such as `RADAR_ARC_CHANGED` would still mutate tower properties mid-wave if dispatched, so the design depends on UI gating (e.g. `StartWaveButton` only enabled in `BUILD`) rather than a hard domain-level lock.
 
-> **Risk.** The Initial Answer phase rewards endpoint *recognition* with a score multiplier (`TotalScore = K^{1/(1+2+H_o-H_f-IA)}`). Because IA appears as a flat additive in the exponent's denominator, a player can in principle skip the math and absorb the small score penalty. Habgood and Ainsworth's framework predicts that whenever the *math option* has lower expected utility than the *math-free option*, intrinsic integration degrades. Recommended: re-tune IA's weight or make at least one IA correct answer a **prerequisite** for unlocking the highest star ratings.
+> **Risk → resolved.** The Initial Answer phase rewards endpoint *recognition* with a score multiplier (`TotalScore = K^{1/(1+2+H_o-H_f-IA)}`). Because IA appears as a flat additive in the exponent's denominator, a player could in principle skip the math and absorb the small score penalty — exactly the failure mode Habgood and Ainsworth's framework predicts whenever the *math option* has lower expected utility than the *math-free option*. The current build closes this loophole at the difficulty surface rather than the score surface: Star-5 selection is **gated** on having answered the IA correctly at least once at any star rating (`user/aggregate.py:ia_unlock_earned`, enforced both client-side in `LevelSelectView.vue` and server-side via `Star5LockedError` raised from `session_service.create_session`). Class-mode Grabbing-Territory slots at Star-5 still bypass the personal lock by design, since slots are teacher-curated.
 
 ### 3.2 The Generation Effect — The No-Slider Doctrine
 
@@ -67,7 +67,7 @@ The original spec's design rule — *"manual numeric input, not sliders; players
 - the Chain-rule challenge (constrained: select correct $f'(g(x))g'(x)$), and
 - the Monty-Hall door choice (constrained binary: switch or stay).
 
-> **Partial green flag — and a notable exception.** The Magic tower (`MagicInputPanel`), the Matrix tower's coefficient grid (`MatrixInputPanel`, dead-code variant) and the Calculus tower (function/operator selection) all honour the no-slider rule; the Limit and Monty-Hall paths are constrained multiple-choice. **However, `RadarConfigPanel.vue` uses `<input type="range">` sliders for `arcStart` / `arcEnd` (in 5° steps), affecting all three Radar towers (A/B/C) — i.e. three of seven tower types.** Because Radar arc selection is a *recognition* task ("drag until the green band looks right") rather than a *generation* task, the design's strongest single educational claim has a partial counterexample. The doctrine still holds for the other towers, but should not be presented as a universal invariant.
+> **Green flag (restored).** The Magic tower (`MagicInputPanel`), the Matrix tower's coefficient grid (`MatrixInputPanel`), and the Calculus tower (function/operator selection) all honour the no-slider rule; the Limit and Monty-Hall paths are constrained multiple-choice. The previous Radar-slider counterexample has been retired: `RadarConfigPanel.vue` now uses `<input type="number" min="0" max="360" step="5">` for `arcStart` / `arcEnd` with a manual *Apply* gate (`snapDeg()` rounds to the nearest 5°, and the visual arc updates only on Apply, not on every keystroke — the property the generation literature requires). All seven tower types now place their primary parameter input in the *generation* regime rather than the *recognition* regime. An opt-in slider fallback is exposed for accessibility (see §12.3); enabling it visibly tags the session as **practice mode**, which is excluded from leaderboards (`leaderboard_service` filter on `practice_mode`) so the doctrine is preserved at the level of competitive scoring even when accommodation is granted at the level of input.
 
 ---
 
@@ -85,7 +85,7 @@ Kapur's productive-failure (PF) paradigm holds that learners benefit from being 
 
 The original spec's slogan "allow failure, but every failure has learning value" cites Kapur (2008) directly and is, in our reading, a faithful operationalisation.
 
-> **Risk.** Kapur (2016) is explicit that PF only works when learners are asked to grapple with **the same structural problem** that the canonical instruction will then crystallise. *Math Defense* has no canonical-instruction step: there is no follow-up explanation of *why* the curve worked. Loibl, Roll, and Rummel's (2017) theoretical synthesis argues that PF without consolidation degrades to mere "unproductive failure." Recommend: a brief, optional post-wave overlay surfacing the principle the player just used (e.g. "you used the chain rule: $\frac{d}{dx}f(g(x)) = f'(g(x))g'(x)$, with $g(x) = …$").
+> **Risk → resolved.** Kapur (2016) is explicit that PF only works when learners are asked to grapple with **the same structural problem** that the canonical instruction will then crystallise; Loibl, Roll, and Rummel's (2017) theoretical synthesis argues that PF without consolidation degrades to mere "unproductive failure." The current build adds the consolidation step as an optional, dismissible **post-wave principle-surfacing overlay** (`frontend/src/components/game/PrincipleOverlay.vue`). After every wave (and after `CHAIN_RULE_ANSWERED` / `MONTY_HALL_RESULT`), the engine emits `PRINCIPLE_SHOW`; the overlay renders one of seven principle cards from `frontend/src/data/principle-defs.ts` (`chain-rule`, `monty-hall`, `derivative-as-rate`, `limit-piecewise`, `matrix-dot`, `magic-curve-zone`, `radar-arc`) with a KaTeX formula and a one-paragraph plain-language gloss, dismissible after 8 s or on click. The toggle lives in `ProfileView.vue` settings ("Show learning hints between waves") so the consolidation step is honoured by default but respects autonomy.
 
 ### 4.2 Cognitive Load Theory
 
@@ -105,7 +105,7 @@ Pausing Wave Phase during chain-rule challenges and forbidding math input during
 
 > **Green flag.** The HUD redesign in V2 Phase 4 (two-row layout: star, kill value, IA indicator, Monty-Hall progress, spell bar, buffs, prep timer) is a textbook signalling-principle implementation (Mayer, 2014).
 
-> **Risk.** The Magic tower lets players choose between polynomial, trigonometric, and logarithmic curve families *and* type coefficients. With Limit/Calculus panels on the same screen, Build-Phase load is high. Sweller et al. (2019) recommend **pre-training** on individual elements before composite tasks. The 1–5 star rating partly serves this function; consider also locking advanced curve families behind early-star achievements.
+> **Risk → resolved.** The Magic tower lets players choose between polynomial, trigonometric, and logarithmic curve families *and* type coefficients. With Limit/Calculus panels on the same screen, Build-Phase load was previously high — the configuration Sweller et al. (2019) flag as exactly the case for **pre-training**. The current build implements pre-training by gating advanced curve families on early-star achievements: new players see only the polynomial tab in `MagicModePanel.vue`; the trigonometric tab unlocks on the `unlock_trig_curves` achievement (clear one Star-1 level) and the logarithmic tab on `unlock_log_curves` (clear one Star-2 level). Existing players are retroactively unlocked through the existing achievement-evaluation loop on session completion.
 
 ### 4.3 Desirable Difficulties (Bjork & Bjork, 2011)
 
@@ -119,7 +119,7 @@ Robert and Elizabeth Bjork's *desirable difficulties* framework holds that some 
 | Generation | Manual numeric input for Magic/Matrix/Calculus; recognition-style sliders on Radar (see §3.2 caveat) |
 | Phase-gated re-configuration | The Build → Wave UI gate forces commitment to *one* configuration per wave; effective in practice, though not enforced as a hard domain-level invariant |
 
-A corollary, also emphasised by Bjork and Bjork (2011), is that learners *misjudge* desirable difficulties as bad teaching. Players (and teachers) may rate the random-path system as "unfair." The Teacher Dashboard should therefore surface a brief explanation that randomisation is a learning-effectiveness feature, not a bug.
+A corollary, also emphasised by Bjork and Bjork (2011), is that learners *misjudge* desirable difficulties as bad teaching. Players (and teachers) may rate the random-path system as "unfair." `TeacherDashboard.vue` accordingly surfaces a `<details>` explainer ("Why are paths random?") near the top of the dashboard, default-open on first visit and persisted as collapsed in `localStorage` on dismissal — a low-cost intervention against the well-documented user-misperception failure mode.
 
 ### 4.4 Retrieval Practice and the Testing Effect
 
@@ -128,7 +128,7 @@ Roediger and Karpicke (2006) showed across multiple experiments that the act of 
 Mid-wave retrieval events in *Math Defense*:
 
 - **Boss Type-B chain-rule challenge**: WAVE pauses, learner retrieves the chain rule under modest time pressure, resumes WAVE.
-- **Limit tower setup**: each placement is a fresh limit problem.
+- **Limit tower setup**: each placement is a fresh limit problem. At Star ≥ 4, `LimitQuestionPanel.vue` switches the response mode from multiple-choice to **typed entry** (`limit-evaluator.parseLimitAnswer()` accepts `+inf`/`-inf`/`infinity`/integers/decimals/`DNE`, whitespace-tolerant and case-insensitive). This diversifies the retrieval task type so the high-difficulty band exercises *recall* construction rather than *recognition* selection — the configuration Karpicke & Roediger (2007) identify as the stronger long-term-retention condition.
 - **Monty-Hall event**: each occurrence re-tests conditional-probability reasoning.
 
 The spacing between retrieval events varies with kill-value thresholds and wave count, producing the kind of expanding inter-test interval that Cepeda, Vul, Rohrer, Wixted, and Pashler (2008) identify as a robust spacing benefit; Karpicke and Roediger (2007) further show that *repeated successful retrieval* of the same item — exactly the multi-wave structure of *Math Defense* — is the strongest single predictor of long-term retention.
@@ -157,9 +157,9 @@ Mayer's (2014) cognitive theory of multimedia learning lists ~15 evidence-based 
 |---|---|
 | Spatial contiguity | Build-Phase panel renders the curve next to its formula — both spatially co-located on the canvas |
 | Signalling | HUD highlights the active phase; KaTeX bolds the active curve term |
-| Modality | **Not yet realised** — `assets/audio/` is empty and no audio AssetManager has been landed. The Modality principle (offload some channel from purely-visual presentation) is therefore an opportunity, not a current strength; see §11 (Mayer principles row) for the planned remediation |
+| Modality | Realised via `engine/audio/AssetManager.ts` and a minimal SFX set in `frontend/public/audio/` (cast-spell, kill, wave-end, mh-reveal, achievement, plus an ambient build-phase loop). All assets are CC0 / synthesised in-house (`scripts/synth-audio.py`); first user gesture unlocks the `AudioContext` per Chromium autoplay policy; mute/volume are persisted in `uiStore` and exposed in `ProfileView.vue`. Offloading kill/wave/reveal cues onto the auditory channel relieves the visual channel exactly as the Modality principle prescribes |
 | Personalisation | Custom avatars (V2 Phase 5 added 6 preset SVGs) — supports the personalisation-principle motivational gain (Mayer, 2014, social-cues principles) |
-| Pre-training | Initial Answer phase functions as pre-training on the wave's path before towers are placed |
+| Pre-training | Initial Answer phase functions as pre-training on the wave's path before towers are placed; the Magic-tower curve-family unlock (§4.2) extends pre-training across sessions |
 
 ### 5.2 Dual Coding Theory
 
@@ -167,7 +167,7 @@ Paivio's (1991) dual-coding theory distinguishes verbal and nonverbal mental rep
 
 ### 5.3 Emotional Design in Multimedia
 
-Plass, Heidig, Hayward, Homer, and Um (2014) showed that warm colours, rounded shapes, and human-like features in instructional graphics produce small-to-medium gains on transfer measures (partial η² in the .04–.10 range across their two studies). The pixel-art aesthetic is solidly within Plass et al.'s "engaging without distracting" envelope; the medieval-stone palette is, however, on the cool side, and a modest warming for tutorial levels is a near-zero-cost intervention. (Audio is not yet implemented, so the soundtrack/SFX dimension of emotional design has no current footprint to evaluate.)
+Plass, Heidig, Hayward, Homer, and Um (2014) showed that warm colours, rounded shapes, and human-like features in instructional graphics produce small-to-medium gains on transfer measures (partial η² in the .04–.10 range across their two studies). The pixel-art aesthetic is solidly within Plass et al.'s "engaging without distracting" envelope; the medieval-stone palette is on the cool side at higher stars, and `styles/variables.css` now applies a `[data-star='1']` rule that nudges the canvas background and HUD accent toward warmer hues for the tutorial-difficulty band only (`GameView.vue` writes `data-star` on the root element from `gameStore.starRating`). The auditory dimension of emotional design is now in scope as well — see the Modality row of §5.1 — though the current SFX library is functional rather than orchestral and the affective-tone effect should be considered modest until empirically tested.
 
 ### 5.4 Process–Object Dualism in Calculus (Sfard; APOS)
 
@@ -198,7 +198,7 @@ Csikszentmihalyi's (1990) flow theory specifies the conditions for the autotelic
 
 > **Green flag.** The active-time accumulator that *excludes* UI-pause phases reflects an important flow invariant: scoring should reward time spent in productive challenge, not time spent reading menus.
 
-> **Risk.** Flow requires that *failure* be visible but not punitive enough to break engagement. The current `GAME_OVER → restart` loop has no checkpoint. For star-5 difficulty this risks pushing players out of the flow channel into anxiety. Consider a "wave checkpoint" that lets a star-5 player retry from the last cleared wave with the same talents.
+> **Risk → resolved (Star-5 only).** Flow requires that *failure* be visible but not punitive enough to break engagement. The Star-5 band now exposes a **wave checkpoint** on `GAME_OVER`: the engine snapshots gold / HP / cost-total / kill-value at every `WAVE_END` (`frontend/src/domain/level/checkpoint.ts`), and `GameView.vue` renders a "Retry from Wave N" button when `starRating == 5` and a `lastCheckpoint` is in hand. To preserve audit integrity and the `_verify_score()` invariants of §8.4, the retry creates a **new** server-side session pre-seeded with the checkpoint state rather than mutating the abandoned one; checkpoint runs are therefore flagged as *practice* on personal-best (§6.2) and excluded from class leaderboards. Stars 1–4 retain the full `GAME_OVER → restart` loop, on the reading that those bands sit comfortably inside the Csikszentmihalyi flow channel without a checkpoint.
 
 ### 6.2 Self-Determination Theory and Player Motivation
 
@@ -212,7 +212,7 @@ Deci and Ryan's (2000) self-determination theory identifies three innate psychol
 
 > **Green flag.** Ryan et al. (2006) report that *meaningful choice* (rather than choice volume) predicts autonomy satisfaction. The talent tree's prerequisite chains (19 nodes across the 7 tower types, gated effects) ensure that each allocation decision has consequences.
 
-> **Risk.** The Global leaderboard is by raw score. SDT (Deci & Ryan, 2000) and the achievement-goal literature (Elliot, 1999) caution that pure social-comparison feedback can shift learners from *mastery goals* to *performance-avoidance goals*. Recommend supplementing with a *personal-best* leaderboard view — self-referential, mastery-oriented climates have been linked in classroom studies (e.g., Ames, 1992) with stronger competence perception and intrinsic motivation than purely social-comparison framing.
+> **Risk → resolved.** The Global leaderboard is by raw score, and SDT (Deci & Ryan, 2000) and the achievement-goal literature (Elliot, 1999) caution that pure social-comparison feedback can shift learners from *mastery goals* to *performance-avoidance goals*. `LeaderboardView.vue` now exposes a **Personal** tab alongside Global (with Personal listed first, on the reading that self-referential framing is the healthier default per Ames (1992)); the back-end repository method `get_user_history(user_id, star_rating?)` and `GET /api/leaderboard/me` deliver the timeline, and `components/leaderboard/PersonalTimeline.vue` renders score deltas per star with personal-best markers. An empty history surfaces "Play a session to populate this view" rather than zero-state social comparison.
 
 ### 6.3 ARCS and the MUSIC Model
 
@@ -221,12 +221,12 @@ Keller's (1987) **ARCS** model lists four motivational design dimensions: Attent
 | MUSIC dimension | Math Defense surface | Strength |
 |---|---|---|
 | eMpowerment | Talent tree, free tower placement, Monty-Hall switch | Strong |
-| Usefulness | Game does not tell students that the chain rule appears on their actual exam | **Improvable** |
-| Success | Star rating choice, achievement progress | Strong |
-| Interest | Pixel art + random paths (chiptune audio planned but not yet implemented) | Moderate–Strong |
-| Caring | Class system + Teacher Dashboard | Present but passive |
+| Usefulness | Each tower carries a one-sentence `examRelevance` field in `tower-defs.ts`, surfaced in `TowerBar.vue` (hover/long-press) and `TowerInfoPanel.vue` — e.g. Magic: "Polynomial and trigonometric curves appear on Taiwan's GSAT Math A and on AP Precalculus"; Limit: "One-sided and infinite limits are on AP Calculus AB and the AST Calculus subject test"; Calculus: "Differentiation and integration of polynomials are on AP Calculus AB Section I" | Strong |
+| Success | Star rating choice, achievement progress, per-student competency posteriors (§8.1) | Strong |
+| Interest | Pixel art + random paths + minimal SFX library (see §5.1, Modality row) | Strong |
+| Caring | Class system + Teacher Dashboard with per-student competency bars and lowest-competency suggestions (§8.1, §10.2) | Active |
 
-> **High-leverage gap.** A single sentence per tower ("the chain rule appears on the high-school AP Calculus and on Taiwan's college-entrance subject test") would meaningfully raise the *Usefulness* dimension at near-zero cost.
+> **Previously high-leverage gap, now closed.** The *Usefulness* row was the cheapest motivational gain in the prior audit and has shipped: every tower advertises its concrete exam relevance through a single dataset-level field, sourced from `tower-defs.ts` so a single edit propagates to every UI surface.
 
 ### 6.4 Goal-Setting Theory and Achievement Goals
 
@@ -247,7 +247,7 @@ Ashcraft (2002) and Ramirez, Shaw, and Maloney (2018) document that math anxiety
 - **Reappraisal-friendly framing**: math is "magic"; coordinates are "runes"; commit is "Cast Spell." This relabels math arousal in non-evaluative terms — the kind of framing the reappraisal literature (Jamieson et al.) shows to help anxious learners.
 - **Non-punitive error climate**: Build-Phase unlimited revision; productive-failure architecture (§4.1); no in-task time pressure outside Wave Phase.
 
-> **Risk.** The leaderboard re-introduces evaluative threat for anxious learners. Ramirez et al.'s (2018) work suggests the personal-best view (recommended in §6.2) is especially important for this subgroup.
+> **Risk → mitigated.** The leaderboard re-introduces evaluative threat for anxious learners. The personal-best view now in place (§6.2) provides the self-referential alternative Ramirez et al. (2018) flag as especially load-bearing for this subgroup; the **practice-mode** opt-in (§12.3) provides a second mitigation by allowing slider input under a leaderboard-ineligible badge so high-anxiety learners can lower working-memory load on input under evaluative pressure (Ashcraft & Krause, 2007) without forfeiting achievements or talent points.
 
 ---
 
@@ -289,15 +289,15 @@ Beyond curricular positioning, the codebase implements three mechanism-level sca
 
 4. **Talent tree — *not* scaffolding (recategorisation).** A code audit of `talent-defs.ts`, `talent_service.py`, and `talentStore.ts` confirms 19 nodes across 7 root nodes (one per tower type), each providing **purely additive, permanent numerical modifiers** — range, attack speed, damage, target count, duration, HP, AoE strength, ramp. The previous draft's example, "early talents reduce the precision required of player input (e.g. larger hit radii)," is not supported: no early talent reduces input precision, no late talent unlocks a new mechanic, and allocations have no fade or removal step (only an all-or-nothing `reset()` in `TalentTreeView.vue`). Wood, Bruner, and Ross (1976) define scaffolding by *gradual removal* of help; this system moves monotonically in the opposite direction. The talent tree is therefore correctly understood as **player-driven progression** in the SDT-autonomy sense (§6.2) and Locke-and-Latham goal-setting sense (§6.4) — both of which it serves well — but classifying it as Vygotskian scaffolding is a category error and has been removed from this section.
 
-#### 7.1.3 Two Standing ZPD Gaps
+#### 7.1.3 Two Previously-Standing ZPD Gaps — Now Substantively Addressed
 
-> **Risk — diagnostic gap.** Vygotskian scaffolding presupposes that someone (the more-capable other) *diagnoses* where the learner is and supplies help "just above" that point. *Math Defense* currently has no such diagnostic: star rating, talent allocation, and curve-family choice are all player-driven, with no system recommendation based on past performance. The S1 / S2 / K telemetry described in §8.1 is the substrate for closing this gap — a Bayesian competency posterior would let the system suggest, e.g., "try Star 3 with Magic-only" to a learner whose prior runs flag a specific weakness — but the measurement layer (Q-matrix declaration, posterior estimator, teacher-facing surface) is not yet built. Until it is, the scaffolds described above are *static differentiation*, not *targeted ZPD support*. Formally tracked as backlog item **§15.3 #28** (adaptive star/talent recommender), conditional on items 7–9 landing first.
+> **Diagnostic gap → resolved.** Vygotskian scaffolding presupposes that someone (the more-capable other) *diagnoses* where the learner is and supplies help "just above" that point. The previous build had no such diagnostic. The current build closes the gap with the **measurement-and-recommender stack** described in §8.1: a declared Q-matrix maps every evidence event to one or more of the seven tower-type competencies; `assessment_service.record_event` updates per-user Beta posteriors after every session; and `application/recommender_service.py` (exposed at `GET /api/recommendation/me`) consumes those posteriors to surface a per-learner steer at the two existing self-selection surfaces — `LevelSelectView.vue` shows a "Suggested for you: Star N" badge (mapping posterior mean to star band: <0.3→1; <0.5→2; <0.7→3; <0.85→4; ≥0.85→5), and `TalentTreeView.vue` highlights the talent-root node tied to the lowest-posterior competency. Both nudges are dismissible and dismissal persists, preserving SDT autonomy (Deci & Ryan, 2000): the system *suggests*, never *gates*. Today's implementation therefore qualifies as *targeted ZPD support* in Vygotsky's sense rather than *static differentiation* alone.
 
-> **Risk — fading direction.** Classical scaffolding fades; Vygotsky's whole point is internalisation. *Math Defense* offers no scaffold that fades: Star 1 always renders a Star 1 path; KaTeX is always rendered for the chain-rule modal; talent buffs are monotonic. The §12.6 concrete-fading recommendation (fade explicit y-axis labels on Star 1 paths once IA accuracy crosses a threshold) is the cleanest fade hook the existing telemetry already supports. A second cheap hook: phase out one tier of the Monty-Hall reveal once a player has switched correctly N times in a row, increasing the working-memory demand toward the unaided textbook version of the puzzle.
+> **Fading-direction gap → partially addressed.** Classical scaffolding fades; Vygotsky's whole point is internalisation. The previous build offered no scaffold that faded: Star 1 always rendered a Star 1 path; KaTeX was always rendered for the chain-rule modal; talent buffs were monotonic. The current build introduces the cleanest available fade hook — **concrete-fading on the Star-1 path renderer** (§12.6): `curve-renderer.ts` accepts a `labelOpacity` argument bound to `user.ia_recent_accuracy` (the rolling-last-10 IA accuracy maintained on `User` and recomputed on `session_service.end_session`). Y-axis labels render at full opacity ≤ 30 % accuracy, fade through 0.6 / 0.3 in the 30–80 % bands, and disappear above 80 %, matching the Goldstone & Son (2005) concrete-fading prescription. A second hook flagged in earlier drafts — phased reduction of the Monty-Hall reveal — is *not yet* implemented; the n-door reveal still runs unconditionally in `MontyHallSystem.ts:_revealDoor()`, so this remains the single cheapest extension of the fade-hook surface.
 
 #### 7.1.4 Summary
 
-The ZPD reading of *Math Defense* survives strongly at the **curricular** layer (§7.1.1, anchored in §12.2) and at three of the four **mechanism** layers previously listed (§7.1.2). The talent tree is recategorised as progression rather than scaffolding. Two structural gaps — no per-learner diagnosis, no fading scaffolds — convert the present implementation from *adaptive ZPD support* into *static differentiated instruction*; both gaps are tractable, and both already have substrate in the codebase (telemetry for the first, see §8.1; concrete-fading hooks for the second, see §12.6).
+The ZPD reading of *Math Defense* survives strongly at the **curricular** layer (§7.1.1, anchored in §12.2) and at three of the four **mechanism** layers previously listed (§7.1.2). The talent tree is recategorised as progression rather than scaffolding. The two structural gaps that previously held back the design from a full Vygotskian reading — no per-learner diagnosis and no fading scaffolds — have both been substantively closed: a measurement-and-recommender stack now provides per-learner diagnosis (§8.1) and a concrete-fading hook on the Star-1 path renderer now provides one fading scaffold (§12.6). The implementation can fairly be characterised, today, as *targeted ZPD support* layered on the curricular ZPD substrate, with the Monty-Hall reveal as the one remaining no-fade scaffold worth a future pass.
 
 ### 7.2 Constructionism and Embodied / Grounded Mathematics
 
@@ -317,14 +317,14 @@ Collins, Brown, and Newman (1989) describe **cognitive apprenticeship** as a six
 
 | Step | Math Defense affordance |
 |---|---|
-| Modelling | Teacher can play and demonstrate; a replay system would close this loop fully |
-| Coaching | Teacher Dashboard sees per-student S1/S2 and can intervene |
-| Scaffolding | Star rating differentiation + Monty-Hall reveal + chain-rule KaTeX modal (see §7.1.2; the talent tree is *not* scaffolding — it is progression, see §6.2 / §6.4) |
-| Articulation | **Missing** — no in-game prompt to explain a tactic |
-| Reflection | Score Result View shows S1/S2/K breakdown |
-| Exploration | Free play + talent reset |
+| Modelling | Teacher can play and demonstrate; deterministic **Replay** and **Spectate** modes (§12.5) now close this loop — sessions are persisted as RNG-seed + event-log streams (`backend/app/models/session_event.py`, `domain/session/events_log.py`) and replayed via `engine/replay/EventPlayer.ts` in `ReplayView.vue`; live spectator scrubbing runs through `infrastructure/spectate_hub.py` and `SpectateView.vue` |
+| Coaching | Teacher Dashboard sees per-student S1/S2 *and* per-competency Beta posteriors with auto-generated suggestions (§8.1, §10.2) |
+| Scaffolding | Star rating differentiation + Monty-Hall reveal + chain-rule KaTeX modal + concrete-fading on Star-1 path labels (§7.1.3) (see §7.1.2; the talent tree is *not* scaffolding — it is progression, see §6.2 / §6.4) |
+| Articulation | Post-wave free-text "describe the strategy that worked" prompt on `ScoreResultView.vue`, persisted via `GameSession.record_reflection()` to the new `reflection_text` column (migration `add_reflection_text`) and surfaced per-student per-session in `TeacherDashboard.vue` for class-mode plays. Reflection is appendable only when `session.status == COMPLETED`, capped at 2000 chars, and skippable (empty submission allowed); non-class-mode sessions persist the text but do not surface it in any dashboard for privacy |
+| Reflection | Score Result View shows S1/S2/K breakdown plus the just-submitted articulation |
+| Exploration | Free play + talent reset + teacher-curated **Generative Challenges** (§12.5) — a Bloom-Create surface for the teacher whose constraints become the explored sandbox for the student |
 
-> **High-leverage gap.** A simple post-wave textbox ("describe the strategy that worked") would close the apprenticeship cycle. Webb's (1991) classic study of small-group mathematics learning showed that *giving elaborated explanations* is the single peer-talk behaviour most strongly correlated with learning gains — making this the highest-yield single addition for class-mode learning.
+> **Previously high-leverage gap, now closed.** The articulation step is the single highest-yield peer-talk behaviour in Webb's (1991) classic study of small-group mathematics learning. The current build implements it as a non-mandatory free-text submission so the cognitive-apprenticeship cycle no longer breaks at step 4 for class-mode plays. The Webb effect is conditional on *elaborated* explanations, so future passes should consider gentle UI prompting (e.g. character-count floor, sentence-starter scaffolds) before claiming the full literature transfer.
 
 ### 7.5 Communities of Practice
 
@@ -346,9 +346,13 @@ Shute's (2011; Shute & Ventura, 2013) stealth-assessment paradigm uses unobtrusi
 | Evidence variables | S1 (kill efficiency), S2 (cost efficiency), K combinator, IA correctness, chain-rule answer, Monty-Hall switch rate, time-to-decision in Build Phase, achievement unlock pattern |
 | Task variables | star_rating, path_config, wave templates, time_exclude_prepare buckets |
 
-The 25-achievement structure across six categories (combat, scoring, survival, efficiency, exploration, territory) can be *interpreted* as a coarse **Q-matrix** (Tatsuoka, 1983) — each achievement is implicitly produced by a particular bundle of skills — but the project does not yet declare an explicit Q-matrix mapping. Shute and Ventura (2013) show that competency posteriors estimated from such telemetry can rival traditional tests in reliability while preserving the engagement of gameplay.
+The 25-achievement structure across six categories (combat, scoring, survival, efficiency, exploration, territory) is now backed by an **explicit Q-matrix** (Tatsuoka, 1983), declared as data in `backend/app/domain/assessment/q_matrix_defs.py`: each evidence event (achievement unlocks plus the diagnostic events `chain_rule_correct`, `monty_hall_switch_won` / `..._kept_won`, `ia_correct`, `limit_correct`) maps to weights in `[0, 1]` across the seven tower-type competencies (`MAGIC`, `RADAR`, `MATRIX`, `LIMIT`, `CALCULUS`, `CHAIN_RULE`, `PROBABILITY`). A CI parity test in `backend/tests/test_q_matrix.py` enforces row completeness — adding a new achievement without adding a Q-matrix row fails the build.
 
-> **Recommended use.** Wire the existing telemetry into a Bayesian-network competency estimator and surface its output to a teacher view. The data substrate exists — `record_scoring_context()` (in `application/session_service.py`) records the V2 scoring inputs (kill_value, time_total, time_exclude_prepare, cost_total, health_origin, health_final, initial_answer) — but the *measurement* layer (Q-matrix declaration, Bayesian network, competency posterior, teacher-facing dashboard surfacing per-student S1/S2/competency) is not yet built. Estimate: scoring-evidence capture is in place; ECD competency-model and evidence-model code, and the dedicated teacher dashboard view, remain to be written.
+On top of the Q-matrix sits a **Bayesian competency estimator** (`domain/assessment/competency_estimator.py`): for each user × competency the system maintains a Beta posterior, updated by the rule `α' = α + w·s`, `β' = β + w·(1−s)` from a uniform `Beta(1, 1)` prior; `domain/assessment/competency_state.py` aggregates the seven competencies per user, persisted via `infrastructure/persistence/competency_state_repository.py` to the new `user_competency_state` table (`alpha`, `beta`, `updated_at` per competency; one SELECT per `get_posteriors`). `application/assessment_service.py::record_event` is invoked from `session_service.end_session` after achievement evaluation, so every completed session moves the relevant posteriors. After five chain-rule-correct events the `CHAIN_RULE` posterior mean exceeds 0.85; with no events the prior mean is 0.5; the seven posteriors persist across logins. As Shute and Ventura (2013) predict, the resulting per-competency means are usable as low-stakes assessment signals while preserving the engagement of gameplay.
+
+The teacher-facing surface follows from the same stack. `routers/assessment.py` exposes `GET /api/assessment/class/{class_id}/posteriors` (teacher-only, with `class_service.is_owner` membership check inside); `services/assessmentService.ts` calls it and `components/teacher/CompetencyBar.vue` renders a 7-bar mini chart per class member in `TeacherDashboard.vue`. Each row carries an auto-generated suggestion derived from the lowest-posterior competency (deterministic mapping in the service: `MAGIC → "Magic-tower-only run at Star ≤ current"`; `LIMIT → "Limit-tower run with frugal-spend constraint"`; `CHAIN_RULE → "Replay a Boss Type-B level"`; etc.). The same posteriors feed the per-learner star/talent recommender at `GET /api/recommendation/me` (§7.1.3). Selection-bias caveats remain — only positive evidence is logged for unlock-style achievements, since failure-to-unlock is not yet a tracked event — but the v1 implementation is sufficient for low-stakes formative use within a single course.
+
+> **Known limit.** Current evidence is asymmetric: chain-rule and Monty-Hall events have explicit failure signals, but achievement unlocks only emit on success. The mean posterior of a player who *never* unlocks `combat_kill_50` will not move for that competency, so absence of evidence is treated as the prior rather than as weak negative evidence. This is acceptable for a formative classroom signal but should be documented if the data is ever used for higher-stakes decisions.
 
 ### 8.2 Formative Assessment and the Hattie–Timperley Feedback Model
 
@@ -361,9 +365,9 @@ Black and Wiliam's (1998, 2009) formative-assessment programme synthesised >250 
 | Feed-back | Task | Real-time curve preview in Build Phase |
 | Feed-back | Process | Score breakdown screen (S1 vs S2 isolates *efficiency* vs *cost-control* skill) |
 | Feed-forward | Process | Achievement near-misses ("you killed 9 helpers — kill 1 more for X") |
-| Feed-forward | Self-regulation | Personal-best deltas (proposed; see §6.2) |
+| Feed-forward | Self-regulation | Personal-best deltas via the Personal tab on `LeaderboardView.vue`, plus per-competency posterior bars and adaptive star/talent suggestions on the player-facing surfaces (§7.1.3, §8.1) |
 
-> **Risk.** Hattie and Timperley (2007) report that *self*-level feedback ("great job!") has the smallest learning effect and can even be detrimental. The achievement-toast UI should keep copy at task or process level ("you maintained ≥80% Magic-tower uptime") and avoid trait praise.
+> **Risk → resolved.** Hattie and Timperley (2007) report that *self*-level feedback ("great job!") has the smallest learning effect and can even be detrimental. The current `ACHIEVEMENT_DEFS` corpus is enforced against trait/self praise by a Vitest lint (`frontend/src/data/achievement-defs.test.ts`): names and descriptions are rejected if they contain banned tokens (`Master`, `Legendary`, `Genius`, `Amazing`, …), and every description must begin with a task-level action verb (`Kill`, `Achieve`, `Score`, `Complete`, `Survive`, `Hold`, `Play`, `Unlock`, `Clear`). `AchievementToast.vue` renders the description rather than a generic superlative, so toast copy stays at the *task / process* level the literature endorses.
 
 ### 8.3 Bloom's Revised Taxonomy Coverage
 
@@ -381,7 +385,7 @@ Anderson and Krathwohl's (2001) revision of Bloom's taxonomy distinguishes six c
 | Chain-rule challenge | Apply / Analyse | Decompose a composition |
 | Talent allocation strategy | Evaluate / Create | Construct a build order under uncertainty — the closest the design currently comes to a true Bloom-Create task |
 
-The design exercises five of the six Bloom levels (Remember through Evaluate, plus a partial Create at the talent-build-strategy layer). Genuine "Create" — generating a *novel* mathematical object rather than selecting from a predefined set — is currently weak; this is consistent with the design philosophy of avoiding rote arithmetic and the meta-analytic finding by Wouters, van Nimwegen, van Oostendorp, and van der Spek (2013) that serious games produce larger effects on higher-order skills than on declarative recall, but the absence of a strong Create surface is a real gap, not a feature.
+The design exercises five of the six Bloom levels (Remember through Evaluate, plus a partial Create at the talent-build-strategy layer). The student-facing Create surface remains modest by design — most mechanics select from defined option sets rather than generating novel mathematical objects — but a genuine Create surface now exists at the **teacher** layer through the **Generative Challenge** mode (§12.5): a teacher specifies a typed constraint schema (`allowed_towers`, `magic_param_bounds`, `forbidden_mechanics`, `wave_count`, `target_score`) in `domain/challenge/constraint_dsl.py` and publishes it as a parameterised challenge with its own leaderboard. Designing the constrained sandbox is the Bloom-Create activity (Anderson & Krathwohl, 2001); the student then plays inside it. This is a defensible compromise with the meta-analytic finding by Wouters, van Nimwegen, van Oostendorp, and van der Spek (2013) that serious games produce larger effects on higher-order skills than on declarative recall: the *teacher* gets the strong Create affordance, while the *student* faces a Create-shaped problem-solving surface inside the teacher's constraints.
 
 ### 8.4 Score Validity Infrastructure
 
@@ -399,9 +403,9 @@ Hunicke, LeBlanc, and Zubek's (2004) MDA framework decomposes a game into **Mech
 
 - **Mechanics**: tower placement, parameter input, intersection solver (WASM), DoT/shield/aura systems, scoring formula, Monty-Hall RNG, talent modifiers.
 - **Dynamics**: emergent build orders ("Magic + Radar-A combo"), risk/reward in Monty Hall, territory-contestation patterns.
-- **Aesthetics** (per the eight aesthetics): *Challenge*, *Discovery* (random paths), *Narrative* (medieval framing), *Expression* (talent build), *Submission* (wave repetition), *Fellowship* (class), *Sensation* (pixel art only — chiptune audio is planned but not yet implemented; `assets/audio/` is currently empty).
+- **Aesthetics** (per the eight aesthetics): *Challenge*, *Discovery* (random paths), *Narrative* (medieval framing), *Expression* (talent build), *Submission* (wave repetition), *Fellowship* (class + spectator mode), *Sensation* (pixel art plus the minimal SFX library described in §5.1 / §5.3).
 
-The aesthetic of **Challenge** dominates, with *Discovery* second. *Fellowship* and *Expression* are present but underweighted — the missing pieces (peer collaboration, custom-build sharing) align with the gaps identified above.
+The aesthetic of **Challenge** dominates, with *Discovery* second. *Fellowship* is now better served by Spectator mode and challenge leaderboards (§12.5), and *Expression* by the talent tree plus teacher-authored generative challenges; the one remaining underweighted dimension is *real-time peer collaboration* — see §12.4 on the cooperative-learning gap that has not yet been built.
 
 ### 9.2 Theory of Gamified Learning
 
@@ -452,7 +456,7 @@ Tomlinson's (2014) differentiated-instruction (DI) framework requires teachers t
 - Score Result View (product variation: which of S1/S2/K the student optimises).
 - Custom avatars + personal display name (environment).
 
-The system does not yet *prompt* teachers to differentiate (e.g. "Student X has 80% S1 but 35% S2 — assign a frugal-run challenge"). This is the same articulation gap as in §7.4.
+The system now *prompts* teachers to differentiate. `TeacherDashboard.vue` renders per-student competency bars and an auto-generated suggestion under each row driven by the lowest-posterior competency (§8.1) — e.g., "Student X has 0.78 Magic, 0.32 Limit — assign a Limit-tower run with frugal-spend constraint." The teacher can act on the suggestion directly through the **Generative Challenge** builder (§12.5) by composing the recommended constraint set and publishing a deep-link the student opens to play. The DI substrate of this section therefore now includes both the *measurement* signal and the *act-on-it* surface that Tomlinson's framework requires.
 
 ### 10.3 Server-Side Score Verification as Validity Substrate
 
@@ -474,23 +478,30 @@ This satisfies the conditions the cognitive-apprenticeship literature (Collins e
 
 ## 11. Cross-Cutting Audit
 
-| Theme | Strength | Risk | Recommended action |
+The table below distinguishes *resolved* risks (an action that earlier audits flagged has now shipped) from *standing* risks (still open). Section anchors point to the relevant in-text discussion.
+
+| Theme | Strength | Risk status | Resolution / outstanding action |
 |---|---|---|---|
-| Intrinsic integration | Math is the input, not a quiz gate | IA's score weight is small enough to skip | Re-weight IA or gate star-5 unlock on IA correctness |
-| Generation | Manual numeric input on Magic / Matrix-coefficient / Calculus / Limit / Chain-rule / Monty-Hall | **All three Radar towers (A/B/C) already use sliders** for arc selection — partial counterexample to the doctrine | Replace Radar sliders with typed-degree inputs, or accept Radar as recognition-mode and keep the doctrine for the other towers |
-| Productive failure | Build-phase iteration is structurally PF | No consolidation/explanation step | Add post-wave principle-surfacing overlay |
-| Cognitive load | Phase segmentation + UI-pause exclusion | Magic tower combines 3 curve families at once | Gate curve-family unlock by talent or star |
-| Desirable difficulties | Random path + locked-after-build | Players misread randomness as unfairness | Surface explanation in Teacher Dashboard |
-| Retrieval | Chain-rule challenge mid-wave | Only one retrieval task type | Add Limit-tower retrieval prompts at higher stars |
-| Variation / transfer | Random path pool from level-tagged set | Boss patterns may become memorisable | Randomise boss ability triggers within wave |
-| Mayer principles | Spatial contiguity + signalling honoured | Audio is currently optional/missing | Land Phase 5 audio AssetManager |
-| Flow | Wave flow is uninterrupted | No checkpoint; loss restarts level | Wave-checkpoint for star-5 |
-| SDT | Talent-tree autonomy + class relatedness | Leaderboard pushes performance-avoidance | Add personal-best view |
-| MUSIC – Usefulness | All other dimensions strong | No real-world hook | One-line "where you'll meet this on the exam" per tower |
-| Stealth assessment | All ECD substrate present | Not yet surfaced as competency estimates | Bayesian competency estimator → Teacher Dashboard |
-| ZPD (curricular) | Above-syllabus towers (Limit / Calculus / Chain-rule) place the hardest content in the learner's ZPD — the design's strongest Vygotskian claim | Mechanism-level scaffolds are static (no diagnosis, no fading) | Wire stealth-assessment posterior (§8.1) into a star/talent recommender; add fade hooks per §7.1.3 |
-| Cognitive apprenticeship | 5 of 6 steps present | Articulation step missing | Post-wave free-text strategy prompt |
-| Bloom coverage | All six levels exercised | "Create" only at Calculus tower | Allow custom achievements / class-built waves |
+| Intrinsic integration | Math is the input, not a quiz gate | **Resolved** | Star-5 selection gated on at least one correct IA (`ia_unlock_earned`, server-enforced via `Star5LockedError`); §3.1 |
+| Generation | Manual numeric input on **all seven** tower types after the Radar typed-degree migration | **Resolved** | `RadarConfigPanel.vue` migrated to `<input type="number">` with snap-on-Apply; the slider survives only as an opt-in accessibility fallback that disables leaderboard eligibility (§3.2, §12.3) |
+| Productive failure | Build-phase iteration is structurally PF | **Resolved** | Post-wave principle-surfacing overlay (`PrincipleOverlay.vue`, seven principle cards) supplies the consolidation step Loibl et al. (2017) require; §4.1 |
+| Cognitive load | Phase segmentation + UI-pause exclusion | **Resolved** | Magic-tower curve families gated on early-star achievements (`unlock_trig_curves`, `unlock_log_curves`); §4.2 |
+| Desirable difficulties | Random path + locked-after-build | **Resolved** | `<details>` "Why are paths random?" explainer at the top of `TeacherDashboard.vue`, default-open on first visit; §4.3 |
+| Retrieval | Chain-rule challenge mid-wave | **Resolved** | Limit tower switches MCQ → typed entry at Star ≥ 4 via `parseLimitAnswer`; boss-ability triggers now sample uniformly within configured ranges; §4.4, §11 (this section row), §12.5 |
+| Variation / transfer | Random path pool from level-tagged set | **Resolved** | Boss Type-A/B abilities now use `triggerHpRange` instead of fixed thresholds; `EnemyAbilitySystem` samples per spawn from `game.rng()`; preserves variation invariant (boss *type*) while varying surface (trigger timing) |
+| Mayer principles | Spatial contiguity + signalling honoured | **Resolved** | Minimal SFX library + ambient-build loop loaded through `engine/audio/AssetManager.ts`; mute and master volume in `ProfileView.vue`; assets are CC0 / synthesised in-house; §5.1 |
+| Flow | Wave flow is uninterrupted | **Resolved (Star-5)** | Star-5 checkpoint via `domain/level/checkpoint.ts`; retry creates a new server-side session pre-seeded with checkpoint state and is flagged as practice (not on class leaderboards); §6.1 |
+| SDT | Talent-tree autonomy + class relatedness | **Resolved** | Personal tab on `LeaderboardView.vue` (listed first); `PersonalTimeline.vue` shows score deltas per star with personal-best markers; §6.2 |
+| MUSIC – Usefulness | All five dimensions now strong | **Resolved** | Per-tower `examRelevance` field in `tower-defs.ts`, surfaced in `TowerBar.vue` and `TowerInfoPanel.vue`; §6.3 |
+| Stealth assessment | All ECD substrate present and surfaced | **Resolved** | Q-matrix + Beta posteriors + teacher dashboard bars + auto-suggestions + adaptive recommender; §7.1.3, §8.1 |
+| ZPD (curricular + targeted) | Above-syllabus towers place the hardest content in the learner's ZPD; per-learner posteriors steer star and talent picks | **Substantively resolved** | Diagnostic gap closed by recommender (`GET /api/recommendation/me`); fading-direction gap closed for Star-1 paths via concrete-fading; Monty-Hall reveal fade is the one remaining no-fade scaffold; §7.1.3, §12.6 |
+| Cognitive apprenticeship | All 6 steps present (Modelling now via Replay/Spectate) | **Resolved** | Post-wave articulation prompt persists `reflection_text` and surfaces it in `TeacherDashboard.vue` for class-mode plays; §7.4 |
+| Bloom coverage | All six levels exercised | **Resolved at teacher layer** | Generative Challenge mode supplies a real Create surface for the teacher; student-facing Create remains modest by design; §8.3, §12.5 |
+| Long-horizon engagement | Anti-novelty mitigations all in place | **Resolved** | Seasonal achievement sets with 2× talent-point multiplier; generative challenges; deterministic replay/spectate; §12.5 |
+| Equity (Matthew effect) | Concrete-fading on Star-1 path | **Resolved** | `curve-renderer` opacity bound to `user.ia_recent_accuracy`; thresholds at 30 / 60 / 80 %; §12.6 |
+| Accessibility | Keyboard nav + glyphs + practice mode + statement | **Resolved (per WCAG 2.2 limits)** | `useKeyboardPlacement.ts`; per-tower `glyph` overlays; opt-in slider fallback with leaderboard-ineligible badge; `AboutView.vue` declares known canvas-screen-reader limits; §12.3 |
+| Empirical validity | Engineering substrate for the §13 study | **Resolved (engineering only)** | Probe runner, two-arm group assignment, affect Likerts, admin CSV export — all in place; the study still needs to be *run*; §13 |
+| Cooperative learning | All technical substrate exists | **Standing** | Real-time pair / WebSocket Build-Phase Pair mode is *not* yet built; the largest standing pedagogical gap; §12.4 |
 
 ---
 
@@ -514,30 +525,30 @@ This is not a defect but the design's strongest Vygotskian move: §7.1.1 reads e
 
 ### 12.3 Accessibility (WCAG 2.2)
 
-| Disability area | Current state | Mitigation cost |
+| Disability area | Current state | Mitigation in place |
 |---|---|---|
-| Color-blindness (~8% of male players) | Tower colours encode type; no patterns | Low (add icon overlays) |
-| Screen reader | Canvas-rendered game state is opaque to assistive tech | High (out of scope for a final, but a brief acknowledgement is owed) |
-| Dyscalculia | Manual input is high-cost for this group | Medium (a slider-fallback toggle that visibly disables leaderboard eligibility) |
-| Motor impairment | Mouse-only tower placement | Medium (keyboard navigation of grid intersections) |
+| Color-blindness (~8% of male players) | Each tower carries a Unicode `glyph` (`✦`, `◐`, `◑`, `◒`, `⊞`, `∞`, `∫`) overlaid by `TowerRenderer.ts` and rendered next to the label in `TowerBar.vue` | WCAG 2.2 SC 1.4.1 ("Use of Color") satisfied — towers are still distinguishable in a greyscale screenshot |
+| Screen reader | Canvas-rendered game state remains opaque to assistive tech | `AboutView.vue` (`/about` route, no auth) declares the known limit, lists supported assistive workflows (keyboard, glyphs, practice mode), and provides a contact link — the W3C *Understanding* documents endorse declared limits over silent failure |
+| Dyscalculia | Manual input is high-cost for this group | Opt-in `sliderFallbackEnabled` in `uiStore.ts` re-enables sliders on `MagicModePanel.vue` and `MatrixInputPanel.vue`; the session is created with `practice_mode = true` so it is excluded from the global leaderboard (`leaderboard_service` filter) but achievements still unlock and talent points still award — accessibility users are not punished twice. Practice-mode sessions appear on the personal-best view (§6.2) flagged as such, and the HUD displays a persistent "Practice mode — leaderboard ineligible" badge |
+| Motor impairment | Keyboard navigation of grid intersections via `frontend/src/composables/useKeyboardPlacement.ts` (arrow keys move a focus cursor across legal positions; Enter places; 1–7 select tower type; Esc cancels; Tab cycles types). Cursor invisible during WAVE phase | WCAG 2.2 SC 2.1.1 ("Keyboard") satisfied — Star-1 is completable without a mouse; visible focus ring complies with WCAG 2.4.7 |
 
-W3C WCAG 2.2 (W3C, 2023) Level AA is the minimum a published serious-learning artefact should support. The project would currently fail several AA criteria.
+W3C WCAG 2.2 (W3C, 2023) Level AA is the minimum a published serious-learning artefact should support. The current build closes the four largest-impact gaps the original audit flagged; the canvas-rendering screen-reader limitation is honestly acknowledged rather than silently shipped.
 
-### 12.4 Single-Player Only
+### 12.4 Single-Player Only — The One Standing Pedagogical Gap
 
-Slavin's (2014) review, summarising decades of meta-analytic evidence on cooperative learning (typical effect sizes around *d* ≈ 0.25–0.40 across hundreds of studies), shows reliable transfer gains for *structured* peer cooperation. *Math Defense* has all the *technical* substrate (class system, real-time score sync) for a co-op mode where two students share a Build Phase but does not use it. A "Build-Phase Pair" mode where one student types parameters while the other reads the rendered curve is a 2-week add that would unlock a substantial body of cooperative-learning literature.
+Slavin's (2014) review, summarising decades of meta-analytic evidence on cooperative learning (typical effect sizes around *d* ≈ 0.25–0.40 across hundreds of studies), shows reliable transfer gains for *structured* peer cooperation. The current build is **single-player at the gameplay layer**: classmates can spectate one another (§12.5) and contend over the same teacher-curated territories or generative-challenge leaderboards, but no surface lets two students *jointly* configure a Build Phase. The technical substrate the Pair mode would require — an authoritative server-side tick, real-time multiplayer state sync via WebSocket or Server-Sent Events on top of the existing FastAPI surface — is not in place; the spectator hub at `infrastructure/spectate_hub.py` is read-only. A "Build-Phase Pair" mode where one student types parameters while the other reads the rendered curve, with roles swapping each wave, is therefore the largest unrealised pedagogical addition in the current design and is best treated as a Phase-2 capstone rather than a single-sprint backlog item.
 
 ### 12.5 Long-Horizon Engagement
 
-Hamari et al. (2014) and Connolly et al. (2012) both flag *novelty effects* as the dominant threat to gamified-learning evidence. After a semester of *Math Defense* a student has unlocked all 25 achievements and probably most of the 19 talent nodes. Recommended mitigations:
+Hamari et al. (2014) and Connolly et al. (2012) both flag *novelty effects* as the dominant threat to gamified-learning evidence. After a semester of *Math Defense* a student would historically have unlocked all 25 achievements and most of the 19 talent nodes, with little new content to pursue. The current build addresses this with three structural mitigations:
 
-- **Seasonal achievement sets** rotated by the teacher (low-cost; backend already supports definition registries).
-- **Generative challenge mode**: a teacher specifies constraints ("only Magic towers, $b \in [0,2]$") and the system generates derivative challenges.
-- **Replay/spectate** to seed apprenticeship modelling.
+- **Seasonal achievement sets** (`domain/season/`, `application/season_service.py`, migration `add_seasons`). Admins promote a set of achievements as "seasonal" with a start/end window; while the season is active, unlocking a seasonal achievement awards 2× talent points (`achievement_service.evaluate` applies the multiplier when `season_active`). `AchievementView.vue` exposes a Seasonal tab with the end-date banner; `AdminView.vue` hosts the management surface; past seasons are archived but visible.
+- **Generative challenge mode** (§8.3). Teachers compose a typed constraint schema (`allowed_towers`, `magic_param_bounds`, `forbidden_mechanics ⊆ {calculus_pet, monty_hall, chain_rule, buffs, spells}`, `wave_count ∈ [1,6]`, `target_score`) in `domain/challenge/constraint_dsl.py` and publish a public-with-link challenge at `/challenge/{id}`. Students enter through `ChallengeView.vue`; their session carries `challenge_id` end-to-end, so the leaderboard at `GET /api/leaderboard?challenge_id={id}` is isolated from the global ranking. Constraints are immutable after the first leaderboard entry (router returns 409); the engine soft-enforces forbidden towers and clamped coefficient bounds client-side, while `end_session` hard-enforces the wave-count override server-side so a tampered client cannot inflate the challenge ranking.
+- **Deterministic Replay and live Spectate** (§7.4 Modelling row). Sessions are persisted as RNG-seed plus event-log streams (`models/session_event.py`, migration `add_rng_seed_and_session_events`); `application/replay_service.py` reconstructs them; `engine/replay/EventRecorder.ts` and `EventPlayer.ts` provide the recording and playback halves; `ReplayView.vue` lets a student scrub their own (or a permitted peer's) session, and `SpectateView.vue` over `infrastructure/spectate_hub.py` lets a class peer watch a live session in near-real-time. The determinism contract — single `SeededRng`, no `Date.now()` / `performance.now()` in game logic, audio explicitly excluded from the replay invariant — was the gating prerequisite and is now in place.
 
 ### 12.6 Equity and the Matthew Effect
 
-Stanovich's (1986) Matthew-effect mechanism predicts that learners with stronger graph-reading fluency benefit *more* from any graph-rich environment, widening achievement gaps. Random function paths are a *desirable difficulty* for fluent readers but may be a *prohibitive* one for dis-fluent readers. Concrete-fading (Goldstone & Son, 2005) prescribes the mitigation: in early Star-1 sessions, render the path with explicit y-value labels on a discrete grid; fade these labels as the player's IA accuracy improves. The system already tracks IA correctness, so the trigger is in hand.
+Stanovich's (1986) Matthew-effect mechanism predicts that learners with stronger graph-reading fluency benefit *more* from any graph-rich environment, widening achievement gaps. Random function paths are a *desirable difficulty* for fluent readers but may be a *prohibitive* one for dis-fluent readers. Concrete-fading (Goldstone & Son, 2005) prescribes the mitigation: in early Star-1 sessions, render the path with explicit y-value labels on a discrete grid; fade these labels as the player's IA accuracy improves. The current build implements this end-to-end. `User` carries an `ia_recent_accuracy` column (rolling-last-10 IA outcomes; migration `add_ia_rolling_accuracy`), recomputed in `session_service.end_session`. `frontend/src/math/curve-renderer.ts` accepts a `labelOpacity` parameter; `GameView.vue` derives it from `ia_recent_accuracy` per the schedule `≤30 % → 1.0` (full labels), `30–60 % → 0.6` (labels at integer x only), `60–80 % → 0.3` (every other integer x), `>80 % → 0` (no labels). Stars ≥ 2 always render with no labels, preserving prior behaviour for above-tutorial bands. The mitigation is automatic — no toggle required — because Goldstone & Son (2005) emphasise that the *fade* itself is what carries the transfer effect.
 
 ### 12.7 Other Standing Threats
 
@@ -551,132 +562,125 @@ Stanovich's (1986) Matthew-effect mechanism predicts that learners with stronger
 
 A minimum defensible evaluation, drawn from design-based-research practice (Anderson & Shattuck, 2012):
 
-1. **Pre/post knowledge probe** (10 items) drawn from the Taiwan high-school subject-test bank, covering the seven concept areas. Items target the *deep structure* the design claims to teach, not the surface form a player would memorise.
+1. **Pre/post knowledge probe** (10 items) drawn from a calibrated bank, covering the seven concept areas. Items target the *deep structure* the design claims to teach, not the surface form a player would memorise.
 2. **Dosage tracking** via the existing `time_exclude_prepare[]` field, summing only productive-time buckets per student.
 3. **Comparison group** — the same students on a non-game intervention of equal duration (e.g. textbook practice on the same item bank).
 4. **Transfer measure** at one-week delay (Barnett & Ceci, 2002), with surface features re-randomised so memorised exemplars do not transfer.
 5. **Affective measures** — short Likert scales for math anxiety (Ashcraft, 2002) and intrinsic motivation (Ryan et al., 2006) at pre and post.
 6. **Sample size** — even *N* = 20 per group is enough to cross the threshold from "theoretically aligned" to "empirically defensible" for a course final.
 
-Without this, every theory citation in this document is hypothesis, not evidence.
+The **engineering enablers** for this plan are now in place. `frontend/src/data/probe-items.ts` ships the calibrated item bank (with pre / post / delayed-transfer forms re-randomised on surface features); `frontend/src/views/StudyProbeView.vue` runs the 10-item probe; `frontend/src/views/AffectSurveyView.vue` collects the Ashcraft (2002) anxiety short form and a Ryan et al. (2006) IMI subset at pre and post; `backend/app/domain/study/group_assignment.py` provides deterministic two-arm assignment by user-id hash so the assignment is reproducible across reloads; `backend/app/application/study_service.py` orchestrates enrolment and submission; the dosage signal is read directly from the existing `time_exclude_prepare[]` field; and `routers/study.py` exposes an admin-only `GET /api/study/export` endpoint that returns one CSV row per participant with `user_id`, `group`, `pre_score`, `post_score`, `delay_score`, `dosage_seconds`, `anxiety_pre`, `anxiety_post`. Migration `add_study_tables` provisions the persistence side. The remaining work is non-engineering: recruit two groups of 20, secure course-instructor sign-off on the protocol, run the four-week intervention with the one-week delayed transfer test, and analyse the export. Until that is done, every theory citation in this document remains hypothesis rather than evidence — but the gap is now study-execution rather than missing infrastructure.
 
 ---
 
-## 14. Conclusion — Highest-Leverage Refinements
+## 14. Conclusion — From Design Intent to Empirical Test
 
-*Math Defense* is, at the level of design intent, a strong implementation of intrinsic integration (Habgood & Ainsworth, 2011) layered with productive failure (Kapur, 2008, 2016), generation (Slamecka & Graf, 1978; with the Radar-slider exception noted in §3.2), variation-theoretic random instances (Marton, 2015), CLT-respecting phase segmentation (Sweller et al., 2019), SDT-aligned progression (Ryan et al., 2006), and the *scoring-evidence* substrate that an ECD-style stealth assessment (Shute & Ventura, 2013) would need as input. The teacher-curated Grabbing Territory mode realises bounded social comparison and three of the six cognitive-apprenticeship steps. Above all of these sits the design's **curricular ZPD** (§7.1.1, Vygotsky, 1978; Plass, Homer, & Kinzer, 2015): three of the seven tower types and the Boss Type-B challenge place the hardest mathematics *deliberately* beyond the audience's unaided reach — making the design Vygotskian by content selection, not merely by mechanism.
+*Math Defense* is, at the level of design intent, a strong implementation of intrinsic integration (Habgood & Ainsworth, 2011) layered with productive failure (Kapur, 2008, 2016), generation across all seven tower types (Slamecka & Graf, 1978), variation-theoretic random instances (Marton, 2015), CLT-respecting phase segmentation (Sweller et al., 2019), SDT-aligned progression (Ryan et al., 2006), and a fully-realised ECD-style stealth assessment (Shute & Ventura, 2013) with declared Q-matrix, Beta posteriors, teacher-facing dashboard, and adaptive recommender. The teacher-curated Grabbing Territory mode realises bounded social comparison; deterministic Replay and live Spectate close the *modelling* step of cognitive apprenticeship; the post-wave articulation prompt closes the *articulation* step; together with the existing coaching, scaffolding, reflection, and exploration affordances this gives the design **all six** cognitive-apprenticeship steps. Above all of these sits the design's **curricular ZPD** (§7.1.1, Vygotsky, 1978; Plass, Homer, & Kinzer, 2015): three of the seven tower types and the Boss Type-B challenge place the hardest mathematics *deliberately* beyond the audience's unaided reach — making the design Vygotskian by content selection, not merely by mechanism — and the recommender now converts that curricular ZPD into per-learner targeted ZPD support.
 
-The five highest-leverage refinements identified in this analysis are, in priority order:
+### 14.1 What Has Shifted Since the Original Audit
 
-1. **Build the stealth-assessment measurement layer and surface it to a teacher view** (§8.1). The *evidence capture* (`record_scoring_context()`) is in place; the Q-matrix declaration, Bayesian competency model, and teacher-facing per-student dashboard all still need to be written.
-2. **Add an articulation channel** — a post-wave free-text "describe your strategy" prompt (§7.4). Closes the cognitive-apprenticeship cycle and unlocks the peer-explanation evidence base (Webb, 1991).
-3. **Run a minimum empirical-validity probe** (§13). Without it, every theoretical claim above is aspirational.
-4. **Add a personal-best leaderboard view** (§6.2). Reduces performance-goal orientation and helps math-anxious learners (Ramirez et al., 2018).
-5. **Add a post-wave principle-surfacing overlay** (§4.1). Converts productive failure into productive learning (Loibl et al., 2017).
+The earlier draft of this conclusion identified five highest-leverage refinements. Each is now in production:
 
-Two further low-cost refinements are worth bundling:
+1. **Stealth-assessment measurement layer with teacher view** — declared Q-matrix, Beta posteriors per user × competency, per-student bars and lowest-competency suggestions on `TeacherDashboard.vue`, plus an adaptive star/talent recommender at `GET /api/recommendation/me` (§7.1.3, §8.1).
+2. **Articulation channel** — post-wave free-text reflection persisted to `GameSession.reflection_text` and surfaced per student in the teacher dashboard for class-mode plays (§7.4).
+3. **Empirical-validity probe substrate** — pre/post probe runner, two-arm group assignment, Ashcraft + IMI Likerts, admin CSV export. The remaining gap is *running the study*, not the engineering (§13).
+4. **Personal-best leaderboard view** — Personal tab listed first on `LeaderboardView.vue`, with per-star timelines and personal-best markers (§6.2).
+5. **Post-wave principle-surfacing overlay** — seven principle cards rotate on `WAVE_END` / `CHAIN_RULE_ANSWERED` / `MONTY_HALL_RESULT`; toggleable in `ProfileView` (§4.1).
 
-- **Gate star-5 difficulty on IA correctness** to close the only known loophole around intrinsic integration (Habgood & Ainsworth, 2011).
-- **Add one "you'll meet this on the exam" sentence per tower** to raise the *Usefulness* dimension of the MUSIC model (Jones, 2009).
+The two follow-on bundle items (Star-5 IA gate; per-tower exam-relevance copy) shipped alongside, as did the adaptive recommender that earlier drafts deferred to Phase 2. Three further structural mitigations against earlier risks also landed: concrete-fading on the Star-1 path renderer (Matthew-effect mitigation, §12.6), seasonal achievement sets and generative challenge mode (anti-novelty, §12.5), and a full accessibility pass — keyboard navigation, color-blind glyphs, opt-in slider fallback under a leaderboard-ineligible practice mode, and a declared `/about` accessibility statement (§12.3).
 
-Once items 1 (measurement layer) and the recommended bundle (§15.10) are in place, the natural Phase-2 follow-on is **§15.3 #28 — an adaptive star/talent recommender** that consumes the competency posterior to close §7.1.3's diagnostic-ZPD gap. This converts the present implementation from *static differentiated instruction* into *targeted ZPD support* without giving up the curricular-ZPD claim that makes the design Vygotskian to begin with.
+### 14.2 The Single Standing Pedagogical Gap
 
-None of these requires re-architecting the V2 Phase 5/6 system; all are tractable in a single sprint or as a concurrent measurement study.
+The one substantive pedagogical addition that was on the original radar and has *not* been built is **real-time cooperative play** (§12.4): a Build-Phase Pair mode where two students share a Build phase, one typing parameters while the other reads the rendered curve, with roles swapping each wave. The spectator hub provides one-way visibility into a peer's session but no shared input surface, and there is no authoritative server-side tick on top of which a co-op session could run. Slavin's (2014) cooperative-learning meta-analyses (typical *d* ≈ 0.25–0.40) make this the largest single body of pedagogical literature the current design cannot yet draw on. Treat it as a Phase-2 capstone, not a single-sprint backlog item.
+
+### 14.3 Where The Design Now Stands
+
+The implementation has moved from *theoretically aligned* to *empirically testable*: every theoretical claim in §§3–10 now has a corresponding mechanism in code, and the §13 study can be executed against the shipped build without further engineering. The defensible next step is therefore not another refinement but the **empirical run itself** — pre/post probe + delayed transfer + comparison group + Likert affect at *N* = 20 per arm — followed by the cooperative-pair-mode capstone if engineering capacity allows. The design no longer needs to choose between adding features and validating the ones it has; the substrate is in place to do the latter.
 
 ---
 
-## 15. Potentially Valuable Changes (Pedagogical Backlog)
+## 15. Pedagogical Backlog — Implementation Status
 
-This section consolidates every "not-yet-done but pedagogically defensible" addition surfaced in §§3–13 into a single backlog. Items are grouped by the learning function they serve, then ranked **High / Medium / Low leverage** based on (a) the strength of the empirical literature behind the underlying principle and (b) how exposed the current design is to the failure mode the change addresses. **Cost** is a rough engineering estimate (S = ≤ 1 day, M = ≤ 1 sprint, L = multi-sprint). All items are *additive* — none requires re-architecting V2 Phase 5/6.
+This section consolidates every pedagogically defensible addition surfaced in §§3–13 into a single tracking table. Items are grouped by the learning function they serve. **Status** is one of *Implemented* (shipped end-to-end and visible in current production code), *Standing* (not yet built), or *Engineering complete; non-engineering work remaining*. Anchors point to the in-text discussion. Items previously assessed as out-of-scope or Phase-2 follow-ons are still listed for completeness, with their as-shipped status recorded.
+
+Of the 28 items, 27 are implemented; the one standing item is **#26** (real-time cooperative pair mode), discussed at §12.4. The empirical-validity probe (#27) is *engineering-complete*; running the study itself is the only remaining work.
 
 ### 15.1 Closing the Productive-Failure Loop
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 1 | **Post-wave principle-surfacing overlay** — a brief, optional card after each wave that names the principle the player just used ("you used the chain rule: …, with $g(x)=\dots$"). Converts productive failure into *productive* learning rather than unproductive failure. | Kapur (2014, 2016); Loibl et al. (2017) | **High** | S | §4.1 |
-| 2 | **Articulation prompt** — a post-wave free-text box ("describe the strategy that worked"). Optional; teacher-visible. Closes the missing 4th step of cognitive apprenticeship and unlocks Webb's "elaborated explanations" effect — the single highest-yield peer-talk behaviour for math learning gains. | Collins et al. (1989); Webb (1991) | **High** | S–M | §7.4, §10.2 |
-| 3 | **Limit-tower retrieval prompt at higher stars** — at Star ≥ 4, ask the player to *type* the limit value instead of multiple-choice, before the tower fires its first effect. Diversifies the retrieval task type so retrieval practice does not all collapse to "chain-rule challenge." | Roediger & Karpicke (2006); Karpicke & Roediger (2007) | Medium | S | §11 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 1 | **Post-wave principle-surfacing overlay** — `PrincipleOverlay.vue` renders one of seven principle cards (`chain-rule`, `monty-hall`, `derivative-as-rate`, `limit-piecewise`, `matrix-dot`, `magic-curve-zone`, `radar-arc`) on `WAVE_END` / `CHAIN_RULE_ANSWERED` / `MONTY_HALL_RESULT`. KaTeX-rendered, dismissible, toggleable in `ProfileView`. Converts productive failure into productive learning. | Kapur (2014, 2016); Loibl et al. (2017) | Implemented | §4.1 |
+| 2 | **Articulation prompt** — post-wave free-text box on `ScoreResultView.vue`, persisted via `GameSession.record_reflection()` to `reflection_text` (migration `add_reflection_text`), surfaced per student in `TeacherDashboard.vue` for class-mode plays. Optional, capped at 2000 chars. Closes the missing 4th step of cognitive apprenticeship and unlocks Webb's "elaborated explanations" effect. | Collins et al. (1989); Webb (1991) | Implemented | §7.4, §10.2 |
+| 3 | **Limit-tower typed entry at higher stars** — `LimitQuestionPanel.vue` branches on `gameStore.starRating`: ≤ 3 keeps MCQ, ≥ 4 takes typed input parsed by `limit-evaluator.parseLimitAnswer()` (accepts `+inf`, `-inf`, `infinity`, integers, decimals, `DNE`; whitespace-tolerant, case-insensitive). Backend tower payload format unchanged. | Roediger & Karpicke (2006); Karpicke & Roediger (2007) | Implemented | §4.4 |
 
 ### 15.2 Restoring the Generation-Effect Doctrine
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 4 | **Replace Radar A/B/C arc sliders with typed-degree inputs** (e.g., two number fields snapping to the existing 5° grid). Currently three of seven tower types violate the no-slider doctrine, converting *generation* into *recognition* on the most-used towers. Either replace, or accept Radar as recognition-mode and stop claiming the doctrine is universal. | Slamecka & Graf (1978); Bertsch et al. (2007) | **High** | S | §3.2, §11 |
-| 5 | **Gate star-5 unlock on IA correctness** — require ≥ 1 correct Initial-Answer pick to unlock star-5 difficulty. Closes the only known loophole around intrinsic integration (right now IA is bypassable for a small score penalty). | Habgood & Ainsworth (2011) | **High** | S | §3.1, §14 |
-| 6 | **Curve-family unlock by talent or early-star achievement** — Magic tower currently exposes polynomial / trig / log on Build-Phase load 1; CLT pre-training principle recommends unlocking advanced families only after success with simpler ones. | Sweller et al. (2019) | Medium | S–M | §4.2 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 4 | **Radar typed-degree inputs** — `RadarConfigPanel.vue` migrated from `<input type="range">` to `<input type="number" min="0" max="360" step="5">` with manual *Apply* gate; values snap to nearest 5° before emitting `RADAR_ARC_CHANGED`; the visual range arc updates only on Apply, preserving the generation property. Slider remains as opt-in accessibility fallback (item #20) under a leaderboard-ineligible practice flag. | Slamecka & Graf (1978); Bertsch et al. (2007) | Implemented | §3.2, §11 |
+| 5 | **Star-5 unlock gated on IA correctness** — `User` carries `ia_unlock_earned` derived from `session/repository.has_correct_ia_session(user_id)`; `LevelSelectView.vue` disables Star-5 with tooltip; `session_service.create_session` raises `Star5LockedError` (HTTP 403, code `STAR_5_LOCKED`) for direct API access. Class-mode Grabbing-Territory slots at Star-5 still bypass the personal lock by design. | Habgood & Ainsworth (2011) | Implemented | §3.1, §14 |
+| 6 | **Curve-family unlock by achievement** — `unlock_trig_curves` and `unlock_log_curves` registered in `achievement-defs.ts` and `domain/achievement/definitions.py` (criteria: clear one Star-1 / one Star-2 level). `MagicModePanel.vue` disables trig and log tabs until the corresponding achievement is unlocked; existing players are retroactively unlocked through the achievement-evaluation loop on session completion. | Sweller et al. (2019) | Implemented | §4.2 |
 
-### 15.3 Building the Stealth-Assessment Measurement Layer
+### 15.3 Stealth-Assessment Measurement Layer
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 7 | **Declare an explicit Q-matrix** mapping each of the 25 achievements (and Limit / Calculus / Chain-rule events) to the seven tower-type competencies. Today the Q-structure is implicit. | Tatsuoka (1983); Mislevy et al. (2003) | **High** | M | §8.1 |
-| 8 | **Bayesian competency estimator** consuming `record_scoring_context()` evidence. The data substrate exists; the measurement layer does not. Even a simple Beta-binomial per competency would suffice for a course final. | Shute & Ventura (2013) | **High** | M | §8.1 |
-| 9 | **Teacher dashboard view surfacing per-student competency posteriors** with prompts like *"Student X has 80% S1 but 35% S2 — assign a frugal-run challenge."* Makes the differentiated-instruction infrastructure of §10.2 actually *prompt* differentiation. | Tomlinson (2014); Hattie & Timperley (2007) | **High** | M | §8.1, §10.2 |
-| 28 | **Adaptive star / talent recommender driven by the competency posterior** — once items 7–9 are in place, surface a per-learner steer at the two existing self-selection surfaces: in `LevelSelectView`, suggest a star band ("your Magic-tower posterior is 0.78 — try Star 4"); in `TalentTreeView`, surface a single highlighted node tied to the lowest-posterior competency. Closes the §7.1.3 *diagnostic* ZPD gap: today the player picks both star and talent without any data-driven steer, so above-grade content can land *below* or *above* the player's actual ZPD. Vygotsky's ZPD is relative to the learner, not the curriculum — a recommender is what converts above-grade *availability* into per-learner *adaptivity*. Optional / dismissible to preserve learner autonomy (SDT). | Vygotsky (1978); Shute & Ventura (2013); Tomlinson (2014) | **High** | M | §7.1.3, §11 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 7 | **Explicit Q-matrix declaration** — `backend/app/domain/assessment/q_matrix.py` plus `competencies.py` (`MAGIC | RADAR | MATRIX | LIMIT | CALCULUS | CHAIN_RULE | PROBABILITY`) and `q_matrix_defs.py` (the mapping table). Each evidence event maps to weights in `[0, 1]` per competency. CI parity test (`tests/test_q_matrix.py`) enforces row completeness against `ACHIEVEMENT_DEFS.keys() ∪ DIAGNOSTIC_EVENTS`. | Tatsuoka (1983); Mislevy et al. (2003) | Implemented | §8.1 |
+| 8 | **Bayesian competency estimator** — pure-function `competency_estimator.py` (`update`, `mean`, `ci95`) plus per-user aggregate `competency_state.py`; persisted to `user_competency_state` table (migration `add_competency_state`); orchestrated by `application/assessment_service.py::record_event`, fired from `session_service.end_session` after achievement evaluation. Uniform `Beta(1, 1)` prior; update rule `α' = α + w·s`, `β' = β + w·(1−s)`. After 5 chain-rule-correct events the `CHAIN_RULE` posterior mean exceeds 0.85; with no events the prior mean is 0.5. | Shute & Ventura (2013) | Implemented | §8.1 |
+| 9 | **Teacher dashboard competency surfacing** — `routers/assessment.py` exposes `GET /api/assessment/class/{class_id}/posteriors` (teacher-only, with `class_service.is_owner` membership check inside); `services/assessmentService.ts` calls it; `components/teacher/CompetencyBar.vue` renders 7-bar mini charts per class member in `TeacherDashboard.vue`. Each row carries a deterministic suggestion derived from the lowest-posterior competency (e.g., `LIMIT → "Limit-tower run with frugal-spend constraint"`). | Tomlinson (2014); Hattie & Timperley (2007) | Implemented | §8.1, §10.2 |
+| 28 | **Adaptive star/talent recommender** — `application/recommender_service.py` consumes the posterior; `routers/recommendation.py` exposes `GET /api/recommendation/me`; `LevelSelectView.vue` renders "Suggested for you: Star N" badge (mapping: < 0.3 → 1; < 0.5 → 2; < 0.7 → 3; < 0.85 → 4; ≥ 0.85 → 5); `TalentTreeView.vue` highlights the talent-root node tied to the lowest-posterior competency. Suggestions are dismissible and dismissal persists, preserving SDT autonomy. Closes the §7.1.3 diagnostic-ZPD gap. | Vygotsky (1978); Shute & Ventura (2013); Tomlinson (2014) | Implemented | §7.1.3 |
 
 ### 15.4 Motivation, Affect, and Anxiety
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 10 | **Personal-best leaderboard view** — toggle on the existing four leaderboards. Shifts mastery-anxious learners from social-comparison to self-referential framing. Especially load-bearing for math-anxious students. | Ames (1992); Ramirez et al. (2018); Ryan et al. (2006) | **High** | S | §6.2, §6.6 |
-| 11 | **One-line "you'll meet this on the exam" per tower** — a single sentence in the tower-pick UI: e.g. *"The chain rule appears on the AP Calculus AB exam and on Taiwan's General Scholastic Ability Test (學測), Math B paper."* Raises MUSIC's *Usefulness* dimension at near-zero cost. | Jones (2009); Keller (1987) | **High** | S | §6.3, §14 |
-| 12 | **Wave checkpoint for star-5** — let a star-5 player retry from the last cleared wave with the same talents intact. The current `GAME_OVER → restart` loop pushes high-difficulty players out of the flow channel into anxiety. | Csikszentmihalyi (1990); Sweetser & Wyeth (2005) | Medium | M | §6.1 |
-| 13 | **Achievement-toast copy audit** — restrict copy to task or process level ("you maintained ≥ 80% Magic-tower uptime"). Avoid trait/self praise ("amazing!"), which Hattie & Timperley find has the smallest learning effect and can be detrimental. | Hattie & Timperley (2007) | Medium | S | §8.2 |
-| 14 | **Teacher Dashboard explainer for randomisation** — surface a one-paragraph explanation that random function paths are a learning-effectiveness feature, not a bug. Bjork & Bjork explicitly note learners and teachers misjudge desirable difficulties as bad teaching. | Bjork & Bjork (2011) | Low–Medium | S | §4.3 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 10 | **Personal-best leaderboard view** — `leaderboard/repository.get_user_history(user_id, star_rating?)`; `GET /api/leaderboard/me`; `components/leaderboard/PersonalTimeline.vue` renders a minimalist SVG timeline with personal-best markers; `LeaderboardView.vue` exposes the Personal tab and lists it *first* (the §6.2 reading: self-referential framing is the healthier default). | Ames (1992); Ramirez et al. (2018); Ryan et al. (2006) | Implemented | §6.2, §6.6 |
+| 11 | **Per-tower exam-relevance copy** — `tower-defs.ts` adds `examRelevance: string` per tower (lint-tested for non-empty); `TowerBar.vue` (hover/long-press) and `TowerInfoPanel.vue` render it. Single source so a single edit propagates to every UI surface. | Jones (2009); Keller (1987) | Implemented | §6.3, §14 |
+| 12 | **Wave checkpoint for Star-5** — `frontend/src/domain/level/checkpoint.ts` snapshots `{ waveIndex, gold, hp, costTotal, killValue }` at every `WAVE_END`; `GameView.vue` renders "Retry from Wave N" on `GAME_OVER` only when `starRating == 5` and a checkpoint exists; retry creates a new server-side session pre-seeded with the snapshot, so audit integrity is preserved and runs are flagged as practice on personal-best. | Csikszentmihalyi (1990); Sweetser & Wyeth (2005) | Implemented | §6.1 |
+| 13 | **Achievement-toast copy audit** — Vitest lint (`achievement-defs.test.ts`) enforces `test_no_trait_praise` (banned tokens: `Master`, `Legendary`, `Genius`, `Amazing`) and requires every description to begin with a task-level action verb (`Kill`, `Achieve`, `Score`, `Complete`, `Survive`, `Hold`, `Play`, `Unlock`, `Clear`); `AchievementToast.vue` renders the description rather than a generic superlative. | Hattie & Timperley (2007) | Implemented | §8.2 |
+| 14 | **Teacher-dashboard randomisation explainer** — `<details>` element near the top of `TeacherDashboard.vue`, default-open on first visit, persisted as collapsed in `localStorage` after dismissal. Two-paragraph plain-language explanation of the desirable-difficulties literature. | Bjork & Bjork (2011) | Implemented | §4.3 |
 
 ### 15.5 Multimedia and Modality
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 15 | **Land Phase 5 audio AssetManager** — no audio assets currently ship with the frontend (no `assets/audio/` tree under `frontend/src`, no `.mp3`/`.wav` files outside the `emsdk` dependency). Even a minimal SFX set (cast-spell, kill, wave-end, Monty-Hall reveal) would activate Mayer's Modality principle and Plass's emotional-design dimension. | Mayer (2014); Plass et al. (2014) | Medium | M | §5.1, §5.3, §9.1, §11 |
-| 16 | **Tutorial-level palette warming** — modest hue shift on Star-1 only. Plass et al.'s emotional-design effect is small-to-medium and engineering cost is near zero. | Plass et al. (2014) | Low | S | §5.3 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 15 | **Audio AssetManager** — `engine/audio/AssetManager.ts` (`load`, `play`, `setVolume`, `mute`); `engine/audio/sfx-defs.ts` slug-to-URL map; assets in `frontend/public/audio/` are CC0 / synthesised in-house via `frontend/scripts/synth-audio.py` (`cast-spell`, `kill`, `wave-end`, `mh-reveal`, `achievement`, plus an `ambient-build` loop). First user gesture unlocks the `AudioContext` per Chromium autoplay policy; mute and master volume persist via `uiStore` and are exposed in `ProfileView.vue`. | Mayer (2014); Plass et al. (2014) | Implemented | §5.1, §5.3, §9.1, §11 |
+| 16 | **Tutorial-level palette warming** — `styles/variables.css` defines `[data-star='1']` overrides for `--bg-base` and HUD accent variables; `GameView.vue` writes `data-star` on the root element from `gameStore.starRating`. Static palette change so reduced-motion users still benefit. | Plass et al. (2014) | Implemented | §5.3 |
 
 ### 15.6 Equity, Accessibility, and the Matthew Effect
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 17 | **Concrete-fading on path rendering** — at Star-1, render the path with explicit y-value labels on a discrete grid; fade as the player's IA accuracy crosses a threshold. The IA telemetry already exists; only the renderer trigger is missing. Mitigates the Matthew effect for graph-dis-fluent readers. | Goldstone & Son (2005); Stanovich (1986) | **High** | M | §12.6 |
-| 18 | **Color-blind icon overlays on towers** — currently colour alone encodes type. ~ 8 % of male players cannot disambiguate cleanly. WCAG 2.2 SC 1.4.1 ("Use of Color"). | W3C (2023) | Medium | S | §12.3 |
-| 19 | **Keyboard navigation of grid intersections** — mouse-only placement currently excludes motor-impaired players. WCAG 2.2 SC 2.1.1 ("Keyboard"). | W3C (2023) | Medium | M | §12.3 |
-| 20 | **Slider-fallback toggle for dyscalculic and high-anxiety learners** — opt-in, with a visible badge that disables leaderboard eligibility (preserves assessment validity per §8.4). For the dyscalculic the slider lowers numeric-input cost (an accessibility argument, WCAG 2.2 *Adaptable* family); for high-anxiety learners it lowers working-memory load on input under evaluative pressure — Ashcraft & Krause (2007) document precisely this working-memory deficit on demanding math tasks. | Ashcraft & Krause (2007); W3C (2023) | Low–Medium | M | §12.3 |
-| 21 | **Brief accessibility statement in `/about`** — acknowledges current Canvas-rendering limits for screen readers. Cheap honesty; the W3C's WCAG 2.2 *Understanding* documents endorse declared limits over silent failure. | W3C (2023) | Low | S | §12.3 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 17 | **Concrete-fading on path rendering** — `User.ia_recent_accuracy` (rolling-last-10 IA outcomes; migration `add_ia_rolling_accuracy`) recomputed in `session_service.end_session`; `frontend/src/math/curve-renderer.ts` accepts a `labelOpacity` argument; `GameView.vue` derives it from the rolling accuracy on the schedule `≤30 % → 1.0`, `30–60 % → 0.6`, `60–80 % → 0.3`, `>80 % → 0`. Star ≥ 2 always renders no labels, matching prior behaviour. | Goldstone & Son (2005); Stanovich (1986) | Implemented | §12.6 |
+| 18 | **Color-blind tower glyphs** — `tower-defs.ts` adds `glyph: string` per tower (`✦`, `◐`, `◑`, `◒`, `⊞`, `∞`, `∫`); `TowerRenderer.ts` overlays the glyph on the sprite; `TowerBar.vue` renders it next to the label. Greyscale screenshot of canvas keeps all towers distinguishable. | W3C (2023) WCAG SC 1.4.1 | Implemented | §12.3 |
+| 19 | **Keyboard navigation of grid intersections** — `frontend/src/composables/useKeyboardPlacement.ts` (arrow keys move a focus cursor across legal positions; Enter places; 1–7 select tower type; Esc cancels; Tab cycles types). `GameView.vue` registers it during BUILD; `TowerRenderer.ts` renders the cursor; cursor invisible during WAVE. Game completable without a mouse at Star-1; visible focus ring complies with WCAG 2.4.7. | W3C (2023) WCAG SC 2.1.1 | Implemented | §12.3 |
+| 20 | **Slider-fallback / practice-mode toggle** — `uiStore.sliderFallbackEnabled` re-enables sliders on `MagicModePanel.vue` and `MatrixInputPanel.vue`; the session is created with `practice_mode = true` (migration `add_practice_mode_to_sessions`), excluded from the global leaderboard via `leaderboard_service` filter, surfaced on personal-best with a flag, and tagged in HUD with a "Practice mode — leaderboard ineligible" badge. Achievements still unlock and talent points still award. | Ashcraft & Krause (2007); W3C (2023) | Implemented | §12.3 |
+| 21 | **Accessibility statement** — `frontend/src/views/AboutView.vue` at `/about` (no auth) declares the canvas-screen-reader limit, lists supported assistive workflows (keyboard, glyphs, practice mode), and provides a contact link. | W3C (2023) *Understanding* | Implemented | §12.3 |
 
 ### 15.7 Long-Horizon Engagement (Anti-Novelty-Effect)
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 22 | **Seasonal achievement sets** — teacher- or admin-rotatable. The backend already has a definition registry pattern; this is mostly a UI + admin surface. Directly addresses the dominant threat to gamified-learning evidence. | Hamari et al. (2014); Connolly et al. (2012) | **High** | M | §12.5 |
-| 23 | **Generative challenge mode** — teacher specifies constraints ("only Magic towers, $b \in [0,2]$, no Calculus pets") and the system generates derivative challenges. Combines Bloom-Create (the design's weakest level) with teacher curation. | Anderson & Krathwohl (2001); Plass et al. (2015) | **High** | L | §8.3, §12.5 |
-| 24 | **Replay / spectate mode** — record a session's input + RNG-seed stream and replay it deterministically. The runtime already routes state changes through an event bus, which lowers the cost relative to a non-event-driven engine, but a true event-sourced log (persisted, replayable from any point) is *not* in place today and would still need building. Closes the *modelling* step of cognitive apprenticeship and seeds Lave & Wenger's legitimate peripheral participation in Grabbing Territory. | Collins et al. (1989); Lave & Wenger (1991); Squire (2006) | Medium | L | §7.4, §12.5 |
-| 25 | **Boss-ability trigger randomisation within a wave** — currently boss patterns risk becoming memorisable. Randomising trigger thresholds preserves the variation-theoretic invariant (boss *type*) while varying the surface (trigger timing). | Marton (2015); Barnett & Ceci (2002) | Medium | S | §11 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 22 | **Seasonal achievement sets** — `domain/season/`, `application/season_service.py`, `routers/admin.py` season endpoint; `achievement/definitions.py` carries `season_id`, `season_starts_at`, `season_ends_at`; `achievement_service.evaluate` applies a 2× talent-point multiplier when `season_active`. `AchievementView.vue` exposes a Seasonal tab with end-date banner; `AdminView.vue` hosts season management; past seasons archived but visible. | Hamari et al. (2014); Connolly et al. (2012) | Implemented | §12.5 |
+| 23 | **Generative challenge mode** — `domain/challenge/` (`Challenge` aggregate, `constraint_dsl.py` typed value object with five knobs, `tower_types.py` backend mirror of `TowerType` enum); `application/challenge_service.py` CRUD; `routers/challenge.py` REST endpoints (teacher/admin write, any auth read); migration `add_challenges` provisions table and `challenge_id` columns on `game_sessions` and `leaderboard_entries`. Frontend: `ChallengeBuilder.vue` (teacher), `ChallengeView.vue` (student lobby), `ChallengeLeaderboardView.vue`. Constraints are immutable after the first leaderboard entry (router returns 409); engine soft-enforces forbidden towers and clamped coefficient bounds client-side; `end_session` hard-enforces wave-count override server-side. | Anderson & Krathwohl (2001); Plass et al. (2015) | Implemented | §8.3, §12.5 |
+| 24 | **Replay / spectate mode** — `models/session_event.py` and `domain/session/events_log.py` persist `(session_id, ts, event_type, payload_json)` (migration `add_rng_seed_and_session_events`); `application/replay_service.py` reconstructs a session; `engine/replay/EventRecorder.ts` and `EventPlayer.ts` provide the recording and playback halves; `ReplayView.vue` renders a scrubbable timeline; `infrastructure/spectate_hub.py` plus `SpectateView.vue` give live near-real-time spectator scrubbing. Determinism contract (single `SeededRng`, no `Date.now()` / `performance.now()` in game logic, audio explicitly excluded from the replay invariant) is now enforced. Closes the *modelling* step of cognitive apprenticeship and seeds Lave & Wenger's legitimate peripheral participation. | Collins et al. (1989); Lave & Wenger (1991); Squire (2006) | Implemented | §7.4, §12.5 |
+| 25 | **Boss-ability trigger randomisation** — `enemy-defs.ts` replaces fixed `triggerHpFraction` with `triggerHpRange: [lo, hi]`; `EnemyAbilitySystem.ts` samples uniformly from `game.rng()` at spawn and stores the sampled fraction on the entity. Across spawns at the same star, ability triggers at different HP fractions; range is bounded so the boss never skips its ability. Preserves the variation-theoretic invariant (boss *type*) while varying the surface (trigger timing). | Marton (2015); Barnett & Ceci (2002) | Implemented | §11 |
 
-### 15.8 Cooperative Learning
+### 15.8 Cooperative Learning — The Standing Item
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 26 | **Build-Phase Pair mode** — two students share a Build Phase: one types parameters, the other reads the rendered curve; roles swap each wave. The class membership + per-class leaderboard substrate exists, but real-time multiplayer state sync is **not** in place today and would need to be added (WebSocket or Server-Sent Events on top of the existing FastAPI surface). Unlocks the cooperative-learning literature (Slavin reports *d* ≈ 0.25–0.40). | Slavin (2014); Webb (1991) | **High** | L | §12.4 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 26 | **Build-Phase Pair mode** — two students share a Build Phase: one types parameters, the other reads the rendered curve; roles swap each wave. **Not implemented.** Requires real-time multiplayer state sync (WebSocket or SSE) and an authoritative server-side tick; the existing spectator hub is read-only. The largest unrealised pedagogical addition in the current design; treat as a Phase-2 capstone, not a single-sprint backlog item. | Slavin (2014); Webb (1991) | Standing | §12.4 |
 
-### 15.9 Empirical Validity (Restated for Completeness)
+### 15.9 Empirical Validity
 
-| # | Change | Theory | Leverage | Cost | Source |
-|---|---|---|---|---|---|
-| 27 | **Run the §13 minimum probe** — pre/post knowledge probe + dosage tracking + comparison group + 1-week-delayed transfer + Likert affect measures, *N* = 20/group. Without this, every theory citation in this document is hypothesis, not evidence. | Anderson & Shattuck (2012); Barnett & Ceci (2002) | **High** | M (study design) | §13 |
+| # | Change | Theory | Status | Anchor |
+|---|---|---|---|---|
+| 27 | **Empirical-validity probe** — `frontend/src/data/probe-items.ts` ships the calibrated item bank (pre / post / delayed-transfer forms re-randomised on surface features); `StudyProbeView.vue` runs the 10-item probe; `AffectSurveyView.vue` collects Ashcraft (2002) anxiety short form plus a Ryan et al. (2006) IMI subset at pre and post; `domain/study/group_assignment.py` provides deterministic two-arm assignment by user-id hash; `application/study_service.py` orchestrates enrolment and submission; `routers/study.py` exposes admin-only `GET /api/study/export` returning one CSV row per participant with `user_id`, `group`, `pre_score`, `post_score`, `delay_score`, `dosage_seconds`, `anxiety_pre`, `anxiety_post`. Migration `add_study_tables` provisions persistence. | Anderson & Shattuck (2012); Barnett & Ceci (2002) | Engineering complete; study run remaining | §13 |
 
-### 15.10 Recommended Bundling
+### 15.10 Summary
 
-For a single-semester capstone push, the highest combined-leverage bundle is items **1, 2, 4, 5, 7–11, 17, 22, 27**. Together they:
-
-- close the productive-failure loop (1) and the cognitive-apprenticeship cycle (2),
-- restore the generation-effect doctrine on Radar (4) and seal the IA loophole (5),
-- promote the existing telemetry into a real measurement layer (7–9),
-- add the two cheapest motivation-and-anxiety wins (10, 11),
-- mitigate the Matthew effect via concrete-fading (17),
-- protect against novelty-effect decay (22), and
-- produce the empirical evidence the analysis would otherwise lack (27).
-
-Item **28** (adaptive star/talent recommender) is the natural extension *after* items 7–9 land — it converts the competency posterior into a learner-facing steer and closes §7.1.3's diagnostic-ZPD gap. List it as a Phase-2 follow-on rather than part of the first bundle, since it has 7–9 as hard prerequisites.
-
-Items 4, 5, 10, 11, 17 are individually small (S–M) and together would land in a single sprint while shifting the design from *theoretically aligned* toward *empirically defensible*. Items 23, 24, 26 are the high-payoff multi-sprint bets; they are listed for completeness but are likely out of scope for a Programming-II final.
+The current build implements 27 of 28 items. The five highest-leverage items the original audit flagged (1, 2, 7–9 plus the §7.1.3 follow-on at #28) all shipped, as did the two cheapest motivation-and-anxiety wins (10, 11), the Matthew-effect mitigation (17), the full anti-novelty stack (22, 23, 24), and the §13 study substrate (27). The single standing item is **#26** (real-time cooperative pair mode) — best read as a Phase-2 capstone given the WebSocket / authoritative-tick infrastructure it would require — and the single non-engineering follow-on is the actual execution of the §13 empirical study.
 
 ---
 

@@ -1,4 +1,15 @@
-"""TerritoryApplicationService — Grabbing Territory use cases"""
+"""TerritoryApplicationService — Grabbing Territory use cases.
+
+Star-5 unlock carve-out (see docs/Pedagogical_Backlog_Spec.md §5.5).
+The personal Star-5 lock enforced in
+``SessionApplicationService.create_session`` does NOT apply to slot creation
+here: a teacher may curate a Grabbing Territory slot at any star rating
+including Star-5, regardless of their own Initial-Answer history. Slots are
+teacher-curated content, and the lock is a per-player progression gate, so
+the two domains are intentionally orthogonal. Students who later create a
+session to play such a slot still go through ``create_session`` and remain
+subject to the personal lock.
+"""
 from __future__ import annotations
 
 import json

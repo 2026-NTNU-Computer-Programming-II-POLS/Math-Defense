@@ -74,6 +74,10 @@ function startGame() {
       level: JSON.stringify(level.value),
       iaResult: iaResult.value,
       territoryContext: territoryContext.value,
+      // Forward the per-session deterministic seed so the engine can re-seed
+      // its in-game RNG (game.rng) before the first LEVEL_START handler runs.
+      // Required by Backlog §24 replay; see Game.setSeed / useGameLoop wiring.
+      seed: history.state?.seed,
     },
   })
 }

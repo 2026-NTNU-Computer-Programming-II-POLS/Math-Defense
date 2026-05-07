@@ -2,12 +2,14 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useUiStore } from '@/stores/uiStore'
 import { authService } from '@/services/authService'
 import { achievementService, type AchievementSummary } from '@/services/achievementService'
 import { talentService, type TalentTreeOut } from '@/services/talentService'
 
 const router = useRouter()
 const auth = useAuthStore()
+const ui = useUiStore()
 
 const roleLabels: Record<string, string> = {
   admin: 'Admin',
@@ -210,6 +212,54 @@ async function selectAvatar(url: string): Promise<void> {
       <div class="profile-links">
         <button class="btn link-btn" @click="router.push('/achievements')">View Achievements</button>
         <button class="btn link-btn" @click="router.push('/talents')">Talent Tree</button>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="section-title">Game Settings</h3>
+        <label class="settings-row">
+          <input
+            v-model="ui.principleOverlayEnabled"
+            type="checkbox"
+            class="settings-checkbox"
+          />
+          <span class="settings-label">Show learning hints between waves</span>
+        </label>
+        <label class="settings-row settings-row--with-hint">
+          <input
+            v-model="ui.sliderFallbackEnabled"
+            type="checkbox"
+            class="settings-checkbox"
+          />
+          <span class="settings-label settings-label--block">
+            Practice mode (slider fallback)
+            <span class="settings-hint">
+              Replace typed math input with sliders for accessibility.
+              Runs are not eligible for the global leaderboard while enabled.
+            </span>
+          </span>
+        </label>
+        <label class="settings-row">
+          <input
+            v-model="ui.audioMuted"
+            type="checkbox"
+            class="settings-checkbox"
+          />
+          <span class="settings-label">Mute audio</span>
+        </label>
+        <label class="settings-row volume-row">
+          <span class="settings-label volume-label">Master volume</span>
+          <input
+            :value="ui.audioVolume"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            class="settings-range"
+            :disabled="ui.audioMuted"
+            @input="ui.setAudioVolume(Number(($event.target as HTMLInputElement).value))"
+          />
+          <span class="volume-pct">{{ Math.round(ui.audioVolume * 100) }}%</span>
+        </label>
       </div>
 
       <div class="pw-section">
@@ -418,6 +468,43 @@ async function selectAvatar(url: string): Promise<void> {
 }
 
 .section-title { font-size: 12px; color: var(--gold); margin: 0; }
+
+.settings-section { display: flex; flex-direction: column; gap: 8px; }
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #e8dcc8;
+  cursor: pointer;
+}
+.settings-checkbox { accent-color: var(--gold); cursor: pointer; }
+.settings-label { color: #e8dcc8; }
+.settings-row--with-hint { align-items: flex-start; }
+.settings-row--with-hint .settings-checkbox { margin-top: 2px; }
+.settings-label--block { display: flex; flex-direction: column; gap: 2px; }
+.settings-hint {
+  font-size: 10px;
+  color: var(--axis);
+  opacity: 0.75;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.volume-row { gap: 12px; }
+.volume-label { flex-shrink: 0; }
+.settings-range {
+  flex: 1;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.settings-range:disabled { opacity: 0.4; cursor: not-allowed; }
+.volume-pct {
+  font-size: 11px;
+  color: var(--axis);
+  min-width: 36px;
+  text-align: right;
+}
 
 .pw-error { font-size: 10px; color: var(--error-red); }
 .pw-success { font-size: 10px; color: var(--gold); }

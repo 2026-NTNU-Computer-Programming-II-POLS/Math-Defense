@@ -93,3 +93,16 @@ class MembershipOut(BaseModel):
     joined_at: datetime
     player_name: str = ""
     email: str = ""
+
+
+class ClassReflectionOut(BaseModel):
+    """A student's reflection surfaced to the class owner (teacher)."""
+    model_config = ConfigDict(extra="ignore")
+
+    session_id: str
+    student_id: str
+    student_name: str = ""
+    star_rating: int
+    score: int
+    reflection_text: str
+    ended_at: datetime | None = None

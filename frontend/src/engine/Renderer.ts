@@ -12,9 +12,46 @@ import type { LevelLayoutService, TileClass } from '@/domain/level/level-layout-
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import { tileStyleFor, type TileStyle } from './render-helpers/tile-style'
 
+/**
+ * Swappable neutral-tone palette (Backlog §16). Bright accents that encode
+ * meaning (path green, buildable blue, enemy red) intentionally stay on
+ * `Colors` — only the stone/grid/axis/forbidden tones, which carry no
+ * categorical signal, shift on Star-1.
+ */
+export interface RendererPalette {
+  readonly stoneDark: string
+  readonly stoneLight: string
+  readonly gridLine: string
+  readonly axis: string
+  readonly forbiddenFill: string
+}
+
+const NEUTRAL_PALETTE: RendererPalette = Object.freeze({
+  stoneDark: Colors.STONE_DARK,
+  stoneLight: Colors.STONE_LIGHT,
+  gridLine: Colors.GRID_LINE,
+  axis: Colors.AXIS,
+  forbiddenFill: Colors.STONE_DARK,
+})
+
+const WARM_PALETTE: RendererPalette = Object.freeze({
+  stoneDark: '#251a18',
+  stoneLight: '#2f231f',
+  gridLine: '#4a3525',
+  axis: '#9c7a40',
+  forbiddenFill: '#251a18',
+})
+
 export class Renderer {
   readonly canvas: HTMLCanvasElement
   readonly ctx: CanvasRenderingContext2D
+
+  /**
+   * Active neutral palette. Mutates only via `setStarPalette` so the engine
+   * has one well-defined seam for swapping Star-1 warming on/off, and the
+   * default state matches the legacy `Colors`-driven appearance.
+   */
+  palette: RendererPalette = NEUTRAL_PALETTE
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -23,6 +60,16 @@ export class Renderer {
     this.ctx = ctx
 
     this._applyDpr()
+  }
+
+  /**
+   * §16: select the neutral-tone palette for the current Star tier. Star-1
+   * warms the canvas backdrop and grid (emotional-design cue per Plass et
+   * al. 2014); Star-2+ uses the default neutrals. Idempotent — safe to call
+   * on every LEVEL_START even if the rating did not change.
+   */
+  setStarPalette(starRating: number): void {
+    this.palette = starRating === 1 ? WARM_PALETTE : NEUTRAL_PALETTE
   }
 
   /** Build the backing buffer at the current devicePixelRatio. */
@@ -53,7 +100,7 @@ export class Renderer {
   }
 
   clear(): void {
-    this.ctx.fillStyle = Colors.STONE_DARK
+    this.ctx.fillStyle = this.palette.stoneDark
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   }
 
@@ -72,14 +119,14 @@ export class Renderer {
         if (layout) {
           this._paintTile(px, py, layout.classify(gx, gy))
         } else {
-          ctx.fillStyle = (gx + gy) % 2 === 0 ? Colors.STONE_DARK : Colors.STONE_LIGHT
+          ctx.fillStyle = (gx + gy) % 2 === 0 ? this.palette.stoneDark : this.palette.stoneLight
           ctx.fillRect(px, py, UNIT_PX, UNIT_PX)
         }
       }
     }
 
     // Grid lines (dark gold rune lines)
-    ctx.strokeStyle = Colors.GRID_LINE
+    ctx.strokeStyle = this.palette.gridLine
     ctx.lineWidth = 0.5
     ctx.beginPath()
     for (let gx = GRID_MIN_X; gx <= GRID_MAX_X; gx++) {
@@ -95,7 +142,7 @@ export class Renderer {
     ctx.stroke()
 
     // Coordinate axes (bright gold)
-    ctx.strokeStyle = Colors.AXIS
+    ctx.strokeStyle = this.palette.axis
     ctx.lineWidth = 2
     ctx.beginPath()
     const xAxisY = gameToCanvasY(0)
@@ -107,7 +154,7 @@ export class Renderer {
     ctx.stroke()
 
     // Tick labels
-    ctx.fillStyle = Colors.AXIS
+    ctx.fillStyle = this.palette.axis
     ctx.font = '10px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
@@ -121,7 +168,7 @@ export class Renderer {
       if (gy === 0) continue
       ctx.fillText(String(gy), yAxisX - 6, gameToCanvasY(gy))
     }
-    ctx.fillStyle = Colors.AXIS
+    ctx.fillStyle = this.palette.axis
     ctx.textAlign = 'right'
     ctx.textBaseline = 'top'
     ctx.fillText('O', yAxisX - 6, xAxisY + 4)
@@ -136,7 +183,13 @@ export class Renderer {
    */
   private _paintTile(px: number, py: number, cls: TileClass): void {
     const style = tileStyleFor(cls)
-    this._applyTileStyle(px, py, style)
+    // §16 Star-1 warming: forbidden cells share their fill with the stone
+    // backdrop, so swap to the active palette's neutral. Path/buildable
+    // fills encode meaning and stay on the categorical palette.
+    const effective = cls === 'forbidden'
+      ? { ...style, fill: this.palette.forbiddenFill }
+      : style
+    this._applyTileStyle(px, py, effective)
   }
 
   private _applyTileStyle(px: number, py: number, style: TileStyle): void {

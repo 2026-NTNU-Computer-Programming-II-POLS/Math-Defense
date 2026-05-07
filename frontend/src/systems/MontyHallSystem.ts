@@ -20,9 +20,15 @@ export interface MontyHallState {
 export class MontyHallSystem implements GameSystem {
   private _unsubs: (() => void)[] = []
   current: MontyHallState | null = null
+  // Cached at init() so _startEvent/_revealDoor (private, called from event
+  // handlers) don't need to thread a Game ref through every call. Replaces a
+  // direct Math.random() so reruns of the same seed surface the same prize
+  // door + revealed doors (Backlog §24 determinism).
+  private _rng: () => number = Math.random
 
   init(game: Game): void {
     this.destroy()
+    this._rng = () => game.rng()
 
     this._unsubs.push(
       game.eventBus.on(Events.KILL_VALUE_CHANGED, (killValue) => {
@@ -94,9 +100,9 @@ export class MontyHallSystem implements GameSystem {
   }
 
   private _startEvent(doorCount: number): void {
-    const prizeIndex = Math.floor(Math.random() * doorCount)
+    const prizeIndex = Math.floor(this._rng() * doorCount)
     const reward = MONTY_HALL_REWARD_POOL[
-      Math.floor(Math.random() * MONTY_HALL_REWARD_POOL.length)
+      Math.floor(this._rng() * MONTY_HALL_REWARD_POOL.length)
     ]
     this.current = {
       doorCount,
@@ -119,7 +125,7 @@ export class MontyHallSystem implements GameSystem {
     }
     const revealCount = doorCount - 2
     for (let r = 0; r < revealCount && candidates.length > 0; r++) {
-      const idx = Math.floor(Math.random() * candidates.length)
+      const idx = Math.floor(this._rng() * candidates.length)
       this.current.revealedDoors.push(candidates[idx])
       candidates.splice(idx, 1)
     }

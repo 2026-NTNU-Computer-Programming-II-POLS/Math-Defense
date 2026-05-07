@@ -9,6 +9,7 @@ from app.config import settings
 from app.db.database import get_db
 from app.domain.user.aggregate import User
 from app.factories import build_auth_service
+from app.infrastructure.persistence.session_repository import SqlAlchemySessionRepository
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.middleware.csrf import mint_csrf_cookie
@@ -205,7 +206,14 @@ def change_password(
 
 @router.get("/me", response_model=AuthMeResponse)
 @limiter.limit("30/minute")
-def get_me(request: Request, current_user: User = Depends(get_current_user)):
+def get_me(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ia_unlock_earned = SqlAlchemySessionRepository(db).has_correct_ia_session(
+        current_user.id
+    )
     return AuthMeResponse(
         id=current_user.id,
         email=current_user.email,
@@ -215,6 +223,8 @@ def get_me(request: Request, current_user: User = Depends(get_current_user)):
         avatar_url=current_user.avatar_url,
         is_email_verified=current_user.is_email_verified,
         mfa_enabled=current_user.mfa_enabled,
+        ia_unlock_earned=ia_unlock_earned,
+        ia_recent_accuracy=current_user.ia_recent_accuracy,
     )
 
 

@@ -7,6 +7,7 @@ import type { BuffCard } from '@/data/buff-defs'
 import type { PathSegmentView } from '@/engine/projections/project-path-panel'
 import type { CalculusState } from '@/entities/types'
 import type { MontyHallState, MontyHallSystem } from '@/systems/MontyHallSystem'
+import type { Checkpoint } from '@/domain/level/checkpoint'
 export type { PathSegmentView } from '@/engine/projections/project-path-panel'
 
 export interface PathPanelState {
@@ -60,6 +61,22 @@ export const useGameStore = defineStore('game', () => {
 
   // V2 Spell cooldowns
   const spellCooldowns = ref<Record<string, number>>({})
+
+  // Concrete-fading on Star-1 path rendering (spec §17). Set by GameView
+  // from the authenticated profile's rolling-10 IA accuracy and the active
+  // star rating (Star ≥ 2 always gets 0). Consumed by the curve renderer
+  // when it draws the Star-1 path with y-axis labels at integer x.
+  const pathLabelOpacity = ref(0)
+
+  // Wave checkpoint for Star-5 retry (Pedagogical Backlog §12). Captured on
+  // WAVE_END only when starRating == 5; consumed by GameView's GAME_OVER UI.
+  // Survives LEVEL_START so a player who dies again after a checkpoint retry
+  // (without clearing a new wave) can still re-retry from the same point.
+  const lastCheckpoint = ref<Checkpoint | null>(null)
+  // True for the current run if it began from a checkpoint restore. Drives
+  // the §12.6 "practice — not eligible for class leaderboards" disclaimer
+  // on the Score Result View.
+  const isCheckpointRun = ref(false)
 
   // Piecewise paths
   const _pathPanelSegments = shallowRef<ReadonlyArray<PathSegmentView>>([])
@@ -137,6 +154,18 @@ export const useGameStore = defineStore('game', () => {
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, () => {
         enemiesAlive.value = game.enemies.length
       }),
+      game.eventBus.on(Events.WAVE_END, (snapshot) => {
+        // Star-5 only — other difficulties retain a full restart on GAME_OVER.
+        if (game.state.starRating === 5) {
+          lastCheckpoint.value = {
+            waveIndex: snapshot.wave + 1,
+            gold: snapshot.gold,
+            hp: snapshot.hp,
+            costTotal: snapshot.costTotal,
+            killValue: snapshot.killValue,
+          }
+        }
+      }),
       game.eventBus.on(Events.LEVEL_START, (l) => {
         level.value = l
         starRating.value = game.state.starRating
@@ -181,6 +210,22 @@ export const useGameStore = defineStore('game', () => {
     for (const unsub of _unsubscribes) unsub()
     _unsubscribes = []
     _game = null
+    // Drop the checkpoint when the player leaves the game view entirely;
+    // re-entering from the menu should always start fresh.
+    lastCheckpoint.value = null
+    isCheckpointRun.value = false
+  }
+
+  function clearCheckpoint(): void {
+    lastCheckpoint.value = null
+  }
+
+  function setCheckpoint(cp: Checkpoint | null): void {
+    lastCheckpoint.value = cp
+  }
+
+  function markCheckpointRun(): void {
+    isCheckpointRun.value = true
   }
 
   function syncFromEngine(game: Game): void {
@@ -264,11 +309,14 @@ export const useGameStore = defineStore('game', () => {
     costTotal, healthOrigin, timeTotal, timeExcludePrepare,
     initialAnswer, pathsVisible, montyHallProgress, montyHallState,
     activeBuffs, spellCooldowns, calculusStates, towerUpgradeTick,
+    pathLabelOpacity,
     pathPanel,
+    lastCheckpoint, isCheckpointRun,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, isMontyHall, hpPercent, activeTime,
     bindEngine, unbindEngine, syncFromEngine, getEngine,
     requestTowerUpgrade, requestTowerRefund, selectBuffCard,
     selectMontyHallDoor, decideMontyHallSwitch, finishMontyHall,
+    clearCheckpoint, setCheckpoint, markCheckpointRun,
   }
 })

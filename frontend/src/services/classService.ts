@@ -18,6 +18,16 @@ export interface Membership {
   email: string
 }
 
+export interface ClassReflection {
+  session_id: string
+  student_id: string
+  student_name: string
+  star_rating: number
+  score: number
+  reflection_text: string
+  ended_at: string | null
+}
+
 export const classService = {
   createClass(name: string) {
     return api.post<ClassInfo>('/api/classes', { name })
@@ -48,5 +58,8 @@ export const classService = {
   },
   regenerateCode(classId: string) {
     return api.post<{ join_code: string }>(`/api/classes/${classId}/regenerate-code`, {})
+  },
+  listReflections(classId: string) {
+    return api.get<ClassReflection[]>(`/api/classes/${classId}/reflections`)
   },
 }

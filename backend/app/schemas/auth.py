@@ -130,6 +130,13 @@ class AuthMeResponse(BaseModel):
     avatar_url: str | None = None
     is_email_verified: bool = False
     mfa_enabled: bool = False
+    # Star-5 personal unlock derived from completed-IA history; the level-select
+    # screen reads this to disable the Star-5 button until the user clears IA.
+    ia_unlock_earned: bool = False
+    # Rolling fraction (0.0–1.0) of the last 10 completed sessions whose IA
+    # was answered correctly. The frontend curve renderer reads this at
+    # level start to fade y-axis labels (spec §17).
+    ia_recent_accuracy: float = 0.0
 
 
 class UpdatePlayerNameRequest(BaseModel):

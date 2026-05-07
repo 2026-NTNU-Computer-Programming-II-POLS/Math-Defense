@@ -28,6 +28,7 @@ frontend/
 │   │
 │   ├── views/                      Page-level screens
 │   │   ├── MenuView.vue            Main menu
+│   │   ├── AboutView.vue           Project / accessibility statement page
 │   │   ├── AuthView.vue            Login / register (email + player_name + role)
 │   │   ├── LevelSelectView.vue     Star-rated difficulty picker (1–5 stars)
 │   │   ├── InitialAnswerView.vue   Pre-game endpoint identification (Initial Answer)
@@ -35,52 +36,67 @@ frontend/
 │   │   ├── ScoreResultView.vue     Post-game score breakdown (S1/S2/K/TotalScore)
 │   │   ├── LeaderboardView.vue     Score table
 │   │   ├── ProfileView.vue         User profile + achievement/talent summary cards
-│   │   ├── AchievementView.vue     Achievement gallery (20 achievements, 5 categories)
+│   │   ├── AchievementView.vue     Achievement gallery (5 categories, season multipliers)
 │   │   ├── TalentTreeView.vue      Talent tree allocation UI (21 nodes, 7 tower types)
 │   │   ├── ClassView.vue           Student: list/join classes; Teacher: create/manage classes
-│   │   ├── AdminView.vue           Admin dashboards for teachers / classes / students
-│   │   ├── TeacherDashboard.vue    Teacher overview of activity results
+│   │   ├── AdminView.vue           Admin dashboards for teachers / classes / students / seasons
+│   │   ├── TeacherDashboard.vue    Teacher overview of activity results + per-student competency posteriors
 │   │   ├── TeacherTerritorySetup.vue  Create a Grabbing Territory activity
 │   │   ├── TerritoryListView.vue   List of territory activities
 │   │   ├── TerritoryDetailView.vue Territory map + slot status
 │   │   ├── TerritoryResultView.vue Play / result screen for a territory slot
-│   │   └── RankingsView.vue        Territory or global rankings (4 ranking types)
+│   │   ├── RankingsView.vue        Territory or global rankings (4 ranking types)
+│   │   ├── ChallengeBuilder.vue    Teacher-side authoring UI for generative challenges
+│   │   ├── ChallengeView.vue       Player-side challenge runner (constraint preview + launch)
+│   │   ├── ChallengeLeaderboardView.vue  Challenge-specific leaderboard
+│   │   ├── ReplayView.vue          Deterministic replay player — re-feeds recorded events through `EventPlayer`
+│   │   ├── SpectateView.vue        Live spectate via WebSocket (`SpectatorClient`)
+│   │   ├── StudyProbeView.vue      Empirical-validity-probe quiz form (`?study_id=…&form=pre|post|delay`)
+│   │   └── AffectSurveyView.vue    Likert affect survey (`?study_id=…&phase=pre|post`)
 │   │
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Modal.vue           Generic modal wrapper
 │   │   │   ├── MathDisplay.vue     KaTeX renderer wrapper
 │   │   │   └── LevelCard.vue       Level-selection card (emits 'select')
-│   │   └── game/
-│   │       ├── HUD.vue             Two-row HUD: star rating, kill value, IA indicator,
-│   │       │                       Monty Hall progress bar, spell bar, buff icons, prep timer
-│   │       ├── TowerBar.vue        Tower selection bar
-│   │       ├── StartWaveButton.vue Player-paced "Start Wave" control shown during BUILD
-│   │       ├── BuildPanel.vue      Thin wrapper — delegates to TowerInfoPanel
-│   │       ├── TowerInfoPanel.vue  Unified stats + type-specific panel + upgrade button
-│   │       ├── BuildHint.vue       First-time placement hints
-│   │       ├── ShopPanel.vue       In-BUILD shop for time-based buffs
-│   │       ├── SpellBar.vue        Spell cooldown buttons (Fireball/Frost Nova/Lightning/Rejuvenate)
-│   │       ├── MagicModePanel.vue  Magic tower: function curve selection
-│   │       ├── RadarConfigPanel.vue Radar tower: arc start/end/restrict config
-│   │       ├── MatrixPairPanel.vue  Matrix tower: pair selection
-│   │       ├── LimitQuestionPanel.vue  Limit tower: multiple-choice lim question
-│   │       ├── CalculusPanel.vue   Calculus tower: derivative/integral function picker
-│   │       ├── ChainRulePanel.vue  Boss Type-B chain-rule challenge overlay (KaTeX)
-│   │       ├── MontyHallPanel.vue  Monty Hall event overlay (doors, reveal, switch)
-│   │       ├── TargetingModePanel.vue Per-tower targeting-mode picker (closest / strongest / first / last)
-│   │       ├── AchievementToast.vue Toast for newly-unlocked achievements after session end
-│   │       ├── BuffCardPanel.vue   (Legacy V1 — buff card draw overlay; superseded by ShopPanel)
-│   │       ├── FunctionPanel.vue   (Legacy V1 — quadratic a/b/c input)
-│   │       ├── MatrixInputPanel.vue (Legacy V1 — 2×2 matrix input)
-│   │       └── IntegralPanel.vue   (Legacy V1 — [a,b] interval input)
+│   │   ├── game/
+│   │   │   ├── HUD.vue             Two-row HUD: star rating, kill value, IA indicator,
+│   │   │   │                       Monty Hall progress bar, spell bar, buff icons, prep timer
+│   │   │   ├── TowerBar.vue        Tower selection bar
+│   │   │   ├── StartWaveButton.vue Player-paced "Start Wave" control shown during BUILD
+│   │   │   ├── BuildPanel.vue      Thin wrapper — delegates to TowerInfoPanel
+│   │   │   ├── TowerInfoPanel.vue  Unified stats + type-specific panel + upgrade button
+│   │   │   ├── BuildHint.vue       First-time placement hints
+│   │   │   ├── ShopPanel.vue       In-BUILD shop for time-based buffs
+│   │   │   ├── SpellBar.vue        Spell cooldown buttons (Fireball/Frost Nova/Lightning/Rejuvenate)
+│   │   │   ├── MagicModePanel.vue  Magic tower: function curve selection
+│   │   │   ├── RadarConfigPanel.vue Radar tower: arc start/end/restrict config
+│   │   │   ├── MatrixPairPanel.vue  Matrix tower: pair selection
+│   │   │   ├── LimitQuestionPanel.vue  Limit tower: multiple-choice lim question (branches on starRating)
+│   │   │   ├── CalculusPanel.vue   Calculus tower: derivative/integral function picker
+│   │   │   ├── ChainRulePanel.vue  Boss Type-B chain-rule challenge overlay (KaTeX)
+│   │   │   ├── MontyHallPanel.vue  Monty Hall event overlay (doors, reveal, switch)
+│   │   │   ├── TargetingModePanel.vue Per-tower targeting-mode picker (closest / strongest / first / last)
+│   │   │   ├── AchievementToast.vue Toast for newly-unlocked achievements after session end
+│   │   │   ├── PrincipleOverlay.vue Post-wave card surfacing the mathematical principle exercised by the player's last move
+│   │   │   ├── BuffCardPanel.vue   (Legacy V1 — buff card draw overlay; superseded by ShopPanel)
+│   │   │   ├── FunctionPanel.vue   (Legacy V1 — quadratic a/b/c input)
+│   │   │   ├── MatrixInputPanel.vue (Legacy V1 — 2×2 matrix input)
+│   │   │   └── IntegralPanel.vue   (Legacy V1 — [a,b] interval input)
+│   │   ├── teacher/
+│   │   │   └── CompetencyBar.vue   Beta-distribution bar for the teacher dashboard (mean ± uncertainty band)
+│   │   ├── territory/
+│   │   │   └── TerritorySlotCard.vue  Slot card used in TerritoryDetailView
+│   │   └── leaderboard/
+│   │       └── PersonalTimeline.vue   User's personal score progression timeline
 │   │
 │   ├── composables/
 │   │   ├── useGameLoop.ts          Mount/unmount engine, inject systems, wire UI bridges, talent modifiers
-│   │   ├── useSessionSync.ts       Bridge engine lifecycle ↔ backend session API (V2 payload)
+│   │   ├── useSessionSync.ts       Bridge engine lifecycle ↔ backend session API (V2 payload, rng_seed)
 │   │   ├── useCanvasPlot.ts        Canvas plotting helper for KaTeX-adjacent function previews
 │   │   ├── useAuth.ts              Reactive auth helpers (email-based; role checks)
-│   │   └── useLeaderboard.ts       Leaderboard fetch helpers
+│   │   ├── useLeaderboard.ts       Leaderboard fetch helpers
+│   │   └── useKeyboardPlacement.ts Arrow-key + Enter tower placement (WCAG 2.2 SC 2.1.1 — pointer-free)
 │   │
 │   ├── stores/                     Pinia stores (Vue reactivity layer)
 │   │   ├── authStore.ts            token, user (email/player_name/role), initialising flag
@@ -91,15 +107,20 @@ frontend/
 │   │
 │   ├── services/                   Backend API clients
 │   │   ├── api.ts                  fetch wrapper; auto-attaches Bearer token; ApiError
-│   │   ├── authService.ts          register(email, playerName, password, role) / login / me / logout
-│   │   ├── sessionService.ts       create / update / end / abandon / getActive (V2 fields)
-│   │   ├── leaderboardService.ts   fetchLeaderboard, submitScore
+│   │   ├── authService.ts          register(email, playerName, password, role) / login / me / logout / refresh
+│   │   ├── sessionService.ts       create / update / end / abandon / getActive (V2 fields, rng_seed, practice_mode)
+│   │   ├── leaderboardService.ts   fetchLeaderboard, submitScore, fetchPersonalTimeline
 │   │   ├── achievementService.ts   fetchAchievements, fetchSummary
+│   │   ├── seasonService.ts        listSeasons, upsertSeason (admin)
 │   │   ├── talentService.ts        fetchTree, fetchModifiers, allocate, reset
 │   │   ├── classService.ts         createClass, listClasses, joinByCode, deleteClass
 │   │   ├── adminService.ts         listTeachers, listClasses, listStudents
 │   │   ├── rankingService.ts       fetchRankings (4 ranking types)
-│   │   └── territoryService.ts     createActivity, listActivities, getActivity, playTerritory, getRankings, settleActivity
+│   │   ├── territoryService.ts     createActivity, listActivities, getActivity, playTerritory, getRankings, settleActivity
+│   │   ├── assessmentService.ts    fetchClassPosteriors(classId) — Beta posteriors for the teacher dashboard
+│   │   ├── recommendationService.ts fetchMyRecommendation() — adaptive star + talent steer
+│   │   ├── challengeService.ts     CRUD for generative challenges; fetch + run + leaderboard
+│   │   └── studyService.ts         enroll(), submitProbe(), submitAffect(), exportCsv() (admin)
 │   │
 │   ├── router/index.ts             Routes with RBAC guards (protected / admin / teacher / student sets)
 │   │
@@ -116,8 +137,15 @@ frontend/
 │   │   │   └── registry.ts         EVENT_HANDLER_REGISTRY — index of every EventBus subscription
 │   │   ├── projections/
 │   │   │   └── project-path-panel.ts   Path-panel viewport projection (world → screen pixels)
-│   │   └── render-helpers/
-│   │       └── tile-style.ts           Tile-appearance lookup shared by grid + placement preview
+│   │   ├── render-helpers/
+│   │   │   └── tile-style.ts           Tile-appearance lookup shared by grid + placement preview
+│   │   ├── audio/                  HTMLAudioElement-based SFX layer
+│   │   │   ├── AssetManager.ts     Lazy-loaded audio buffers, mute/volume controls, gesture-gated unlock
+│   │   │   └── sfx-defs.ts         SFX slug → .wav URL + per-clip volume (see frontend/public/audio/)
+│   │   └── replay/                 Deterministic recording + playback + spectate
+│   │       ├── EventRecorder.ts    Captures curated player-decision events (excludes simulation output) with batched flush
+│   │       ├── EventPlayer.ts      Re-feeds the recorded stream against a fresh engine seeded from `rng_seed`
+│   │       └── SpectatorClient.ts  WebSocket client for `/api/sessions/{id}/spectate` live fan-out
 │   │
 │   ├── domain/                     Domain policies (shared across systems)
 │   │   ├── combat/
@@ -128,7 +156,8 @@ frontend/
 │   │   │   ├── decoy-generator.ts      Decoy curve generation for Initial Answer screen
 │   │   │   ├── level-layout-service.ts Builds SegmentedPath + placement rules for a level definition
 │   │   │   ├── path-group-defs.ts      7 runtime path group definitions
-│   │   │   └── placement-policy.ts     Grid-cell → can-place decision shared by preview and click handler
+│   │   │   ├── placement-policy.ts     Grid-cell → can-place decision shared by preview and click handler
+│   │   │   └── checkpoint.ts           Star-5 retry-from-checkpoint serialization (gold/HP/costTotal/killValue)
 │   │   ├── movement/               Curve-path and piecewise-path movement strategies
 │   │   │   ├── movement-strategy.ts
 │   │   │   ├── movement-strategy-registry.ts
@@ -203,15 +232,17 @@ frontend/
 │   │
 │   ├── data/                       Static definitions — no functions
 │   │   ├── constants.ts            GamePhase / TowerType / EnemyType / Events (`as const`)
-│   │   ├── tower-defs.ts           Cost, damage, range, math concept, V2 params (7 tower types)
-│   │   ├── enemy-defs.ts           HP, speed, reward, split/helper/boss config (7 enemy types)
+│   │   ├── tower-defs.ts           Cost, damage, range, math concept, V2 params (7 tower types) + glyph + examRelevance
+│   │   ├── enemy-defs.ts           HP, speed, reward, split/helper/boss config + triggerHpRange (7 enemy types)
 │   │   ├── level-defs.ts           V2 wave definitions with enemy distribution
 │   │   ├── difficulty-defs.ts      DIFFICULTY_TABLE, MultisetEntry, pickRandomMultiset
 │   │   ├── buff-defs.ts            Time-based buff/curse IDs, labels, effect strategies (30+ effects)
 │   │   ├── spell-defs.ts           4 spell definitions (Fireball/Frost Nova/Lightning/Rejuvenate)
 │   │   ├── monty-hall-defs.ts      Kill-value thresholds per star rating; door reward pool
-│   │   ├── achievement-defs.ts     20 achievement definitions (5 categories)
+│   │   ├── achievement-defs.ts     Achievement definitions (5 categories) — lint-tested against trait-praise vocabulary
 │   │   ├── talent-defs.ts          21 talent node definitions (7 tower types, prereq chains)
+│   │   ├── principle-defs.ts       7 mathematical-principle definitions surfaced by `PrincipleOverlay` after the matching gameplay moment
+│   │   ├── probe-items.ts          Item pool for the Empirical Validity Probe forms (pre/post/delay)
 │   │   ├── wave-templates.ts       Wave template definitions
 │   │   ├── wave-generator.ts       Dynamic wave generation utilities
 │   │   ├── path-segment-types.ts   Piecewise path segment type constants
@@ -454,6 +485,11 @@ Panel visibility, selected tower type, build-hint step, modal state.
 | `adminService.ts` | `listTeachers()`, `listClasses()`, `listStudents()` |
 | `rankingService.ts` | `fetchRankings(type, options)` |
 | `territoryService.ts` | `createActivity(payload)`, `listActivities(classId?)`, `getActivity(id)`, `playTerritory(activityId, slotId, sessionId)`, `getRankings(activityId)`, `settleActivity(activityId)` |
+| `assessmentService.ts` | `fetchClassPosteriors(classId)` — `{ student_id, competency, alpha, beta, mean, recommend_next }` rows |
+| `recommendationService.ts` | `fetchMyRecommendation()` — adaptive star-rating + suggested talent node |
+| `seasonService.ts` | `listSeasons()`, `upsertSeason(payload)` (admin) |
+| `challengeService.ts` | `createChallenge`, `listChallenges({ mine })`, `getChallenge(id)`, `renameChallenge(id, payload)`, `updateConstraints(id, payload)`, `deleteChallenge(id)` |
+| `studyService.ts` | `enroll(studyId)`, `submitProbe(studyId, form, responses)`, `submitAffect(studyId, phase, responses)`, `exportCsv()` (admin) |
 
 ---
 
@@ -508,6 +544,15 @@ benchmark(fn, iterations = 1000)         // ms per iteration; reports WASM vs JS
 | `/admin/teachers` | `AdminView` | Requires admin |
 | `/admin/classes` | `AdminView` | Requires admin |
 | `/admin/students` | `AdminView` | Requires admin |
+| `/admin/seasons` | `AdminView` | Requires admin — manage achievement-multiplier windows |
+| `/about` | `AboutView` | — — accessibility statement and project info |
+| `/teacher/challenges` | `ChallengeBuilder` | Requires teacher |
+| `/challenge/:id` | `ChallengeView` | Requires auth |
+| `/challenge/:id/leaderboard` | `ChallengeLeaderboardView` | Requires auth |
+| `/replay/:sessionId` | `ReplayView` | Requires auth |
+| `/spectate/:sessionId` | `SpectateView` | Requires auth |
+| `/study/probe` | `StudyProbeView` | Requires auth — `?study_id=…&form=pre\|post\|delay` |
+| `/study/affect` | `AffectSurveyView` | Requires auth — `?study_id=…&phase=pre\|post` |
 
 ---
 
@@ -519,7 +564,7 @@ npm install
 npm run dev        # Vite dev server at http://localhost:5173
 npm run build      # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
 npm run preview    # Preview the production build
-npm test           # Vitest — 28 test files
+npm test           # Vitest — 41 test files
 npm run test:watch # Vitest in watch mode
 ```
 
@@ -544,8 +589,11 @@ src/engine/Renderer.test.ts
 src/engine/level-context.test.ts
 src/engine/projections/project-path-panel.test.ts
 src/engine/render-helpers/tile-style.test.ts
+src/engine/audio/AssetManager.test.ts          Lazy load + mute + gesture-gated unlock
+src/engine/__tests__/determinism.test.ts       Replay reproducibility from rng_seed
 src/domain/level/level-layout-service.test.ts
 src/domain/level/placement-policy.test.ts
+src/domain/level/checkpoint.test.ts            Star-5 checkpoint serialization round-trip
 src/domain/movement/vertical-movement-strategy.test.ts
 src/domain/movement/x-driven-movement-strategy.test.ts
 src/domain/path/path-builder.test.ts
@@ -553,12 +601,23 @@ src/domain/path/path-progress-tracker.test.ts
 src/domain/path/path-validator.test.ts
 src/domain/path/segmented-path.test.ts
 src/composables/useSessionSync.test.ts
+src/composables/useKeyboardPlacement.test.ts   Arrow-key + Enter placement
 src/components/game/FunctionPanel.test.ts
-src/math/WasmBridge.test.ts                JS-only parity (fallback surface + numerical invariants)
-src/math/WasmBridge.wasm.test.ts           JS ↔ WASM parity under Node (requires math_engine.* built)
-src/systems/__tests__/*.test.ts            BuffSystem, BuffSystem.duration, BuffSystem.effects,
-                                           CombatSystem, EconomySystem, MovementSystem,
-                                           TowerPlacementSystem, TowerUpgradeSystem, WaveSystem
+src/components/game/LimitQuestionPanel.test.ts
+src/components/game/RadarConfigPanel.test.ts
+src/components/game/PrincipleOverlay.test.ts
+src/views/LevelSelectView.test.ts
+src/data/principle-defs.test.ts                Principle/tower/moment integrity
+src/data/tower-defs.test.ts
+src/data/achievement-defs.test.ts              Bans trait-praise vocabulary; verb-led descriptions
+src/math/limit-evaluator.test.ts
+src/math/curve-renderer.test.ts
+src/math/WasmBridge.test.ts                    JS-only parity (fallback surface + numerical invariants)
+src/math/WasmBridge.wasm.test.ts               JS ↔ WASM parity under Node (requires math_engine.* built)
+src/systems/__tests__/*.test.ts                BuffSystem, BuffSystem.duration, BuffSystem.effects,
+                                               CombatSystem, EconomySystem, EnemyAbilitySystem,
+                                               MovementSystem, TowerPlacementSystem,
+                                               TowerUpgradeSystem, WaveSystem
 ```
 
 Vitest is configured with `happy-dom` so systems can be tested without a real browser. The WASM-bridge test files split responsibilities: `WasmBridge.test.ts` pins the JS fallback's behaviour without loading the binary, and `WasmBridge.wasm.test.ts` loads the compiled module under Node to assert numerical parity (skipped if the WASM build is absent).
@@ -579,3 +638,20 @@ Conversion:
 ```
 
 Grid bounds: X ∈ [-14, 14], Y ∈ [-14, 14]. Tower placement snaps to grid intersection points (not all cells — legal positions are pre-computed from path clearance). Canvas size, origin, unit, bounds, initial HP/gold and `hitRadius` all come from `shared/game-constants.json`.
+
+---
+
+## Audio Assets
+
+`frontend/public/audio/` contains six WAV files loaded on-demand by `engine/audio/AssetManager`:
+
+| File | Trigger |
+|---|---|
+| `cast-spell.wav` | Spell cast |
+| `kill.wav` | Enemy killed |
+| `wave-end.wav` | Wave cleared |
+| `mh-reveal.wav` | Monty Hall door reveal |
+| `achievement.wav` | Newly-unlocked achievement toast |
+| `ambient-build.wav` | Looped low-volume bed during BUILD phase |
+
+The AssetManager defers `play()` until after the first user gesture so autoplay policies do not fail silently, exposes mute + per-slug volume, and is independently unit-tested.

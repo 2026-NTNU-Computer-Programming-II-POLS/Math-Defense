@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import Boolean, String, Integer, DateTime, Enum
+from sqlalchemy import Boolean, String, Integer, Float, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
@@ -25,6 +25,11 @@ class User(Base):
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     totp_last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Rolling fraction of the last 10 completed sessions whose Initial-Answer
+    # phase was answered correctly. Recomputed by the session-service at
+    # session-end and read by the frontend at level start to drive
+    # concrete-fading on the Star-1 path renderer (spec §17).
+    ia_recent_accuracy: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )

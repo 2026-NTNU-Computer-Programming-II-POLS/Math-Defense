@@ -3,8 +3,55 @@
  * Manages panel visibility, selected tower, and other UI-only state.
  */
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import type { TowerType } from '@/data/constants'
+
+const PRINCIPLE_OVERLAY_PREF_KEY = 'mdf.principleOverlayEnabled'
+const AUDIO_MUTED_PREF_KEY = 'mdf.audioMuted'
+const AUDIO_VOLUME_PREF_KEY = 'mdf.audioVolume'
+const SLIDER_FALLBACK_PREF_KEY = 'mdf.sliderFallbackEnabled'
+
+function loadPrincipleOverlayPref(): boolean {
+  if (typeof window === 'undefined') return true
+  try {
+    const raw = window.localStorage.getItem(PRINCIPLE_OVERLAY_PREF_KEY)
+    if (raw === null) return true
+    return raw === '1'
+  } catch {
+    return true
+  }
+}
+
+function loadAudioMutedPref(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(AUDIO_MUTED_PREF_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function loadSliderFallbackPref(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(SLIDER_FALLBACK_PREF_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function loadAudioVolumePref(): number {
+  if (typeof window === 'undefined') return 0.7
+  try {
+    const raw = window.localStorage.getItem(AUDIO_VOLUME_PREF_KEY)
+    if (raw === null) return 0.7
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return 0.7
+    return Math.max(0, Math.min(1, n))
+  } catch {
+    return 0.7
+  }
+}
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return (
@@ -42,6 +89,57 @@ export const useUiStore = defineStore('ui', () => {
 
   // HUD hint
   const buildHintStep = ref(0)   // 0=select tower  1=click cell  2=set params  3=Cast Spell
+
+  // Pedagogy: post-wave principle-surfacing overlay (Backlog item #1).
+  // Persisted to localStorage so the player's choice survives reloads.
+  const principleOverlayEnabled = ref<boolean>(loadPrincipleOverlayPref())
+  if (typeof window !== 'undefined') {
+    watch(principleOverlayEnabled, (v) => {
+      try { window.localStorage.setItem(PRINCIPLE_OVERLAY_PREF_KEY, v ? '1' : '0') }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setPrincipleOverlayEnabled(v: boolean): void {
+    principleOverlayEnabled.value = v
+  }
+
+  // Pedagogical Backlog §15.3 — master volume + mute persisted across sessions.
+  // useGameLoop bridges these refs into AssetManager so the audio engine
+  // never imports Pinia (preserves engine/UI separation).
+  const audioMuted = ref<boolean>(loadAudioMutedPref())
+  const audioVolume = ref<number>(loadAudioVolumePref())
+  if (typeof window !== 'undefined') {
+    watch(audioMuted, (v) => {
+      try { window.localStorage.setItem(AUDIO_MUTED_PREF_KEY, v ? '1' : '0') }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+    watch(audioVolume, (v) => {
+      try { window.localStorage.setItem(AUDIO_VOLUME_PREF_KEY, String(v)) }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setAudioVolume(v: number): void {
+    audioVolume.value = Math.max(0, Math.min(1, v))
+  }
+
+  // Pedagogical Backlog §20 — opt-in slider-fallback / practice mode for
+  // dyscalculic / high-anxiety learners. When true, MagicModePanel and
+  // MatrixInputPanel render slider controls instead of typed expression /
+  // coefficient input, AND every new session is flagged practice_mode so it
+  // is excluded from the global leaderboard. Persisted across sessions.
+  const sliderFallbackEnabled = ref<boolean>(loadSliderFallbackPref())
+  if (typeof window !== 'undefined') {
+    watch(sliderFallbackEnabled, (v) => {
+      try { window.localStorage.setItem(SLIDER_FALLBACK_PREF_KEY, v ? '1' : '0') }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setSliderFallbackEnabled(v: boolean): void {
+    sliderFallbackEnabled.value = v
+  }
 
   // Piecewise paths Phase 5: Function Panel ↔ Renderer hover sync.
   // Panel writes via `setHoveredSegmentId`; `useGameLoop` mirrors the
@@ -142,9 +240,15 @@ export const useUiStore = defineStore('ui', () => {
     tutorialVisible, tutorialStep,
     buildHintStep,
     hoveredSegmentId,
+    principleOverlayEnabled,
+    audioMuted, audioVolume,
+    sliderFallbackEnabled,
     showModal, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
     setBuildHintStep,
     setHoveredSegmentId,
+    setPrincipleOverlayEnabled,
+    setAudioVolume,
+    setSliderFallbackEnabled,
   }
 })

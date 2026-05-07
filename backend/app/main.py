@@ -23,7 +23,7 @@ from app.infrastructure.login_guard import purge_stale as purge_stale_login_atte
 from app.infrastructure.scheduler import territory_settlement_task
 from app.infrastructure.token_denylist import purge_expired as purge_expired_denied_tokens
 from app.middleware.csrf import CsrfMiddleware
-from app.routers import achievement, admin, auth, class_, leaderboard, game_session, talent, territory
+from app.routers import achievement, admin, assessment, auth, challenge, class_, leaderboard, game_session, recommendation, replay, study, talent, territory
 from app.limiter import limiter
 from app.seed import ensure_demo_user
 
@@ -202,8 +202,14 @@ app.include_router(admin.router)
 app.include_router(leaderboard.router)
 app.include_router(game_session.router)
 app.include_router(achievement.router)
+app.include_router(achievement.seasons_router)
 app.include_router(talent.router)
 app.include_router(territory.router)
+app.include_router(assessment.router)
+app.include_router(recommendation.router)
+app.include_router(challenge.router)
+app.include_router(replay.router)
+app.include_router(study.router)
 
 
 @app.get("/")

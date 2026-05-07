@@ -27,6 +27,7 @@ class LeaderboardEntry:
         kills: int,
         waves_survived: int,
         session_id: str | None = None,
+        challenge_id: str | None = None,
         created_at: datetime | None = None,
     ) -> None:
         if kills < 0:
@@ -40,6 +41,8 @@ class LeaderboardEntry:
         self.kills = kills
         self.waves_survived = waves_survived
         self.session_id = session_id
+        # Backlog §23 — non-NULL when entry comes from a challenge run.
+        self.challenge_id = challenge_id
         self.created_at = created_at or datetime.now(UTC)
 
     @classmethod
@@ -51,8 +54,9 @@ class LeaderboardEntry:
         kills: int,
         waves_survived: int,
         session_id: str,
+        challenge_id: str | None = None,
     ) -> LeaderboardEntry:
-        """從完成的場次建立排行榜條目"""
+        """Build a leaderboard entry from a completed session."""
         return cls(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -61,4 +65,5 @@ class LeaderboardEntry:
             kills=kills,
             waves_survived=waves_survived,
             session_id=session_id,
+            challenge_id=challenge_id,
         )

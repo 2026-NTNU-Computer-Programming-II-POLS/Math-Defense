@@ -1,14 +1,36 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { STAR_MIN, STAR_MAX } from '@/data/difficulty-defs'
 import { generateLevel } from '@/domain/level/level-generator'
 import { mulberry32 } from '@/math/MathUtils'
+import { useAuthStore } from '@/stores/authStore'
+import { recommendationService } from '@/services/recommendationService'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const selectedStar = ref(1)
 const generating = ref(false)
 const error = ref<string | null>(null)
+// Pedagogical_Backlog_Spec §28: surface a "Suggested for you: Star N" badge
+// driven by the user's competency posterior. The suggestion is *advisory* —
+// the user can still pick any star, and dismissal persists across sessions
+// (SDT autonomy: nudging, not gating).
+const suggestedStar = ref<number | null>(null)
+const RECOMMENDATION_DISMISS_KEY = 'recommendation:dismissed'
+const recommendationDismissed = ref<boolean>(
+  typeof localStorage !== 'undefined'
+    && localStorage.getItem(RECOMMENDATION_DISMISS_KEY) === '1',
+)
+const showSuggestion = computed(
+  () => suggestedStar.value !== null && !recommendationDismissed.value,
+)
+function dismissSuggestion() {
+  recommendationDismissed.value = true
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(RECOMMENDATION_DISMISS_KEY, '1')
+  }
+}
 
 const stars = Array.from({ length: STAR_MAX - STAR_MIN + 1 }, (_, i) => STAR_MIN + i)
 
@@ -20,12 +42,40 @@ const starLabels: Record<number, string> = {
   5: 'Legendary',
 }
 
+const STAR_5_LOCK_TOOLTIP =
+  'Complete the Initial Answer phase correctly at any star rating to unlock.'
+
+const iaUnlockEarned = computed(() => authStore.user?.ia_unlock_earned === true)
+
+function isStarLocked(star: number): boolean {
+  return star === 5 && !iaUnlockEarned.value
+}
+
+// Pull the latest profile once on entry so an unlock earned in the previous
+// session takes effect without a full reload (Pedagogical_Backlog_Spec §5.3).
+onMounted(async () => {
+  authStore.refreshProfile()
+  // Recommendation fetch is best-effort — a failure (network, 401, anything)
+  // must not block level selection.
+  try {
+    const rec = await recommendationService.me()
+    suggestedStar.value = rec.star
+  } catch {
+    suggestedStar.value = null
+  }
+})
+
 function selectStar(star: number) {
+  if (isStarLocked(star)) return
   selectedStar.value = star
   error.value = null
 }
 
 function startLevel() {
+  if (isStarLocked(selectedStar.value)) {
+    error.value = STAR_5_LOCK_TOOLTIP
+    return
+  }
   generating.value = true
   error.value = null
   try {
@@ -47,18 +97,40 @@ function startLevel() {
 <template>
   <div class="level-select">
     <h1>Select Difficulty</h1>
+    <div
+      v-if="showSuggestion"
+      class="suggestion-badge"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="suggestion-text">
+        Suggested for you: <strong>Star {{ suggestedStar }}</strong>
+      </span>
+      <button
+        type="button"
+        class="suggestion-dismiss"
+        aria-label="Dismiss suggestion"
+        @click="dismissSuggestion"
+      >×</button>
+    </div>
     <div class="star-grid">
       <button
         v-for="star in stars"
         :key="star"
         class="star-card"
-        :class="{ selected: selectedStar === star }"
+        :class="{ selected: selectedStar === star, locked: isStarLocked(star) }"
+        :disabled="isStarLocked(star)"
+        :title="isStarLocked(star) ? STAR_5_LOCK_TOOLTIP : undefined"
+        :aria-disabled="isStarLocked(star) || undefined"
         @click="selectStar(star)"
       >
         <div class="star-icons">
           <span v-for="s in star" :key="s" class="star-icon">&#9733;</span>
         </div>
         <div class="star-label">{{ starLabels[star] }}</div>
+        <div v-if="isStarLocked(star)" class="lock-badge" aria-hidden="true">
+          &#128274;
+        </div>
       </button>
     </div>
     <p v-if="error" class="error">{{ error }}</p>
@@ -117,6 +189,23 @@ h1 {
   box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
 }
 
+.star-card.locked,
+.star-card[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+.star-card.locked:hover {
+  border-color: var(--grid-line);
+}
+
+.lock-badge {
+  margin-top: 0.4rem;
+  font-size: 1rem;
+  color: var(--axis);
+}
+
 .star-icons {
   font-size: 1.5rem;
   color: var(--gold-bright);
@@ -159,5 +248,36 @@ h1 {
 .error {
   color: var(--hp-red);
   margin-bottom: 1rem;
+}
+
+.suggestion-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(212, 168, 64, 0.12);
+  border: 1px solid var(--gold-bright, #d4a840);
+  color: var(--gold-bright, #d4a840);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.suggestion-text strong {
+  color: var(--gold-bright, #d4a840);
+}
+
+.suggestion-dismiss {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+
+.suggestion-dismiss:hover {
+  opacity: 0.7;
 }
 </style>

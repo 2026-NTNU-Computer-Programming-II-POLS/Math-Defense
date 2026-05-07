@@ -42,3 +42,29 @@ class GameSessionRepository(Protocol):
     def save_all(self, sessions: list[GameSession]) -> None: pass
 
     def get_cumulative_stats(self, user_id: str) -> CumulativeStats: pass
+
+    def compute_ia_recent_accuracy(self, user_id: str, window: int = 10) -> float:
+        """Fraction (0.0–1.0) of the user's last ``window`` completed sessions
+        whose Initial-Answer phase was answered correctly.
+
+        Returns 0.0 when the user has no completed sessions yet — new players
+        therefore see fully-labelled paths until they accumulate evidence
+        (spec §17, concrete-fading)."""
+        pass
+
+    def has_correct_ia_session(self, user_id: str) -> bool:
+        """True iff the user has at least one session whose Initial-Answer
+        phase was answered correctly (initial_answer flag set at creation).
+
+        Used by the Star-5 unlock gate (see SessionApplicationService.create_session
+        and the user-profile endpoint). Status is irrelevant — IA correctness is
+        recorded at session creation and never overwritten, so even abandoned
+        sessions satisfy the predicate."""
+        pass
+
+    def find_reflections_for_users(
+        self, user_ids: list[str], limit: int = 100
+    ) -> list[GameSession]:
+        """Most-recent completed sessions with a non-empty reflection_text,
+        scoped to the given users. Used by the teacher dashboard."""
+        pass

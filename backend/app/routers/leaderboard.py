@@ -13,6 +13,8 @@ from app.middleware.auth import get_current_user, get_current_user_optional
 from app.schemas.leaderboard import (
     LeaderboardEntryOut,
     LeaderboardResponse,
+    PersonalHistoryEntryOut,
+    PersonalHistoryOut,
     ScoreSubmission,
     ScoreSubmissionResponse,
 )
@@ -30,6 +32,7 @@ def get_leaderboard(
     request: Request,
     level: int | None = Query(None, ge=1, le=5),
     class_id: str | None = Query(None),
+    challenge_id: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -39,7 +42,13 @@ def get_leaderboard(
         if current_user is None:
             raise InvalidTokenError("Authentication required to view class leaderboard")
         build_class_service(db).verify_access(class_id, current_user.id, current_user.role)
-    ranked, total = build_leaderboard_service(db).get_leaderboard(level, page, per_page, class_id=class_id)
+    if challenge_id is not None and current_user is None:
+        # Challenge leaderboards only render for authenticated viewers — keeps
+        # the surface symmetric with /api/challenges/{id} which also requires auth.
+        raise InvalidTokenError("Authentication required to view challenge leaderboard")
+    ranked, total = build_leaderboard_service(db).get_leaderboard(
+        level, page, per_page, class_id=class_id, challenge_id=challenge_id,
+    )
     entries = [
         LeaderboardEntryOut(
             id=r.id,
@@ -54,6 +63,36 @@ def get_leaderboard(
         for r in ranked
     ]
     return LeaderboardResponse(entries=entries, total=total)
+
+
+@router.get("/me", response_model=PersonalHistoryOut)
+@limiter.limit("30/minute")
+def get_my_history(
+    request: Request,
+    level: int | None = Query(None, ge=1, le=5),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Personal-best timeline for the authenticated user.
+
+    Authorisation is implicit: the user_id is read from the verified token,
+    never from a query/body parameter, so the endpoint cannot return another
+    user's history regardless of the query string.
+    """
+    history = build_leaderboard_service(db).get_user_history(current_user.id, level)
+    entries = [
+        PersonalHistoryEntryOut(
+            id=h.id,
+            level=h.level,
+            score=h.score,
+            kills=h.kills,
+            waves_survived=h.waves_survived,
+            created_at=h.created_at,
+            is_personal_best=h.is_personal_best,
+        )
+        for h in history
+    ]
+    return PersonalHistoryOut(entries=entries)
 
 
 @router.post("", status_code=201, response_model=ScoreSubmissionResponse)

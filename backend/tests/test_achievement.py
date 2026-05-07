@@ -187,6 +187,32 @@ def test_sessions_count_achievement_not_unlocked_early(client):
     assert entry["unlocked"] is False
 
 
+def test_achievement_unlocks_curve_families(client):
+    """Pedagogical_Backlog_Spec.md §6 — curve-family achievements gate the magic
+    tower's trig/log functions. Star-1 unlocks trig; Star-2 unlocks log.
+    """
+    token = _register(client, "ach_curve_unlocks")
+
+    # Pre-condition: neither curve-family unlock is granted.
+    before = client.get("/api/achievements", headers=_auth(token)).json()
+    by_id = {e["id"]: e for e in before}
+    assert by_id["unlock_trig_curves"]["unlocked"] is False
+    assert by_id["unlock_log_curves"]["unlocked"] is False
+
+    # Star-1 clear → trig unlocks, log stays locked.
+    _complete_session(client, token, level=1, score=500, kills=10, waves_survived=2)
+    after_star1 = client.get("/api/achievements", headers=_auth(token)).json()
+    by_id = {e["id"]: e for e in after_star1}
+    assert by_id["unlock_trig_curves"]["unlocked"] is True
+    assert by_id["unlock_log_curves"]["unlocked"] is False
+
+    # Star-2 clear → log unlocks too.
+    _complete_session(client, token, level=2, score=500, kills=10, waves_survived=2)
+    after_star2 = client.get("/api/achievements", headers=_auth(token)).json()
+    by_id = {e["id"]: e for e in after_star2}
+    assert by_id["unlock_log_curves"]["unlocked"] is True
+
+
 def test_achievements_isolated_between_users(client):
     token1 = _register(client, "ach_iso1")
     token2 = _register(client, "ach_iso2")
@@ -195,3 +221,100 @@ def test_achievements_isolated_between_users(client):
 
     achievements2 = client.get("/api/achievements", headers=_auth(token2)).json()
     assert all(not e["unlocked"] for e in achievements2)
+
+
+# ── Seasonal achievement sets — Pedagogical_Backlog_Spec.md §22 ──────────────
+
+def _seed_seasonal_def(monkeypatch, season_id="spring_2026"):
+    """Tag an existing achievement def as part of a season for the duration of
+    the test. Patches the frozen dataclass via dataclasses.replace and re-binds
+    the registry so neither persists past the test.
+    """
+    import dataclasses
+
+    from app.domain.achievement import definitions as defs_mod
+
+    target = defs_mod.ACHIEVEMENT_DEFS["explore_star_1"]
+    seasoned = dataclasses.replace(target, season_id=season_id)
+    patched = dict(defs_mod.ACHIEVEMENT_DEFS)
+    patched["explore_star_1"] = seasoned
+    monkeypatch.setattr(defs_mod, "ACHIEVEMENT_DEFS", patched)
+    return seasoned
+
+
+def _set_season_window(client, season_id, starts_at, ends_at):
+    """Insert a Season row directly through the repository. The admin endpoint
+    requires Role.ADMIN, which the test fixtures don't seed; using the repo
+    keeps the test focused on the multiplier behaviour."""
+    from app.db.database import get_db
+
+    from app.domain.season.aggregate import Season
+    from app.infrastructure.persistence.season_repository import SqlAlchemySeasonRepository
+
+    override = client.app.dependency_overrides[get_db]
+    gen = override()
+    db = next(gen)
+    try:
+        SqlAlchemySeasonRepository(db).save(
+            Season(season_id=season_id, name=season_id, starts_at=starts_at, ends_at=ends_at)
+        )
+        db.commit()
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
+def test_season_award_doubled(client, monkeypatch):
+    """Unlock during an active season grants 2x talent points (Spec §22.3)."""
+    from datetime import datetime, timedelta, UTC
+
+    seasoned = _seed_seasonal_def(monkeypatch)
+    now = datetime.now(UTC)
+    _set_season_window(
+        client, "spring_2026", now - timedelta(days=1), now + timedelta(days=7)
+    )
+
+    token = _register(client, "ach_season_active")
+    _complete_session(client, token, level=1, score=500, kills=10, waves_survived=2)
+
+    summary = client.get("/api/achievements/summary", headers=_auth(token)).json()
+    achievements = client.get("/api/achievements", headers=_auth(token)).json()
+    star1 = next(e for e in achievements if e["id"] == "explore_star_1")
+    assert star1["unlocked"] is True
+    assert star1["season_id"] == "spring_2026"
+    assert star1["season_active"] is True
+    # Stored reward must reflect the 2x multiplier — base talent_points=1 → 2.
+    other_unlocked = sum(
+        e["talent_points"] for e in achievements
+        if e["unlocked"] and e["id"] != "explore_star_1"
+    )
+    assert summary["talent_points_earned"] == other_unlocked + seasoned.talent_points * 2
+
+
+def test_season_inactive_normal_award(client, monkeypatch):
+    """Outside the season window, no multiplier applies (Spec §22.4)."""
+    from datetime import datetime, timedelta, UTC
+
+    seasoned = _seed_seasonal_def(monkeypatch)
+    # Window already closed.
+    now = datetime.now(UTC)
+    _set_season_window(
+        client, "spring_2026", now - timedelta(days=14), now - timedelta(days=1)
+    )
+
+    token = _register(client, "ach_season_past")
+    _complete_session(client, token, level=1, score=500, kills=10, waves_survived=2)
+
+    summary = client.get("/api/achievements/summary", headers=_auth(token)).json()
+    achievements = client.get("/api/achievements", headers=_auth(token)).json()
+    star1 = next(e for e in achievements if e["id"] == "explore_star_1")
+    assert star1["unlocked"] is True
+    assert star1["season_active"] is False
+    other_unlocked = sum(
+        e["talent_points"] for e in achievements
+        if e["unlocked"] and e["id"] != "explore_star_1"
+    )
+    # No multiplier — points equal the def's base value.
+    assert summary["talent_points_earned"] == other_unlocked + seasoned.talent_points

@@ -5,6 +5,7 @@ import { ACHIEVEMENT_DEFS } from '@/data/achievement-defs'
 export interface ToastItem {
   id: string
   name: string
+  description: string
   talentPoints: number
 }
 
@@ -19,6 +20,7 @@ watch(() => props.achievements, (newVal) => {
     return {
       id: a.id,
       name: def?.name ?? a.id,
+      description: def?.description ?? '',
       talentPoints: a.talent_points,
     }
   })
@@ -33,7 +35,10 @@ watch(() => props.achievements, (newVal) => {
     <div v-if="visible.length > 0" class="achievement-toast">
       <div v-for="item in visible" :key="item.id" class="toast-item">
         <span class="toast-icon">&#10003;</span>
-        <span class="toast-text">{{ item.name }}</span>
+        <span class="toast-body">
+          <span class="toast-name">{{ item.name }}</span>
+          <span class="toast-desc">{{ item.description }}</span>
+        </span>
         <span class="toast-tp">+{{ item.talentPoints }} TP</span>
       </div>
     </div>
@@ -64,7 +69,9 @@ watch(() => props.achievements, (newVal) => {
 }
 
 .toast-icon { color: var(--gold); font-size: 14px; }
-.toast-text { color: #e8dcc8; }
+.toast-body { display: flex; flex-direction: column; gap: 2px; }
+.toast-name { color: #e8dcc8; font-weight: 600; }
+.toast-desc { color: #b8a98c; font-size: 11px; }
 .toast-tp { color: var(--gold); font-size: 10px; margin-left: auto; }
 
 .toast-enter-active { animation: slideIn 0.3s ease-out; }

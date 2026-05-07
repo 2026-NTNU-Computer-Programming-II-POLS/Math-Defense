@@ -18,6 +18,11 @@ export interface User {
   player_name: string
   role: UserRole
   avatar_url: string | null
+  ia_unlock_earned: boolean
+  // Rolling fraction (0.0–1.0) of the last 10 completed sessions whose IA
+  // was answered correctly. Read at level start by the path renderer to
+  // drive concrete-fading on y-axis labels (spec §17).
+  ia_recent_accuracy: number
 }
 
 const TOKEN_PROBE_INTERVAL_MS = 15_000
@@ -47,6 +52,8 @@ export const useAuthStore = defineStore('auth', () => {
         player_name: res.player_name,
         role: res.role as UserRole,
         avatar_url: res.avatar_url ?? null,
+        ia_unlock_earned: res.ia_unlock_earned ?? false,
+        ia_recent_accuracy: res.ia_recent_accuracy ?? 0,
       }
       startTokenProbe()
     } catch {
@@ -98,6 +105,29 @@ export const useAuthStore = defineStore('auth', () => {
     if (probeTimer === null) return
     clearInterval(probeTimer)
     probeTimer = null
+  }
+
+  async function refreshProfile(): Promise<void> {
+    // Pulls /me again so derived progression flags (ia_unlock_earned) reflect
+    // any unlocks earned since login. LevelSelectView calls this on entry to
+    // honour Pedagogical_Backlog_Spec.md §5.3: Star-5 unlocks on next entry
+    // after a correct Initial-Answer phase.
+    if (!user.value) return
+    try {
+      const res = await authService.me()
+      user.value = {
+        id: res.id,
+        email: res.email,
+        player_name: res.player_name,
+        role: res.role as UserRole,
+        avatar_url: res.avatar_url ?? null,
+        ia_unlock_earned: res.ia_unlock_earned ?? false,
+        ia_recent_accuracy: res.ia_recent_accuracy ?? 0,
+      }
+    } catch {
+      // 401 handler in api.ts deals with auth failures; transient errors are
+      // intentionally swallowed so Star-5 keeps its previous gating state.
+    }
   }
 
   async function updatePlayerName(playerName: string): Promise<void> {
@@ -158,6 +188,7 @@ export const useAuthStore = defineStore('auth', () => {
     handleSessionExpiry,
     logout,
     init,
+    refreshProfile,
     updateAvatar,
     updatePlayerName,
     stopProbe: stopTokenProbe,

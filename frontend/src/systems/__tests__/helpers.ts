@@ -29,6 +29,18 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
     generatedLevel: null,
     currentWaves: null,
     time: 0,
+    // Backlog §24: tests default to Math.random for the rng so existing
+    // suites pass unchanged. Determinism-specific tests overwrite this with
+    // a seeded mulberry32 stream.
+    rng: Math.random,
+    seed: null,
+    setSeed(this: Game, seed: number) {
+      // Lightweight stand-in: the real Game.setSeed wires mulberry32; tests
+      // rarely care about the algorithm, just that re-seeding is observable.
+      // Tests that DO care about the stream itself bypass this and assign
+      // game.rng directly.
+      this.seed = seed >>> 0
+    },
     changeGold(this: Game, amount: number) {
       this.state.gold = Math.max(0, this.state.gold + amount)
       this.eventBus.emit(Events.GOLD_CHANGED, this.state.gold)
@@ -95,6 +107,7 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     minionType: null,
     chainRuleTriggered: false,
     chainRuleAnsweredCorrectly: null,
+    chainRuleTriggerFraction: 0,
     slowFactor: 0,
     slowTimer: 0,
     speedBoost: 0,

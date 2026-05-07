@@ -1,5 +1,6 @@
 /* CSS variables — medieval fantasy pixel art theme */
 :root {
+  --bg-base:       #0b0a12;
   --stone-dark:    #1a1520;
   --stone-light:   #252030;
   --grid-line:     #3a3028;
@@ -44,4 +45,15 @@
   --z-overlay:      40;
   --z-modal:        50;
   --z-toast:       100;
+}
+
+/* §16: Tutorial-Level Palette Warming. On Star-1 the canvas backdrop and
+   gold accent shift toward warmer hues — emotional design cue per Plass et
+   al. (2014) to reduce the cognitive friction of a first encounter. The
+   override is static (no transition) so reduced-motion users get parity. */
+[data-star='1'] {
+  --bg-base:     #120a0e;
+  --stone-dark:  #251a18;
+  --gold:        #e0a838;
+  --panel-bg:    rgba(37, 26, 24, 0.95);
 }

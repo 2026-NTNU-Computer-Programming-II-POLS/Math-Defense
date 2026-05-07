@@ -4,22 +4,32 @@ import { useRouter, useRoute } from 'vue-router'
 import { rankingService, type ExternalRankingEntry } from '@/services/rankingService'
 import { classService, type ClassInfo } from '@/services/classService'
 import { territoryService, type ActivityInfo, type RankingEntry } from '@/services/territoryService'
-import type { LeaderboardEntry } from '@/services/leaderboardService'
+import {
+  leaderboardService,
+  type LeaderboardEntry,
+  type PersonalHistoryEntry,
+} from '@/services/leaderboardService'
+import { useAuthStore } from '@/stores/authStore'
+import PersonalTimeline from '@/components/leaderboard/PersonalTimeline.vue'
 import { formatScore } from '@/domain/formatters'
 
 const router = useRouter()
 const route = useRoute()
 
-const TAB_IDS = ['global', 'class', 'internal', 'external'] as const
+// Personal-first ordering per analysis §6.2: self-referential framing is the
+// healthier default than social ranking. Logged-out visitors fall back to Global.
+const TAB_IDS = ['personal', 'global', 'class', 'internal', 'external'] as const
 type TabId = typeof TAB_IDS[number]
 const TAB_LABELS: Record<TabId, string> = {
+  personal: 'Personal',
   global: 'Global',
   class: 'Class',
   internal: 'Activity Rankings',
   external: 'External',
 }
 
-const activeTab = ref<TabId>('global')
+const auth = useAuthStore()
+const activeTab = ref<TabId>(auth.isLoggedIn ? 'personal' : 'global')
 const loading = ref(false)
 const error = ref('')
 
@@ -35,6 +45,9 @@ const activities = ref<ActivityInfo[]>([])
 const selectedActivityId = ref<string | null>(null)
 const territoryRankings = ref<RankingEntry[]>([])
 const externalRankings = ref<ExternalRankingEntry[]>([])
+
+const personalEntries = ref<PersonalHistoryEntry[]>([])
+const personalLevel = ref<number | undefined>(undefined)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 
@@ -131,6 +144,26 @@ async function loadInternal(): Promise<void> {
   }
 }
 
+async function loadPersonal(): Promise<void> {
+  cancelInflight()
+  const controller = new AbortController()
+  inflight = controller
+  const thisId = ++fetchId
+  loading.value = true
+  error.value = ''
+  try {
+    const res = await leaderboardService.getMyHistory(personalLevel.value, controller.signal)
+    if (thisId !== fetchId) return
+    personalEntries.value = res.entries
+  } catch (e) {
+    if (thisId !== fetchId) return
+    if (e instanceof DOMException && e.name === 'AbortError') return
+    error.value = e instanceof Error ? e.message : 'Failed'
+  } finally {
+    if (thisId === fetchId) { loading.value = false; inflight = null }
+  }
+}
+
 async function loadExternal(): Promise<void> {
   if (!selectedActivityId.value) return
   cancelInflight()
@@ -157,6 +190,7 @@ function resetData(): void {
   total.value = 0
   territoryRankings.value = []
   externalRankings.value = []
+  personalEntries.value = []
   page.value = 1
   error.value = ''
 }
@@ -169,11 +203,16 @@ function switchTab(tab: TabId): void {
     const selectedActivity = activities.value.find(activity => activity.id === selectedActivityId.value)
     if (selectedActivity && selectedActivity.class_id !== null) selectedActivityId.value = null
   }
-  if (tab === 'global') loadGlobal()
+  if (tab === 'personal') loadPersonal()
+  else if (tab === 'global') loadGlobal()
   else if (tab === 'class' && selectedClassId.value) loadClass()
   else if (tab === 'internal' && selectedActivityId.value) loadInternal()
   else if (tab === 'external' && selectedActivityId.value) loadExternal()
 }
+
+watch(personalLevel, () => {
+  if (activeTab.value === 'personal') loadPersonal()
+})
 
 function goToPage(p: number): void {
   if (p < 1 || p > totalPages.value) return
@@ -200,6 +239,8 @@ onMounted(async () => {
   if (paramId) {
     selectedActivityId.value = paramId
     switchTab('internal')
+  } else if (activeTab.value === 'personal') {
+    loadPersonal()
   } else {
     loadGlobal()
   }
@@ -220,6 +261,8 @@ onBeforeUnmount(cancelInflight)
         v-for="tab in TAB_IDS"
         :key="tab"
         :class="['btn', 'tab-btn', { active: activeTab === tab }]"
+        :disabled="tab === 'personal' && !auth.isLoggedIn"
+        :title="tab === 'personal' && !auth.isLoggedIn ? 'Log in to view your personal history' : ''"
         @click="switchTab(tab)"
       >
         {{ TAB_LABELS[tab] }}
@@ -242,12 +285,28 @@ onBeforeUnmount(cancelInflight)
       </select>
     </div>
 
+    <!-- Personal-tab star-rating filter -->
+    <div v-if="activeTab === 'personal'" class="rk-filters">
+      <span class="filter-label">Star rating:</span>
+      <button
+        v-for="lv in [undefined, 1, 2, 3, 4]"
+        :key="lv ?? 'all'"
+        :class="['btn', 'tab-btn', { active: personalLevel === lv }]"
+        @click="personalLevel = lv"
+      >
+        {{ lv === undefined ? 'All' : `Lv.${lv}` }}
+      </button>
+    </div>
+
     <div v-if="loading" class="rk-loading">Loading…</div>
     <div v-else-if="error" class="rk-error">{{ error }}</div>
 
     <div v-else class="rk-table-wrap">
+      <!-- Personal-best timeline -->
+      <PersonalTimeline v-if="activeTab === 'personal'" :entries="personalEntries" />
+
       <!-- Standard leaderboard table (global / class) -->
-      <table v-if="activeTab === 'global' || activeTab === 'class'" class="rk-table">
+      <table v-else-if="activeTab === 'global' || activeTab === 'class'" class="rk-table">
         <thead>
           <tr>
             <th>#</th><th>Player</th><th>Level</th><th>Score</th><th>Kills</th><th>Waves</th>
@@ -327,7 +386,10 @@ onBeforeUnmount(cancelInflight)
 .rk-title { font-size: 20px; color: var(--gold); letter-spacing: 4px; }
 
 .rk-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.rk-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-label { font-size: 11px; color: var(--axis); }
 .tab-btn.active { background: var(--gold); color: var(--stone-dark); }
+.tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .rk-selector { max-width: 300px; }
 

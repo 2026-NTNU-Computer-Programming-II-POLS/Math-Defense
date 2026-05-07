@@ -16,10 +16,41 @@ export interface LeaderboardResponse {
   total: number
 }
 
+export interface PersonalHistoryEntry {
+  id: string
+  level: number
+  score: number
+  kills: number
+  waves_survived: number
+  created_at: string
+  is_personal_best: boolean
+}
+
+export interface PersonalHistoryResponse {
+  entries: PersonalHistoryEntry[]
+}
+
 export const leaderboardService = {
   get(level?: number, page = 1, perPage = 20, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
     if (level != null) params.set('level', String(level))
     return api.get<LeaderboardResponse>(`/api/leaderboard?${params}`, { signal })
+  },
+
+  getForChallenge(challengeId: string, page = 1, perPage = 20, signal?: AbortSignal) {
+    const params = new URLSearchParams({
+      challenge_id: challengeId,
+      page: String(page),
+      per_page: String(perPage),
+    })
+    return api.get<LeaderboardResponse>(`/api/leaderboard?${params}`, { signal })
+  },
+
+  getMyHistory(level?: number, signal?: AbortSignal) {
+    const params = new URLSearchParams()
+    if (level != null) params.set('level', String(level))
+    const qs = params.toString()
+    const url = qs ? `/api/leaderboard/me?${qs}` : '/api/leaderboard/me'
+    return api.get<PersonalHistoryResponse>(url, { signal })
   },
 }

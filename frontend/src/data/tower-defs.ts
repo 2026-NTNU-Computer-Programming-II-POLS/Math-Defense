@@ -8,6 +8,12 @@ function validateTowerDefs(defs: Record<string, TowerDef>): void {
     if (def.cost <= 0) throw new Error(`[tower-defs] ${type}: cost must be > 0 (got ${def.cost})`)
     if (def.range <= 0) throw new Error(`[tower-defs] ${type}: range must be > 0 (got ${def.range})`)
     if (def.damage < 0) throw new Error(`[tower-defs] ${type}: damage must be >= 0 (got ${def.damage})`)
+    if (!def.examRelevance || def.examRelevance.trim().length === 0) {
+      throw new Error(`[tower-defs] ${type}: examRelevance must be a non-empty string`)
+    }
+    if (!def.glyph || def.glyph.length === 0) {
+      throw new Error(`[tower-defs] ${type}: glyph must be a non-empty string`)
+    }
     if (def.upgrades.length === 0) throw new Error(`[tower-defs] ${type}: upgrades array is empty`)
     for (let i = 0; i < def.upgrades.length; i++) {
       const tier = def.upgrades[i]
@@ -39,6 +45,10 @@ export interface TowerDef {
   unlockLevel: number
   description: string
   mathConcept: string
+  examRelevance: string
+  // Color-blind disambiguation: a unique Unicode glyph rendered alongside the
+  // tower's hue-coded body so type is identifiable in greyscale (WCAG 2.2 SC 1.4.1).
+  glyph: string
   upgrades: UpgradeTier[]
 }
 
@@ -58,6 +68,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 1,
     description: 'Draws a math function curve as a zone of effect. Toggle between debuff enemies or buff allied towers.',
     mathConcept: 'Function curves (polynomial, trig, log)',
+    examRelevance: "Polynomial and trigonometric curves appear on Taiwan's GSAT Math A and on AP Precalculus.",
+    glyph: '✦',
     upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
   },
   [TowerType.RADAR_A]: {
@@ -72,6 +84,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 1,
     description: 'Continuous sweep around circle, AoE damage on contact.',
     mathConcept: 'Radian intervals, arc sectors',
+    examRelevance: 'Radian measure and arc identification are on the GSAT Math B unit and the AP Calculus AB exam.',
+    glyph: '◐',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { sweepSpeed: 0.2 } },
       { ...UPGRADE_TIER_3, extra: { sweepSpeed: 0.4, aoeWidth: 0.3 } },
@@ -89,6 +103,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 2,
     description: 'Fast single-target projectile shots.',
     mathConcept: 'Radian intervals, arc sectors',
+    examRelevance: 'Radian measure and arc identification are on the GSAT Math B unit and the AP Calculus AB exam.',
+    glyph: '◑',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { targetCount: 1 } },
       { ...UPGRADE_TIER_3, extra: { targetCount: 2 } },
@@ -106,6 +122,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 2,
     description: 'Slow powerful single-target shots with long range.',
     mathConcept: 'Radian intervals, arc sectors',
+    examRelevance: 'Radian measure and arc identification are on the GSAT Math B unit and the AP Calculus AB exam.',
+    glyph: '◒',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { critChance: 0.1 } },
       { ...UPGRADE_TIER_3, extra: { critChance: 0.2, critDamage: 0.5 } },
@@ -123,6 +141,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 2,
     description: 'Pair two towers. Base damage = dot product of their grid coordinate vectors. Laser locks on and ramps damage.',
     mathConcept: 'Dot product, vectors',
+    examRelevance: '2×2 matrices and the dot product are on the AST Math (學測數學) Linear Algebra unit.',
+    glyph: '⊞',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { rampRate: 0.2 } },
       { ...UPGRADE_TIER_3, extra: { rampRate: 0.4, targetCount: 1 } },
@@ -140,6 +160,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 3,
     description: 'Answer: lim [f(x)/(x-a)] as x→a. Effects: +∞=max dmg, +C=dmg, 0=removed, const=disabled, -C=heal, -∞=max heal.',
     mathConcept: 'Limits, L\'Hôpital\'s rule',
+    examRelevance: 'One-sided and infinite limits are on AP Calculus AB and the AST Calculus subject test.',
+    glyph: '∞',
     upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
   },
   [TowerType.CALCULUS]: {
@@ -154,6 +176,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     unlockLevel: 3,
     description: 'Choose a function, then derivative or integral. Result C*x^n spawns C pets with trait based on n.',
     mathConcept: 'Derivatives, integrals, power rule',
+    examRelevance: 'Differentiation and integration of polynomials are on AP Calculus AB Section I.',
+    glyph: '∫',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { petHp: 0.25 } },
       { ...UPGRADE_TIER_3, extra: { petHp: 0.5, petCount: 1 } },

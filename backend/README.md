@@ -1,6 +1,6 @@
 # Backend — FastAPI (DDD)
 
-REST API server for Math Defense: authentication, game-session lifecycle, and leaderboard. The code is organised into **Domain / Application / Infrastructure** layers — routers are thin HTTP adapters, business rules live in aggregates, and SQLAlchemy is kept behind repository protocols.
+REST API server for Math Defense: authentication, game-session lifecycle, leaderboard, classroom management, achievements/talents, grabbing-territory activities, generative challenges, deterministic replay + live spectate, Bayesian stealth assessment, adaptive recommendations, and the empirical-validity-probe study harness. The code is organised into **Domain / Application / Infrastructure** layers — routers are thin HTTP adapters, business rules live in aggregates, and SQLAlchemy is kept behind repository protocols.
 
 ## Tech Stack
 
@@ -40,51 +40,81 @@ backend/
 │   │   │   └── repository.py      Repository Protocol (interface only)
 │   │   ├── leaderboard/
 │   │   │   ├── aggregate.py       LeaderboardEntry aggregate
+│   │   │   ├── view.py            Read-model projection used by query_ranked / personal_timeline
 │   │   │   └── repository.py      Repository Protocol
 │   │   ├── user/
 │   │   │   ├── aggregate.py       User aggregate root (email, player_name, role; password_hash only — plaintext never reaches domain)
 │   │   │   └── repository.py      Repository Protocol
-│   │   ├── achievement/           Achievement definitions + aggregate (20 achievements, 5 categories)
+│   │   ├── achievement/           Achievement definitions + aggregate (incl. season-multiplier hooks)
 │   │   ├── talent/                Talent tree aggregate (21 nodes, 7 tower types, prereq chains)
 │   │   ├── class_/                Class aggregate + ClassMembership + join_code
 │   │   ├── auth/                  Auth-specific domain helpers
 │   │   ├── identity/              Identity value objects
 │   │   ├── scoring/               score_calculator.py — server-side S1/S2/K/TotalScore formula
-│   │   └── territory/             Grabbing Territory aggregate + optimistic locking
+│   │   ├── territory/             Grabbing Territory aggregate + optimistic locking
+│   │   ├── season/                Season aggregate — time-bounded achievement multipliers
+│   │   ├── challenge/             Challenge aggregate + constraint DSL + tower-type enum (generative challenge mode)
+│   │   ├── assessment/            Q-matrix, competencies, Beta-Bernoulli competency_estimator (Bayesian stealth assessment)
+│   │   └── study/                 Empirical-validity-probe domain helpers (group_assignment, scoring)
 │   │
 │   ├── application/               ── APPLICATION LAYER ──
-│   │   ├── auth_service.py        AuthApplicationService — register(email, player_name, password) / login / authenticate_token
-│   │   ├── session_service.py     Session use cases; consumes SessionCompleted to auto-create leaderboard; calls achievement_svc post-commit
-│   │   ├── leaderboard_service.py Leaderboard query + manual score submission (idempotent)
-│   │   ├── achievement_service.py AchievementApplicationService — evaluate + unlock; awards talent points
+│   │   ├── auth_service.py        AuthApplicationService — register(email, player_name, password) / login / authenticate_token; also issues + rotates refresh tokens
+│   │   ├── session_service.py     Session use cases; consumes SessionCompleted to auto-create leaderboard; calls achievement_svc post-commit; updates IA rolling accuracy + study dosage
+│   │   ├── leaderboard_service.py Leaderboard query + manual score submission (idempotent) + per-user personal timeline
+│   │   ├── achievement_service.py AchievementApplicationService — evaluate + unlock; awards talent points; applies active season multipliers
+│   │   ├── season_service.py      SeasonApplicationService — list + upsert seasonal windows
 │   │   ├── talent_service.py      TalentApplicationService — allocate + reset + runtime modifiers
 │   │   ├── class_service.py       ClassApplicationService — CRUD + student join by code
 │   │   ├── admin_service.py       AdminApplicationService — teacher/class/student management
 │   │   ├── territory_service.py   TerritoryApplicationService — activity lifecycle + slot occupation
+│   │   ├── assessment_service.py  AssessmentApplicationService — applies evidence to Beta posteriors via competency_estimator
+│   │   ├── recommender_service.py RecommenderApplicationService — adaptive star-rating + talent-tree suggestions from posteriors
+│   │   ├── challenge_service.py   ChallengeApplicationService — challenge CRUD; soft-delete via deleted_at
+│   │   ├── replay_service.py      ReplayApplicationService — record event batches; serve seed + ordered event stream
+│   │   ├── study_service.py       StudyApplicationService — enrollment, probe-form scoring, affect surveys, admin CSV export
 │   │   └── mappers.py             Aggregate → Pydantic DTO mappers; keeps domain free of Pydantic imports
 │   │
 │   ├── infrastructure/            ── INFRASTRUCTURE LAYER ──
 │   │   ├── unit_of_work.py        SqlAlchemyUnitOfWork — explicit commit; auto-rollback on exit
-│   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers 5-min lockout
+│   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers exponential-backoff lockout (5m → 15m → 1h → 24h)
 │   │   ├── token_denylist.py      DB-backed JWT deny-list for server-side logout (jti → expiry); bounded by natural JWT TTL
+│   │   ├── refresh_token_store.py DB-backed rotating refresh-token store (SHA-256 hashed; used + revoked flags)
+│   │   ├── audit_logger.py        record_audit_event() — writes to its own SQLAlchemy session so audit rows commit independently of the surrounding business txn
+│   │   ├── email_service.py       Thin SMTP wrapper for verification/2FA mail; no-op when SMTP env is unset
+│   │   ├── scheduler.py           Background asyncio task runner (territory settlement loop)
+│   │   ├── spectate_hub.py        In-process pub/sub for live-spectate WebSocket fan-out (bounded queue per subscriber)
 │   │   └── persistence/
-│   │       ├── user_repository.py         SQLAlchemy impl of UserRepository
-│   │       ├── session_repository.py      SQLAlchemy impl of SessionRepository + get_cumulative_stats()
-│   │       ├── leaderboard_repository.py  SQLAlchemy impl with per-level DENSE_RANK ranking
-│   │       ├── achievement_repository.py  SQLAlchemy impl of AchievementRepository
-│   │       └── talent_repository.py       SQLAlchemy impl of TalentRepository
+│   │       ├── user_repository.py             SQLAlchemy impl of UserRepository (incl. ia_recent_accuracy)
+│   │       ├── session_repository.py          SQLAlchemy impl of SessionRepository + get_cumulative_stats()
+│   │       ├── leaderboard_repository.py      SQLAlchemy impl with per-level DENSE_RANK ranking + per-challenge query
+│   │       ├── achievement_repository.py      SQLAlchemy impl of AchievementRepository
+│   │       ├── talent_repository.py           SQLAlchemy impl of TalentRepository
+│   │       ├── season_repository.py           SQLAlchemy impl of SeasonRepository
+│   │       ├── challenge_repository.py        SQLAlchemy impl of ChallengeRepository (soft-delete aware)
+│   │       ├── competency_state_repository.py SQLAlchemy impl backing the Beta-posterior store
+│   │       ├── session_event_repository.py    Append-only event log (replay/spectate)
+│   │       └── study_repository.py            Enrollment + probe + affect persistence for the validity probe
 │   │
 │   ├── models/                    SQLAlchemy ORM models
-│   │   ├── user.py                User (email, player_name, avatar_url, role)
-│   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields)
-│   │   ├── leaderboard.py         LeaderboardEntry (unique session_id; user_id nullable via SET NULL)
-│   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline)
+│   │   ├── user.py                User (email, player_name, avatar_url, role, totp_*, ia_recent_accuracy)
+│   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields, reflection_text, practice_mode, rng_seed, challenge_id)
+│   │   ├── leaderboard.py         LeaderboardEntry (unique session_id; user_id nullable via SET NULL; challenge_id nullable)
+│   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline + lockout_count for backoff)
 │   │   ├── denied_token.py        DeniedToken (revoked JWT JTIs until natural expiry)
+│   │   ├── refresh_token.py       RefreshToken (hashed, used/revoked flags; rotation primitive)
 │   │   ├── achievement.py         UserAchievement (user_id + achievement_id, unique)
 │   │   ├── talent.py              TalentAllocation (user_id + node_id + level, unique)
 │   │   ├── class_.py              Class (join_code, teacher_id)
 │   │   ├── class_membership.py    ClassMembership (class_id + student_id)
-│   │   └── territory.py           GrabbingTerritoryActivity + TerritorySlot + TerritoryOccupation
+│   │   ├── removed_class_membership.py  Re-join blocklist
+│   │   ├── email_verification_token.py  One-use email tokens
+│   │   ├── territory.py           GrabbingTerritoryActivity + TerritorySlot + TerritoryOccupation
+│   │   ├── season.py              Season (windowed achievement multipliers; CHECK ends_at > starts_at)
+│   │   ├── challenge.py           Challenge (constraints JSONB; soft-delete via deleted_at)
+│   │   ├── competency_state.py    UserCompetencyState (composite PK user_id + competency; Beta α/β)
+│   │   ├── session_event.py       SessionEvent (append-only event log for replay; UNIQUE(session_id, seq))
+│   │   ├── study.py               StudyEnrollment + StudyProbeAttempt + StudyAffectResponse
+│   │   └── audit_log.py           AuditLog (no FK on user_id — survives user deletion). See DATABASE_SCHEMA.md for the open schema-gap note.
 │   │
 │   ├── schemas/                   Pydantic request/response DTOs
 │   │   ├── auth.py
@@ -93,17 +123,28 @@ backend/
 │   │   ├── achievement.py
 │   │   ├── admin.py
 │   │   ├── class_.py
-│   │   └── talent.py
+│   │   ├── talent.py
+│   │   ├── challenge.py
+│   │   ├── assessment.py
+│   │   ├── recommendation.py
+│   │   ├── replay.py
+│   │   ├── season.py
+│   │   └── study.py
 │   │
 │   ├── routers/                   HTTP adapters — thin controllers; error translation lives in main.py handlers
 │   │   ├── auth.py                /api/auth
 │   │   ├── game_session.py        /api/sessions
 │   │   ├── leaderboard.py         /api/leaderboard
-│   │   ├── achievement.py         /api/achievements
+│   │   ├── achievement.py         /api/achievements + /api/seasons (seasons_router lives here)
 │   │   ├── talent.py              /api/talents
 │   │   ├── class_.py              /api/classes
 │   │   ├── admin.py               /api/admin
-│   │   └── territory.py           /api/activities
+│   │   ├── territory.py           /api/activities
+│   │   ├── assessment.py          /api/assessment — class-scoped Beta posteriors for the teacher dashboard
+│   │   ├── recommendation.py      /api/recommendation — adaptive star + talent suggestions
+│   │   ├── challenge.py           /api/challenges — generative challenge CRUD
+│   │   ├── replay.py              /api/sessions/{id}/events + /replay + WS /spectate
+│   │   └── study.py               /api/study — empirical-validity-probe enrollment, probe forms, affect surveys, admin export
 │   │
 │   ├── db/database.py             Engine, Base, get_db() session factory
 │   ├── middleware/
@@ -118,23 +159,30 @@ backend/
 │
 ├── tests/
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
-│   ├── test_auth.py                       (5)
-│   ├── test_auth_lockout.py               (3)  — per-account lockout window
-│   ├── test_token_denylist.py             (3)  — JWT JTI revocation after logout
-│   ├── test_game_session.py               (11)
-│   ├── test_leaderboard.py                (10)
-│   ├── test_session_aggregate.py          (30) — pure aggregate unit tests
-│   ├── test_value_objects.py              (15) — VO invariants
-│   ├── test_coverage_gaps.py              (12) — audit-driven edge cases
-│   ├── test_domain_invariants.py          (10) — cross-aggregate invariant tests
-│   ├── test_shared_constants_parity.py    (3)  — Python ↔ shared/game-constants.json parity
-│   ├── test_score_verify.py               (4)  — server-side score recomputation vs client claim
-│   ├── test_achievement.py                (15) — achievement unlock / summary / isolation
-│   ├── test_talent.py                     (17) — talent tree allocate / reset / modifiers
-│   ├── test_class.py                      (21) — class CRUD, join, rename, student management
-│   ├── test_territory.py                  (36) — activity lifecycle, seize/counter-seize, cap, settlement
-│   └── test_avatar_parity.py              (1)  — backend ↔ frontend avatar whitelist parity
-│   # 196 tests total
+│   ├── test_auth.py                       — register / login / me / logout
+│   ├── test_auth_lockout.py               — per-account lockout window + exponential backoff
+│   ├── test_token_denylist.py             — JWT JTI revocation after logout
+│   ├── test_game_session.py
+│   ├── test_session_repository.py         — repo-level invariants and cumulative stats
+│   ├── test_leaderboard.py
+│   ├── test_session_aggregate.py          — pure aggregate unit tests
+│   ├── test_value_objects.py              — VO invariants
+│   ├── test_coverage_gaps.py              — audit-driven edge cases
+│   ├── test_domain_invariants.py          — cross-aggregate invariant tests
+│   ├── test_shared_constants_parity.py    — Python ↔ shared/game-constants.json parity
+│   ├── test_score_verify.py               — server-side score recomputation vs client claim
+│   ├── test_achievement.py                — achievement unlock / summary / isolation / seasonal multiplier
+│   ├── test_talent.py                     — talent tree allocate / reset / modifiers
+│   ├── test_class.py                      — class CRUD, join, rename, student management
+│   ├── test_territory.py                  — activity lifecycle, seize/counter-seize, cap, settlement
+│   ├── test_avatar_parity.py              — backend ↔ frontend avatar whitelist parity
+│   ├── test_q_matrix.py                   — Q-matrix lookup + competency mapping
+│   ├── test_competency_estimator.py       — Beta posterior update (Bayesian stealth assessment)
+│   ├── test_assessment_router.py          — /api/assessment posteriors endpoint + RBAC
+│   ├── test_challenge.py                  — challenge CRUD + soft-delete + role guards
+│   ├── test_study.py                      — enrollment, probe + affect submission, admin CSV export
+│   └── test_recommender.py                — adaptive recommendation against synthetic posteriors
+│   # 23 test files / 315 tests total
 │
 ├── requirements.txt
 └── Dockerfile
@@ -310,6 +358,55 @@ Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default
 | GET | `/api/admin/classes` | 30/min | List all classes (admin only) |
 | GET | `/api/admin/students` | 30/min | List all student accounts (admin only) |
 
+### Seasons — `/api/seasons`
+
+Mounted from `routers/achievement.py` as a sibling `seasons_router`.
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| GET | `/api/seasons` | 60/min | List defined achievement seasons (windows + multiplier metadata) |
+| POST | `/api/seasons` | 10/min | Upsert a season window (admin only) |
+
+### Assessment — `/api/assessment`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| GET | `/api/assessment/class/{class_id}/posteriors` | 30/min | Per-student Beta posteriors + recommended next-step competency. Teacher dashboard payload; teacher must own the class |
+
+### Recommendation — `/api/recommendation`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| GET | `/api/recommendation/me` | 60/min | Adaptive star-rating + talent-node suggestion derived from the caller's competency posteriors |
+
+### Challenges — `/api/challenges`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| POST | `/api/challenges` | 10/min | Create a constrained challenge (teacher/admin) |
+| GET | `/api/challenges` | 60/min | List challenges. `?mine=true` filters to ones authored by the caller |
+| GET | `/api/challenges/{id}` | 60/min | Fetch a single challenge |
+| PATCH | `/api/challenges/{id}` | 20/min | Rename / update title or description |
+| PUT | `/api/challenges/{id}/constraints` | 10/min | Replace the challenge's constraint payload |
+| DELETE | `/api/challenges/{id}` | 10/min | Soft-delete (sets `deleted_at`); historical sessions/leaderboard rows still resolve `challenge_id` |
+
+### Replay & Spectate — `/api/sessions`
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| POST | `/api/sessions/{session_id}/events` | 60/min | Recorder flushes a batch of session events (returns 202; idempotent via `(session_id, seq)`); fans out to live spectators via the in-process spectate hub |
+| GET | `/api/sessions/{session_id}/replay` | 30/min | Returns `rng_seed` + ordered event stream so `EventPlayer` can reconstruct the run |
+| WS | `/api/sessions/{session_id}/spectate` | — | WebSocket: streams events live; owner-scoped in v1 |
+
+### Study — `/api/study` (Empirical Validity Probe)
+
+| Method | Path | Rate | Description |
+|---|---|---|---|
+| POST | `/api/study/enroll` | 10/min | Idempotent enrollment; returns deterministic A/B group from `assign_group()` |
+| POST | `/api/study/probe` | 10/min | Submit a probe form (`form` ∈ `pre`/`post`/`delay`); returns the score |
+| POST | `/api/study/affect` | 10/min | Submit a Likert affect survey (`phase` ∈ `pre`/`post`); returns subscale means |
+| GET | `/api/study/export` | 10/min | Admin-only CSV export — one row per participant, dosage + scores + subscale means |
+
 ### Territory — `/api/activities`
 
 | Method | Path | Rate | Description |
@@ -326,6 +423,8 @@ Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default
 
 ## Database Models
 
+> See [DATABASE_SCHEMA.md](../DATABASE_SCHEMA.md) for the full ERD, every column with constraints, all indexes, and the migration history. The summary below is the most-touched subset.
+
 ### User
 
 | Column | Type | Notes |
@@ -337,6 +436,10 @@ Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default
 | `avatar_url` | String(500) | Nullable; path to one of the 6 preset SVG avatars |
 | `role` | Enum | `admin` / `teacher` / `student`; default `student` |
 | `password_hash` | String(255) | bcrypt hash |
+| `password_version` | Integer | Bumped on password change to invalidate older JWTs |
+| `is_email_verified`, `mfa_enabled`, `totp_secret` | — | Verification + TOTP MFA |
+| `totp_last_used_at` | DateTime | TOTP step-replay guard |
+| `ia_recent_accuracy` | Float | Rolling fraction of last 10 IA-correct sessions; drives Star-1 concrete-fading |
 | `created_at`, `updated_at` | DateTime | Auto-managed |
 
 ### GameSession
@@ -357,6 +460,10 @@ Query params: `star_rating` 1–5 optional, `page` default 1, `per_page` default
 | `time_exclude_prepare` | JSON | Array of prepare-phase durations excluded from scoring time |
 | `health_origin`, `health_final` | Integer | HP at level start and end (scoring formula inputs) |
 | `total_score` | Float | Server-recomputed final score (K^(1/exp) formula) |
+| `reflection_text` | String(2000) | Free-text reflection captured after a winning wave |
+| `practice_mode` | Boolean | When true, the global leaderboard query filters this row out — but achievement/talent awards still fire |
+| `rng_seed` | BigInteger | Per-session deterministic RNG seed forwarded by the client; replayed by `EventPlayer` |
+| `challenge_id` | String (FK) | Non-NULL when launched from a challenge deep-link; FK to `challenges` (SET NULL on soft delete) |
 | `started_at`, `ended_at` | DateTime | `ended_at` nullable |
 
 Indexes: `ix_game_session_user_id`; partial unique `uq_one_active_per_user WHERE status='active'` — enforces at most one active session per user.
@@ -387,7 +494,14 @@ cp ../.env.example ../.env       # then fill in SECRET_KEY
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The schema is applied on first boot via `alembic upgrade head` (invoked from the FastAPI `lifespan`). Interactive API docs: http://localhost:8000/docs.
+The schema is applied on first boot via `alembic upgrade head` (invoked from the FastAPI `lifespan`, serialised across workers with a Postgres advisory lock). Interactive API docs: http://localhost:8000/docs.
+
+The lifespan also seeds the demo user and starts two background asyncio tasks:
+
+| Task | Purpose |
+|---|---|
+| `_auth_store_janitor` (10-min interval) | Purges expired JWT deny-list rows + stale `login_attempts` rows so the auth path never has to clean up inline (removes a TOCTOU window and a DoS amplifier under logout spam) |
+| `territory_settlement_task` (5-s interval) | Settles `grabbing_territory_activities` whose `deadline` has passed |
 
 ### Docker
 
@@ -418,10 +532,15 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # all 196 tests
+pytest                                      # all 315 tests across 23 files
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 pytest tests/test_territory.py -v           # territory integration tests
+pytest tests/test_competency_estimator.py -v  # Beta posterior update rule
+pytest tests/test_assessment_router.py -v   # /api/assessment posteriors + RBAC
+pytest tests/test_challenge.py -v           # challenge CRUD + soft-delete
+pytest tests/test_study.py -v               # validity probe enrollment + export
+pytest tests/test_recommender.py -v         # adaptive star/talent recommendation
 ```
 
 The test suite targets a dedicated PostgreSQL database (the dev DB name with a `_test` suffix; auto-created on first run). Each test truncates all tables before it starts so the suite shares one connection pool without cross-test pollution. Notable coverage includes:
@@ -462,5 +581,16 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter).
 | `GET /activities` | 30/min |
 | `POST /activities/{id}/slots/{slot_id}/play` | 30/min |
 | `POST /activities/{id}/settle` | 5/min |
+| `GET /seasons` | 60/min |
+| `POST /seasons` | 10/min |
+| `GET /assessment/class/{class_id}/posteriors` | 30/min |
+| `GET /recommendation/me` | 60/min |
+| `POST /challenges` | 10/min |
+| `GET /challenges`, `GET /challenges/{id}` | 60/min |
+| `PATCH /challenges/{id}` | 20/min |
+| `PUT /challenges/{id}/constraints`, `DELETE /challenges/{id}` | 10/min |
+| `POST /sessions/{id}/events` | 60/min |
+| `GET /sessions/{id}/replay` | 30/min |
+| `POST /study/enroll`, `/study/probe`, `/study/affect`, `GET /study/export` | 10/min |
 
-Exceeding the limit returns `HTTP 429 Too Many Requests`.
+Exceeding the limit returns `HTTP 429 Too Many Requests`. WebSocket spectate (`/api/sessions/{id}/spectate`) is not rate-limited at the slowapi layer.

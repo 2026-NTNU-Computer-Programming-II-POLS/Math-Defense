@@ -171,14 +171,17 @@ function canAfford(cost: number): boolean {
           { unaffordable: !canAfford(def.cost) },
           { shaking: shakingType === def.type },
         ]"
-        :data-tooltip="`${def.description} — ${def.mathConcept} · Cost: ${def.cost} gold`"
+        :data-tooltip="`${def.description} — ${def.mathConcept} · Cost: ${def.cost} gold\nOn the exam: ${def.examRelevance}`"
         :aria-label="`${def.nameEn}, ${def.mathConcept}, cost ${def.cost} gold${canAfford(def.cost) ? '' : ', unaffordable'}`"
         :aria-pressed="uiStore.selectedTowerType === def.type"
         :aria-disabled="!canAfford(def.cost)"
         @click="selectTower(def.type, def)"
       >
         <span class="tower-icon" :style="{ color: def.color }">⬡</span>
-        <span class="tower-name">{{ def.nameEn }}</span>
+        <span class="tower-name">
+          <span class="tower-glyph" aria-hidden="true">{{ def.glyph }}</span>
+          {{ def.nameEn }}
+        </span>
         <span class="tower-cost" :class="{ 'cost-red': !canAfford(def.cost) }">
           {{ def.cost > 0 ? `⬡ ${def.cost}` : 'Free' }}
         </span>
@@ -341,6 +344,16 @@ function canAfford(cost: number): boolean {
 
 .tower-icon { font-size: 18px; }
 .tower-name { font-size: 12px; color: #e8dcc8; letter-spacing: 1px; }
+/* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
+   colour-blind players can identify tower type without relying on the
+   colour of .tower-icon. Lives inline with the label. */
+.tower-glyph {
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 13px;
+  color: var(--gold-bright);
+  font-weight: bold;
+}
 .tower-cost { font-size: 12px; color: var(--gold); }
 .cost-red   { color: var(--hp-red); }
 
@@ -361,7 +374,7 @@ function canAfford(cost: number): boolean {
   color: #e8dcc8;
   font-size: 11px;
   line-height: 1.4;
-  white-space: normal;
+  white-space: pre-line;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;

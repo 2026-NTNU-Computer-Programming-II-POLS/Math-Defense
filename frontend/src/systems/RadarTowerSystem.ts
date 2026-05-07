@@ -108,7 +108,9 @@ export class RadarTowerSystem {
     const targets = this._findTargets(tower, game, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)
-      const isCrit = critChance > 0 && Math.random() < critChance
+      // game.rng (seeded) so a recorded run replays with identical crit hits
+      // (Backlog §24 determinism contract).
+      const isCrit = critChance > 0 && game.rng() < critChance
       const critMult = isCrit ? 2.0 + critDmgBonus : 1.0
       this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus * critMult, game)
     }

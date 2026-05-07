@@ -27,7 +27,7 @@ export const ACHIEVEMENT_DEFS: Record<string, AchievementDef> = {
 
   score_1000:         { id: 'score_1000', name: 'Score Seeker', description: 'Achieve total score of 1,000 or more', category: 'scoring', talentPoints: 1, icon: '★' },
   score_10000:        { id: 'score_10000', name: 'Score Hunter', description: 'Achieve total score of 10,000 or more', category: 'scoring', talentPoints: 2, icon: '★' },
-  score_50000:        { id: 'score_50000', name: 'Score Master', description: 'Achieve total score of 50,000 or more', category: 'scoring', talentPoints: 3, icon: '★' },
+  score_50000:        { id: 'score_50000', name: '50K Scorer', description: 'Achieve total score of 50,000 or more', category: 'scoring', talentPoints: 3, icon: '★' },
   score_single_2000:  { id: 'score_single_2000', name: 'High Scorer', description: 'Score 2,000 or more in one session', category: 'scoring', talentPoints: 1, icon: '★' },
   score_single_5000:  { id: 'score_single_5000', name: 'Top Scorer', description: 'Score 5,000 or more in one session', category: 'scoring', talentPoints: 2, icon: '★' },
 
@@ -44,6 +44,11 @@ export const ACHIEVEMENT_DEFS: Record<string, AchievementDef> = {
   explore_all_stars:  { id: 'explore_all_stars', name: 'Cartographer', description: 'Play at every star rating (1-5)', category: 'exploration', talentPoints: 3, icon: '?' },
   explore_sessions_5: { id: 'explore_sessions_5', name: 'Regular', description: 'Complete 5 sessions', category: 'exploration', talentPoints: 1, icon: '?' },
   explore_sessions_20: { id: 'explore_sessions_20', name: 'Dedicated', description: 'Complete 20 sessions', category: 'exploration', talentPoints: 2, icon: '?' },
+
+  // Curve-family unlocks (Pedagogical_Backlog_Spec.md §6) — listed under
+  // exploration so they appear alongside other star-progression milestones.
+  unlock_trig_curves:  { id: 'unlock_trig_curves', name: 'Trig Initiate', description: 'Unlock trig functions (sin/cos/tan) in the magic tower by clearing a Star-1 level', category: 'exploration', talentPoints: 1, icon: '?' },
+  unlock_log_curves:   { id: 'unlock_log_curves',  name: 'Log Initiate',  description: 'Unlock log functions (log/ln) in the magic tower by clearing a Star-2 level',   category: 'exploration', talentPoints: 1, icon: '?' },
 
   territory_first:     { id: 'territory_first', name: 'Land Grabber', description: 'Hold a territory', category: 'territory', talentPoints: 1, icon: '#' },
   territory_three:     { id: 'territory_three', name: 'Expansionist', description: 'Hold 3 territories', category: 'territory', talentPoints: 2, icon: '#' },
