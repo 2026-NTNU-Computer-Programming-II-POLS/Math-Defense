@@ -46,7 +46,12 @@ export interface Tower {
   calculusState?: CalculusState | null
   upgradeExtras?: Record<string, number>
   upgradeSpend?: number
+  // Targeting preference for towers that pick a finite N targets per attack
+  // (currently RADAR_B / RADAR_C). Other types (sweep, zone, AoE) ignore it.
+  targetingMode?: TargetingMode
 }
+
+export type TargetingMode = 'first' | 'last' | 'closest' | 'strongest'
 
 export type LimitOutcome = '+inf' | '+c' | 'zero' | 'constant' | '-c' | '-inf'
 

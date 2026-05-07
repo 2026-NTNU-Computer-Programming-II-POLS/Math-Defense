@@ -10,6 +10,7 @@ import RadarConfigPanel from './RadarConfigPanel.vue'
 import MatrixPairPanel from './MatrixPairPanel.vue'
 import LimitQuestionPanel from './LimitQuestionPanel.vue'
 import CalculusPanel from './CalculusPanel.vue'
+import TargetingModePanel from './TargetingModePanel.vue'
 
 const gameStore = useGameStore()
 const uiStore = useUiStore()
@@ -32,6 +33,69 @@ watch(() => uiStore.buildPanelTowerId, () => { confirmingRefund.value = false })
 const towerDef = computed(() =>
   tower.value ? TOWER_DEFS[tower.value.type] : null,
 )
+
+// Stat breakdown: separates def → upgrades → talents → magic buff so the
+// player can see where each contribution comes from when expanding a stat row.
+interface StatBreakdown {
+  base: number
+  afterUpgrade: number
+  afterTalent: number
+  total: number
+  upgradePct: number   // (afterUpgrade / base - 1) * 100
+  talentPct: number    // (damageBonus - 1) * 100  (additive talent percent)
+  magicPct: number     // (magicBuff - 1) * 100, 0 if not buffed
+}
+
+function buildBreakdown(base: number, afterUpgrade: number, talentMul: number, magicMul: number): StatBreakdown {
+  const afterTalent = afterUpgrade * talentMul
+  const total = afterTalent * magicMul
+  const upgradePct = base > 0 ? (afterUpgrade / base - 1) * 100 : 0
+  const talentPct = (talentMul - 1) * 100
+  const magicPct = (magicMul - 1) * 100
+  return { base, afterUpgrade, afterTalent, total, upgradePct, talentPct, magicPct }
+}
+
+const damageBreakdown = computed<StatBreakdown | null>(() => {
+  const t = tower.value
+  const def = towerDef.value
+  if (!t || !def) return null
+  return buildBreakdown(def.damage, t.baseDamage, t.damageBonus, t.magicBuff || 1)
+})
+
+const rangeBreakdown = computed<StatBreakdown | null>(() => {
+  const t = tower.value
+  const def = towerDef.value
+  if (!t || !def) return null
+  // Range is unaffected by magicBuff (buff only multiplies damage); pass 1.
+  return buildBreakdown(def.range, t.baseRange, t.rangeBonus, 1)
+})
+
+const cooldownBreakdown = computed(() => {
+  const t = tower.value
+  const def = towerDef.value
+  if (!t || !def || def.cooldown <= 0) return null
+  // Reproduce the upgrade-tier compounding so we can show the upgrade %
+  // contribution without exposing internals to other components.
+  let cdAfterTier = def.cooldown
+  for (let i = 0; i < t.level - 1; i++) {
+    cdAfterTier *= (1 - (def.upgrades[i]?.speedBonus ?? 0))
+  }
+  const talentSpeed = t.talentMods?.['attack_speed'] ?? 0
+  const upgradePct = def.cooldown > 0 ? (1 - cdAfterTier / def.cooldown) * 100 : 0
+  const talentPct = talentSpeed * 100
+  return {
+    base: def.cooldown,
+    afterUpgrade: cdAfterTier,
+    total: t.cooldown,
+    upgradePct,    // attack-speed gain (positive = faster)
+    talentPct,
+  }
+})
+
+function fmtPct(pct: number): string {
+  if (Math.abs(pct) < 0.05) return '+0%'
+  return `${pct > 0 ? '+' : ''}${pct.toFixed(0)}%`
+}
 
 const upgradeInfo = computed(() => {
   const t = tower.value
@@ -77,6 +141,13 @@ const isRadar = computed(() => {
   const t = tower.value?.type
   return t === TowerType.RADAR_A || t === TowerType.RADAR_B || t === TowerType.RADAR_C
 })
+
+// RADAR_A is a passive sweep that hits everything in its arc, so a targeting
+// preference would be meaningless. Only single-target shooters get the picker.
+const showTargetingMode = computed(() => {
+  const t = tower.value?.type
+  return t === TowerType.RADAR_B || t === TowerType.RADAR_C
+})
 </script>
 
 <template>
@@ -92,18 +163,67 @@ const isRadar = computed(() => {
 
     <div class="stats">
       <div class="stat-row"><span>Level</span><span>{{ tower.level }}</span></div>
-      <div class="stat-row"><span>Damage</span><span>{{ tower.effectiveDamage.toFixed(1) }}</span></div>
-      <div class="stat-row"><span>Range</span><span>{{ tower.effectiveRange.toFixed(1) }}</span></div>
-      <div v-if="tower.cooldown > 0" class="stat-row">
-        <span>Cooldown</span><span>{{ tower.cooldown.toFixed(2) }}s</span>
-      </div>
+
+      <details v-if="damageBreakdown" class="stat-row stat-row--breakdown">
+        <summary>
+          <span class="stat-label">Damage</span>
+          <span class="stat-value">
+            {{ damageBreakdown.total.toFixed(1) }}
+            <span class="bd-chevron" aria-hidden="true">▾</span>
+          </span>
+        </summary>
+        <div class="breakdown-body">
+          <span class="bd-row"><span>Base</span><span>{{ damageBreakdown.base.toFixed(1) }}</span></span>
+          <span class="bd-row"><span>Upgrades</span><span :class="{ 'bd-zero': damageBreakdown.upgradePct === 0 }">{{ fmtPct(damageBreakdown.upgradePct) }}</span></span>
+          <span class="bd-row"><span>Talents</span><span :class="{ 'bd-zero': damageBreakdown.talentPct === 0 }">{{ fmtPct(damageBreakdown.talentPct) }}</span></span>
+          <span v-if="damageBreakdown.magicPct !== 0" class="bd-row bd-row--magic">
+            <span>Magic Buff</span><span>{{ fmtPct(damageBreakdown.magicPct) }}</span>
+          </span>
+          <span class="bd-row bd-total"><span>Total</span><span>{{ damageBreakdown.total.toFixed(1) }}</span></span>
+        </div>
+      </details>
+
+      <details v-if="rangeBreakdown" class="stat-row stat-row--breakdown">
+        <summary>
+          <span class="stat-label">Range</span>
+          <span class="stat-value">
+            {{ rangeBreakdown.total.toFixed(1) }}
+            <span class="bd-chevron" aria-hidden="true">▾</span>
+          </span>
+        </summary>
+        <div class="breakdown-body">
+          <span class="bd-row"><span>Base</span><span>{{ rangeBreakdown.base.toFixed(1) }}</span></span>
+          <span class="bd-row"><span>Upgrades</span><span :class="{ 'bd-zero': rangeBreakdown.upgradePct === 0 }">{{ fmtPct(rangeBreakdown.upgradePct) }}</span></span>
+          <span class="bd-row"><span>Talents</span><span :class="{ 'bd-zero': rangeBreakdown.talentPct === 0 }">{{ fmtPct(rangeBreakdown.talentPct) }}</span></span>
+          <span class="bd-row bd-total"><span>Total</span><span>{{ rangeBreakdown.total.toFixed(1) }}</span></span>
+        </div>
+      </details>
+
+      <details v-if="cooldownBreakdown" class="stat-row stat-row--breakdown">
+        <summary>
+          <span class="stat-label">Cooldown</span>
+          <span class="stat-value">
+            {{ cooldownBreakdown.total.toFixed(2) }}s
+            <span class="bd-chevron" aria-hidden="true">▾</span>
+          </span>
+        </summary>
+        <div class="breakdown-body">
+          <span class="bd-row"><span>Base</span><span>{{ cooldownBreakdown.base.toFixed(2) }}s</span></span>
+          <span class="bd-row"><span>Upgrade Speed</span><span :class="{ 'bd-zero': cooldownBreakdown.upgradePct === 0 }">{{ fmtPct(cooldownBreakdown.upgradePct) }}</span></span>
+          <span class="bd-row"><span>Talent Speed</span><span :class="{ 'bd-zero': cooldownBreakdown.talentPct === 0 }">{{ fmtPct(cooldownBreakdown.talentPct) }}</span></span>
+          <span class="bd-row bd-total"><span>Total</span><span>{{ cooldownBreakdown.total.toFixed(2) }}s</span></span>
+        </div>
+      </details>
     </div>
 
     <p class="math-concept">{{ towerDef.mathConcept }}</p>
 
     <!-- Type-specific panels -->
     <MagicModePanel v-if="tower.type === TowerType.MAGIC" :tower-id="tower.id" />
-    <RadarConfigPanel v-else-if="isRadar" :tower-id="tower.id" />
+    <template v-else-if="isRadar">
+      <RadarConfigPanel :tower-id="tower.id" />
+      <TargetingModePanel v-if="showTargetingMode" :tower-id="tower.id" />
+    </template>
     <MatrixPairPanel v-else-if="tower.type === TowerType.MATRIX" :tower-id="tower.id" />
     <LimitQuestionPanel v-else-if="tower.type === TowerType.LIMIT" :tower-id="tower.id" />
     <CalculusPanel v-else-if="tower.type === TowerType.CALCULUS" :tower-id="tower.id" />
@@ -172,7 +292,77 @@ const isRadar = computed(() => {
   display: flex; justify-content: space-between;
   font-size: 11px; color: #e8dcc8;
 }
-.stat-row span:last-child { color: var(--gold); }
+.stat-row > span:last-child { color: var(--gold); }
+
+/* Click-to-expand breakdown for Damage / Range / Cooldown rows. Using
+   <details>/<summary> instead of an absolute-positioned tooltip avoids
+   clipping by the panel's overflow-y:auto and gives screen readers and
+   keyboard users a built-in disclosure widget. */
+details.stat-row--breakdown {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: #e8dcc8;
+}
+details.stat-row--breakdown > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+  outline: none;
+}
+details.stat-row--breakdown > summary::-webkit-details-marker { display: none; }
+details.stat-row--breakdown > summary:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+details.stat-row--breakdown > summary > .stat-value {
+  color: var(--gold);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bd-chevron {
+  font-size: 9px;
+  color: var(--axis);
+  transition: transform 0.15s;
+}
+details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
+  transform: rotate(180deg);
+}
+
+.breakdown-body {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 2px solid rgba(139, 115, 66, 0.4);
+  border-radius: 0 4px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+}
+.bd-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  letter-spacing: 0.5px;
+}
+.bd-row > span:first-child { color: #c8b894; }
+.bd-row > span:last-child { color: var(--gold); }
+/* Specificity must beat ".bd-row > span:last-child" (0,2,1); use a chained
+   class on the same element so this wins by source order at (0,2,1). */
+.bd-row > span.bd-zero { color: #6a6052; }
+.bd-row--magic > span:last-child { color: #c8a4ff; }
+.bd-total {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(139, 115, 66, 0.3);
+}
+.bd-total > span:first-child { color: #e8dcc8; }
+.bd-total > span:last-child { color: var(--gold-bright); font-weight: bold; }
 
 .math-concept { font-size: 10px; color: var(--axis); letter-spacing: 1px; margin: 0; }
 

@@ -61,6 +61,12 @@ export function createTower(
     tower.arcRestrict = false
   }
 
+  if (type === TowerType.RADAR_B || type === TowerType.RADAR_C) {
+    // Default to "first" so single-target shooters prioritize the enemy
+    // closest to the goal — matches conventional TD player expectations.
+    tower.targetingMode = 'first'
+  }
+
   if (type === TowerType.MATRIX) {
     tower.matrixPairId = null
   }

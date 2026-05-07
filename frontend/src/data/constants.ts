@@ -107,6 +107,7 @@ export const Events = Object.freeze({
   MAGIC_FUNCTION_SELECTED: 'magicFunctionSelected',
   MAGIC_MODE_CHANGED:   'magicModeChanged',
   RADAR_ARC_CHANGED:    'radarArcChanged',
+  TOWER_TARGETING_CHANGED: 'towerTargetingChanged',
   MATRIX_PAIR_CHANGED:  'matrixPairChanged',
   LIMIT_ANSWER:         'limitAnswer',
   CALCULUS_OPERATION:    'calculusOperation',

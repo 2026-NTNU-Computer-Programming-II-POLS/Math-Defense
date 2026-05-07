@@ -124,6 +124,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   RADAR_ARC_CHANGED: [
     { module: 'systems/RadarTowerSystem', handler: 'anonymous', purpose: 'Update arc parameters on radar tower' },
   ],
+  TOWER_TARGETING_CHANGED: [
+    { module: 'systems/RadarTowerSystem', handler: 'anonymous', purpose: 'Update targeting mode on RADAR_B / RADAR_C tower' },
+  ],
   MATRIX_PAIR_CHANGED: [
     { module: 'systems/MatrixTowerSystem', handler: 'anonymous', purpose: 'Update matrix pair id on tower' },
   ],

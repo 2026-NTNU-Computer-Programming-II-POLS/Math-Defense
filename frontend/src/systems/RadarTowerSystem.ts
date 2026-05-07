@@ -2,7 +2,7 @@ import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
-import type { Tower, Enemy, Projectile } from '@/entities/types'
+import type { Tower, Enemy, Projectile, TargetingMode } from '@/entities/types'
 
 let _projId = 0
 
@@ -28,6 +28,11 @@ export class RadarTowerSystem {
         tower.arcEnd = arcEnd
         tower.arcRestrict = restrict
         tower.configured = true
+      }),
+      game.eventBus.on(Events.TOWER_TARGETING_CHANGED, ({ towerId, mode }: { towerId: string; mode: TargetingMode }) => {
+        const tower = game.towers.find((t) => t.id === towerId)
+        if (!tower) return
+        tower.targetingMode = mode
       }),
       game.eventBus.on(Events.LEVEL_START, () => {
         this._sweepAngles.clear()
@@ -119,7 +124,17 @@ export class RadarTowerSystem {
       if (tower.arcRestrict && !this._isInArc(tower, enemy)) continue
       candidates.push({ enemy, dist: d })
     }
-    candidates.sort((a, b) => a.dist - b.dist)
+
+    // Game convention (see MovementSystem): enemies travel from larger x → smaller x
+    // toward the origin. So "first" (closest to goal) = smallest x.
+    const mode: TargetingMode = tower.targetingMode ?? 'first'
+    switch (mode) {
+      case 'first':     candidates.sort((a, b) => a.enemy.x - b.enemy.x); break
+      case 'last':      candidates.sort((a, b) => b.enemy.x - a.enemy.x); break
+      case 'strongest': candidates.sort((a, b) => b.enemy.hp - a.enemy.hp); break
+      case 'closest':
+      default:          candidates.sort((a, b) => a.dist - b.dist); break
+    }
     return candidates.slice(0, count).map(c => c.enemy)
   }
 

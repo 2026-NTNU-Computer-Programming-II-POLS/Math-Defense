@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { TowerType, Events } from '@/data/constants'
+import { TowerType, Events, GamePhase } from '@/data/constants'
+import type { MatrixTowerSystem } from '@/systems/MatrixTowerSystem'
 
 const props = defineProps<{ towerId: string }>()
 const gameStore = useGameStore()
 
 const tower = computed(() => {
+  void gameStore.towerUpgradeTick
   const engine = gameStore.getEngine()
   return engine?.towers.find((t) => t.id === props.towerId) ?? null
 })
@@ -35,6 +37,69 @@ const availablePairs = computed(() => {
   )
 })
 
+// ── Live laser ramp readout ────────────────────────────────────────────────
+// MatrixTowerSystem holds laser state internally and updates it every tick.
+// We poll via RAF while the panel is mounted instead of pushing the state
+// through Pinia — the data is purely visual and changes 60×/sec, so a store
+// mirror would be wasteful.
+interface LaserView {
+  active: boolean
+  invalid: boolean
+  rampMultiplier: number
+  rampRate: number
+  targetCount: number
+}
+
+const laserView = ref<LaserView>({
+  active: false, invalid: false, rampMultiplier: 1, rampRate: 0.5, targetCount: 0,
+})
+
+let _raf: number | null = null
+function pollLaser() {
+  const engine = gameStore.getEngine()
+  const t = tower.value
+  const inWave = engine?.state.phase === GamePhase.WAVE
+  if (engine && t && t.matrixPairId && inWave) {
+    const sys = engine.getSystem('matrixTower') as MatrixTowerSystem | undefined
+    const state = sys?.getLaserState(t.id)
+    if (state) {
+      const mods = t.talentMods ?? {}
+      const upgradeRamp = t.upgradeExtras?.['rampRate'] ?? 0
+      const rampRate = 0.5 * (1 + (mods['damage_ramp'] ?? 0) + upgradeRamp)
+      laserView.value = {
+        active: state.targetIds.length > 0 && !state.invalid,
+        invalid: state.invalid,
+        rampMultiplier: 1 + state.rampTime * rampRate,
+        rampRate,
+        targetCount: state.targetIds.length,
+      }
+    } else {
+      laserView.value = { active: false, invalid: false, rampMultiplier: 1, rampRate: 0.5, targetCount: 0 }
+    }
+  } else {
+    laserView.value = { active: false, invalid: false, rampMultiplier: 1, rampRate: 0.5, targetCount: 0 }
+  }
+  _raf = requestAnimationFrame(pollLaser)
+}
+
+onMounted(() => { _raf = requestAnimationFrame(pollLaser) })
+onBeforeUnmount(() => { if (_raf !== null) cancelAnimationFrame(_raf) })
+
+// Cap the visual progress bar at a sensible "fully ramped" point so the user
+// gets a clear "full power" indicator. Beyond ~5× the marginal benefit is
+// overshadowed by enemy spawn churn, so 5× is the visual ceiling.
+const RAMP_VISUAL_CAP = 5
+const rampPct = computed(() => {
+  const m = laserView.value.rampMultiplier
+  return Math.max(0, Math.min(1, (m - 1) / (RAMP_VISUAL_CAP - 1))) * 100
+})
+
+const damagePerSec = computed(() => {
+  const dp = dotProduct.value
+  if (dp == null || dp <= 0) return 0
+  return dp * laserView.value.rampMultiplier
+})
+
 function pairWith(pairId: string) {
   const engine = gameStore.getEngine()
   if (!engine) return
@@ -56,6 +121,42 @@ function pairWith(pairId: string) {
         Dot product: [{{ tower?.x }}, {{ tower?.y }}] · [{{ pair.x }}, {{ pair.y }}] =
         <strong>{{ dotProduct }}</strong>
       </p>
+
+      <div v-if="dotProduct !== null && dotProduct <= 0" class="laser-status laser-status--invalid">
+        ⚠ Negative or zero dot product — laser disabled.
+        Reposition towers into the same quadrant.
+      </div>
+
+      <template v-else>
+        <div class="ramp-block">
+          <div class="ramp-header">
+            <span class="ramp-label">
+              Laser Ramp
+              <span v-if="laserView.invalid" class="ramp-state ramp-state--invalid">disabled</span>
+              <span v-else-if="laserView.active" class="ramp-state ramp-state--active">
+                locked × {{ laserView.targetCount }}
+              </span>
+              <span v-else class="ramp-state ramp-state--idle">idle</span>
+            </span>
+            <span class="ramp-mult">×{{ laserView.rampMultiplier.toFixed(2) }}</span>
+          </div>
+          <div class="ramp-bar" :class="{ 'ramp-bar--idle': !laserView.active }">
+            <div
+              class="ramp-fill"
+              :class="{ 'ramp-fill--active': laserView.active }"
+              :style="{ width: `${rampPct}%` }"
+            ></div>
+            <span class="ramp-cap-label">×1</span>
+            <span class="ramp-cap-label ramp-cap-label--right">×5+</span>
+          </div>
+          <p class="ramp-detail">
+            <!-- Per-target: each locked enemy receives this damage independently,
+                 so total damage scales with target count (multi-target upgrades). -->
+            DPS / target: <strong>{{ damagePerSec.toFixed(1) }}</strong>
+            <span class="ramp-rate">· ramp +{{ (laserView.rampRate * 100).toFixed(0) }}% / s</span>
+          </p>
+        </div>
+      </template>
     </div>
     <div v-else class="no-pair">
       <p class="info-line">No pair — place another Matrix tower to auto-pair</p>
@@ -78,4 +179,104 @@ function pairWith(pairId: string) {
 .info-line strong { color: var(--gold); }
 .section-label { font-size: 10px; color: var(--axis); margin: 4px 0 2px; }
 .no-pair .btn { font-size: 10px; margin-top: 4px; }
+
+.laser-status {
+  font-size: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.laser-status--invalid {
+  background: rgba(204, 68, 68, 0.12);
+  border: 1px solid rgba(204, 68, 68, 0.4);
+  color: var(--hp-red);
+}
+
+.ramp-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--grid-line);
+  border-radius: 4px;
+}
+
+.ramp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+}
+
+.ramp-label {
+  color: #c8b894;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ramp-state {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ramp-state--idle    { color: #8a7a5e; background: rgba(139, 122, 94, 0.15); }
+.ramp-state--active  { color: #6ee7b7; background: rgba(110, 231, 183, 0.15); }
+.ramp-state--invalid { color: var(--hp-red); background: rgba(204, 68, 68, 0.15); }
+
+.ramp-mult {
+  color: var(--gold-bright);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.ramp-bar {
+  position: relative;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--grid-line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ramp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #9068c8, #c8a4ff);
+  transition: width 0.1s linear;
+  opacity: 0.5;
+}
+.ramp-fill--active {
+  opacity: 1;
+  background: linear-gradient(90deg, #9068c8, #ffd700);
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+
+.ramp-cap-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 8px;
+  color: rgba(232, 220, 200, 0.45);
+  pointer-events: none;
+  font-family: var(--font-mono);
+  padding: 0 3px;
+}
+.ramp-cap-label:not(.ramp-cap-label--right) { left: 2px; }
+.ramp-cap-label--right { right: 2px; }
+
+.ramp-detail {
+  font-size: 10px;
+  color: #e8dcc8;
+  margin: 0;
+}
+.ramp-detail strong { color: var(--gold); }
+.ramp-rate { color: #8a7a5e; margin-left: 6px; }
 </style>
