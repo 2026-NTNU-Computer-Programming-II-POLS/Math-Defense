@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PersonalHistoryEntry } from '@/services/leaderboardService'
-import { formatScore } from '@/domain/formatters'
+import { formatScore } from '@/utils/formatters'
 
 // Self-referential mastery framing (Ames 1992; Ramirez 2018; Ryan/Rigby/Przybylski
 // 2006) — the chart shows the player's own scores over time, never compared to

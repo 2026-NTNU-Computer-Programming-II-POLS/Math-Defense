@@ -11,9 +11,11 @@
     "test": "npm run arch-check && vitest run",
     "test:watch": "vitest",
     "arch-check": "tsx scripts/arch-check.ts",
-    "validate-levels": "tsx --tsconfig ./tsconfig.app.json scripts/validate-levels.ts",
+    "validate-levels": "vite-node scripts/validate-levels.ts",
     "lint-chinese-comments": "tsx scripts/lint-chinese-comments.ts",
-    "ci": "npm run arch-check && npm run validate-levels && npm run lint-chinese-comments && vitest run"
+    "lint-determinism": "tsx scripts/lint-determinism.ts",
+    "bench": "vitest run --config dev/vitest.bench.config.ts",
+    "ci": "npm run arch-check && npm run validate-levels && npm run lint-chinese-comments && npm run lint-determinism && vitest run"
   },
   "dependencies": {
     "katex": "^0.16.45",
@@ -30,6 +32,7 @@
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "vite": "^8.0.8",
+    "vite-node": "^6.0.0",
     "vitest": "^4.1.2",
     "vue-tsc": "^3.2.5"
   },

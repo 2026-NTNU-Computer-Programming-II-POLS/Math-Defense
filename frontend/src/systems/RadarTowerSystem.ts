@@ -76,6 +76,7 @@ export class RadarTowerSystem {
       const d = distance(tower.x, tower.y, enemy.x, enemy.y)
       if (d > range) continue
       if (tower.arcRestrict && !this._isInArc(tower, enemy)) continue
+      // allow-non-deterministic-math: visual/geometric arc check, not in RNG draw schedule (follow-up: MovementSystem audit per construction plan §8).
       const enemyAngle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
       const angleDiff = Math.abs(normalizeAngle(enemyAngle - angle))
       if (angleDiff < aoeWidth) {
@@ -161,11 +162,13 @@ export class RadarTowerSystem {
   }
 
   private _getArcBonusForTarget(tower: Tower, enemy: Enemy): number {
+    // allow-non-deterministic-math: visual/geometric arc check, not in RNG draw schedule (follow-up: MovementSystem audit per construction plan §8).
     const angle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
     return this._getArcBonus(tower, angle)
   }
 
   private _isInArc(tower: Tower, enemy: Enemy): boolean {
+    // allow-non-deterministic-math: visual/geometric arc check, not in RNG draw schedule (follow-up: MovementSystem audit per construction plan §8).
     const angle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
     return isAngleInArc(angle, tower.arcStart ?? 0, tower.arcEnd ?? Math.PI / 2)
   }

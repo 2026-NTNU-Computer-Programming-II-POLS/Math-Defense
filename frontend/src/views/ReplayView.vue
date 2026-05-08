@@ -18,7 +18,8 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { Game } from '@/engine/Game'
 import { mulberry32 } from '@/math/MathUtils'
-import { generateLevel } from '@/domain/level/level-generator'
+import { generateLevel, generateLevelDeterministicFromSeed } from '@/domain/level/level-generator'
+import { initWasm, isUsingWasm, whenWasmReady } from '@/math/WasmBridge'
 import { buildWavesForStar } from '@/data/wave-generator'
 import { sessionService, type ReplayBundleOut } from '@/services/sessionService'
 import { EventPlayer } from '@/engine/replay/EventPlayer'
@@ -78,6 +79,22 @@ async function boot(): Promise<void> {
       // timeline, but warn the player that randomness will diverge.
       console.warn('[Replay] session has no rng_seed — RNG-driven events will diverge')
     }
+    // construction plan §3.8 — v2 replays must run through the WASM determinism
+    // module. Kick off the load (idempotent — initWasm uses a singleton
+    // promise) and await it before wiring the engine. v1 replays don't
+    // need WASM but tolerate it loading in the background.
+    if ((bundle.value.replay_version ?? 1) === 2) {
+      const ok = await initWasm()
+      if (!ok || !isUsingWasm()) {
+        loadError.value = 'This recording requires the bit-exact replay engine. ' +
+          'It could not be loaded in this browser — please try Chrome, Firefox, ' +
+          'or Safari (recent versions).'
+        return
+      }
+    } else {
+      // Best-effort: warm the cache. wireEngine handles either outcome.
+      await whenWasmReady().catch(() => false)
+    }
     await wireEngine()
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e)
@@ -100,8 +117,21 @@ async function wireEngine(): Promise<void> {
   // Re-generate the level deterministically from the same seed. The level
   // generator is pure on (starRating, rng), so a fresh stream from the
   // same seed reproduces the exact GeneratedLevel that the live run saw.
-  const levelRng = mulberry32(seed)
-  const generatedLevel = generateLevel(b.star_rating, levelRng)
+  // construction plan §3.8: v2 sessions go through the WASM determinism path so
+  // every browser produces a bit-identical level; v1 stays on the JS path
+  // (mulberry32 + Math.* — within ε = 0.0005).
+  let generatedLevel
+  if ((b.replay_version ?? 1) === 2) {
+    const v2Level = generateLevelDeterministicFromSeed(b.star_rating, seed)
+    if (!v2Level) {
+      loadError.value = 'Level could not be regenerated from the recorded seed (WASM v2 path).'
+      return
+    }
+    generatedLevel = v2Level
+  } else {
+    const levelRng = mulberry32(seed)
+    generatedLevel = generateLevel(b.star_rating, levelRng)
+  }
   g.generatedLevel = generatedLevel
   g.currentWaves = buildWavesForStar(b.star_rating)
 

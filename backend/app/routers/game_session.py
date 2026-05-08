@@ -42,6 +42,7 @@ def create_session(
         practice_mode=req.practice_mode,
         challenge_id=req.challenge_id,
         rng_seed=req.rng_seed,
+        replay_version=req.replay_version,
     )
     return session_to_out(session, ia_recent_accuracy=current_user.ia_recent_accuracy)
 

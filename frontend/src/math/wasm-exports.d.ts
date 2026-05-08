@@ -4,11 +4,19 @@
 // not via ccall/cwrap.
 export type WasmExport =
   | 'matrix_multiply'
-  | 'calculate_trajectory'
   | 'sector_coverage'
   | 'point_in_sector'
   | 'numerical_integrate'
-  | 'fourier_composite'
-  | 'fourier_match'
-  | 'line_circle_intersect'
+  | 'power_f64'
+  | 'prng_seed'
+  | 'prng_next_u32'
+  | 'prng_next_f64'
+  | 'curve_evaluate'
+  | 'curve_derivative'
+  | 'curve_in_domain'
+  | 'find_pair_intersections'
+  | 'find_all_curves_common_point'
+  | 'count_common_intersections_in_interval'
+  | 'compute_spawn_points'
+  | 'generate_level'
 ;

@@ -10,6 +10,7 @@ import { PhaseStateMachine } from './PhaseStateMachine'
 import { type GameState, createInitialState } from './GameState'
 import { GamePhase, Events, FIXED_DT, type TowerType } from '@/data/constants'
 import { mulberry32 } from '@/math/MathUtils'
+import { createPrng, prngNextF64, type PrngHandle } from '@/math/WasmBridge'
 import type { Tower, Enemy, Projectile, Pet, LimitResult, CalculusState, TargetingMode } from '@/entities/types'
 import type { BuffCard } from '@/data/buff-defs'
 import type { MontyHallReward } from '@/data/monty-hall-defs'
@@ -272,6 +273,10 @@ export class Game {
   private _lastTime = 0
   private _accumulator = 0
   private readonly _boundLoop: () => void
+  // PCG handle owned when VITE_DETERMINISTIC_RNG=true. Disposed before
+  // re-seeding (replayer reset path) and during destroy() so the WASM heap
+  // doesn't leak across game instances within one tab session.
+  private _prngHandle: PrngHandle | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.eventBus = new EventBus<GameEvents>()
@@ -298,6 +303,20 @@ export class Game {
    */
   setSeed(seed: number): void {
     this.seed = seed >>> 0
+    // Phase 1 (construction plan): when the deterministic-RNG flag is set, route
+    // through the PCG-in-WASM stream. createPrng transparently falls back to
+    // a mulberry32-backed JsPrngHandle if the WASM module is not loaded, so
+    // sessions that miss the WASM load still get *some* RNG — they just
+    // forfeit the bit-exact replay guarantee for that session.
+    if (import.meta.env.VITE_DETERMINISTIC_RNG === 'true') {
+      this._prngHandle?.dispose()
+      this._prngHandle = createPrng(this.seed, /* stream */ 0)
+      const h = this._prngHandle
+      this.rng = () => prngNextF64(h)
+      return
+    }
+    this._prngHandle?.dispose()
+    this._prngHandle = null
     this.rng = mulberry32(this.seed)
   }
 
@@ -439,6 +458,8 @@ export class Game {
     this.levelContext = null
     this.input.destroy()
     this.eventBus.clear()
+    this._prngHandle?.dispose()
+    this._prngHandle = null
   }
 
   /**

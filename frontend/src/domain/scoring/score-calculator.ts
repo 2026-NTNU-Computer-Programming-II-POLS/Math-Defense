@@ -2,6 +2,9 @@
 //   killValue=0  → totalScore is always 0 (0**x = 0). Zero-kill runs score nothing by design.
 //   costTotal=0  → s2=0, k=0.7*s1 (no-tower penalty). Penalised 30% of s1 by design.
 //   mUsed is a debug field only; the backend anti-cheat verifier does not track it.
+//   pow is routed through WasmBridge so the frontend figure agrees bit-exactly
+//   with the server-side wasmtime-py recomputation (construction plan §8 FU-A).
+import { powerF64 } from '@/math/WasmBridge'
 
 export interface ScoreInput {
   killValue: number
@@ -53,7 +56,7 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
   }
   const exponentDenom = Math.max(1, rawExponentDenom)
   const exponent = 1 / exponentDenom
-  const totalScore = Math.pow(Math.max(0, k), exponent)
+  const totalScore = powerF64(Math.max(0, k), exponent)
 
   return {
     s1: round4(s1),

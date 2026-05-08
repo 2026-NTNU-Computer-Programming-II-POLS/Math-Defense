@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from app.domain.errors import (
     ConstraintViolationError,
     PersistenceError,
+    ReplayMismatchError,
     SessionNotFoundError,
     SessionStaleError,
     Star5LockedError,
@@ -18,6 +19,7 @@ from app.domain.session.aggregate import GameSession
 from app.domain.session.events import SessionCompleted
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.scoring.score_calculator import recompute_total_score
+from app.infrastructure.wasm_runtime import get_pow_fn, is_wasm_loaded
 if TYPE_CHECKING:
     from app.application.achievement_service import AchievementApplicationService
     from app.application.assessment_service import AssessmentApplicationService
@@ -91,6 +93,7 @@ class SessionApplicationService:
         practice_mode: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
+        replay_version: int = 1,
     ) -> GameSession:
         # Under PG, find_active_by_user holds a row lock via with_for_update, so the
         # race between concurrent creates is closed. The retry here is defence-in-depth
@@ -100,7 +103,7 @@ class SessionApplicationService:
             try:
                 return self._create_session_once(
                     user_id, level, initial_answer, path_config, practice_mode,
-                    challenge_id, rng_seed,
+                    challenge_id, rng_seed, replay_version,
                 )
             except ConstraintViolationError as e:
                 if attempt == 1 or e.constraint_name != _ACTIVE_SESSION_UNIQUE_INDEX:
@@ -117,6 +120,7 @@ class SessionApplicationService:
         practice_mode: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
+        replay_version: int = 1,
     ) -> GameSession:
         with self._uow:
             # 0. Star-5 personal lock (Habgood & Ainsworth 2011): the user must
@@ -149,6 +153,7 @@ class SessionApplicationService:
                 practice_mode=practice_mode,
                 challenge_id=challenge_id,
                 rng_seed=rng_seed,
+                replay_version=replay_version,
             )
             self._session_repo.save(session)
             self._uow.commit()
@@ -481,8 +486,16 @@ class SessionApplicationService:
     def _verify_score(self, session: GameSession) -> None:
         """Recompute total_score server-side and overwrite session.total_score.
 
-        On mismatch, logs a warning and replaces the client value with the
-        server-authoritative result so the DB always stores the canonical figure.
+        v1 sessions: log a warning on mismatch and replace the client value
+        with the server-authoritative result so the DB always stores the
+        canonical figure.
+
+        v2 sessions (FU-A, construction plan §8): the client and server share
+        the same musl pow via WASM, so a mismatch beyond 4-decimal rounding is
+        treated as tampering and rejected with HTTP 422 + ``replay_mismatch``.
+        Strict-rejection mode only kicks in when the WASM runtime actually
+        loaded — without it the backend falls back to Python pow and we widen
+        to v1's ε tolerance because bit-equality cannot be guaranteed.
         """
         recomputed = recompute_total_score(
             kill_value=session.kill_value,
@@ -492,6 +505,7 @@ class SessionApplicationService:
             health_origin=session.health_origin,
             health_final=session.health_final,
             initial_answer=session.initial_answer,
+            pow_fn=get_pow_fn(),
         )
         if recomputed is None:
             if session.total_score is not None:
@@ -503,11 +517,21 @@ class SessionApplicationService:
             return
         submitted = session.total_score
         if submitted is not None:
-            # Frontend rounds totalScore to 4 decimal places; max rounding error is 5e-5.
-            # Tolerance of 0.0005 gives a 10x safety margin over rounding without accepting
-            # significant manipulation at either extreme of the score range.
-            tolerance = 0.0005
+            replay_version = getattr(session, "replay_version", 1) or 1
+            strict = replay_version >= 2 and is_wasm_loaded()
+            # Frontend rounds totalScore to 4 decimal places; even in strict
+            # mode we must absorb the rounding step or every legitimate v2
+            # submission would 422. 5e-5 is the upper bound on round4 error;
+            # 1e-4 leaves a 2× safety margin without accepting meaningful
+            # manipulation. v1 keeps the legacy 5e-4 ε.
+            tolerance = 1e-4 if strict else 5e-4
             if abs(recomputed - submitted) > tolerance:
+                if strict:
+                    logger.warning(
+                        "replay_mismatch v2 session=%s submitted=%.6f recomputed=%.6f",
+                        session.id, submitted, recomputed,
+                    )
+                    raise ReplayMismatchError(submitted=submitted, recomputed=recomputed)
                 logger.warning(
                     "total_score mismatch session=%s submitted=%.4f recomputed=%.4f; using server value",
                     session.id, submitted, recomputed,

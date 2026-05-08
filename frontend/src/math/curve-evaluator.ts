@@ -1,66 +1,23 @@
 import type { CurveDefinition, PolynomialCurve, TrigonometricCurve, LogarithmicCurve } from './curve-types'
+import { evaluateCurve, evaluateCurveDerivative, isCurveInDomain } from './WasmBridge'
+
+// Phase 2 (construction plan): evaluate/evaluateDerivative/isInDomain delegate to
+// the WASM bridge so cross-engine ULP drift on Math.sin/cos/log no longer
+// leaks into the level generator and curve renderer. The bridge transparently
+// falls back to a JS implementation (duplicated inside WasmBridge.ts) when
+// the .wasm module hasn't loaded — every consumer keeps its existing
+// `evaluate(curve, x)` call site unchanged.
 
 export function evaluate(curve: CurveDefinition, x: number): number {
-  switch (curve.family) {
-    case 'polynomial': return evaluatePolynomial(curve, x)
-    case 'trigonometric': return evaluateTrig(curve, x)
-    case 'logarithmic': return evaluateLog(curve, x)
-  }
-}
-
-function evaluatePolynomial(curve: PolynomialCurve, x: number): number {
-  const c = curve.coefficients
-  switch (curve.degree) {
-    case 1: return c[0] * x + c[1]
-    case 2: return c[0] * x * x + c[1] * x + c[2]
-    case 3: return c[0] * x * x * x + c[1] * x * x + c[2] * x + c[3]
-  }
-}
-
-function evaluateTrig(curve: TrigonometricCurve, x: number): number {
-  const inner = curve.b * x + curve.c
-  const base = curve.fn === 'sin' ? Math.sin(inner) : Math.cos(inner)
-  return curve.a * base + curve.d
-}
-
-function evaluateLog(curve: LogarithmicCurve, x: number): number {
-  const arg = curve.b * x + curve.c
-  if (arg <= 0) return NaN
-  return curve.a * Math.log(arg) + curve.d
+  return evaluateCurve(curve, x)
 }
 
 export function evaluateDerivative(curve: CurveDefinition, x: number): number {
-  switch (curve.family) {
-    case 'polynomial': return derivativePolynomial(curve, x)
-    case 'trigonometric': return derivativeTrig(curve, x)
-    case 'logarithmic': return derivativeLog(curve, x)
-  }
-}
-
-function derivativePolynomial(curve: PolynomialCurve, x: number): number {
-  const c = curve.coefficients
-  switch (curve.degree) {
-    case 1: return c[0]
-    case 2: return 2 * c[0] * x + c[1]
-    case 3: return 3 * c[0] * x * x + 2 * c[1] * x + c[2]
-  }
-}
-
-function derivativeTrig(curve: TrigonometricCurve, x: number): number {
-  const inner = curve.b * x + curve.c
-  const base = curve.fn === 'sin' ? Math.cos(inner) : -Math.sin(inner)
-  return curve.a * curve.b * base
-}
-
-function derivativeLog(curve: LogarithmicCurve, x: number): number {
-  const arg = curve.b * x + curve.c
-  if (arg <= 0) return NaN
-  return (curve.a * curve.b) / arg
+  return evaluateCurveDerivative(curve, x)
 }
 
 export function isInDomain(curve: CurveDefinition, x: number): boolean {
-  if (curve.family !== 'logarithmic') return true
-  return curve.b * x + curve.c > 0
+  return isCurveInDomain(curve, x)
 }
 
 export function curveToLatex(curve: CurveDefinition): string {

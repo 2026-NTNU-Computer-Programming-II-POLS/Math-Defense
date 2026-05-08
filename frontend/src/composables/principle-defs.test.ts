@@ -1,10 +1,21 @@
 /**
- * Unit tests for principle-defs.ts (Backlog item #1).
+ * Tests for principle-defs.ts (data layer) and pickPrincipleForWave (composable).
+ *
+ * Lives under composables/ rather than data/ because pickPrincipleForWave
+ * comes from useGameLoop — and arch-check enforces that the data layer
+ * cannot import from presentation. Co-locating both halves of the test in
+ * the presentation layer keeps the layering rule clean without splitting
+ * the file into two thinly-related halves.
  */
 import { describe, it, expect } from 'vitest'
-import { PRINCIPLE_DEFS, PRINCIPLE_IDS, TOWER_TO_PRINCIPLE, type PrincipleId } from './principle-defs'
+import {
+  PRINCIPLE_DEFS,
+  PRINCIPLE_IDS,
+  TOWER_TO_PRINCIPLE,
+  type PrincipleId,
+} from '@/data/principle-defs'
 import { TowerType, type TowerType as TowerTypeT } from '@/data/constants'
-import { pickPrincipleForWave } from '@/composables/useGameLoop'
+import { pickPrincipleForWave } from './useGameLoop'
 
 function towersFromTypes(types: TowerTypeT[]): { towers: Array<{ type: TowerTypeT }> } {
   return { towers: types.map((type) => ({ type })) }

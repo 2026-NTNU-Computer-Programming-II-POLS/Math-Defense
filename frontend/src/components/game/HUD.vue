@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { GamePhase } from '@/data/constants'
-import { formatScore } from '@/domain/formatters'
+import { formatScore } from '@/utils/formatters'
 import { MONTY_HALL_THRESHOLDS_BY_STAR } from '@/data/monty-hall-defs'
 import FunctionPanel from './FunctionPanel.vue'
 import SpellBar from './SpellBar.vue'

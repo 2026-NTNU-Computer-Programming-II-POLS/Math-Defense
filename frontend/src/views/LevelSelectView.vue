@@ -2,8 +2,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { STAR_MIN, STAR_MAX } from '@/data/difficulty-defs'
-import { generateLevel } from '@/domain/level/level-generator'
+import { generateLevel, generateLevelDeterministicFromSeed } from '@/domain/level/level-generator'
 import { mulberry32 } from '@/math/MathUtils'
+import { isUsingWasm, whenWasmReady } from '@/math/WasmBridge'
 import { useAuthStore } from '@/stores/authStore'
 import { recommendationService } from '@/services/recommendationService'
 
@@ -71,7 +72,7 @@ function selectStar(star: number) {
   error.value = null
 }
 
-function startLevel() {
+async function startLevel() {
   if (isStarLocked(selectedStar.value)) {
     error.value = STAR_5_LOCK_TOOLTIP
     return
@@ -80,8 +81,30 @@ function startLevel() {
   error.value = null
   try {
     const seed = Date.now()
-    const rng = mulberry32(seed)
-    const level = generateLevel(selectedStar.value, rng)
+    // construction plan §3.8 — when WASM is ready, generate the level through
+    // the bit-deterministic v2 path. The same seed will be used by ReplayView
+    // (also v2 path) to recreate the identical level on any browser. If WASM
+    // hasn't loaded yet, wait a beat for it; if it still isn't ready, take v1.
+    //
+    // We MUST NOT silently fall back to v1 when the v2 path was attempted but
+    // returned null — useSessionSync tags the resulting session v2 based on
+    // isUsingWasm() at session-create time, so a v1-generated level paired
+    // with a v2 tag would make ReplayView regenerate a *different* level from
+    // the one the player actually played. Throw instead and let the user retry.
+    await whenWasmReady().catch(() => false)
+    let level
+    if (isUsingWasm()) {
+      const v2 = generateLevelDeterministicFromSeed(selectedStar.value, seed)
+      if (!v2) {
+        throw new Error(
+          'Level generation failed — the deterministic engine could not produce a ' +
+          'valid layout for this seed in 400 attempts. Please try again.',
+        )
+      }
+      level = v2
+    } else {
+      level = generateLevel(selectedStar.value, mulberry32(seed))
+    }
     router.push({
       name: 'initial-answer',
       state: { level: JSON.stringify(level), seed },

@@ -43,6 +43,11 @@ services:
       # shared_constants.py resolves /app/../shared → /shared at runtime.
       # Mounted read-only so backend can't mutate the JSON the frontend also imports.
       - ./shared:/shared:ro
+      # FU-A — wasm_runtime.py looks for math_engine.wasm at /app/data/ first.
+      # In prod the Dockerfile COPYs it; in dev the ./backend bind-mount above
+      # would shadow the image layer, so re-bind the artifact directly here so
+      # backend dev container and host build stay in sync.
+      - ./frontend/src/math/wasm/math_engine.wasm:/app/data/math_engine.wasm:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:

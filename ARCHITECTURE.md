@@ -18,9 +18,9 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 
 | Path | Role |
 |---|---|
-| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~41 Vitest files. |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic migrations, ~315 pytest tests. |
-| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (9 exported functions). |
+| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~49 Vitest files (~329 cases). |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic migrations, ~26 pytest files (~325 cases). |
+| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (16 exported functions: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). |
 | `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
 | `shared/` | `game-constants.json` — single source of truth for canvas/grid/economy values. |
 | `assets/` | Sprites, audio, fonts (referenced as `frontend/public/`). |
@@ -138,6 +138,7 @@ flowchart LR
         Email[Email Service]
         Sched[Scheduler<br/>territory settlement<br/>auth janitor]
         Hub[Spectate Hub<br/>in-process pub/sub]
+        WasmRT[wasm_runtime<br/>wasmtime-py singleton<br/>shared math_engine.wasm<br/>FU-A score recompute]
     end
 
     DB[(PostgreSQL 16)]
@@ -479,10 +480,98 @@ C99 sources in `wasm/`, compiled by Emscripten (`wasm/Makefile`) to `frontend/sr
 | `matrix_multiply` | Matrix tower (paired-tower transform) |
 | `sector_coverage`, `point_in_sector` | Radar A/B/C arc / hit-test |
 | `numerical_integrate` | Calculus tower integral picker |
-| `calculate_trajectory`, `fourier_composite`, `fourier_match`, `line_circle_intersect` | V1 legacy systems retained for replay compatibility |
+| `prng_seed`, `prng_next_u32`, `prng_next_f64` | Replay-v2 PCG XSL-RR 64/32 stream |
+| `curve_evaluate`, `curve_derivative`, `curve_in_domain` | Polynomial / trig / log curve evaluator |
+| `find_pair_intersections`, `find_all_curves_common_point`, `count_common_intersections_in_interval` | Level-generator intersection solver |
+| `compute_spawn_points` | Boundary-crossing bisection for the 2-spawn-per-curve rule |
+| `generate_level` | Full rejection-sampling loop (8 batches × 50 attempts) |
 | `malloc`, `free` | Bridge memory plumbing |
 
-`ALLOW_MEMORY_GROWTH=1`, `MAXIMUM_MEMORY=256MiB`. Single linear heap.
+`ALLOW_MEMORY_GROWTH=1`, `MAXIMUM_MEMORY=256MiB`. Single linear heap. The
+build pins `-fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off`
+so the compiler emits no FMA fusions or algebraic rewrites of
+transcendentals — without these, `sinf/cosf/logf/asinf/acosf` would diverge
+across emcc versions and break replay v2's bit-exactness contract (see §5.1).
+
+### 5.1 Replay-determinism contract
+
+Replays are versioned via the `game_sessions.replay_version` column:
+
+| Version | PRNG | Transcendentals | Acceptance |
+|---|---|---|---|
+| `1` (legacy) | `mulberry32` (JS) | `Math.sin/cos/log/asin/acos` (host engine) | final score within `ε = 0.0005` |
+| `2` (current default when WASM is loaded) | PCG XSL-RR 64/32 (in WASM) | musl `sinf/cosf/logf/asinf/acosf` (compiled into the .wasm) | **bit-exact** final score |
+
+Session-creation flow:
+
+1. `LevelSelectView` / `TerritoryDetailView` `await whenWasmReady()`. If
+   `isUsingWasm()` returns true, the level is generated through
+   `generateLevelDeterministicFromSeed` (PCG + WASM curve evaluator) and
+   the new session is tagged `replay_version=2`. Otherwise the JS
+   `generateLevel(seed, mulberry32(seed))` path runs and the session is
+   tagged `replay_version=1`. The two paths **must not be mixed** for a
+   single session — that would produce a layout the replay cannot
+   reconstruct from the same seed.
+2. `useSessionSync` reads `isUsingWasm()` at session-create time and
+   forwards the version to `POST /api/sessions`.
+3. Backend `SessionCreate` accepts `replay_version: int (1|2)` and stores
+   it on the aggregate; `ReplayBundleOut` echoes it back on
+   `GET /api/sessions/{id}/replay`.
+
+Session-replay flow (`ReplayView.vue`):
+
+1. Fetch the bundle. `bundle.replay_version` decides the path.
+2. If `2`: `await initWasm()`. If WASM fails to load, surface a hard error
+   ("browser does not support replay v2") rather than silently regenerating
+   a different layout. Otherwise call
+   `generateLevelDeterministicFromSeed(starRating, seed)` and seed the
+   game with `createPrng(seed)`.
+3. If `1`: legacy path — `generateLevel(starRating, mulberry32(seed))`,
+   `Game.setSeed(seed)` falls through to mulberry32.
+
+The lint rule `npm run lint-determinism` (Phase 5 of the construction
+plan) bans `Math.sin/cos/tan/asin/acos/atan/atan2/log/log2/log10/exp/pow`
+in the directories that reach the v2 reconstruction code path:
+`src/domain/level/`, `src/domain/scoring/`, `src/math/curve-evaluator.ts`,
+`src/engine/Game.ts`, `src/systems/`. Pre-existing legacy callers carry
+per-line opt-outs with a follow-up reference; new code must route through
+`WasmBridge`. The `domain/scoring/` entry was added with FU-A so the
+frontend score formula uses the same musl `pow` the backend recomputes
+against (see §5.2).
+
+### 5.2 Server-side replay validation (FU-A)
+
+For `replay_version=2` sessions the backend recomputes `total_score` from
+the asserted `ScoreInput` (kill_value, time_total, cost_total, HP delta,
+prep-phase durations) using the **same** musl `pow` the browser ran.
+`app/infrastructure/wasm_runtime.py` loads the same `math_engine.wasm`
+artifact the frontend ships, instantiates it under wasmtime-py, and
+exposes a singleton `power_f64(base, exp)` callable. The score recompute
+in `app/domain/scoring/score_calculator.py` accepts a `pow_fn`
+parameter; `SessionApplicationService._verify_score` injects the WASM
+callable so the recomputed value is bit-equal to the browser-displayed
+`totalScore`.
+
+Acceptance flow:
+
+1. Client submits `total_score` on `POST /api/sessions/{id}/end`.
+2. Server recomputes via wasmtime-py.
+3. **v2 path:** if `|submitted - recomputed| > 1e-4` (rounding tolerance
+   only — the formula itself agrees byte-for-byte), raise
+   `ReplayMismatchError → HTTP 422 {"detail": "replay_mismatch"}`.
+4. **v1 path:** legacy ε=5e-4 tolerance, mismatch logs a warning and
+   the canonical server value overwrites the client one.
+5. **WASM unavailable:** if wasmtime-py or `math_engine.wasm` are
+   missing at boot, the singleton falls back to Python `pow` and even
+   v2 sessions widen to v1's ε tolerance — bit-equality cannot be
+   guaranteed without the shared musl. The fallback is logged loudly
+   so a misconfigured deploy is visible.
+
+Today's coverage stops at score-formula tampering. A richer attack —
+fabricating the entire event stream so the resulting `ScoreInput`
+*itself* is a lie — is out of scope and waits on the full Python port
+of `EventPlayer`'s tick logic (construction plan §8 FU-A "not yet
+landed" note).
 
 ---
 
@@ -754,14 +843,14 @@ All scheduled inside the FastAPI lifespan as asyncio tasks (`backend/app/infrast
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~315 tests)
+### Backend (pytest, ~325 tests across 26 files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
-- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta).
+- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
 
-### Frontend (Vitest + happy-dom, ~41 files)
+### Frontend (Vitest + happy-dom, ~49 files)
 
 - Engine systems, GameState and PhaseStateMachine.
 - Domain policies (split, level-generator, path-validator, placement-policy).
@@ -812,6 +901,7 @@ backend/
       unit_of_work.py
       login_guard.py   token_denylist.py   refresh_token_store.py
       audit_logger.py   email_service.py   scheduler.py   spectate_hub.py
+      wasm_runtime.py            # wasmtime-py singleton, hosts math_engine.wasm
     models/                      # SQLAlchemy ORM models (20)
     routers/                     # FastAPI routers (thin adapters)
     schemas/                     # Pydantic DTOs

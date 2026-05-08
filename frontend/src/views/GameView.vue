@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useGameLoop } from '@/composables/useGameLoop'
 import { useKeyboardPlacement } from '@/composables/useKeyboardPlacement'
 import { GamePhase } from '@/data/constants'
-import { formatScore } from '@/domain/formatters'
+import { formatScore } from '@/utils/formatters'
 import { iaAccuracyToLabelOpacity } from '@/math/curve-renderer'
 
 import HUD from '@/components/game/HUD.vue'

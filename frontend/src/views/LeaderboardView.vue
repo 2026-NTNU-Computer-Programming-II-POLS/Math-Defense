@@ -5,7 +5,7 @@ import { useLeaderboard } from '@/composables/useLeaderboard'
 import { leaderboardService, type PersonalHistoryEntry } from '@/services/leaderboardService'
 import { useAuthStore } from '@/stores/authStore'
 import PersonalTimeline from '@/components/leaderboard/PersonalTimeline.vue'
-import { formatScore } from '@/domain/formatters'
+import { formatScore } from '@/utils/formatters'
 
 const router = useRouter()
 const auth = useAuthStore()

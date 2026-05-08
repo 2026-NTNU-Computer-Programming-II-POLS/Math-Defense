@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import BigInteger, String, Integer, Float, Boolean, DateTime, ForeignKey, Index, CheckConstraint, text, Enum as SAEnum
+from sqlalchemy import BigInteger, String, Integer, SmallInteger, Float, Boolean, DateTime, ForeignKey, Index, CheckConstraint, text, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
@@ -64,5 +64,11 @@ class GameSession(Base):
     # SQL INTEGER on every backend dialect; nullable for legacy rows and for
     # callers that don't support replay.
     rng_seed: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # 施工計畫書 §3.8 — replay protocol version. 1 = legacy mulberry32+JS Math.*
+    # (ε = 0.0005); 2 = PCG64/32 + WASM musl transcendentals (bit-exact). Client
+    # tags new sessions v2 when the WASM determinism module loads, otherwise v1.
+    replay_version: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=1, server_default=text("1"),
+    )
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

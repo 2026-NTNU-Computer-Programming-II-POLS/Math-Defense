@@ -7,6 +7,7 @@ import { ApiError } from '@/services/api'
 import { Events, GamePhase } from '@/data/constants'
 import type { Game, WaveEndSnapshot } from '@/engine/Game'
 import { calculateScore } from '@/domain/scoring/score-calculator'
+import { isUsingWasm } from '@/math/WasmBridge'
 
 const MAX_CREATE_RETRIES = 2
 const RETRY_DELAY_MS = 1000
@@ -74,6 +75,11 @@ export function useSessionSync() {
       if (gen !== createGeneration) return null
       try {
         const challengeId = readActiveChallengeId()
+        // construction plan §3.8 — tag the session with replay protocol version 2
+        // only when the WASM determinism module is loaded *and* in use.
+        // Otherwise the session keeps the default v1 acceptance budget,
+        // which is what the JS-fallback bit stream actually delivers.
+        const replayVersion = isUsingWasm() ? 2 : 1
         const session = await sessionService.create(
           game.state.starRating,
           undefined,
@@ -84,6 +90,7 @@ export function useSessionSync() {
           // exact same RNG stream when re-driving the engine against the
           // recorded event log.
           game.seed,
+          replayVersion,
         )
         if (gen !== createGeneration) {
           sessionService.abandon(session.id).catch((err) =>

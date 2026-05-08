@@ -75,6 +75,7 @@ class GameSession:
         practice_mode: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
+        replay_version: int = 1,
         started_at: datetime | None = None,
         ended_at: datetime | None = None,
     ) -> None:
@@ -103,6 +104,10 @@ class GameSession:
         # stream that drove buff-disable / Monty-Hall / Radar-crit / chain-rule
         # randomness during the live run.
         self.rng_seed = rng_seed
+        # 施工計畫書 §3.8 — replay protocol version. v1 = mulberry32 + JS Math.*
+        # (ε = 0.0005); v2 = PCG64/32 + WASM musl (bit-exact). Default 1 so
+        # callers that don't yet pass this through behave like legacy v1.
+        self.replay_version = replay_version
         self.kill_value: int | None = None
         self.cost_total: int | None = None
         self.time_total: float | None = None
@@ -125,6 +130,7 @@ class GameSession:
         practice_mode: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
+        replay_version: int = 1,
     ) -> GameSession:
         """Factory method — creates a new ACTIVE session"""
         session = cls(
@@ -136,6 +142,7 @@ class GameSession:
             practice_mode=practice_mode,
             challenge_id=challenge_id,
             rng_seed=rng_seed,
+            replay_version=replay_version,
         )
         session._events.append(
             SessionCreated(session_id=session.id, user_id=user_id, level=int(level))

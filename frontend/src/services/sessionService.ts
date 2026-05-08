@@ -29,6 +29,10 @@ export interface SessionOut {
   // this into Game.setSeed before re-driving the engine against the stored
   // event log.
   rng_seed?: number | null
+  // construction plan §3.8 — 1 = legacy mulberry32 + JS Math.* (ε = 0.0005 acceptance);
+  // 2 = PCG64/32 + WASM musl transcendentals (bit-exact). The Replay player
+  // branches on this to decide whether to require the WASM determinism module.
+  replay_version?: number
 }
 
 export interface SessionEndPayload {
@@ -53,6 +57,7 @@ export const sessionService = {
     practiceMode?: boolean,
     challengeId?: string | null,
     seed?: number | null,
+    replayVersion?: number,
   ) {
     return api.post<SessionOut>('/api/sessions', {
       star_rating: starRating,
@@ -63,6 +68,10 @@ export const sessionService = {
       // Backlog §24 — per-session RNG seed (32-bit unsigned). Optional so a
       // session created by a non-replay-aware caller (legacy tests) still works.
       rng_seed: typeof seed === 'number' ? seed >>> 0 : null,
+      // construction plan §3.8 — replay protocol version (default 1; clients that
+      // confirmed the WASM determinism module loaded pass 2 to mark the
+      // session as bit-exactly replayable).
+      replay_version: replayVersion ?? 1,
     })
   },
   getActive() {
@@ -113,6 +122,9 @@ export interface ReplayEventOut {
 export interface ReplayBundleOut {
   session_id: string
   rng_seed: number | null
+  // construction plan §3.8 — 1 = legacy JS path; 2 = bit-exact WASM path. Defaults
+  // to 1 when the server returns null/missing for a legacy session.
+  replay_version?: number
   star_rating: number
   events: ReplayEventOut[]
 }

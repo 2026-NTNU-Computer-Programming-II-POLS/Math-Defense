@@ -3,8 +3,9 @@ import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
-import { generateLevel } from '@/domain/level/level-generator'
+import { generateLevel, generateLevelDeterministicFromSeed } from '@/domain/level/level-generator'
 import { mulberry32, stringHash } from '@/math/MathUtils'
+import { isUsingWasm, whenWasmReady } from '@/math/WasmBridge'
 import { sessionService } from '@/services/sessionService'
 import TerritorySlotCard from '@/components/territory/TerritorySlotCard.vue'
 
@@ -56,8 +57,25 @@ async function handlePlay(slotId: string): Promise<void> {
 
   // Stable seed derived from the slot id so every student faces the same level
   const seed = stringHash(slotId)
-  const rng = mulberry32(seed)
-  const level = generateLevel(slot.star_rating, rng)
+  // construction plan §3.8 — when WASM is ready, generate via the bit-deterministic
+  // v2 path so a v2 replay reconstructs the identical level on any browser.
+  // We must NOT silently fall back to v1 when v2 was attempted but failed —
+  // useSessionSync tags the session v2 based on isUsingWasm(), so a v1 level
+  // paired with a v2 tag would produce an unplayable replay (different level
+  // recreated from the same seed). Surface the failure instead.
+  await whenWasmReady().catch(() => false)
+  let level
+  if (isUsingWasm()) {
+    const v2 = generateLevelDeterministicFromSeed(slot.star_rating, seed)
+    if (!v2) {
+      console.error('[TerritoryDetail] Level generation failed via WASM v2 path', { slotId, seed })
+      alert('Level generation failed — please try a different territory slot.')
+      return
+    }
+    level = v2
+  } else {
+    level = generateLevel(slot.star_rating, mulberry32(seed))
+  }
   const territoryContext = { activityId: activityId.value, slotId }
 
   sessionStorage.setItem(

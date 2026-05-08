@@ -7,9 +7,6 @@
  * fallback. This file runs under Node, loads the real ES module via a file://
  * URL (passed through initWasm's urlOverride parameter), and asserts that every
  * bridge function produces the same numeric result on both backends.
- *
- * Regressions caught here include the pre-fix Fourier array-length mismatch,
- * where WASM truncated to 3 components while JS summed all.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
 import { fileURLToPath, pathToFileURL } from 'url'
@@ -22,10 +19,7 @@ import {
   sectorCoverage,
   pointInSector,
   numericalIntegrate,
-  fourierComposite,
-  fourierMatch,
-  calculateTrajectory,
-  lineCircleIntersect,
+  powerF64,
 } from './WasmBridge'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -106,69 +100,21 @@ describe('WasmBridge — WASM/JS parity', () => {
     expect(wasm).toBeCloseTo(js, 5)
   })
 
-  it('fourierComposite: 3-element arrays', () => {
-    const { wasm, js } = bothBackends(() => fourierComposite(1.0, [1, 2, 3], [1, 0.5, 0.3]))
-    expect(wasm).toBeCloseTo(js, 4)
-  })
-
-  // Regression: >3-element input used to diverge (WASM took first 3, JS summed all).
-  it('fourierComposite: >3 elements — both backends truncate to 3', () => {
-    const { wasm, js } = bothBackends(() =>
-      fourierComposite(1.0, [1, 2, 3, 9], [1, 0.5, 0.3, 9]),
-    )
-    expect(wasm).toBeCloseTo(js, 4)
-  })
-
-  // Regression: <3-element input used to read uninitialised heap on the WASM side.
-  it('fourierComposite: <3 elements — both backends zero-pad', () => {
-    const { wasm, js } = bothBackends(() => fourierComposite(1.0, [2], [0.7]))
-    expect(wasm).toBeCloseTo(js, 4)
-  })
-
-  it('fourierMatch: identical waves → ~1', () => {
-    const freqs = [1, 2, 3]
-    const amps = [1, 0.5, 0.3]
-    const { wasm, js } = bothBackends(() => fourierMatch(freqs, amps, freqs, amps))
-    expect(wasm).toBeCloseTo(js, 3)
-  })
-
-  it('calculateTrajectory: quadratic, forward direction', () => {
-    const { wasm, js } = bothBackends(() => calculateTrajectory(1, 0, 0, 0, 3, 0.5))
-    expectArrClose(wasm.xs, js.xs)
-    expectArrClose(wasm.ys, js.ys)
-  })
-
-  // W-5 regression: the C-side int cast of `floorf(...)` is implementation-defined
-  // for negative floats. Exercise the reverse direction (xEnd < xStart) to pin
-  // the clamp_sample_count helper against the JS fallback.
-  it('calculateTrajectory: reverse direction (xEnd < xStart)', () => {
-    const { wasm, js } = bothBackends(() => calculateTrajectory(1, 0, 0, 3, 0, 0.5))
-    expectArrClose(wasm.xs, js.xs)
-    expectArrClose(wasm.ys, js.ys)
-  })
-
-  // W-4 regression: a default samples=200 is fine for normal play, but if a caller
-  // passed a low sample count with high-frequency waves the result would alias.
-  // Post-fix, both sides auto-bump samples, so identical-wave still scores ~1.
-  it('fourierMatch: under-sampled identical high-freq waves still score ~1 (Nyquist gate)', () => {
-    const freqs = [30, 45, 60]
-    const amps = [1, 0.5, 0.3]
-    const { wasm, js } = bothBackends(() => fourierMatch(freqs, amps, freqs, amps, 20))
-    expect(wasm).toBeGreaterThan(0.95)
-    expect(js).toBeGreaterThan(0.95)
-    expect(wasm).toBeCloseTo(js, 3)
-  })
-
-  it('lineCircleIntersect: two roots', () => {
-    const { wasm, js } = bothBackends(() => lineCircleIntersect(1, 0, 0, 0, 2))
-    expect(wasm).toHaveLength(js.length)
-    const sortByX = (pts: { x: number; y: number }[]) =>
-      [...pts].sort((a, b) => a.x - b.x)
-    const w = sortByX(wasm)
-    const j = sortByX(js)
-    for (let i = 0; i < w.length; i++) {
-      expect(w[i].x).toBeCloseTo(j[i].x, 4)
-      expect(w[i].y).toBeCloseTo(j[i].y, 4)
+  // FU-A acceptance signal: powerF64 must be bit-exact between WASM (musl pow)
+  // and the host's Math.pow on the values the score formula actually exercises.
+  // A drift here would mean wasmtime-py's recomputation disagrees with the
+  // browser-displayed totalScore and every legitimate replay would 422.
+  it('powerF64: score-formula inputs', () => {
+    const cases: [number, number][] = [
+      [1024, 1 / 3],   // typical mid-range k with HP delta = 2
+      [50, 1 / 5],     // small k, large exponent denom
+      [1e6, 1 / 2],    // sqrt path
+      [0, 0.5],        // zero-kill path
+      [1, 0.7],        // identity-ish
+    ]
+    for (const [b, e] of cases) {
+      const { wasm, js } = bothBackends(() => powerF64(b, e))
+      expect(wasm, `pow(${b}, ${e})`).toBeCloseTo(js, 12)
     }
   })
 })

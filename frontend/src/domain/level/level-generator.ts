@@ -25,6 +25,13 @@ import { countCommonIntersectionsInInterval } from '@/math/intersection-solver'
 import { computeSpawnPoints, type SpawnPoint } from '@/domain/path/spawn-calculator'
 import { pickRandomMultiset, type MultisetEntry } from '@/data/difficulty-defs'
 import { GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
+import {
+  createPrng,
+  generateLevelDeterministic,
+  isUsingWasm,
+  prngNextF64,
+  type PrngHandle,
+} from '@/math/WasmBridge'
 
 /** Margin keeping P* off the grid boundary so both directions can produce spawns. */
 const ENDPOINT_MARGIN = 3
@@ -59,6 +66,78 @@ export function generateLevel(starRating: number, rng: () => number): GeneratedL
   throw new Error(
     `Failed to generate level for star ${starRating} after ${ATTEMPTS_PER_BATCH * MAX_BATCHES} attempts`,
   )
+}
+
+/**
+ * Phase 4 (construction plan §3.8): bit-exact level generator routed entirely
+ * through the WASM build. Used by replay_version=2 sessions to obtain a
+ * level that any client running the same .wasm will reproduce byte-for-byte.
+ *
+ * Caller owns the PrngHandle: this function consumes draws from it but does
+ * not dispose it (later `Game.setSeed` may need to keep drawing). Returns
+ * `null` if WASM is unavailable or the multiset cannot be satisfied — the
+ * caller is expected to surface a v2-replay-incompatibility error in that
+ * case rather than silently falling back to the JS path (§3.8 again).
+ */
+export function generateLevelV2(
+  starRating: number,
+  rngHandle: PrngHandle,
+  multisetEntries: ReadonlyArray<MultisetEntry>,
+): GeneratedLevel | null {
+  if (!isUsingWasm()) return null
+  const result = generateLevelDeterministic(starRating, rngHandle, multisetEntries)
+  if (!result) return null
+  // The bridge's BridgeSpawnPoint is structurally identical to SpawnPoint;
+  // edge/side/curveIndex carry the same values. A direct cast is safe.
+  const spawns = result.spawns as unknown as SpawnPoint[]
+  const xs = spawns.map((s) => s.x)
+  const interval: readonly [number, number] = [
+    Math.min(...xs, result.endpoint.x),
+    Math.max(...xs, result.endpoint.x),
+  ]
+  const region: DisclosureRegion = {
+    xMin: result.region.xMin,
+    xMax: result.region.xMax,
+    yMin: result.region.yMin,
+    yMax: result.region.yMax,
+  }
+  return {
+    curves: result.curves,
+    endpoint: { x: result.endpoint.x, y: result.endpoint.y },
+    region,
+    interval,
+    starRating,
+    multisetLabel: multisetEntries.join(','),
+  }
+}
+
+/**
+ * Convenience wrapper: pickRandomMultiset using a PrngHandle, then generate.
+ * Mirrors `generateLevel` for the v2 path, but pulls draws from the WASM PRNG
+ * so the same seed yields the same multiset selection across browsers.
+ */
+export function generateLevelV2WithSeed(
+  starRating: number,
+  rngHandle: PrngHandle,
+): GeneratedLevel | null {
+  if (!isUsingWasm()) return null
+  // Use a draw from the same handle for multiset selection so the rng state
+  // stays in step with v1's `pickRandomMultiset(starRating, rng)`.
+  const multiset = pickRandomMultiset(starRating, () => prngNextF64(rngHandle))
+  return generateLevelV2(starRating, rngHandle, multiset.entries)
+}
+
+/** Convenience wrapper that creates and disposes its own PrngHandle. */
+export function generateLevelDeterministicFromSeed(
+  starRating: number,
+  seed: number,
+): GeneratedLevel | null {
+  const handle = createPrng(seed >>> 0, 0)
+  try {
+    return generateLevelV2WithSeed(starRating, handle)
+  } finally {
+    handle.dispose()
+  }
 }
 
 interface TryGenerateResult {
@@ -171,6 +250,7 @@ function generateTrigThrough(
   const ratio = (y0 - d) / a
   if (Math.abs(ratio) > 1) return null
 
+  // allow-non-deterministic-math: v1 fallback path. v2 (WASM) uses asinf/acosf via generateLevelDeterministicFromSeed (construction plan §3.5).
   const base = fn === 'sin' ? Math.asin(ratio) : Math.acos(ratio)
   if (!isFinite(base)) return null
   const c = base - b * x0
@@ -191,6 +271,7 @@ function generateLogThrough(
   const arg = b * x0 + cCoeff
   if (arg <= 0) return null
 
+  // allow-non-deterministic-math: v1 fallback path. v2 (WASM) uses logf via generateLevelDeterministicFromSeed (construction plan §3.5).
   const d = y0 - a * Math.log(arg)
 
   // Logarithmic domain ends at x = -c/b (b>0). Require buffer between domain

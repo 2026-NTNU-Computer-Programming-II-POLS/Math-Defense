@@ -39,6 +39,12 @@ class SessionCreate(BaseModel):
     # (matches the mulberry32 input on the frontend). Nullable so non-replay
     # clients (legacy tests, third-party tooling) can still create sessions.
     rng_seed: int | None = Field(default=None, ge=0, le=4_294_967_295)
+    # 施工計畫書 §3.8 — 1 = legacy mulberry32 + JS Math.* (ε = 0.0005);
+    # 2 = PCG64/32 + WASM musl transcendentals (bit-exact). Client tags new
+    # sessions v2 only when initWasm() succeeded; otherwise omits the field
+    # and the column defaults to 1. Range is intentionally tight so a future
+    # v3 forces an explicit migration.
+    replay_version: int = Field(default=1, ge=1, le=2)
 
     @field_validator("path_config")
     @classmethod
@@ -141,6 +147,11 @@ class SessionOut(BaseModel):
     # Backlog §24 — per-session RNG seed forwarded to the Replay player so
     # game.rng can be re-seeded before re-driving the engine.
     rng_seed: int | None = None
+    # 施工計畫書 §3.8 — replay protocol version this session was created under.
+    # The frontend reads this on ReplayView load to decide whether to drive
+    # the run through the JS path (v1) or the WASM-only deterministic path
+    # (v2). Defaults to 1 for legacy rows with NULL semantics.
+    replay_version: int = 1
     newly_unlocked_achievements: list[UnlockedAchievementOut] = []
     # Player's rolling IA accuracy snapshot at the moment the session was
     # served. The frontend curve renderer reads it at level start to decide

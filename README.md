@@ -73,9 +73,10 @@ Browser
 |---|---|
 | Frontend | Vue 3 (Composition API, `<script setup>`), TypeScript 5.9 strict, Pinia, Vue Router, Vite 8, Vitest |
 | Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
-| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`) |
+| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 16 exported functions |
 | Database | PostgreSQL 16 (Alembic migrations) |
 | Container | Docker, Docker Compose |
+| Replay | Versioned (`replay_version` 1=mulberry32+JS Math, 2=PCG+WASM bit-exact); server-side score recompute via `wasmtime-py` |
 
 ---
 
@@ -190,8 +191,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 315 tests across 23 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository)
-cd frontend && npm test            # 41 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view)
+cd backend  && pytest              # ~325 tests across 26 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute)
+cd frontend && npm test            # 49 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).

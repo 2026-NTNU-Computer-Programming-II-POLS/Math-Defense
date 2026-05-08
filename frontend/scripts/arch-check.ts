@@ -30,16 +30,15 @@ interface Violation {
 const SRC_ROOT = resolve(process.cwd(), 'src')
 
 /**
- * Pre-existing SoC violations. Each entry is a known presentation-layer
- * import of `domain/formatters` that the ratchet permits but should
- * eventually be removed by relocating the module.
+ * Pre-existing SoC violations. Each entry is a known cross-layer import
+ * the ratchet permits but should eventually be removed. Currently empty
+ * because the formerly-allowlisted `domain/formatters → components` was
+ * fixed by relocating the module to `src/utils/formatters.ts`.
  */
 const PRE_EXISTING_ALLOWLIST: ReadonlyArray<{
   fileSuffix: string
   importPath: string
-}> = [
-  { fileSuffix: '/src/components/game/HUD.vue', importPath: '@/domain/formatters' },
-]
+}> = []
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

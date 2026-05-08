@@ -14,6 +14,7 @@ REST API server for Math Defense: authentication, game-session lifecycle, leader
 | Auth | PyJWT (HS256) + bcrypt |
 | Rate Limiting | slowapi |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
+| WASM host | wasmtime-py 44.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
 | Testing | pytest + pytest-asyncio |
 
 ---
@@ -83,6 +84,7 @@ backend/
 │   │   ├── email_service.py       Thin SMTP wrapper for verification/2FA mail; no-op when SMTP env is unset
 │   │   ├── scheduler.py           Background asyncio task runner (territory settlement loop)
 │   │   ├── spectate_hub.py        In-process pub/sub for live-spectate WebSocket fan-out (bounded queue per subscriber)
+│   │   ├── wasm_runtime.py        FU-A — singleton wasmtime-py runtime hosting the same math_engine.wasm the frontend ships; exposes power_f64 for v2 score recompute. Thread-safe; falls back to Python pow if WASM unavailable.
 │   │   └── persistence/
 │   │       ├── user_repository.py             SQLAlchemy impl of UserRepository (incl. ia_recent_accuracy)
 │   │       ├── session_repository.py          SQLAlchemy impl of SessionRepository + get_cumulative_stats()
@@ -181,8 +183,9 @@ backend/
 │   ├── test_assessment_router.py          — /api/assessment posteriors endpoint + RBAC
 │   ├── test_challenge.py                  — challenge CRUD + soft-delete + role guards
 │   ├── test_study.py                      — enrollment, probe + affect submission, admin CSV export
-│   └── test_recommender.py                — adaptive recommendation against synthetic posteriors
-│   # 23 test files / 315 tests total
+│   ├── test_recommender.py                — adaptive recommendation against synthetic posteriors
+│   └── test_wasm_runtime.py               — wasmtime-py singleton load + fallback + thread-safety (FU-A); v2 strict-rejection lives in test_score_verify.py
+│   # 26 test files / ~325 tests total
 │
 ├── requirements.txt
 └── Dockerfile
@@ -309,6 +312,7 @@ Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars
 | `410` | `SessionStaleError` | Session > 2h active — auto-abandoned before raise |
 | `422` | `DomainValueError` / plain `ValueError` from aggregate invariants | Bounds violation, score going backwards, delta > 50 000 |
 | `429` | `AccountLockedError`, slowapi `RateLimitExceeded` | Per-account login lockout or IP rate limit |
+| `422` | `ReplayMismatchError` (`{"detail":"replay_mismatch"}`) | FU-A — server-side recompute disagrees with submitted `total_score` for a `replay_version=2` session beyond the 1e-4 strict tolerance. v1 sessions log a warning and overwrite the client value with the server value instead of rejecting. |
 
 ### Leaderboard — `/api/leaderboard`
 
@@ -463,6 +467,7 @@ Mounted from `routers/achievement.py` as a sibling `seasons_router`.
 | `reflection_text` | String(2000) | Free-text reflection captured after a winning wave |
 | `practice_mode` | Boolean | When true, the global leaderboard query filters this row out — but achievement/talent awards still fire |
 | `rng_seed` | BigInteger | Per-session deterministic RNG seed forwarded by the client; replayed by `EventPlayer` |
+| `replay_version` | SmallInteger | `1` = legacy (mulberry32 + JS Math, ε=5e-4) / `2` = bit-exact (PCG + WASM, ε=1e-4 strict). Tagged at session creation by the client when WASM is available; backend `_verify_score` raises `ReplayMismatchError → 422 replay_mismatch` on v2 mismatch (FU-A) |
 | `challenge_id` | String (FK) | Non-NULL when launched from a challenge deep-link; FK to `challenges` (SET NULL on soft delete) |
 | `started_at`, `ended_at` | DateTime | `ended_at` nullable |
 
@@ -532,7 +537,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # all 315 tests across 23 files
+pytest                                      # ~325 tests across 26 files
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 pytest tests/test_territory.py -v           # territory integration tests

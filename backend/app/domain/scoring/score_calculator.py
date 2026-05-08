@@ -8,9 +8,15 @@ Design notes:
   cost_total=0  → s2=0, k=0.7*s1 (no-tower penalty). Penalised 30% of s1 by design.
   mUsed (0.7 or 0.5) is returned in the frontend ScoreBreakdown for debugging but not
   here; the scalar score is all that is needed for anti-cheat comparison.
+
+  pow_fn dependency injection (FU-A): the application layer passes in a WASM-
+  backed pow so v2 sessions verify against the same musl pow that produced the
+  client value. Default `pow` (Python builtin) keeps domain unit tests free of
+  infrastructure imports.
 """
 from __future__ import annotations
 import logging
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,7 @@ def recompute_total_score(
     health_origin: int | None,
     health_final: int | None,
     initial_answer: bool | None,
+    pow_fn: Callable[[float, float], float] = pow,
 ) -> float | None:
     if (
         kill_value is None
@@ -60,4 +67,4 @@ def recompute_total_score(
             exponent_denom,
         )
     exponent = 1.0 / max(1, exponent_denom)
-    return max(0.0, k) ** exponent
+    return float(pow_fn(max(0.0, k), exponent))

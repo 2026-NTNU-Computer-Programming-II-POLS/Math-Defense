@@ -37,6 +37,8 @@ class ReplayBundle:
     diverge, while still scrubbing through the deterministic events."""
     session_id: str
     rng_seed: int | None
+    # 施工計畫書 §3.8 — replay protocol version (1 = legacy, 2 = bit-exact WASM).
+    replay_version: int
     star_rating: int
     events: list[ReplayEvent]
 
@@ -104,6 +106,7 @@ class ReplayApplicationService:
         return ReplayBundle(
             session_id=session.id,
             rng_seed=getattr(session, "rng_seed", None),
+            replay_version=getattr(session, "replay_version", 1) or 1,
             star_rating=int(session.level),
             events=events,
         )

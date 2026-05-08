@@ -505,10 +505,6 @@ matrixMultiply(a, b)                     // 2×2 × 2×2
 sectorCoverage(r, θ)
 pointInSector(px, py, cx, cy, r, aStart, aWidth)
 numericalIntegrate(a, b, c, lo, hi, n = 100)
-fourierComposite(t, freqs, amps)
-fourierMatch(f1, a1, f2, a2, samples = 200)
-calculateTrajectory(a, b, c, xStart, xEnd, step)
-lineCircleIntersect(m, b, cx, cy, r)
 
 setUseWasm(use)                          // force JS fallback (used by parity tests)
 benchmark(fn, iterations = 1000)         // ms per iteration; reports WASM vs JS in dev

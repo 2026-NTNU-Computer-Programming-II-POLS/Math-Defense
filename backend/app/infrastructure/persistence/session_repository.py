@@ -94,6 +94,7 @@ class SqlAlchemySessionRepository:
                 practice_mode=session.practice_mode,
                 challenge_id=session.challenge_id,
                 rng_seed=session.rng_seed,
+                replay_version=session.replay_version,
                 path_config=session.path_config,
                 status=session.status.value,
                 current_wave=session.current_wave,
@@ -215,6 +216,7 @@ class SqlAlchemySessionRepository:
             practice_mode=bool(row.practice_mode),
             challenge_id=row.challenge_id,
             rng_seed=row.rng_seed,
+            replay_version=getattr(row, "replay_version", 1) or 1,
             started_at=_ensure_utc(row.started_at),
             ended_at=_ensure_utc(row.ended_at),
         )

@@ -88,6 +88,7 @@ def get_replay(
     return ReplayBundleOut(
         session_id=bundle.session_id,
         rng_seed=bundle.rng_seed,
+        replay_version=bundle.replay_version,
         star_rating=bundle.star_rating,
         events=[
             ReplayEventOut(

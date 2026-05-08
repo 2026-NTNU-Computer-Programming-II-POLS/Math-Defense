@@ -85,6 +85,26 @@ class MFAAlreadyEnabledError(DomainError):
     status_code = 409
 
 
+# ── Replay validation (FU-A) ──
+
+class ReplayMismatchError(DomainError):
+    """Raised when a v2 session submits a total_score that doesn't match the
+    server's wasmtime-py recomputation. v1 sessions only log a warning (no
+    bit-exactness contract); v2 explicitly promised bit-equal acceptance so
+    a mismatch is treated as tampering.
+
+    The message is the literal string ``replay_mismatch`` so the global
+    DomainError handler surfaces it as the ``detail`` field — the construction
+    plan §8 acceptance criterion checks for this exact code.
+    """
+    status_code = 422
+
+    def __init__(self, submitted: float, recomputed: float) -> None:
+        super().__init__("replay_mismatch")
+        self.submitted = submitted
+        self.recomputed = recomputed
+
+
 # ── Validation ──
 
 class DomainValueError(DomainError, ValueError):

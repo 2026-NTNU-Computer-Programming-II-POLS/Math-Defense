@@ -58,5 +58,10 @@ class ReplayBundleOut(BaseModel):
     # back to a Math.random stream — events still play back, but RNG-driven
     # outcomes (buff disable target, Monty-Hall door) will diverge.
     rng_seed: int | None = None
+    # 施工計畫書 §3.8 — replay protocol version this session was created under.
+    # ReplayView branches on this: v1 keeps the existing JS-Math.* path
+    # (within ε = 0.0005); v2 routes through the WASM determinism module and
+    # surfaces an error if the .wasm fails to load (no silent fallback).
+    replay_version: int = 1
     star_rating: int
     events: list[ReplayEventOut]

@@ -70,6 +70,7 @@ erDiagram
         float   total_score              "nullable"
         string  reflection_text          "nullable, ≤2000 chars"
         bigint  rng_seed                 "nullable — replay determinism seed"
+        smallint replay_version          "DEFAULT 1 — 1=mulberry32+JS Math, 2=PCG+WASM bit-exact"
         datetime started_at
         datetime ended_at                "nullable"
     }
@@ -383,7 +384,8 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `time_exclude_prepare` | `JSON` | YES | list of per-wave time floats |
 | `total_score` | `Float` | YES | — |
 | `reflection_text` | `String(2000)` | YES | Free-text reflection captured after a winning wave (articulation prompt) |
-| `rng_seed` | `BigInteger` | YES | Per-session deterministic RNG seed forwarded by the client at session creation; replayed by `EventPlayer` to rebuild the mulberry32 stream. `BigInteger` because the client emits a 32-bit unsigned value that does not fit in every dialect's `INTEGER`. NULL on legacy rows / clients that do not opt into replay |
+| `rng_seed` | `BigInteger` | YES | Per-session deterministic RNG seed forwarded by the client at session creation; replayed by `EventPlayer` to rebuild the PRNG stream. `BigInteger` because the client emits a 32-bit unsigned value that does not fit in every dialect's `INTEGER`. NULL on legacy rows / clients that do not opt into replay |
+| `replay_version` | `SmallInteger` | NO | SERVER DEFAULT `1`. `1` = legacy mulberry32 PRNG + JS `Math.*` transcendentals (ε=5e-4 acceptance); `2` = PCG XSL-RR 64/32 in WASM + musl transcendentals compiled into the .wasm (bit-exact across browsers). Tagged at session creation: client tags `2` only when WASM has loaded; backend `_verify_score` rejects v2 mismatches with HTTP 422 `replay_mismatch` (FU-A) |
 | `started_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `ended_at` | `DateTime(tz)` | YES | set on completion / abandonment |
 
@@ -861,7 +863,8 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `r2a3b4c5d6e7` | **Merge migration** for branched chain (`q1f2a3b4c5d6` + `a3b4c5d6e7f8`) — also adds the `seasons` table |
 | `s3b4c5d6e7f8` | `challenges` table + `challenge_id` columns on `game_sessions` and `leaderboard_entries` |
 | `t4c5d6e7f8a9` | Replay foundation — `game_sessions.rng_seed` + append-only `session_events` table |
-| `u5d6e7f8a9b0` | Empirical Validity Probe — `study_enrollments` / `study_probe_attempts` / `study_affect_responses` (current head) |
+| `u5d6e7f8a9b0` | Empirical Validity Probe — `study_enrollments` / `study_probe_attempts` / `study_affect_responses` |
+| `v6e7f8a9b0c1` | Replay protocol versioning — `game_sessions.replay_version SMALLINT NOT NULL DEFAULT 1` (current head). Splits sessions into v1 (mulberry32+JS Math, ε=5e-4) vs v2 (PCG+WASM, bit-exact). Phase 4 of the construction plan; FU-A server-side recompute rejects v2 mismatches with HTTP 422 |
 
 > **Branched history**: After `q1f2a3b4c5d6` (gameplay branch — practice mode) and `a3b4c5d6e7f8` (auth branch — lockout backoff) shipped on parallel branches, `r2a3b4c5d6e7` is a merge migration whose `down_revision` is the tuple `(q1f2a3b4c5d6, a3b4c5d6e7f8)`. It also creates the `seasons` table in the same revision. Subsequent revisions (`s3b4c5d6e7f8`, `t4c5d6e7f8a9`, `u5d6e7f8a9b0`) form a linear chain on top.
 

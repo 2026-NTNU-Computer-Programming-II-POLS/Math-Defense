@@ -7,7 +7,13 @@ CC = emcc
 # Artifacts live under src/ so Vite bundles them as proper module assets —
 # dynamic imports of files in /public/ are rejected by newer Vite versions.
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-SRC = $(MAKEFILE_DIR)math_engine.c
+# All translation units linked into the single math_engine.{js,wasm} pair.
+# One linked binary is preferable to multiple modules: one .wasm download,
+# shared RAII helper on the bridge side, one ABI surface.
+SRC = $(MAKEFILE_DIR)math_engine.c \
+      $(MAKEFILE_DIR)prng.c \
+      $(MAKEFILE_DIR)curve.c \
+      $(MAKEFILE_DIR)level_gen.c
 OUT_DIR = $(MAKEFILE_DIR)../frontend/src/math/wasm
 OUT = $(OUT_DIR)/math_engine.js
 # Generated TypeScript declaration mirroring EXPORTED_FUNCTIONS. Keeps the
@@ -16,11 +22,19 @@ OUT = $(OUT_DIR)/math_engine.js
 DTS = $(MAKEFILE_DIR)../frontend/src/math/wasm-exports.d.ts
 
 # Newer emcc requires either JSON-array or comma-separated list (no shell-quoted JSON).
-# Comma-list form is portable across cmd / sh.
-# calculate_trajectory and line_circle_intersect are kept for the trajectory-preview /
-# line-circle hit-detection paths that WasmBridge now wraps below.
-EXPORTED_FUNCTIONS = _matrix_multiply,_calculate_trajectory,_sector_coverage,_point_in_sector,_numerical_integrate,_fourier_composite,_fourier_match,_line_circle_intersect,_malloc,_free
+# Comma-list form is portable across cmd / sh. Kept on one line because Make
+# collapses backslash-continuations to a single space, and emcc's parser
+# rejects spaces embedded inside the comma list.
+EXPORTED_FUNCTIONS = _matrix_multiply,_sector_coverage,_point_in_sector,_numerical_integrate,_power_f64,_prng_seed,_prng_next_u32,_prng_next_f64,_curve_evaluate,_curve_derivative,_curve_in_domain,_find_pair_intersections,_find_all_curves_common_point,_count_common_intersections_in_interval,_compute_spawn_points,_generate_level,_malloc,_free
 EXPORTED_RUNTIME = ccall,cwrap,getValue,setValue
+
+# Determinism flags: forbid the compiler from rewriting transcendentals or
+# fusing FMAs, both of which can yield engine-dependent ULP drift. With these
+# in place, sinf/cosf/logf compile through musl in WASM bytecode and produce
+# byte-identical output across every host that runs the .wasm.
+FP_FLAGS = -fno-fast-math \
+           -fno-unsafe-math-optimizations \
+           -ffp-contract=off
 
 FLAGS = -sEXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
         -sEXPORTED_RUNTIME_METHODS=$(EXPORTED_RUNTIME) \
@@ -29,6 +43,7 @@ FLAGS = -sEXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
         -sEXPORT_NAME=createMathEngine \
         -sALLOW_MEMORY_GROWTH=1 \
         -sMAXIMUM_MEMORY=268435456 \
+        $(FP_FLAGS) \
         -O2
 
 .PHONY: all clean dts
