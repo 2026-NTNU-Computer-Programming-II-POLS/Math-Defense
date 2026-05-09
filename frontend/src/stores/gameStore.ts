@@ -71,6 +71,11 @@ export const useGameStore = defineStore('game', () => {
 
   // V2 Active buffs
   const activeBuffs = shallowRef<ReadonlyArray<ActiveBuffEntry>>([])
+  // game.state.timeTotal at the moment activeBuffs was last emitted. Lets
+  // consumers interpolate liveRemaining = max(0, b.remainingTime - (timeTotal
+  // - activeBuffsSnapshotTime)) without an extra periodic event from the
+  // engine, since BuffSystem only emits on add / expire / LEVEL_START.
+  const activeBuffsSnapshotTime = ref(0)
 
   // V2 Calculus tower states (reactive mirror of tower.calculusState per towerId)
   const calculusStates = shallowRef<Record<string, CalculusState | null>>({})
@@ -201,6 +206,7 @@ export const useGameStore = defineStore('game', () => {
         montyHallState.value = null
         enemiesAlive.value = 0
         activeBuffs.value = []
+        activeBuffsSnapshotTime.value = 0
         spellCooldowns.value = {}
         calculusStates.value = {}
       }),
@@ -209,6 +215,7 @@ export const useGameStore = defineStore('game', () => {
       }),
       game.eventBus.on(Events.ACTIVE_BUFFS_CHANGED, (buffs) => {
         activeBuffs.value = buffs
+        activeBuffsSnapshotTime.value = game.state.timeTotal
       }),
       game.eventBus.on(Events.TOWER_UPGRADED, () => { towerUpgradeTick.value++ }),
       game.eventBus.on(Events.CALCULUS_STATE_CHANGED, ({ towerId, state }) => {
@@ -264,6 +271,7 @@ export const useGameStore = defineStore('game', () => {
     initialAnswer.value = s.initialAnswer
     pathsVisible.value = s.pathsVisible
     activeBuffs.value = [...s.activeBuffs]
+    activeBuffsSnapshotTime.value = s.timeTotal
   }
 
   /**
@@ -286,7 +294,7 @@ export const useGameStore = defineStore('game', () => {
     gold, hp, maxHp, score, kills, cumulativeKillValue, enemiesAlive, buffCards,
     costTotal, healthOrigin, timeTotal, timeExcludePrepare,
     initialAnswer, pathsVisible, montyHallProgress, montyHallState,
-    activeBuffs, spellCooldowns, calculusStates, towerUpgradeTick,
+    activeBuffs, activeBuffsSnapshotTime, spellCooldowns, calculusStates, towerUpgradeTick,
     pathLabelOpacity,
     pathPanel,
     lastCheckpoint, isCheckpointRun,
