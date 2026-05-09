@@ -70,6 +70,14 @@ const prepTime = computed(() => {
   return Math.floor(g.timeTotal)
 })
 
+// Live remaining seconds for an active buff. BuffSystem only emits
+// ACTIVE_BUFFS_CHANGED on add/expire, so buff.remainingTime is a snapshot —
+// interpolate from activeBuffsSnapshotTime to drain the displayed countdown
+// in step with timeTotal (~2 Hz via useGameLoop's RAF mirror).
+function liveBuffSeconds(buff: { remainingTime: number }): number {
+  return Math.ceil(Math.max(0, buff.remainingTime - (g.timeTotal - g.activeBuffsSnapshotTime)))
+}
+
 // HUD height publish
 const hudRef = ref<HTMLDivElement | null>(null)
 let hudRo: ResizeObserver | null = null
@@ -181,10 +189,10 @@ onBeforeUnmount(() => {
         v-for="buff in g.activeBuffs"
         :key="buff.id"
         class="buff-icon"
-        :title="`${buff.name} — ${Math.ceil(buff.remainingTime)}s`"
+        :title="`${buff.name} — ${liveBuffSeconds(buff)}s`"
       >
         <span class="buff-letter">{{ buff.name[0] }}</span>
-        <span class="buff-timer">{{ Math.ceil(buff.remainingTime) }}</span>
+        <span class="buff-timer">{{ liveBuffSeconds(buff) }}</span>
       </div>
     </div>
 
