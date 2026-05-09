@@ -8,9 +8,8 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/services/api'
-import { AFFECT_ITEMS, LIKERT_ANCHORS } from '@/domain/study/probe-items'
 import { isAffectPhase } from '@/views/study-helpers'
-import { studyService } from '@/services/studyService'
+import { AFFECT_ITEMS, LIKERT_ANCHORS, studyService } from '@/services/studyService'
 
 const route = useRoute()
 const router = useRouter()

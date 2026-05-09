@@ -39,7 +39,7 @@ def _register_student(client, name):
 def _register_teacher(db_session, name):
     _u, token, _r = build_auth_service(db_session).register(
         email=f"{name}@test.local",
-        password="secret123",
+        password="xQ7!aPm2#vKz9",
         player_name=name,
         role="teacher",
     )

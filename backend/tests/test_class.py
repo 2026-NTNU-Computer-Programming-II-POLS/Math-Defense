@@ -22,7 +22,7 @@ def _register_student(client, name):
 def _register_teacher(db_session, name):
     _user, token, _refresh = build_auth_service(db_session).register(
         email=f"{name}@test.local",
-        password="secret123",
+        password="xQ7!aPm2#vKz9",
         player_name=name,
         role="teacher",
     )
@@ -32,7 +32,7 @@ def _register_teacher(db_session, name):
 def _register_admin(db_session, name):
     _user, token, _refresh = build_auth_service(db_session).register(
         email=f"{name}@test.local",
-        password="secret123",
+        password="xQ7!aPm2#vKz9",
         player_name=name,
         role="admin",
     )
@@ -159,7 +159,7 @@ def test_add_teacher_as_student_returns_400(client, db_session):
     t1 = _register_teacher(db_session, "t_addteacher1")
     t2_email = "t_addteacher2@test.local"
     build_auth_service(db_session).register(
-        email=t2_email, password="secret123", player_name="t_addteacher2", role="teacher",
+        email=t2_email, password="xQ7!aPm2#vKz9", player_name="t_addteacher2", role="teacher",
     )
     class_id = _create_class(client, t1).json()["id"]
     res = client.post(

@@ -23,7 +23,7 @@ import {
   LevelGenerationFailedError,
 } from '@/services/levelGenerationService'
 import { initWasm, isUsingWasm, whenWasmReady } from '@/math/WasmBridge'
-import { buildWavesForStar } from '@/domain/wave/wave-generator'
+import { buildWavesForStar } from '@/services/waveService'
 import { sessionService, type ReplayBundleOut } from '@/services/sessionService'
 import { EventPlayer } from '@/engine/replay/EventPlayer'
 import { createGeneratedLevelContext } from '@/engine/generated-level-context'

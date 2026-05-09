@@ -3,6 +3,19 @@
  */
 import { api } from '@/services/api'
 
+export {
+  PROBE_ITEMS,
+  PROBE_FORM_LABEL,
+  AFFECT_ITEMS,
+  LIKERT_ANCHORS,
+} from '@/domain/study/probe-items'
+export type {
+  ProbeForm,
+  ProbeItem,
+  ProbeOption,
+  LikertItem,
+} from '@/domain/study/probe-items'
+
 export interface EnrollResponse { group: 'A' | 'B' }
 export interface ProbeSubmitResponse { score: number; total: number }
 
