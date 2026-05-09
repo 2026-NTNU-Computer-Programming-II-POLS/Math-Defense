@@ -30,7 +30,6 @@ function purchase(itemId: string, cost: number): void {
       type="button"
       aria-label="Open shop"
       aria-expanded="false"
-      aria-controls="shop-grid"
       @click="collapsed = false"
     >
       <span aria-hidden="true">🏪</span>
@@ -43,13 +42,12 @@ function purchase(itemId: string, cost: number): void {
           type="button"
           aria-label="Close shop"
           aria-expanded="true"
-          aria-controls="shop-grid"
           @click="collapsed = true"
         >
           ✕
         </button>
       </h3>
-      <div id="shop-grid" class="shop-grid">
+      <div class="shop-grid">
         <button
           v-for="item in items"
           :key="item.id"
