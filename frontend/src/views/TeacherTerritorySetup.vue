@@ -171,6 +171,9 @@ onMounted(async () => {
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
+/* Override the global 80px default so date/text/select fields fill the field row. */
+.setup-form .rune-input { width: 100%; box-sizing: border-box; text-align: left; }
+
 :root {
   --min-touch-target: 44px;
 }

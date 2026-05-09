@@ -75,6 +75,31 @@ function wait(ms: number, signal?: AbortSignal): Promise<void> {
 // the original request, so the response will Set-Cookie the csrf_token if
 // it was missing client-side. /api/auth/me is cheap and always handled.
 const CSRF_REFRESH_PATH = '/api/auth/me'
+// FastAPI's RequestValidationError handler returns `detail` as an array of
+// {loc, type, msg} objects. Without normalization the Error constructor
+// coerces it via String() and the user sees "[object Object]".
+function formatErrorDetail(detail: unknown): string | null {
+  if (detail == null) return null
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    if (detail.length === 0) return null
+    const parts = detail.map((d) => {
+      if (d && typeof d === 'object') {
+        const o = d as { loc?: unknown; msg?: unknown }
+        const loc = Array.isArray(o.loc) ? o.loc.filter((x) => x !== 'body').join('.') : ''
+        const msg = typeof o.msg === 'string' ? o.msg : 'Invalid value'
+        return loc ? `${loc}: ${msg}` : msg
+      }
+      return String(d)
+    })
+    return parts.join('; ')
+  }
+  if (typeof detail === 'object') {
+    try { return JSON.stringify(detail) } catch { return String(detail) }
+  }
+  return String(detail)
+}
+
 function looksLikeCsrfReject(e: unknown): boolean {
   if (!(e instanceof ApiError)) return false
   if (e.status !== 403) return false
@@ -177,6 +202,7 @@ async function requestOnce<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
+    const detail = formatErrorDetail(body?.detail) ?? res.statusText
     // 401 interceptor: access token expired / rejected by server. Clear local
     // auth state and (if on a protected route) navigate to /auth so the user
     // isn't stranded on a blank panel with repeating errors.
@@ -190,7 +216,7 @@ async function requestOnce<T>(
         // Pinia not installed yet (very early bootstrap) — best-effort
       }
     }
-    throw new ApiError(res.status, body.detail ?? res.statusText)
+    throw new ApiError(res.status, detail)
   }
 
   // 204 No Content — no body to parse; callers must type T as void/undefined.
