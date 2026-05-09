@@ -47,7 +47,7 @@ class CompetencyState:
         """Snapshot of every competency, materialising the uniform prior for
         any competency that has yet to receive evidence so callers can render
         the full taxonomy without per-competency conditionals."""
-        return {c: self.posterior(c) for c in Competency}
+        return {c: self.posterior(c) for c in Competency}  # lgtm[py/iteration-over-non-iterable]
 
     def apply_event(
         self, q_matrix: QMatrix, event_id: str, success: bool
@@ -60,7 +60,7 @@ class CompetencyState:
         Q-matrix row.
         """
         updated: list[Competency] = []
-        for c in Competency:
+        for c in Competency:  # lgtm[py/iteration-over-non-iterable]
             w = q_matrix.weight(event_id, c)
             if w == 0.0:
                 continue

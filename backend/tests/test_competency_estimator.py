@@ -118,7 +118,7 @@ class TestCompetencyState:
         # limit_correct is unit-loaded on LIMIT only.
         assert updated == [Competency.LIMIT]
         assert state.posterior(Competency.LIMIT).alpha == 2.0
-        for c in Competency:
+        for c in Competency:  # lgtm[py/iteration-over-non-iterable]
             if c is Competency.LIMIT:
                 continue
             assert state.posterior(c) == UNIFORM_PRIOR
@@ -146,7 +146,7 @@ class TestCompetencyState:
 
     def test_zero_event_user_has_mean_half_for_every_competency(self):
         state = CompetencyState.empty("u")
-        for c in Competency:
+        for c in Competency:  # lgtm[py/iteration-over-non-iterable]
             assert mean(state.posterior(c)) == 0.5
 
 

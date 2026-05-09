@@ -30,7 +30,7 @@ def test_completeness() -> None:
 def test_value_bounds() -> None:
     """All weights lie in [0, 1]."""
     for event_id in Q_MATRIX.events():
-        for competency in Competency:
+        for competency in Competency:  # lgtm[py/iteration-over-non-iterable]
             w = Q_MATRIX.weight(event_id, competency)
             assert 0.0 <= w <= 1.0, f"{event_id}/{competency.value} weight {w} out of bounds"
 
@@ -51,7 +51,7 @@ def test_weight_returns_float_for_known_event() -> None:
 
 def test_weight_zero_for_competency_absent_from_row() -> None:
     """`limit_correct` is unit-loaded on LIMIT only — every other competency is 0."""
-    for c in Competency:
+    for c in Competency:  # lgtm[py/iteration-over-non-iterable]
         if c is Competency.LIMIT:
             continue
         assert Q_MATRIX.weight("limit_correct", c) == 0.0
