@@ -8,6 +8,7 @@ export type WasmExport =
   | 'point_in_sector'
   | 'numerical_integrate'
   | 'power_f64'
+  | 'compute_total_score'
   | 'prng_seed'
   | 'prng_next_u32'
   | 'prng_next_f64'

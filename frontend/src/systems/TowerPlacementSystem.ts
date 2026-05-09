@@ -112,8 +112,8 @@ export class TowerPlacementSystem {
     if (game.state.gold < cost) return
 
     game.towers.push(tower)
-    game.changeGold(-cost)
-    game.addCost(cost)
+    game.economy.changeGold(-cost)
+    game.economy.addCost(cost)
     if (game.state.freeTowerNext) {
       game.state.freeTowerNext = false
     } else if (game.state.freeTowerCharges > 0) {

@@ -88,10 +88,10 @@ const effectStrategies: Record<string, EffectFn> = {
   ENEMY_VULNERABILITY_RESET: (g) => { g.state.enemyVulnerability = 1.0 },
 
   // Player / economy
-  HEAL_3: (g) => { g.changeHp(3) },
-  HEAL_5: (g) => { g.changeHp(5) },
-  HEAL_10: (g) => { g.changeHp(10) },
-  HEAL_FULL: (g) => { g.changeHp(g.state.maxHp - g.state.hp) },
+  HEAL_3: (g) => { g.economy.changeHp(3) },
+  HEAL_5: (g) => { g.economy.changeHp(5) },
+  HEAL_10: (g) => { g.economy.changeHp(10) },
+  HEAL_FULL: (g) => { g.economy.changeHp(g.state.maxHp - g.state.hp) },
   SHIELD_ACTIVATE: (g) => { g.state.shieldActive = true; g.state.shieldHitsRemaining = 3 },
   SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false; g.state.shieldHitsRemaining = 0 },
   GOLD_MULTIPLIER_DOUBLE: (g) => { g.state.goldMultiplier *= 2 },
@@ -112,8 +112,8 @@ const effectStrategies: Record<string, EffectFn> = {
   REFUND_LAST_TOWER: (g) => {
     if (g.towers.length > 0) {
       const last = g.towers[g.towers.length - 1]
-      g.changeGold(last.cost)
-      g.addCost(-last.cost)
+      g.economy.changeGold(last.cost)
+      g.economy.addCost(-last.cost)
     }
   },
   ORIGIN_EXPLOSION: (g) => {
@@ -197,8 +197,8 @@ export class BuffSystem implements GameSystem {
     if (!def) return false
     if (game.state.gold < cost) return false
 
-    game.changeGold(-cost)
-    game.addCost(cost)
+    game.economy.changeGold(-cost)
+    game.economy.addCost(cost)
     applyEffect(def.effectId, game)
 
     if (def.duration > 0) {

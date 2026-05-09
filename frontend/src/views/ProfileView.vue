@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -33,6 +33,7 @@ const pwConfirm = ref('')
 const pwChanging = ref(false)
 const pwError = ref('')
 const pwSuccess = ref(false)
+let pwSuccessTimer: ReturnType<typeof setTimeout> | null = null
 
 async function changePassword(): Promise<void> {
   if (!pwCurrent.value || !pwNew.value || !pwConfirm.value) {
@@ -60,7 +61,12 @@ async function changePassword(): Promise<void> {
     pwCurrent.value = ''
     pwNew.value = ''
     pwConfirm.value = ''
-    setTimeout(() => { pwSuccess.value = false; pwVisible.value = false }, 2000)
+    if (pwSuccessTimer !== null) clearTimeout(pwSuccessTimer)
+    pwSuccessTimer = setTimeout(() => {
+      pwSuccess.value = false
+      pwVisible.value = false
+      pwSuccessTimer = null
+    }, 2000)
   } catch (e) {
     pwError.value = e instanceof Error ? e.message : 'Failed to change password'
   } finally {
@@ -122,6 +128,13 @@ async function savePlayerName(): Promise<void> {
     nameSaving.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (pwSuccessTimer !== null) {
+    clearTimeout(pwSuccessTimer)
+    pwSuccessTimer = null
+  }
+})
 
 async function selectAvatar(url: string): Promise<void> {
   if (!auth.user || auth.user.avatar_url === url) return

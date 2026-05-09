@@ -1,9 +1,10 @@
 """Replay/Spectate (§24) request/response schemas."""
 from __future__ import annotations
 
+import json
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain.session.events_log import MAX_BATCH_SIZE
 
@@ -25,6 +26,24 @@ class ReplayEventIn(BaseModel):
     ts: float = Field(ge=0, le=7_200.0)
     event_type: str = Field(min_length=1, max_length=64)
     payload: Any = None
+
+    @field_validator("payload")
+    @classmethod
+    def payload_size(cls, v: Any) -> Any:
+        # The batch-level cap (MAX_BATCH_SIZE events) and the per-session cap
+        # both gate the *count* of payloads but not the size of any single
+        # one — a tampered client can still post a single event holding many
+        # MB of JSON. Bound it here so storage is bounded by
+        # MAX_BATCH_SIZE × _PAYLOAD_MAX_BYTES rather than open-ended.
+        if v is None:
+            return v
+        try:
+            serialised = json.dumps(v)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("payload must be JSON-serialisable") from exc
+        if len(serialised.encode("utf-8")) > _PAYLOAD_MAX_BYTES:
+            raise ValueError(f"payload exceeds {_PAYLOAD_MAX_BYTES} byte limit")
+        return v
 
 
 class ReplayBatchIn(BaseModel):

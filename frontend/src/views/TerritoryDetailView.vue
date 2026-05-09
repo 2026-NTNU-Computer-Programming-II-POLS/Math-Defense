@@ -3,9 +3,12 @@ import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
-import { generateLevel, generateLevelDeterministicFromSeed } from '@/domain/level/level-generator'
-import { mulberry32, stringHash } from '@/math/MathUtils'
-import { isUsingWasm, whenWasmReady } from '@/math/WasmBridge'
+import { useUiStore } from '@/stores/uiStore'
+import { stringHash } from '@/math/MathUtils'
+import {
+  generate as generateLevelForRun,
+  LevelGenerationFailedError,
+} from '@/services/levelGenerationService'
 import { sessionService } from '@/services/sessionService'
 import TerritorySlotCard from '@/components/territory/TerritorySlotCard.vue'
 
@@ -13,6 +16,7 @@ const router = useRouter()
 const route = useRoute()
 const store = useTerritoryStore()
 const auth = useAuthStore()
+const ui = useUiStore()
 
 const activityId = computed(() => route.params.id as string)
 const detail = computed(() => store.currentDetail)
@@ -45,8 +49,10 @@ async function handlePlay(slotId: string): Promise<void> {
   try {
     const active = await sessionService.getActive()
     if (active) {
-      const ok = confirm(
-        'You have an active game session in progress. Starting a territory game will abandon it. Continue?'
+      const ok = await ui.showConfirm(
+        'Active session in progress',
+        'You have an active game session in progress. Starting a territory game will abandon it. Continue?',
+        { confirmLabel: 'Continue', cancelLabel: 'Cancel' },
       )
       if (!ok) return
     }
@@ -57,38 +63,31 @@ async function handlePlay(slotId: string): Promise<void> {
 
   // Stable seed derived from the slot id so every student faces the same level
   const seed = stringHash(slotId)
-  // construction plan §3.8 — when WASM is ready, generate via the bit-deterministic
-  // v2 path so a v2 replay reconstructs the identical level on any browser.
-  // We must NOT silently fall back to v1 when v2 was attempted but failed —
-  // useSessionSync tags the session v2 based on isUsingWasm(), so a v1 level
-  // paired with a v2 tag would produce an unplayable replay (different level
-  // recreated from the same seed). Surface the failure instead.
-  await whenWasmReady().catch(() => false)
   let level
-  if (isUsingWasm()) {
-    const v2 = generateLevelDeterministicFromSeed(slot.star_rating, seed)
-    if (!v2) {
+  try {
+    ({ level } = await generateLevelForRun(slot.star_rating, seed))
+  } catch (e) {
+    if (e instanceof LevelGenerationFailedError) {
       console.error('[TerritoryDetail] Level generation failed via WASM v2 path', { slotId, seed })
-      alert('Level generation failed — please try a different territory slot.')
+      ui.showModal('Level generation failed', 'Please try a different territory slot.')
       return
     }
-    level = v2
-  } else {
-    level = generateLevel(slot.star_rating, mulberry32(seed))
+    throw e
   }
   const territoryContext = { activityId: activityId.value, slotId }
 
-  sessionStorage.setItem(
-    'initial-answer-context',
-    JSON.stringify({
-      level,
-      seed,
-      territoryContext,
-    })
-  )
-
+  // F-BUG-14: pass via history.state to match LevelSelectView; cap the
+  // serialized size so a malformed level can't bloat the history entry.
+  const levelJson = JSON.stringify(level)
+  const MAX_LEVEL_JSON_BYTES = 64 * 1024
+  if (levelJson.length > MAX_LEVEL_JSON_BYTES) {
+    console.error('[TerritoryDetail] Generated level JSON exceeds size cap', { bytes: levelJson.length })
+    ui.showModal('Level too large', 'Generated level payload is unexpectedly large; please try a different slot.')
+    return
+  }
   router.push({
     name: 'initial-answer',
+    state: { level: levelJson, seed, territoryContext: JSON.stringify(territoryContext) },
   })
 }
 
@@ -98,11 +97,12 @@ async function handleSettle(): Promise<void> {
   const msg = isBeforeDeadline
     ? 'The deadline has not passed yet. Settle this activity early? This action is permanent and cannot be undone.'
     : 'Settle this activity? This action is permanent and cannot be undone.'
-  if (!confirm(msg)) return
+  const confirmed = await ui.showConfirm('Settle activity', msg, { confirmLabel: 'Settle' })
+  if (!confirmed) return
   settling.value = true
-  const ok = await store.settleActivity(activityId.value)
+  const settled = await store.settleActivity(activityId.value)
   settling.value = false
-  if (ok) await store.loadDetail(activityId.value)
+  if (settled) await store.loadDetail(activityId.value)
 }
 
 function viewRankings(): void {

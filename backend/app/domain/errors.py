@@ -1,39 +1,38 @@
 """Domain error hierarchy.
 
-Each subclass carries its HTTP status code so the global exception handler
-can translate domain failures without a try/except wall in every router.
+Domain layer is HTTP-free: subclasses describe the *kind* of failure, not its
+transport status. The API layer (see app.main._domain_error_handler) is the
+single place that maps a domain class onto an HTTP status code.
 """
 from __future__ import annotations
 
 
 class DomainError(Exception):
     """Base class for errors raised from domain / application layers."""
-    status_code: int = 400
 
 
 # ── Session ──
 
 class SessionNotFoundError(DomainError):
-    status_code = 404
+    pass
 
 
 class SessionStaleError(DomainError):
-    status_code = 410
+    pass
 
 
 class SessionNotActiveError(DomainError):
-    status_code = 409
+    pass
 
 
 class InvalidStatusTransitionError(DomainError):
-    status_code = 409
+    pass
 
 
 class Star5LockedError(DomainError):
     """Raised when a user attempts to start a Star-5 session before satisfying
     the Initial-Answer unlock requirement (Habgood & Ainsworth 2011 — see
     docs/Pedagogical_Backlog_Spec.md §5)."""
-    status_code = 403
 
     def __init__(self, message: str = "STAR_5_LOCKED") -> None:
         super().__init__(message)
@@ -42,47 +41,45 @@ class Star5LockedError(DomainError):
 # ── Auth ──
 
 class UsernameTakenError(DomainError):
-    status_code = 409
+    pass
 
 
 class InvalidCredentialsError(DomainError):
-    status_code = 401
+    pass
 
 
 class AccountLockedError(DomainError):
-    status_code = 429
-
     def __init__(self, message: str = "", retry_after_seconds: int | None = None) -> None:
         super().__init__(message)
         self.retry_after_seconds = retry_after_seconds
 
 
 class AccountDisabledError(DomainError):
-    status_code = 403
+    pass
 
 
 class InvalidTokenError(DomainError):
-    status_code = 401
+    pass
 
 
 class UserNotFoundError(DomainError):
-    status_code = 403
+    pass
 
 
 class EmailNotVerifiedError(DomainError):
-    status_code = 403
+    pass
 
 
 class InvalidMFACodeError(DomainError):
-    status_code = 401
+    pass
 
 
 class MFANotSetupError(DomainError):
-    status_code = 400
+    pass
 
 
 class MFAAlreadyEnabledError(DomainError):
-    status_code = 409
+    pass
 
 
 # ── Replay validation (FU-A) ──
@@ -97,7 +94,6 @@ class ReplayMismatchError(DomainError):
     DomainError handler surfaces it as the ``detail`` field — the construction
     plan §8 acceptance criterion checks for this exact code.
     """
-    status_code = 422
 
     def __init__(self, submitted: float, recomputed: float) -> None:
         super().__init__("replay_mismatch")
@@ -105,68 +101,74 @@ class ReplayMismatchError(DomainError):
         self.recomputed = recomputed
 
 
+class ReplayUnavailableError(DomainError):
+    """Raised when a v2 session cannot be verified because the WASM runtime
+    that backs bit-exact pow is not loaded. v2 promised bit-equal acceptance;
+    falling back to Python pow at the wider v1 tolerance would silently
+    weaken the contract, so we fail closed (B-BUG-15)."""
+
+    def __init__(self) -> None:
+        super().__init__("replay_unavailable")
+
+
 # ── Validation ──
 
 class DomainValueError(DomainError, ValueError):
     """Domain invariant expressed as a value constraint (e.g. score must not decrease).
 
-    Inherits from both DomainError (carries status_code for the global handler)
-    and ValueError (semantic compatibility with existing except-clauses / tests).
-    The DomainError handler takes precedence over the generic ValueError handler
-    because it is registered first.
+    Inherits from both DomainError and ValueError (semantic compatibility with
+    existing except-clauses / tests). The DomainError handler takes precedence
+    over the generic ValueError handler because it is registered first.
     """
-    status_code = 422
 
 
 # ── Leaderboard ──
 
 class SessionValidationError(DomainError):
-    status_code = 400
+    pass
 
 
 class PermissionDeniedError(DomainError):
-    status_code = 403
+    pass
 
 
 class DuplicateSubmissionError(DomainError):
-    status_code = 409
+    pass
 
 
 # ── Challenge ──
 
 class ChallengeNotFoundError(DomainError):
-    status_code = 404
+    pass
 
 
 class ChallengeImmutableError(DomainError):
     """Constraints cannot be edited once the challenge has been played
     (see Pedagogical_Backlog_Spec.md §23.4)."""
-    status_code = 409
 
 
 # ── Talent ──
 
 class InsufficientTalentPointsError(DomainError):
-    status_code = 409
+    pass
 
 
 class PrerequisiteNotMetError(DomainError):
-    status_code = 409
+    pass
 
 
 class MaxLevelReachedError(DomainError):
-    status_code = 409
+    pass
 
 
 class TalentNodeNotFoundError(DomainError):
-    status_code = 409
+    pass
 
 
 # ── Persistence (infrastructure boundary) ──
 
 class PersistenceError(DomainError):
     """Raised by the UoW when the persistence layer encounters an unrecoverable error."""
-    status_code = 500
 
 
 class ConstraintViolationError(PersistenceError):
@@ -176,7 +178,6 @@ class ConstraintViolationError(PersistenceError):
     (e.g. 'uq_leaderboard_session_id'). Application services inspect this
     field to decide which domain error to surface to the caller.
     """
-    status_code = 409
 
     def __init__(self, message: str = "", *, constraint_name: str | None = None) -> None:
         super().__init__(message)

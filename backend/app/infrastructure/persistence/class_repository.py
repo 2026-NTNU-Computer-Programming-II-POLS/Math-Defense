@@ -44,7 +44,12 @@ class SqlAlchemyClassRepository:
     def find_all_paginated(self, offset: int, limit: int) -> tuple[list[Class], int]:
         q = self._db.query(ClassModel)
         total = q.count()
-        rows = q.order_by(ClassModel.created_at.desc()).offset(offset).limit(limit).all()
+        # B-BUG-13: append .id as a tiebreaker so identical created_at
+        # timestamps (bulk seeds) cannot duplicate / skip rows across pages.
+        rows = (
+            q.order_by(ClassModel.created_at.desc(), ClassModel.id.asc())
+            .offset(offset).limit(limit).all()
+        )
         return [self._to_domain(r) for r in rows], total
 
     def count_by_teacher(self, teacher_id: str) -> int:

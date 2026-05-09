@@ -4,14 +4,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from app.domain.errors import (
-    InsufficientTalentPointsError,
-    MaxLevelReachedError,
-    PrerequisiteNotMetError,
-    TalentNodeNotFoundError,
-)
-from app.domain.talent.aggregate import TalentAllocation
 from app.domain.talent.definitions import TALENT_NODE_DEFS, get_all_nodes
+from app.domain.talent.tree import TalentTree
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
@@ -32,20 +26,14 @@ class TalentApplicationService:
         self._achievement_repo = achievement_repo
         self._uow = uow
 
-    def _calculate_spent_points(self, allocations_list: list[TalentAllocation]) -> int:
-        total = 0
-        for alloc in allocations_list:
-            node_def = TALENT_NODE_DEFS.get(alloc.talent_node_id)
-            if not node_def:
-                raise ValueError(f"Talent node '{alloc.talent_node_id}' has no definition — data integrity error")
-            total += node_def.cost_per_level * alloc.current_level
-        return total
+    def _load_tree(self, user_id: str, alloc_list) -> TalentTree:
+        earned = self._achievement_repo.sum_talent_points(user_id)
+        return TalentTree(user_id, alloc_list, earned)
 
     def get_tree(self, user_id: str) -> dict:
         alloc_list = self._talent_repo.find_by_user(user_id)
+        tree = self._load_tree(user_id, alloc_list)
         allocations = {a.talent_node_id: a.current_level for a in alloc_list}
-        earned = self._achievement_repo.sum_talent_points(user_id)
-        spent = self._calculate_spent_points(alloc_list)
 
         nodes = []
         for n in get_all_nodes():
@@ -63,9 +51,9 @@ class TalentApplicationService:
             })
 
         return {
-            "points_earned": earned,
-            "points_spent": spent,
-            "points_available": earned - spent,
+            "points_earned": tree.points_earned,
+            "points_spent": tree.points_spent,
+            "points_available": tree.points_available,
             "nodes": nodes,
         }
 
@@ -85,46 +73,24 @@ class TalentApplicationService:
         return modifiers
 
     def allocate_point(self, user_id: str, talent_node_id: str) -> dict:
-        node_def = TALENT_NODE_DEFS.get(talent_node_id)
-        if not node_def:
+        # Cheap pre-check before acquiring the row lock — an unknown node id
+        # should fail fast without holding a transaction-scoped lock.
+        from app.domain.errors import TalentNodeNotFoundError
+        if talent_node_id not in TALENT_NODE_DEFS:
             raise TalentNodeNotFoundError(f"Unknown talent node: {talent_node_id}")
-
         with self._uow:
+            # B-BUG-2: anchor the lock on the user row before reading any
+            # allocations. find_by_user_for_update locks zero rows when the
+            # user has no prior allocations, leaving the budget check open
+            # to a concurrent overspend.
+            self._talent_repo.acquire_user_lock(user_id)
             alloc_list = self._talent_repo.find_by_user_for_update(user_id)
-            earned = self._achievement_repo.sum_talent_points(user_id)
-            spent = self._calculate_spent_points(alloc_list)
-            available = earned - spent
-
-            if available < node_def.cost_per_level:
-                raise InsufficientTalentPointsError(
-                    f"Need {node_def.cost_per_level} points, have {available}"
-                )
-
-            existing = self._talent_repo.find_by_user_and_node(user_id, talent_node_id)
-            current_level = existing.current_level if existing else 0
-
-            if current_level >= node_def.max_level:
-                raise MaxLevelReachedError(
-                    f"Node {talent_node_id} already at max level {node_def.max_level}"
-                )
-
-            allocations = {a.talent_node_id: a.current_level for a in alloc_list}
-            for prereq_id in node_def.prerequisites:
-                prereq_def = TALENT_NODE_DEFS.get(prereq_id)
-                if not prereq_def:
-                    continue
-                if allocations.get(prereq_id, 0) < 1:
-                    raise PrerequisiteNotMetError(
-                        f"Prerequisite not met: {prereq_def.name}"
-                    )
-
-            if existing:
-                existing.upgrade(node_def.max_level)
-                self._talent_repo.save(existing)
-            else:
-                alloc = TalentAllocation.create(user_id, talent_node_id)
-                self._talent_repo.save(alloc)
-
+            tree = self._load_tree(user_id, alloc_list)
+            outcome = tree.allocate(talent_node_id)
+            if outcome.upgraded is not None:
+                self._talent_repo.save(outcome.upgraded)
+            if outcome.created is not None:
+                self._talent_repo.save(outcome.created)
             self._uow.commit()
 
         return self.get_tree(user_id)

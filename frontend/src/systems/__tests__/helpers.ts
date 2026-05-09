@@ -15,9 +15,10 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
   const phase = new PhaseStateMachine()
   const state = { ...createInitialState(), ...overrides }
 
-  // Methods reference `this` against the cast-to-Game return value; explicit `this: Game`
-  // annotations let TS resolve `this.state` etc. without the body itself seeing Game's shape.
-  return {
+  // F-ARCH-7: gold/hp/score/cost mutations live on EconomySystem (reached via
+  // `game.economy.*` on the real Game). The mock exposes the same surface
+  // inline so system tests don't have to register a real EconomySystem.
+  const game = {
     eventBus,
     phase,
     state,
@@ -35,28 +36,7 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
     rng: Math.random,
     seed: null,
     setSeed(this: Game, seed: number) {
-      // Lightweight stand-in: the real Game.setSeed wires mulberry32; tests
-      // rarely care about the algorithm, just that re-seeding is observable.
-      // Tests that DO care about the stream itself bypass this and assign
-      // game.rng directly.
       this.seed = seed >>> 0
-    },
-    changeGold(this: Game, amount: number) {
-      this.state.gold = Math.max(0, this.state.gold + amount)
-      this.eventBus.emit(Events.GOLD_CHANGED, this.state.gold)
-    },
-    changeHp(this: Game, amount: number) {
-      this.state.hp = Math.max(0, Math.min(this.state.maxHp, this.state.hp + amount))
-      this.eventBus.emit(Events.HP_CHANGED, this.state.hp)
-      if (this.state.hp <= 0) this.setPhase(GamePhase.GAME_OVER)
-    },
-    addScore(this: Game, points: number) {
-      this.state.score += points
-      this.eventBus.emit(Events.SCORE_CHANGED, this.state.score)
-    },
-    addCost(this: Game, amount: number) {
-      this.state.costTotal += amount
-      this.eventBus.emit(Events.COST_TOTAL_CHANGED, this.state.costTotal)
     },
     addKillValue(this: Game, value: number) {
       this.state.cumulativeKillValue += value
@@ -71,6 +51,32 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
     assignEnemyPath() {},
     getSystem() { return undefined },
   } as unknown as Game
+
+  // Inline economy stub — same shape as EconomySystem's resource API.
+  Object.defineProperty(game, 'economy', {
+    value: {
+      changeGold(amount: number) {
+        game.state.gold = Math.max(0, game.state.gold + amount)
+        eventBus.emit(Events.GOLD_CHANGED, game.state.gold)
+      },
+      changeHp(amount: number) {
+        game.state.hp = Math.max(0, Math.min(game.state.maxHp, game.state.hp + amount))
+        eventBus.emit(Events.HP_CHANGED, game.state.hp)
+        if (game.state.hp <= 0) game.setPhase(GamePhase.GAME_OVER)
+      },
+      addScore(points: number) {
+        game.state.score += points
+        eventBus.emit(Events.SCORE_CHANGED, game.state.score)
+      },
+      addCost(amount: number) {
+        game.state.costTotal += amount
+        eventBus.emit(Events.COST_TOTAL_CHANGED, game.state.costTotal)
+      },
+    },
+    enumerable: true,
+  })
+
+  return game
 }
 
 export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {

@@ -18,6 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import settings
 from app.db.database import engine, SessionLocal
 from app.domain.errors import AccountLockedError, DomainError
+from app.http_status_map import http_status_for
 from app.domain.session.aggregate import set_stale_cutoff_hours
 from app.infrastructure.login_guard import purge_stale as purge_stale_login_attempts
 from app.infrastructure.scheduler import territory_settlement_task
@@ -125,12 +126,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(DomainError)
 async def _domain_error_handler(_request: Request, exc: DomainError) -> JSONResponse:
-    # DomainError subclasses carry their own status_code; pluck it and surface
-    # the message. Unhandled bugs still fall through to Starlette's default 500.
+    # Domain layer is HTTP-free; the class → status mapping lives in
+    # app.http_status_map. Unhandled bugs still fall through to Starlette's
+    # default 500.
     headers = {}
     if isinstance(exc, AccountLockedError) and exc.retry_after_seconds is not None:
         headers["Retry-After"] = str(exc.retry_after_seconds)
-    return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)}, headers=headers)
+    return JSONResponse(
+        status_code=http_status_for(exc),
+        content={"detail": str(exc)},
+        headers=headers,
+    )
 
 
 @app.exception_handler(RequestValidationError)
@@ -142,12 +148,20 @@ async def _request_validation_handler(
     # ValueError handler below would erase that structure (E1).
     # exc.errors() may include a raw exception object in ctx["error"] which
     # is not JSON serializable — convert it to a string first.
+    # Surface field name + a generic message only. Pydantic's `ctx.error`
+    # frequently contains the original exception's repr (sometimes with
+    # filesystem paths or library internals); leaking that gives an
+    # attacker a free oracle for the validator implementation. Keep the
+    # `loc` and `type` fields so the SPA can still map errors to inputs.
     errors = []
     for err in exc.errors():
-        e = dict(err)
-        if "ctx" in e and "error" in e["ctx"]:
-            e["ctx"] = {**e["ctx"], "error": str(e["ctx"]["error"])}
-        errors.append(e)
+        errors.append(
+            {
+                "loc": err.get("loc"),
+                "type": err.get("type"),
+                "msg": err.get("msg", "Invalid value"),
+            }
+        )
     return JSONResponse(status_code=422, content={"detail": errors})
 
 

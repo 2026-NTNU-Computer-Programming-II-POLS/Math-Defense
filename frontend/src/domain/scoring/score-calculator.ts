@@ -1,10 +1,17 @@
+// F-ARCH-3 / B-ARCH-6: the canonical V2 score formula lives in
+// wasm/math_engine.c::compute_total_score. This module computes the s1/s2/k/
+// exponent breakdown locally for the ScoreResultView display, but `totalScore`
+// always comes from `computeTotalScoreWasm` so frontend and the server-side
+// wasmtime-py recomputation agree to the last ULP. When the WASM module
+// hasn't been rebuilt with the new export yet, the bridge's JS fallback
+// runs the same algebra and parity is enforced by
+// shared/score_parity_fixtures.json (consumed by both sides).
+//
 // Design notes:
 //   killValue=0  → totalScore is always 0 (0**x = 0). Zero-kill runs score nothing by design.
 //   costTotal=0  → s2=0, k=0.7*s1 (no-tower penalty). Penalised 30% of s1 by design.
 //   mUsed is a debug field only; the backend anti-cheat verifier does not track it.
-//   pow is routed through WasmBridge so the frontend figure agrees bit-exactly
-//   with the server-side wasmtime-py recomputation (construction plan §8 FU-A).
-import { powerF64 } from '@/math/WasmBridge'
+import { computeTotalScoreWasm } from '@/math/WasmBridge'
 
 export interface ScoreInput {
   killValue: number
@@ -56,7 +63,19 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
   }
   const exponentDenom = Math.max(1, rawExponentDenom)
   const exponent = 1 / exponentDenom
-  const totalScore = powerF64(Math.max(0, k), exponent)
+  // Source-of-truth score lives in WASM (wasm/math_engine.c). The breakdown
+  // above is recomputed locally only because ScoreResultView displays
+  // intermediate fields; the value sent to/verified by the server is the
+  // WASM-derived totalScore.
+  const totalScore = computeTotalScoreWasm(
+    input.killValue,
+    input.timeTotal,
+    prepTimeSum,
+    input.costTotal,
+    input.healthOrigin,
+    input.healthFinal,
+    input.initialAnswer,
+  )
 
   return {
     s1: round4(s1),

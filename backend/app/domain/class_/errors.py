@@ -1,43 +1,43 @@
-"""Class domain errors"""
+"""Class domain errors. Status codes live in app.http_status_map."""
 from app.domain.errors import DomainError
 
 
 class ClassNotFoundError(DomainError):
-    status_code = 404
+    pass
 
 
 class ClassNameInvalidError(DomainError):
-    status_code = 422
+    pass
 
 
 class StudentAlreadyInClassError(DomainError):
-    status_code = 409
+    pass
 
 
 class StudentNotInClassError(DomainError):
-    status_code = 404
+    pass
 
 
 class InvalidJoinCodeError(DomainError):
-    status_code = 404
+    pass
 
 
 class NotClassOwnerError(DomainError):
-    status_code = 403
+    pass
 
 
 # Raised by add_student when the email resolves to no account (404, not 401)
 class StudentEmailNotFoundError(DomainError):
-    status_code = 404
+    pass
 
 
 class NotAStudentError(DomainError):
-    status_code = 400
+    pass
 
 
 class StudentRemovedFromClassError(DomainError):
-    status_code = 403
+    pass
 
 
 class ClassNameConflictError(DomainError):
-    status_code = 409
+    pass

@@ -87,8 +87,6 @@ class AchievementApplicationService:
     ) -> list[UserAchievement]:
         unlocked_ids = {a.achievement_id for a in self._achievement_repo.find_by_user(user_id)}
         stats = self._session_repo.get_cumulative_stats(user_id)
-        seasons_by_id = self._load_seasons()
-        now = datetime.now(UTC)
         newly_unlocked: list[UserAchievement] = []
 
         for d in get_all_defs():
@@ -99,9 +97,22 @@ class AchievementApplicationService:
                 session_star, session_hp_lost, session_gold_remaining,
                 territories_held, territory_max_star,
             ):
+                # B-BUG-11: refresh season state at award time. Holding a
+                # pre-loop snapshot lets two concurrent end_session calls
+                # award the same achievement under different multipliers
+                # if a season toggled mid-loop.
+                seasons_by_id = self._load_seasons()
+                now = datetime.now(UTC)
                 points = self._award_points(d, seasons_by_id, now)
                 achievement = UserAchievement.create(user_id, d.id, points)
-                self._achievement_repo.save(achievement)
+                # B-BUG-3: save() returns False when the unique-constraint
+                # short-circuit fires (concurrent end_session unlocked the
+                # same achievement first). Skipping the append in that case
+                # prevents a double Beta-evidence update and a duplicate
+                # client toast.
+                inserted = self._achievement_repo.save(achievement)
+                if not inserted:
+                    continue
                 newly_unlocked.append(achievement)
                 logger.info(
                     "Achievement unlocked: user=%s achievement=%s points=%d (base=%d)",

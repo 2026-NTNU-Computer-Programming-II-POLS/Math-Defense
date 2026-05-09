@@ -2,9 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { STAR_MIN, STAR_MAX } from '@/data/difficulty-defs'
-import { generateLevel, generateLevelDeterministicFromSeed } from '@/domain/level/level-generator'
-import { mulberry32 } from '@/math/MathUtils'
-import { isUsingWasm, whenWasmReady } from '@/math/WasmBridge'
+import { generate as generateLevelForRun } from '@/services/levelGenerationService'
 import { useAuthStore } from '@/stores/authStore'
 import { recommendationService } from '@/services/recommendationService'
 
@@ -18,10 +16,15 @@ const error = ref<string | null>(null)
 // the user can still pick any star, and dismissal persists across sessions
 // (SDT autonomy: nudging, not gating).
 const suggestedStar = ref<number | null>(null)
-const RECOMMENDATION_DISMISS_KEY = 'recommendation:dismissed'
+// F-BUG-7: namespace per user so a shared device doesn't leak one
+// student's dismiss across logins.
+function dismissKey(): string {
+  const uid = authStore.user?.id ?? '__anon__'
+  return `recommendation:dismissed:${uid}`
+}
 const recommendationDismissed = ref<boolean>(
   typeof localStorage !== 'undefined'
-    && localStorage.getItem(RECOMMENDATION_DISMISS_KEY) === '1',
+    && localStorage.getItem(dismissKey()) === '1',
 )
 const showSuggestion = computed(
   () => suggestedStar.value !== null && !recommendationDismissed.value,
@@ -29,7 +32,7 @@ const showSuggestion = computed(
 function dismissSuggestion() {
   recommendationDismissed.value = true
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(RECOMMENDATION_DISMISS_KEY, '1')
+    localStorage.setItem(dismissKey(), '1')
   }
 }
 
@@ -81,30 +84,7 @@ async function startLevel() {
   error.value = null
   try {
     const seed = Date.now()
-    // construction plan §3.8 — when WASM is ready, generate the level through
-    // the bit-deterministic v2 path. The same seed will be used by ReplayView
-    // (also v2 path) to recreate the identical level on any browser. If WASM
-    // hasn't loaded yet, wait a beat for it; if it still isn't ready, take v1.
-    //
-    // We MUST NOT silently fall back to v1 when the v2 path was attempted but
-    // returned null — useSessionSync tags the resulting session v2 based on
-    // isUsingWasm() at session-create time, so a v1-generated level paired
-    // with a v2 tag would make ReplayView regenerate a *different* level from
-    // the one the player actually played. Throw instead and let the user retry.
-    await whenWasmReady().catch(() => false)
-    let level
-    if (isUsingWasm()) {
-      const v2 = generateLevelDeterministicFromSeed(selectedStar.value, seed)
-      if (!v2) {
-        throw new Error(
-          'Level generation failed — the deterministic engine could not produce a ' +
-          'valid layout for this seed in 400 attempts. Please try again.',
-        )
-      }
-      level = v2
-    } else {
-      level = generateLevel(selectedStar.value, mulberry32(seed))
-    }
+    const { level } = await generateLevelForRun(selectedStar.value, seed)
     router.push({
       name: 'initial-answer',
       state: { level: JSON.stringify(level), seed },

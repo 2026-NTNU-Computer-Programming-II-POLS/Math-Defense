@@ -1,12 +1,12 @@
 """SQLAlchemy implementation of GameSessionRepository"""
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session as DbSession
 
-from app.domain.session.aggregate import GameSession, _stale_cutoff
+from app.domain.session.aggregate import GameSession
 from app.domain.session.repository import CumulativeStats
 from app.domain.value_objects import SessionStatus, Level
 from app.models.game_session import GameSession as GameSessionModel
@@ -42,8 +42,23 @@ class SqlAlchemySessionRepository:
         ).with_for_update().first()
         return self._to_domain(row) if row else None
 
+    def acquire_user_create_lock(self, user_id: str) -> None:
+        # B-BUG-12: serialise concurrent create_session for the same user.
+        # find_active_by_user's row lock is empty until the first row exists,
+        # so 3+ concurrent inserts can all reach the unique partial index and
+        # exhaust the depth-1 retry → RuntimeError("unreachable"). A
+        # transaction-scoped advisory lock keyed on hashtext(user_id) makes
+        # the create path strictly serial per user; auto-released at commit.
+        # No-op on non-PG dialects (legacy tests) — the existing retry covers
+        # the much narrower SQLite race.
+        if self._db.get_bind().dialect.name == "postgresql":
+            self._db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:uid))"),
+                {"uid": user_id},
+            )
+
     def find_stale_sessions(self, user_id: str) -> list[GameSession]:
-        cutoff = datetime.now(UTC) - _stale_cutoff()
+        cutoff = datetime.now(UTC) - timedelta(hours=GameSession._stale_cutoff_hours)
         rows = self._db.query(GameSessionModel).filter(
             GameSessionModel.user_id == user_id,
             GameSessionModel.status == SessionStatus.ACTIVE.value,

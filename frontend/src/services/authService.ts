@@ -1,4 +1,4 @@
-import { api, readCookie, CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './api'
+import { api, readCookie, CSRF_COOKIE_NAME, CSRF_HEADER_NAME, REQUEST_TIMEOUT_MS } from './api'
 
 export interface TokenResponse {
   token_type: string
@@ -63,7 +63,7 @@ export const authService = {
     const csrf = readCookie(CSRF_COOKIE_NAME)
     if (csrf) headers[CSRF_HEADER_NAME] = csrf
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10_000)
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
     return fetch(url, {
       method: 'POST',
       credentials: 'include',

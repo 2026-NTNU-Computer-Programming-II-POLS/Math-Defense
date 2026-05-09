@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from app.domain.errors import (
     DomainValueError,
+    SessionNotActiveError,
     SessionNotFoundError,
 )
 from app.domain.session.events_log import (
@@ -21,6 +22,7 @@ from app.domain.session.events_log import (
     MAX_EVENTS_PER_SESSION,
     ReplayEvent,
 )
+from app.domain.value_objects import SessionStatus
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
@@ -83,15 +85,46 @@ class ReplayApplicationService:
             session = self._session_repo.find_by_id(session_id, user_id)
             if session is None:
                 raise SessionNotFoundError("Session not found")
+            # B-BUG-7: only ACTIVE sessions accept new replay events.
+            # Without this, the owner could splice forged events into a
+            # COMPLETED or ABANDONED session and have them streamed back to
+            # spectators / replayers as if they were part of the original
+            # run.
+            if session.status != SessionStatus.ACTIVE:
+                raise SessionNotActiveError(
+                    "Cannot append events to a non-active session"
+                )
             existing = self._event_repo.count_for_session(session_id)
             if existing + len(events) > MAX_EVENTS_PER_SESSION:
                 raise DomainValueError(
                     f"session event log would exceed cap "
                     f"({MAX_EVENTS_PER_SESSION})"
                 )
+            # B-BUG-7: every seq in the batch must strictly exceed the
+            # current max already on disk. The (session_id, seq) unique
+            # index alone is insufficient: it stops exact replay of the
+            # same seq, but accepts a tampered batch that interleaves
+            # fresh-but-stale numbers (e.g. seq=5 when seq=10 is the latest
+            # legitimate event).
+            current_max = self._event_repo.max_seq_for_session(session_id)
+            min_incoming = min(e.seq for e in events)
+            if min_incoming <= current_max:
+                raise DomainValueError(
+                    f"event seq {min_incoming} is not strictly greater "
+                    f"than recorded max {current_max}"
+                )
             written = self._event_repo.append_batch(session_id, events)
             self._uow.commit()
             return written
+
+    def authorize_spectator(self, session_id: str, user_id: str) -> None:
+        """Owner-only spectator authorization. Raises SessionNotFoundError
+        when the session does not exist or does not belong to the requesting
+        user. Routers must call this before opening a spectate WS rather
+        than running their own ORM query."""
+        session = self._session_repo.find_by_id(session_id, user_id)
+        if session is None:
+            raise SessionNotFoundError("Session not found")
 
     def get_replay(self, session_id: str, user_id: str) -> ReplayBundle:
         """Read-side: return the seed + full event stream for a session.

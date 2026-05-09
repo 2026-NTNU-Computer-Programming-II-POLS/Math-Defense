@@ -31,7 +31,15 @@ class SqlAlchemyRefreshTokenRepository:
             .filter(RefreshToken.token_hash == token_hash)
             .first()
         )
-        if record is None or record.used or record.revoked:
+        if record is None:
+            return None
+        # Reuse detection: a token presented after it has already been
+        # rotated (used) or after revocation indicates either a stolen
+        # cookie or a victim's session being replayed by an attacker.
+        # Treat as compromise and revoke every refresh token for this
+        # user — both lineages die so neither party retains access.
+        if record.used or record.revoked:
+            self.revoke_all_for_user(record.user_id)
             return None
         expires = record.expires_at
         if expires.tzinfo is None:

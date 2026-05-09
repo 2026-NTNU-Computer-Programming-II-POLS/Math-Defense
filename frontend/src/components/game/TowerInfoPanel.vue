@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
+import { gameCommands } from '@/services/gameCommandService'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { TowerType } from '@/data/constants'
 import type { TowerUpgradeSystem } from '@/systems/TowerUpgradeSystem'
@@ -109,7 +110,7 @@ const upgradeInfo = computed(() => {
 function upgrade() {
   const t = tower.value
   if (!t) return
-  gameStore.requestTowerUpgrade(t.id)
+  gameCommands.requestTowerUpgrade(t.id)
 }
 
 function close() {
@@ -128,7 +129,7 @@ function confirmRefund() {
   const t = tower.value
   if (!t) return
   _refundUnsub?.()
-  _refundUnsub = gameStore.requestTowerRefund(t.id, (success) => {
+  _refundUnsub = gameCommands.requestTowerRefund(t.id, (success) => {
     _refundUnsub = null
     confirmingRefund.value = false
     if (success) uiStore.closeBuildPanel()

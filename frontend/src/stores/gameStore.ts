@@ -1,3 +1,22 @@
+/**
+ * gameStore — read-only mirror of Game.state for Vue reactivity (F-ARCH-1).
+ *
+ * Every write into this store originates from an engine event; components
+ * read from it but do NOT issue commands through it. Player-initiated
+ * commands live in `services/gameCommandService.ts`. The RAF-driven
+ * timing/cooldown sync was moved into `useGameLoop`.
+ *
+ * Responsibilities:
+ *   - mirror Game.state into reactive refs via EventBus subscriptions
+ *   - hold derived computeds (isBuilding, hpPercent, activeTime)
+ *   - own the path-panel slice (written by the project-path-panel projection)
+ *   - hold the §12 Star-5 checkpoint between runs
+ *
+ * Non-responsibilities (moved out by F-ARCH-1):
+ *   - issuing commands → gameCommandService
+ *   - RAF loop          → useGameLoop._startTimingMirror
+ *   - reaching into systems (e.g. MontyHallSystem) → gameCommandService
+ */
 import { defineStore } from 'pinia'
 import { ref, reactive, shallowRef, computed } from 'vue'
 import { GamePhase, Events } from '@/data/constants'
@@ -6,7 +25,7 @@ import type { ActiveBuffEntry } from '@/engine/GameState'
 import type { BuffCard } from '@/data/buff-defs'
 import type { PathSegmentView } from '@/engine/projections/project-path-panel'
 import type { CalculusState } from '@/entities/types'
-import type { MontyHallState, MontyHallSystem } from '@/systems/MontyHallSystem'
+import type { MontyHallState } from '@/systems/MontyHallSystem'
 import type { Checkpoint } from '@/domain/level/checkpoint'
 export type { PathSegmentView } from '@/engine/projections/project-path-panel'
 
@@ -59,7 +78,7 @@ export const useGameStore = defineStore('game', () => {
   // Increments on every successful tower upgrade — forces TowerInfoPanel to re-evaluate
   const towerUpgradeTick = ref(0)
 
-  // V2 Spell cooldowns
+  // V2 Spell cooldowns (refreshed by useGameLoop's timing-mirror RAF tick)
   const spellCooldowns = ref<Record<string, number>>({})
 
   // Concrete-fading on Star-1 path rendering (spec §17). Set by GameView
@@ -124,7 +143,6 @@ export const useGameStore = defineStore('game', () => {
     unbindEngine()
     _game = game
     syncFromEngine(game)
-    _startTimingSync()
 
     _unsubscribes = [
       game.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
@@ -206,7 +224,6 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function unbindEngine(): void {
-    _stopTimingSync()
     for (const unsub of _unsubscribes) unsub()
     _unsubscribes = []
     _game = null
@@ -249,58 +266,19 @@ export const useGameStore = defineStore('game', () => {
     activeBuffs.value = [...s.activeBuffs]
   }
 
-  let _timingSyncRaf: number | null = null
-  function _startTimingSync(): void {
-    _stopTimingSync()
-    let frameCount = 0
-    const tick = () => {
-      frameCount++
-      if (_game && frameCount % 30 === 0) {
-        timeTotal.value = _game.state.timeTotal
-        spellCooldowns.value = { ..._game.state.spellCooldowns }
-      }
-      _timingSyncRaf = requestAnimationFrame(tick)
-    }
-    _timingSyncRaf = requestAnimationFrame(tick)
-  }
-  function _stopTimingSync(): void {
-    if (_timingSyncRaf !== null) {
-      cancelAnimationFrame(_timingSyncRaf)
-      _timingSyncRaf = null
-    }
+  /**
+   * Used by useGameLoop's RAF mirror to push timeTotal + spellCooldowns into
+   * reactive state every Nth frame. Keeping the writes here (rather than
+   * letting useGameLoop reach into the refs) preserves the rule that this
+   * file is the only place gameStore state mutates.
+   */
+  function pushTimingTick(timeTotalNow: number, spellCooldownsNow: Record<string, number>): void {
+    timeTotal.value = timeTotalNow
+    spellCooldowns.value = { ...spellCooldownsNow }
   }
 
   function getEngine(): Game | null {
     return _game
-  }
-
-  function requestTowerUpgrade(towerId: string): void {
-    _game?.eventBus.emit(Events.TOWER_UPGRADE, { towerId })
-  }
-
-  function requestTowerRefund(towerId: string, onResult: (success: boolean) => void): () => void {
-    if (!_game) return () => {}
-    const unsub = _game.eventBus.once(Events.TOWER_REFUND_RESULT, ({ success }) => { onResult(success) })
-    _game.eventBus.emit(Events.TOWER_REFUND, { towerId })
-    return unsub
-  }
-
-  function selectBuffCard(cardId: string): void {
-    _game?.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
-  }
-
-  function selectMontyHallDoor(index: number): void {
-    _game?.eventBus.emit(Events.MONTY_HALL_DOOR_SELECTED, index)
-  }
-
-  function decideMontyHallSwitch(doSwitch: boolean): void {
-    _game?.eventBus.emit(Events.MONTY_HALL_SWITCH_DECISION, doSwitch)
-  }
-
-  function finishMontyHall(): void {
-    if (!_game) return
-    const sys = _game.getSystem('montyHall') as MontyHallSystem | undefined
-    sys?.finishEvent(_game)
   }
 
   return {
@@ -315,8 +293,7 @@ export const useGameStore = defineStore('game', () => {
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, isMontyHall, hpPercent, activeTime,
     bindEngine, unbindEngine, syncFromEngine, getEngine,
-    requestTowerUpgrade, requestTowerRefund, selectBuffCard,
-    selectMontyHallDoor, decideMontyHallSwitch, finishMontyHall,
+    pushTimingTick,
     clearCheckpoint, setCheckpoint, markCheckpointRun,
   }
 })

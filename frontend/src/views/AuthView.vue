@@ -72,8 +72,23 @@ function validate(): string {
 }
 
 function getNextPath(): string {
+  // F-BUG-10: the old check (`startsWith('/') && !startsWith('//')`) was
+  // fooled by backslash and unicode variants (`/\\evil.com`, `/%2fevil.com`)
+  // that browsers / vue-router still resolve as a foreign origin. Resolve
+  // through `URL` against the current origin and require an exact origin
+  // match before honouring the redirect target.
   const raw = typeof route.query.next === 'string' ? route.query.next : ''
-  return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
+  if (!raw) return '/'
+  // Reject backslashes outright — they are never a legitimate part of a
+  // same-origin in-app path and only show up in protocol-confusion attacks.
+  if (raw.includes('\\')) return '/'
+  try {
+    const resolved = new URL(raw, window.location.origin)
+    if (resolved.origin !== window.location.origin) return '/'
+    return resolved.pathname + resolved.search + resolved.hash
+  } catch {
+    return '/'
+  }
 }
 
 async function submit(): Promise<void> {

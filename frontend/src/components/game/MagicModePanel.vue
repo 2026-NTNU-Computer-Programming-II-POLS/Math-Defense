@@ -58,6 +58,29 @@ onMounted(async () => {
 const TRIG_RE = /\b(?:sin|cos|tan)\b/
 const LOG_RE = /\b(?:log|ln)\b/
 
+// F-BUG-17: bound user-supplied expressions before parsing. Anything longer
+// or more deeply nested than this isn't a real player input — it's either an
+// accidental paste or a stress probe, and the parser/evaluator can spend
+// significant CPU on pathological inputs (catastrophic backtracking, deep
+// recursion). 256 chars + 16-deep parens easily covers the most elaborate
+// curve students compose in practice.
+const MAX_EXPRESSION_LENGTH = 256
+const MAX_PAREN_DEPTH = 16
+
+function parenDepth(s: string): number {
+  let depth = 0
+  let max = 0
+  for (const ch of s) {
+    if (ch === '(') {
+      depth++
+      if (depth > max) max = depth
+    } else if (ch === ')') {
+      if (depth > 0) depth--
+    }
+  }
+  return max
+}
+
 const placeholder = computed(() => {
   if (trigUnlocked.value) return 'e.g. 2*x^2 + 3*sin(x)  (use * for multiply)'
   return 'e.g. 2*x^2 - x + 5  (use * for multiply)'
@@ -75,6 +98,14 @@ watch(tower, (t) => {
 }, { immediate: true })
 
 function applyFunction() {
+  if (inputExpr.value.length > MAX_EXPRESSION_LENGTH) {
+    error.value = `Expression too long (max ${MAX_EXPRESSION_LENGTH} characters)`
+    return
+  }
+  if (parenDepth(inputExpr.value) > MAX_PAREN_DEPTH) {
+    error.value = `Expression nested too deeply (max ${MAX_PAREN_DEPTH} levels)`
+    return
+  }
   if (!trigUnlocked.value && TRIG_RE.test(inputExpr.value)) {
     error.value = 'Trig functions locked — clear a Star-1 level to unlock'
     return
@@ -148,6 +179,7 @@ function toggleMode(mode: MagicMode) {
           v-model="inputExpr"
           class="fn-field"
           :placeholder="placeholder"
+          :maxlength="MAX_EXPRESSION_LENGTH"
           @keydown.enter="applyFunction"
         />
         <button class="btn apply-btn" @click="applyFunction">Apply</button>

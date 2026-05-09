@@ -107,6 +107,60 @@ double power_f64(double base, double exp) {
 }
 
 /* ══════════════════════════════════════════
+ *  V2 score formula: anti-cheat single source of truth
+ *  ══════════════════════════════════════════
+ *
+ *  Audit F-ARCH-3 / B-ARCH-6: this function is the canonical V2 score
+ *  formula. score-calculator.ts (frontend display) and score_calculator.py
+ *  (backend anti-cheat) both delegate to this via their respective WASM
+ *  bridges. The s1 / s2 / k / exponent breakdown fields the frontend shows
+ *  in ScoreResultView are derived locally, but `totalScore` always comes
+ *  out of this function so server and client agree to the last ULP.
+ *
+ *  When WASM is unavailable (browser fallback / Python without wasmtime),
+ *  the bridge layers re-implement the same algebra in JS / Python and the
+ *  parity test in shared/score_parity_fixtures.json keeps the two paths in
+ *  lock-step. A change to this function MUST be mirrored in both fallbacks
+ *  AND the parity fixtures regenerated.
+ *
+ *  Inputs:
+ *    kill_value, time_total, prep_sum, cost_total
+ *    health_origin, health_final, initial_answer  (initial_answer ∈ {0,1})
+ *  Returns: totalScore (a non-negative double)
+ *
+ *  prep_sum is pre-summed by the caller (TS reduces an array, Python sums
+ *  a list) so the C ABI stays a flat scalar list and the parity fixtures
+ *  don't need to encode variable-length prep arrays.
+ */
+double compute_total_score(double kill_value,
+                           double time_total,
+                           double prep_sum,
+                           double cost_total,
+                           double health_origin,
+                           double health_final,
+                           int initial_answer) {
+    double active_time = time_total - prep_sum;
+    if (active_time < 0.001) active_time = 0.001;
+
+    double s1 = kill_value / active_time;
+    double s2 = (cost_total > 0.0) ? (kill_value / cost_total) : 0.0;
+
+    double k;
+    if (s1 >= s2) {
+        k = 0.7 * s1 + 0.3 * s2;
+    } else {
+        k = 0.5 * s1 + 0.5 * s2;
+    }
+
+    double exponent_denom = 1.0 + (2.0 + health_origin - health_final - (double)initial_answer);
+    if (exponent_denom < 1.0) exponent_denom = 1.0;
+    double exponent = 1.0 / exponent_denom;
+
+    double base = (k < 0.0) ? 0.0 : k;
+    return pow(base, exponent);
+}
+
+/* ══════════════════════════════════════════
  *  Trapezoid-rule integration: Calculus tower
  * ══════════════════════════════════════════ */
 

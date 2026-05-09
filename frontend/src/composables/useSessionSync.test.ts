@@ -122,7 +122,11 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     expect(sessionService.end).toHaveBeenCalledTimes(2)
     const lastCallArgs = vi.mocked(sessionService.end).mock.calls[1]
     expect(lastCallArgs[0]).toBe('sess-abc')
-    expect(lastCallArgs[1]).toMatchObject({ score: 1.0879, kills: 7, waves_survived: 5 })
+    // F-BUG-6: client no longer sends a precomputed `score` field —
+    // backend recomputes from raw inputs (kill_value/time_total/etc.).
+    expect(lastCallArgs[1]).toMatchObject({ kills: 7, waves_survived: 5 })
+    expect(lastCallArgs[1]).not.toHaveProperty('score')
+    expect(lastCallArgs[1]).not.toHaveProperty('total_score')
     expect(sync.sessionId.value).toBeNull()
   })
 
@@ -207,8 +211,10 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     await flushPromises()
     expect(sessionService.end).toHaveBeenCalledTimes(2)
     expect(vi.mocked(sessionService.end).mock.calls[1][1]).toMatchObject({
-      score: 1.0879, kills: 7, waves_survived: 5,
+      kills: 7, waves_survived: 5,
     })
+    expect(vi.mocked(sessionService.end).mock.calls[1][1]).not.toHaveProperty('score')
+    expect(vi.mocked(sessionService.end).mock.calls[1][1]).not.toHaveProperty('total_score')
     expect(sync.sessionId.value).toBeNull()
   })
 

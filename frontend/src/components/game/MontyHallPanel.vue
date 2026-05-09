@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
+import { gameCommands } from '@/services/gameCommandService'
 
 const g = useGameStore()
 const resultTimeout = ref(false)
@@ -53,16 +54,16 @@ function handleKey(e: KeyboardEvent) {
 }
 
 function selectDoor(index: number): void {
-  g.selectMontyHallDoor(index)
+  gameCommands.selectMontyHallDoor(index)
 }
 
 function decideSwitchOrKeep(doSwitch: boolean): void {
-  g.decideMontyHallSwitch(doSwitch)
+  gameCommands.decideMontyHallSwitch(doSwitch)
   resultTimeout.value = true
 }
 
 function close(): void {
-  g.finishMontyHall()
+  gameCommands.finishMontyHall()
   resultTimeout.value = false
 }
 </script>

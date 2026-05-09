@@ -18,7 +18,7 @@ export class ApiError extends Error {
 // Requests over this wall-clock time are aborted. Keeps the UI from hanging
 // indefinitely if the backend disappears; tuned above the slowest expected
 // leaderboard page render and well below any human patience threshold.
-const REQUEST_TIMEOUT_MS = 10_000
+export const REQUEST_TIMEOUT_MS = 10_000
 
 // In dev, leave empty so Vite proxy handles "/api" → backend (vite.config.ts).
 // In prod, set VITE_API_BASE_URL to the backend origin (e.g. https://api.example.com)
@@ -68,17 +68,44 @@ function wait(ms: number, signal?: AbortSignal): Promise<void> {
   })
 }
 
+// F-BUG-16: a 403 with a CSRF-shaped detail means our cookie was missing or
+// stale (server cleared/rotated it). Refetch a safe GET to mint a fresh
+// csrf_token cookie, then retry the original request once.
+// Safe GET that runs through the same /api proxy + CsrfMiddleware path as
+// the original request, so the response will Set-Cookie the csrf_token if
+// it was missing client-side. /api/auth/me is cheap and always handled.
+const CSRF_REFRESH_PATH = '/api/auth/me'
+function looksLikeCsrfReject(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return false
+  if (e.status !== 403) return false
+  const d = (e.detail ?? '').toLowerCase()
+  return d.includes('csrf')
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
   let lastErr: unknown
+  let csrfRefreshed = false
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await requestOnce<T>(path, options)
     } catch (e) {
       lastErr = e
       const method = (options.method ?? 'GET').toUpperCase()
+      // Single-shot CSRF refresh-and-retry. Bypasses the GET-only retry guard
+      // because the original request was rejected pre-server-state-change, so
+      // re-issuing it is safe even for unsafe methods.
+      if (
+        !csrfRefreshed
+        && UNSAFE_METHODS.has(method)
+        && looksLikeCsrfReject(e)
+      ) {
+        csrfRefreshed = true
+        try { await requestOnce<unknown>(CSRF_REFRESH_PATH) } catch { /* best effort */ }
+        continue
+      }
       if (attempt < MAX_RETRIES && shouldRetry(method, e)) {
         // Exponential backoff with a small jitter to decorrelate concurrent
         // retries from different tabs/components.

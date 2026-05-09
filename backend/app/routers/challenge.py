@@ -98,6 +98,11 @@ def get_challenge(
     _user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Read-by-id is intentionally open to any authenticated user: the
+    # share model for challenges is "teacher pastes the deep link" so any
+    # student handed the link must resolve it. The IDs are 128-bit UUIDs
+    # so enumeration is not feasible (B-SEC-8). Do not add a teacher-only
+    # gate here without first replacing the deep-link sharing flow.
     challenge = build_challenge_service(db).get(challenge_id)
     return _challenge_out(challenge)
 

@@ -36,9 +36,12 @@ export interface SessionOut {
 }
 
 export interface SessionEndPayload {
-  score: number
   kills: number
   waves_survived: number
+  // Raw inputs the backend uses to recompute the canonical score. The client
+  // intentionally does NOT send a precomputed `score` / `total_score` — the
+  // server is the sole authority on scoring, otherwise a Burp-replay attack
+  // (or a backend-recompute bug) would let the client value win.
   kill_value?: number
   cost_total?: number
   time_total?: number
@@ -46,7 +49,6 @@ export interface SessionEndPayload {
   health_final?: number
   time_exclude_prepare?: number[]
   n_prep_phases?: number
-  total_score?: number
 }
 
 export const sessionService = {

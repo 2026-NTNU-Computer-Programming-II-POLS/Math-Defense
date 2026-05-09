@@ -7,6 +7,8 @@ import secrets
 from datetime import datetime, timedelta, UTC
 from typing import TYPE_CHECKING
 
+import zxcvbn
+
 from app.domain.errors import (
     ConstraintViolationError,
     AccountDisabledError,
@@ -50,6 +52,22 @@ _MFA_CHALLENGE_TTL_MINUTES = 5
 # (3 × 30 s = 90 s). Reject any code within this window of the last accepted
 # one to prevent replay attacks on intercepted TOTP codes.
 _TOTP_REPLAY_WINDOW_SECS = 90
+
+
+def _assert_password_strength(password: str) -> None:
+    """zxcvbn dictionary/entropy check.
+
+    Lives in the application layer (B-ARCH-18) so it runs after slowapi's
+    per-route rate limiter rather than inside Pydantic validation, where it
+    would be a free DoS lever (zxcvbn is ~10–50ms per call). The cheap
+    structural checks (length, character classes) remain in the schema so
+    obviously bad inputs are rejected without paying for the dictionary
+    lookup.
+    """
+    result = zxcvbn.zxcvbn(password)
+    if result["score"] < 2:
+        feedback = result["feedback"]["warning"] or "Password is too weak or common."
+        raise DomainValueError(f"Password is too weak: {feedback}")
 
 
 class AuthApplicationService:
@@ -103,8 +121,17 @@ class AuthApplicationService:
         except ValueError:
             raise DomainValueError(f"Invalid role: {role}. Must be one of: admin, teacher, student")
 
+        _assert_password_strength(password)
         password_hash = hash_password(password)
         with self._uow:
+            # B-SEC-17 trade-off: this surfaces account existence to a
+            # registrant who guesses an email. For a school math game the
+            # risk is Low (no financial value, emails are typically
+            # institutional and known). Fully fixing it would require a
+            # silent-success-with-email flow (send "you already have an
+            # account" to the existing address, return generic success to
+            # the form) which is a UX-level redesign. Keep the explicit
+            # message for clearer failure diagnosis until that lands.
             if self._user_repo.find_by_email(email_vo.value):
                 raise DomainValueError("Email already registered")
             user = User.create(
@@ -239,6 +266,13 @@ class AuthApplicationService:
         with self._uow:
             user_id = self._refresh_token_repo.consume(token_hash)
             if user_id is None:
+                # consume() may have detected reuse and called
+                # revoke_all_for_user(). That mutation must persist even on
+                # the error path — without this commit the UoW exits via
+                # the exception and rolls back the family-revocation,
+                # defeating B-SEC-1. Empty commits are no-ops, so it's
+                # safe to commit when no reuse was detected either.
+                self._uow.commit()
                 raise InvalidTokenError("Refresh token is invalid or expired")
             user = self._user_repo.find_by_id(user_id)
             if user is None:
@@ -253,6 +287,7 @@ class AuthApplicationService:
     # ── Profile mutations ───────────────────────────────────────────────────
 
     def change_password(self, user_id: str, current_password: str, new_password: str) -> None:
+        _assert_password_strength(new_password)
         with self._uow:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
@@ -262,24 +297,41 @@ class AuthApplicationService:
             user.password_hash = hash_password(new_password)
             user.password_version += 1
             self._user_repo.save(user)
+            # Bumping password_version invalidates outstanding access tokens
+            # via the `pv` claim; refresh tokens carry no claim so they must
+            # be revoked explicitly. Without this an attacker who already
+            # holds a refresh cookie can mint a new access token after the
+            # legitimate user has changed their password.
+            if self._refresh_token_repo is not None:
+                self._refresh_token_repo.revoke_all_for_user(user.id)
             self._uow.commit()
 
     def update_player_name(self, user_id: str, player_name: str) -> User:
+        # B-BUG-19: route through the aggregate so length / non-empty
+        # validation lives next to the invariant rather than at the schema
+        # edge. Direct attribute mutation would bypass these rules.
         with self._uow:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
                 raise UserNotFoundError("User not found")
-            user.player_name = player_name
+            try:
+                user.rename(player_name)
+            except ValueError as e:
+                raise DomainValueError(str(e)) from e
             self._user_repo.save(user)
             self._uow.commit()
         return user
 
     def update_avatar(self, user_id: str, avatar_url: str | None) -> User:
+        # B-BUG-19: route through the aggregate (see update_player_name).
         with self._uow:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
                 raise UserNotFoundError("User not found")
-            user.avatar_url = avatar_url
+            try:
+                user.update_avatar(avatar_url)
+            except ValueError as e:
+                raise DomainValueError(str(e)) from e
             self._user_repo.save(user)
             self._uow.commit()
         return user
@@ -356,8 +408,15 @@ class AuthApplicationService:
             self._user_repo.save(user)
             self._uow.commit()
 
-    def disable_mfa(self, user_id: str, current_password: str) -> None:
-        """Disable MFA after verifying the current password."""
+    def disable_mfa(self, user_id: str, current_password: str, code: str) -> None:
+        """Disable MFA after verifying password + a fresh TOTP code.
+
+        Requiring step-up TOTP raises the bar for an attacker who has
+        already cleared MFA on a single login: they must still produce a
+        live code from the authenticator they don't control. Without this,
+        password alone disables MFA, which collapses the protection we
+        rely on after a credential leak.
+        """
         with self._uow:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
@@ -366,10 +425,21 @@ class AuthApplicationService:
                 raise MFANotSetupError("MFA is not enabled for this account")
             if not verify_password(current_password, user.password_hash):
                 raise InvalidCredentialsError("Current password is incorrect")
+            if not user.totp_secret or not totp_utils.verify_code(user.totp_secret, code):
+                raise InvalidMFACodeError("Invalid TOTP code")
+            now = datetime.now(UTC)
+            if user.totp_last_used_at is not None:
+                if (now - user.totp_last_used_at).total_seconds() < _TOTP_REPLAY_WINDOW_SECS:
+                    raise InvalidMFACodeError("TOTP code already used — wait for the next window")
+            user.totp_last_used_at = now
             user.mfa_enabled = False
             user.totp_secret = None
-            user.totp_last_used_at = None
             self._user_repo.save(user)
+            # Same rationale as change_password: outstanding refresh
+            # tokens survive an MFA disable and would let an attacker who
+            # captured cookies retain access. Kill them all.
+            if self._refresh_token_repo is not None:
+                self._refresh_token_repo.revoke_all_for_user(user.id)
             self._uow.commit()
 
     def verify_mfa_challenge(self, mfa_token: str, code: str) -> tuple[User, str, str]:
@@ -399,6 +469,15 @@ class AuthApplicationService:
         with self._uow:
             user.totp_last_used_at = now
             self._user_repo.save(user)
+            # B-BUG-1: deny the MFA challenge JTI atomically with success.
+            # Without this, the same challenge token plus a fresh TOTP code
+            # within the 5-minute TTL produces another full token pair —
+            # a complete MFA bypass. The denylist row is committed in the
+            # same UoW as the totp_last_used_at update so a partial commit
+            # cannot leave the JTI usable.
+            if jti:
+                exp = payload.get("exp", 0)
+                self._token_denylist.deny(jti, float(exp))
             refresh_token = self._issue_refresh_token(user.id)
             self._uow.commit()
         access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})

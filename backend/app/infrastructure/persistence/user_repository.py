@@ -39,7 +39,12 @@ class SqlAlchemyUserRepository:
     def find_by_role_paginated(self, role: Role, offset: int, limit: int) -> tuple[list[User], int]:
         q = self._db.query(UserModel).filter(UserModel.role == role.value)
         total = q.count()
-        rows = q.order_by(UserModel.created_at.desc()).offset(offset).limit(limit).all()
+        # B-BUG-13: append .id as a tiebreaker so identical created_at
+        # timestamps (bulk seeds) cannot duplicate / skip rows across pages.
+        rows = (
+            q.order_by(UserModel.created_at.desc(), UserModel.id.asc())
+            .offset(offset).limit(limit).all()
+        )
         return [self._to_domain(r) for r in rows], total
 
     def save(self, user: User) -> None:

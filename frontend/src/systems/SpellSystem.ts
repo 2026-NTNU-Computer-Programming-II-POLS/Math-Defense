@@ -49,8 +49,8 @@ export class SpellSystem implements GameSystem {
       if (x < GRID_MIN_X || x > GRID_MAX_X || y < GRID_MIN_Y || y > GRID_MAX_Y) return
     }
 
-    game.changeGold(-def.cost)
-    game.addCost(def.cost)
+    game.economy.changeGold(-def.cost)
+    game.economy.addCost(def.cost)
     game.state.spellCooldowns[spellId] = def.cooldown
 
     let hitCount = 0
@@ -73,8 +73,8 @@ export class SpellSystem implements GameSystem {
 
     // S-8: refund AoE cost when no enemies were in range
     if (hitCount === 0 && def.radius !== undefined) {
-      game.changeGold(def.cost)
-      game.addCost(-def.cost)
+      game.economy.changeGold(def.cost)
+      game.economy.addCost(-def.cost)
       game.state.spellCooldowns[spellId] = 0
       return
     }

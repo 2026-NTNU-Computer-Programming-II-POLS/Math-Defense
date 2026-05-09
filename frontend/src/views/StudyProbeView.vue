@@ -12,7 +12,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/services/api'
 import { PROBE_FORMS_DEFAULT, isProbeForm } from '@/views/study-helpers'
-import { PROBE_FORM_LABEL, PROBE_ITEMS, type ProbeForm } from '@/data/probe-items'
+import { PROBE_FORM_LABEL, PROBE_ITEMS, type ProbeForm } from '@/domain/study/probe-items'
 import { studyService } from '@/services/studyService'
 
 const route = useRoute()

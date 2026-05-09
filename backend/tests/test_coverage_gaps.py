@@ -90,7 +90,7 @@ class TestGetSessionStalePath:
         # First call should hit the stale branch and 410 out
         res = client.patch(
             f"/api/sessions/{sid}",
-            json={"gold": 500},
+            json={"score": 500},
             headers=_auth(token),
         )
         assert res.status_code == 410
@@ -108,7 +108,7 @@ class TestGetSessionStalePath:
         # update_progress raises SessionNotActiveError → 409 (not 410 again).
         res2 = client.patch(
             f"/api/sessions/{sid}",
-            json={"gold": 500},
+            json={"score": 500},
             headers=_auth(token),
         )
         assert res2.status_code == 409

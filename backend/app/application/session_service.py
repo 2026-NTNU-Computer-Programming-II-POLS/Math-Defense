@@ -10,6 +10,7 @@ from app.domain.errors import (
     ConstraintViolationError,
     PersistenceError,
     ReplayMismatchError,
+    ReplayUnavailableError,
     SessionNotFoundError,
     SessionStaleError,
     Star5LockedError,
@@ -17,18 +18,25 @@ from app.domain.errors import (
 from app.domain.value_objects import Level, Score, GameResult, SessionStatus
 from app.domain.session.aggregate import GameSession
 from app.domain.session.events import SessionCompleted
-from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.scoring.score_calculator import recompute_total_score
-from app.infrastructure.wasm_runtime import get_pow_fn, is_wasm_loaded
+from app.infrastructure.wasm_runtime import get_pow_fn, get_total_score_fn, is_wasm_loaded
 if TYPE_CHECKING:
     from app.application.achievement_service import AchievementApplicationService
     from app.application.assessment_service import AssessmentApplicationService
     from app.application.ports import UnitOfWork
     from app.domain.challenge.repository import ChallengeRepository
+    from app.domain.session.events_log import ReplayEventRepository
     from app.domain.session.repository import GameSessionRepository
     from app.domain.leaderboard.repository import LeaderboardRepository
     from app.domain.territory.repository import TerritoryRepository
     from app.domain.user.repository import UserRepository
+
+
+# B-BUG-8: event_type strings emitted by the EventRecorder for wave boundaries
+# (kept in sync with frontend/src/data/constants.ts). Used to derive an
+# authoritative waves_survived count from the persisted event log so the
+# value submitted at end_session cannot be inflated by a tampered client.
+_WAVE_END_EVENT_TYPE = "waveEnd"
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +79,7 @@ class SessionApplicationService:
         assessment_svc: AssessmentApplicationService | None = None,
         user_repo: UserRepository | None = None,
         challenge_repo: ChallengeRepository | None = None,
+        event_repo: "ReplayEventRepository | None" = None,
     ) -> None:
         self._session_repo = session_repo
         self._leaderboard_repo = leaderboard_repo
@@ -83,6 +92,30 @@ class SessionApplicationService:
         # without challenges. End-session validates the wave_count override only
         # when this dependency is present.
         self._challenge_repo = challenge_repo
+        # B-BUG-8: when present, end_session derives waves_survived from the
+        # recorded event log rather than the client-supplied value. Optional
+        # so unit tests can construct the service without §24 wiring; in
+        # those cases end_session falls back to the existing per-level caps.
+        self._event_repo = event_repo
+        # B-ARCH-4: side-effects (leaderboard / achievements / assessment) live
+        # behind an event bus so this service stays a thin lifecycle module.
+        from app.application.session_event_handlers import (
+            AchievementCheckHandler,
+            AssessmentEventHandler,
+            IaAccuracyRefreshHandler,
+            LeaderboardInsertHandler,
+            SessionEventBus,
+        )
+        self._event_bus = SessionEventBus(
+            leaderboard_handler=LeaderboardInsertHandler(leaderboard_repo, uow),
+            achievement_handler=AchievementCheckHandler(
+                achievement_svc, session_repo, territory_repo, uow,
+            ),
+            assessment_handler=AssessmentEventHandler(assessment_svc),
+            ia_accuracy_handler=IaAccuracyRefreshHandler(
+                session_repo, user_repo, uow,
+            ),
+        )
 
     def create_session(
         self,
@@ -123,6 +156,10 @@ class SessionApplicationService:
         replay_version: int = 1,
     ) -> GameSession:
         with self._uow:
+            # B-BUG-12: per-user advisory lock at the very top of the
+            # transaction so concurrent creates serialise instead of racing
+            # the unique partial index and burning through the retry budget.
+            self._session_repo.acquire_user_create_lock(user_id)
             # 0. Star-5 personal lock (Habgood & Ainsworth 2011): the user must
             # have completed the Initial-Answer phase correctly at any star
             # rating at least once before Star-5 becomes selectable. Teacher-
@@ -164,18 +201,18 @@ class SessionApplicationService:
         session_id: str,
         user_id: str,
         current_wave: int | None = None,
-        gold: int | None = None,
-        hp: int | None = None,
         score: int | None = None,
         kill_value: int | None = None,
         cost_total: int | None = None,
     ) -> GameSession:
+        # B-BUG-17: gold/hp are no longer passable from HTTP callers. The
+        # aggregate's update_progress still accepts them for future
+        # server-side derivation from the replay event log, but the client
+        # cannot drive them.
         with self._uow:
             session = self._get_session(session_id, user_id)
             session.update_progress(
                 current_wave=current_wave,
-                gold=gold,
-                hp=hp,
                 score=score,
                 kill_value=kill_value,
                 cost_total=cost_total,
@@ -217,15 +254,33 @@ class SessionApplicationService:
                     kills=session.kills,
                     waves_survived=session.waves_survived,
                     total_score=session.total_score,
+                    challenge_id=session.challenge_id,
+                    practice_mode=session.practice_mode,
                 )
                 try:
-                    with self._uow:
-                        self._handle_session_completed(catch_up)
-                        self._uow.commit()
+                    self._event_bus.replay_leaderboard(catch_up)
                 except PersistenceError:
                     logger.exception("leaderboard catch-up failed session=%s", session.id)
                 return EndSessionResult(session=session, newly_unlocked=[])
             self._ensure_not_stale_or_abandon(session)
+            # B-BUG-8: derive waves_survived from the persisted event log
+            # rather than trusting the client. The recorder emits a
+            # ``waveEnd`` event on every wave boundary; counting them gives
+            # the server an authoritative value that survives any tampering
+            # at the end_session edge. Kills aren't recorded in the event
+            # stream by design (see EventRecorder docstring — output events
+            # are derivable from input + seed and would 10–100× the log
+            # size), so the per-level cap enforced inside session.complete()
+            # remains the kill-side defense. Falls back to the client value
+            # only when the event_repo dep is absent (legacy unit tests).
+            authoritative_waves = self._derive_waves_from_events(session.id)
+            if authoritative_waves is not None:
+                if waves_survived > authoritative_waves:
+                    logger.warning(
+                        "waves_survived inflated session=%s submitted=%d derived=%d",
+                        session.id, waves_survived, authoritative_waves,
+                    )
+                waves_survived = authoritative_waves
             result = GameResult(
                 score=Score(score),
                 kills=kills,
@@ -251,12 +306,11 @@ class SessionApplicationService:
             self._verify_score(session)
             self._session_repo.save(session)
 
-            # Recompute the rolling-10 IA accuracy and persist it on the user
-            # aggregate so the next level start can drive concrete-fading on
-            # the path renderer (spec §17). Lives in the same UoW as the
-            # session save: if it fails, the whole end_session is retried via
-            # the COMPLETED-status idempotent path on the next attempt.
-            self._refresh_ia_recent_accuracy(user_id)
+            # Rolling-10 IA accuracy is recomputed by IaAccuracyRefreshHandler
+            # post-commit (B-ARCH-19) so the cross-aggregate User write does
+            # not live inside the session use case. The handler is idempotent,
+            # so end_session's COMPLETED-status retry path still re-converges
+            # the user's ia_recent_accuracy on transient failures.
 
             # Snapshot events and backfill total_score now that _verify_score has
             # set the authoritative value. The aggregate emits SessionCompleted
@@ -266,6 +320,12 @@ class SessionApplicationService:
                 if isinstance(e, SessionCompleted) else e
                 for e in session.collect_events()
             ]
+            # B-BUG-14: drain the event buffer now that we've snapshotted it.
+            # Without this the aggregate retains processed events; harmless
+            # today (we never read collect_events twice on the same instance)
+            # but latches the moment any aggregate cache lets the same
+            # GameSession instance be reused — events would re-dispatch.
+            session.clear_events()
 
             self._uow.commit()
             logger.info(
@@ -275,8 +335,8 @@ class SessionApplicationService:
 
         # Post-commit dispatch: session completion is now durable. Handler runs
         # in a separate UoW so a leaderboard-insert failure cannot roll back the
-        # already-committed session. Idempotency in _handle_session_completed
-        # makes retries (via end_session catch-up or background sweeper) safe.
+        # already-committed session. Handler idempotency makes retries
+        # (via end_session catch-up or background sweeper) safe.
         newly_unlocked = self._dispatch_post_commit(pending_events)
         newly_unlocked_dicts = [
             {"id": a.achievement_id, "talent_points": a.talent_points}
@@ -285,76 +345,18 @@ class SessionApplicationService:
         return EndSessionResult(session=session, newly_unlocked=newly_unlocked_dicts)
 
     def _dispatch_post_commit(self, events: list) -> list:
-        newly_unlocked: list = []
-        for event in events:
-            if not isinstance(event, SessionCompleted):
-                continue
-            try:
-                with self._uow:
-                    self._handle_session_completed(event)
-                    self._uow.commit()
-            except PersistenceError:
-                logger.exception(
-                    "post-commit dispatch failed session=%s", event.session_id
-                )
-            unlocked: list = []
-            try:
-                unlocked = self._check_achievements(event)
-                newly_unlocked.extend(unlocked)
-            except Exception:
-                logger.exception(
-                    "achievement check failed session=%s", event.session_id
-                )
-            # Stealth-assessment update (Pedagogical_Backlog_Spec.md §8): each
-            # newly-unlocked achievement is positive evidence for the
-            # competencies its Q-matrix row loads on. Failures here must not
-            # roll back the achievement insert — the assessment service runs
-            # in its own UoW for that reason.
-            try:
-                self._record_assessment_events(event.user_id, unlocked)
-            except Exception:
-                logger.exception(
-                    "assessment update failed session=%s", event.session_id
-                )
-        return newly_unlocked
+        # B-ARCH-4: dispatch is delegated to SessionEventBus so this service
+        # owns lifecycle only. Each handler runs in its own UoW; failures are
+        # logged per-handler and never roll back the (already durable)
+        # session row. A future outbox table inside the same UoW as the
+        # session save would replace this best-effort dispatch.
+        return self._event_bus.dispatch(events)
 
-    def _record_assessment_events(self, user_id: str, unlocked: list) -> None:
-        if not self._assessment_svc or not unlocked:
-            return
-        events = [(a.achievement_id, True) for a in unlocked]
-        self._assessment_svc.record_events(user_id, events)
-
-    def _check_achievements(self, event: SessionCompleted) -> list:
-        if not self._achievement_svc:
-            return []
-        with self._uow:
-            from app.shared_constants import INITIAL_HP
-            session = self._session_repo.find_by_id(event.session_id, event.user_id)
-            if not session:
-                logger.warning("Session %s not found for achievement check; skipping", event.session_id)
-                return []
-            origin_hp = session.health_origin if session.health_origin is not None else INITIAL_HP
-            final_hp = session.health_final if session.health_final is not None else session.hp
-            hp_lost = max(0, origin_hp - final_hp)
-            gold_remaining = session.gold
-            territories_held = 0
-            territory_max_star = 0
-            if self._territory_repo:
-                territories_held = self._territory_repo.count_territories_by_student(event.user_id)
-                territory_max_star = self._territory_repo.find_max_star_for_student(event.user_id)
-            result = self._achievement_svc.check_and_unlock(
-                user_id=event.user_id,
-                session_score=event.score,
-                session_kills=event.kills,
-                session_waves=event.waves_survived,
-                session_star=event.level,
-                session_hp_lost=hp_lost,
-                session_gold_remaining=gold_remaining,
-                territories_held=territories_held,
-                territory_max_star=territory_max_star,
-            )
-            self._uow.commit()
-        return result
+    def has_correct_ia_session(self, user_id: str) -> bool:
+        """Star-5 personal-unlock predicate. Routers that need to render
+        the IA-unlock state on /auth/me consume this rather than reaching
+        into the session repository directly."""
+        return self._session_repo.has_correct_ia_session(user_id)
 
     def get_active_for_user(self, user_id: str) -> GameSession | None:
         """Return the caller's active session, if any.
@@ -422,35 +424,25 @@ class SessionApplicationService:
             self._uow.commit()
             return session
 
-    def _handle_session_completed(self, event: SessionCompleted) -> None:
-        """Handle session completed event — auto-create leaderboard entry (idempotent).
+    def _derive_waves_from_events(self, session_id: str) -> int | None:
+        """Count ``waveEnd`` events in the replay log for ``session_id``.
 
-        Practice-mode sessions (Backlog §20) are excluded from the global
-        leaderboard. The session row stays authoritative; we just don't emit
-        a LeaderboardEntry for it.
+        Returns ``None`` when the event_repo dep is not wired (legacy
+        construction in unit tests). Errors fall through as None — the
+        deriver is a defense-in-depth check, not a hard requirement, so a
+        replay-log read failure must not break end_session.
         """
-        # Re-read the session to learn whether the run was practice_mode. The
-        # event payload is the public domain message and we keep that surface
-        # narrow rather than threading practice_mode through every consumer.
-        session = self._session_repo.find_by_id(event.session_id, event.user_id)
-        if session is not None and session.practice_mode:
-            return
-        existing = self._leaderboard_repo.find_by_session_id(event.session_id)
-        if existing:
-            return
-        entry = LeaderboardEntry.create_from_session(
-            user_id=event.user_id,
-            level=event.level,
-            score=event.score,
-            kills=event.kills,
-            waves_survived=event.waves_survived,
-            session_id=event.session_id,
-            # Backlog §23 — read from the server-side session aggregate, not
-            # the event payload, so a tampered end-payload cannot misroute the
-            # entry into a challenge ranking it doesn't belong to.
-            challenge_id=session.challenge_id if session is not None else None,
-        )
-        self._leaderboard_repo.save(entry)
+        if self._event_repo is None:
+            return None
+        try:
+            events = self._event_repo.list_for_session(session_id)
+        except Exception:
+            logger.exception(
+                "failed reading event log for waves_survived derivation session=%s",
+                session_id,
+            )
+            return None
+        return sum(1 for e in events if e.event_type == _WAVE_END_EVENT_TYPE)
 
     def _challenge_wave_cap(self, challenge_id: str | None) -> int | None:
         """Look up the wave_count for a challenge, or None when no challenge
@@ -506,6 +498,7 @@ class SessionApplicationService:
             health_final=session.health_final,
             initial_answer=session.initial_answer,
             pow_fn=get_pow_fn(),
+            total_score_fn=get_total_score_fn(),
         )
         if recomputed is None:
             if session.total_score is not None:
@@ -518,6 +511,16 @@ class SessionApplicationService:
         submitted = session.total_score
         if submitted is not None:
             replay_version = getattr(session, "replay_version", 1) or 1
+            # B-BUG-15: fail closed on v2 when the WASM runtime is missing.
+            # Falling back to Python pow at the v1 ε would silently weaken
+            # v2's bit-equal acceptance contract; instead we surface 503 so
+            # the operator sees the misconfiguration and the client retries.
+            if replay_version >= 2 and not is_wasm_loaded():
+                logger.error(
+                    "replay_unavailable v2 session=%s wasm_runtime not loaded",
+                    session.id,
+                )
+                raise ReplayUnavailableError()
             strict = replay_version >= 2 and is_wasm_loaded()
             # Frontend rounds totalScore to 4 decimal places; even in strict
             # mode we must absorb the rounding step or every legitimate v2
@@ -537,21 +540,6 @@ class SessionApplicationService:
                     session.id, submitted, recomputed,
                 )
         session.override_total_score(recomputed)
-
-    def _refresh_ia_recent_accuracy(self, user_id: str) -> None:
-        """Recompute and persist the rolling-10 IA accuracy on the user.
-
-        Runs inside the same UoW as session.save so the value lands together
-        with the just-completed session row. The user_repo dependency is
-        optional — if absent, we skip silently (e.g. service constructed in
-        a unit test without a user_repo)."""
-        if self._user_repo is None:
-            return
-        user = self._user_repo.find_by_id(user_id)
-        if user is None:
-            return
-        user.ia_recent_accuracy = self._session_repo.compute_ia_recent_accuracy(user_id)
-        self._user_repo.save(user)
 
     def _abandon_and_commit(self, session: GameSession) -> None:
         session.abandon()

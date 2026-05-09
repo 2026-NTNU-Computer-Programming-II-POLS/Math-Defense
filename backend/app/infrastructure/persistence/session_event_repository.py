@@ -52,6 +52,16 @@ class SqlAlchemySessionEventRepository:
             )
         ) or 0
 
+    def max_seq_for_session(self, session_id: str) -> int:
+        # -1 sentinel rather than 0 so a brand-new session whose first event
+        # has seq=0 still satisfies the strict-monotonic gate.
+        result = self._db.scalar(
+            select(func.max(SessionEvent.seq)).where(
+                SessionEvent.session_id == session_id,
+            )
+        )
+        return -1 if result is None else int(result)
+
     def list_for_session(self, session_id: str) -> list[ReplayEvent]:
         rows = self._db.execute(
             select(SessionEvent)

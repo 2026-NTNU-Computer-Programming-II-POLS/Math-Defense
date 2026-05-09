@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from app.domain.class_.aggregate import Class, ClassMembership, RemovedMembership
@@ -21,8 +23,21 @@ from app.domain.user.value_objects import Role
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
     from app.domain.class_.repository import ClassRepository
+    from app.domain.session.repository import GameSessionRepository
     from app.domain.territory.repository import TerritoryRepository
     from app.domain.user.repository import UserRepository
+
+
+@dataclass(frozen=True)
+class ClassReflectionView:
+    """Read-side projection: one student reflection in a class roster."""
+    session_id: str
+    student_id: str
+    student_name: str
+    star_rating: int
+    score: int
+    reflection_text: str
+    ended_at: datetime | None
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +53,14 @@ class ClassApplicationService:
         user_repo: UserRepository,
         uow: UnitOfWork,
         territory_repo: TerritoryRepository | None = None,
+        session_repo: "GameSessionRepository | None" = None,
     ) -> None:
         self._class_repo = class_repo
         self._user_repo = user_repo
         self._uow = uow
         self._territory_repo = territory_repo
+        # Optional so unit tests can construct without §17 reflection wiring.
+        self._session_repo = session_repo
 
     def _get_class_or_raise(self, class_id: str) -> Class:
         cls_ = self._class_repo.find_by_id(class_id)
@@ -169,6 +187,41 @@ class ClassApplicationService:
         student_ids = [m.student_id for m in memberships]
         users = {u.id: u for u in self._user_repo.find_by_ids(student_ids)}
         return [(m, users.get(m.student_id)) for m in memberships]
+
+    def list_class_reflections(
+        self,
+        class_id: str,
+        requester_id: str,
+        requester_role: Role,
+        limit: int = 100,
+    ) -> list[ClassReflectionView]:
+        """Roster + recent reflections for a class. Ownership-checked via
+        list_students_with_users; returns an empty list when the class has
+        no students or no reflections yet."""
+        if self._session_repo is None:
+            raise RuntimeError("session_repo dependency required for reflections view")
+        pairs = self.list_students_with_users(class_id, requester_id, requester_role)
+        student_users = {m.student_id: u for m, u in pairs}
+        if not student_users:
+            return []
+        sessions = self._session_repo.find_reflections_for_users(
+            list(student_users.keys()), limit=limit,
+        )
+        return [
+            ClassReflectionView(
+                session_id=s.id,
+                student_id=s.user_id,
+                student_name=(
+                    student_users[s.user_id].player_name
+                    if student_users.get(s.user_id) else ""
+                ),
+                star_rating=int(s.level),
+                score=s.score,
+                reflection_text=s.reflection_text or "",
+                ended_at=s.ended_at,
+            )
+            for s in sessions
+        ]
 
     def join_by_code(self, code: str, student_id: str, student_role: Role = Role.STUDENT) -> ClassMembership:
         if student_role != Role.STUDENT:

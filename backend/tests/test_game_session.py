@@ -189,16 +189,16 @@ def test_update_session(client):
     token = _register_and_token(client, "sess_update")
     session_id = _create_session(client, token).json()["id"]
 
+    # B-BUG-17: gold/hp are no longer accepted from clients (must derive from
+    # the replay event log). PATCH only carries the safe fields.
     res = client.patch(
         f"/api/sessions/{session_id}",
-        json={"current_wave": 3, "gold": 500, "hp": 80, "score": 1200},
+        json={"current_wave": 3, "score": 1200},
         headers=_auth_headers(token),
     )
     assert res.status_code == 200
     data = res.json()
     assert data["current_wave"] == 3
-    assert data["gold"] == 500
-    assert data["hp"] == 80
     assert data["score"] == 1200
 
 
@@ -215,7 +215,7 @@ def test_update_ended_session_returns_409(client):
 
     res = client.patch(
         f"/api/sessions/{session_id}",
-        json={"gold": 999},
+        json={"score": 999},
         headers=_auth_headers(token),
     )
     assert res.status_code == 409
@@ -225,7 +225,7 @@ def test_update_nonexistent_session(client):
     token = _register_and_token(client, "sess_update_404")
     res = client.patch(
         "/api/sessions/00000000-0000-0000-0000-000000000000",
-        json={"gold": 100},
+        json={"score": 100},
         headers=_auth_headers(token),
     )
     assert res.status_code == 404
@@ -375,7 +375,7 @@ def test_cannot_update_other_users_session(client):
 
     res = client.patch(
         f"/api/sessions/{session_id}",
-        json={"gold": 9999},
+        json={"score": 9999},
         headers=_auth_headers(token2),
     )
     assert res.status_code == 404

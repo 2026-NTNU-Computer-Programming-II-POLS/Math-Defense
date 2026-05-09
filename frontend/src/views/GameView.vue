@@ -6,7 +6,7 @@ import { useUiStore } from '@/stores/uiStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useGameLoop } from '@/composables/useGameLoop'
 import { useKeyboardPlacement } from '@/composables/useKeyboardPlacement'
-import { GamePhase } from '@/data/constants'
+import { GamePhase, CANVAS_WIDTH, CANVAS_HEIGHT } from '@/data/constants'
 import { formatScore } from '@/utils/formatters'
 import { iaAccuracyToLabelOpacity } from '@/math/curve-renderer'
 
@@ -113,10 +113,14 @@ function navigateAfterLoss(): void {
 // Warn before navigating away mid-game (progress would be lost).
 // beforeEnter on the game route already blocks entry without level data,
 // so _generatedLevel is always non-null here.
-onBeforeRouteLeave(() => {
+onBeforeRouteLeave(async () => {
   const activePhases: GamePhase[] = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
   if (activePhases.includes(gameStore.phase)) {
-    return window.confirm('Leave the game? Your current progress will be lost.')
+    return await uiStore.showConfirm(
+      'Leave game',
+      'Leave the game? Your current progress will be lost.',
+      { confirmLabel: 'Leave' },
+    )
   }
 })
 
@@ -226,16 +230,16 @@ watch(() => gameStore.phase, (phase) => {
 }, { flush: 'sync' })
 
 // Responsive scaling (audit C-5). The engine/canvas are authored against a
-// fixed 1280×720 world, so rather than redoing layout math everywhere, we
-// uniformly scale the whole view via CSS transform. Internal coordinates,
-// pointer mapping (browsers account for CSS transforms), and DPR handling in
-// `Renderer` all stay untouched.
+// fixed CANVAS_WIDTH×CANVAS_HEIGHT world, so rather than redoing layout math
+// everywhere, we uniformly scale the whole view via CSS transform. Internal
+// coordinates, pointer mapping (browsers account for CSS transforms), and DPR
+// handling in `Renderer` all stay untouched.
 const shellRef = ref<HTMLDivElement | null>(null)
 
 function calcScale(W: number, H: number) {
   const pad = 2
-  const s = Math.min(1, (W - pad * 2) / 1280, (H - pad * 2) / 720)
-  return { s, ox: Math.floor((W - 1280 * s) / 2), oy: Math.floor((H - 720 * s) / 2) }
+  const s = Math.min(1, (W - pad * 2) / CANVAS_WIDTH, (H - pad * 2) / CANVAS_HEIGHT)
+  return { s, ox: Math.floor((W - CANVAS_WIDTH * s) / 2), oy: Math.floor((H - CANVAS_HEIGHT * s) / 2) }
 }
 
 const _init = calcScale(window.innerWidth, window.innerHeight)
@@ -274,7 +278,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="shellRef" class="game-shell" :data-star="gameStore.starRating">
+  <div
+    ref="shellRef"
+    class="game-shell"
+    :data-star="gameStore.starRating"
+    :style="{ '--canvas-w': `${CANVAS_WIDTH}px`, '--canvas-h': `${CANVAS_HEIGHT}px` }"
+  >
     <!-- R-5: on portrait phones the 1280×720 world scales down to an
          unusably small strip. Ask the user to rotate — the rest of the
          game stays rendered underneath so landscape resumes instantly. -->
@@ -410,8 +419,8 @@ onBeforeUnmount(() => {
 
 .game-view {
   position: absolute;
-  width: 1280px;
-  height: 720px;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
   transform-origin: top left;
   overflow: hidden;
 }
@@ -419,8 +428,8 @@ onBeforeUnmount(() => {
 .game-canvas {
   box-sizing: content-box;
   display: block;
-  width: 1280px;
-  height: 720px;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }

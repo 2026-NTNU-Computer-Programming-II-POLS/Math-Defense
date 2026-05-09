@@ -2,26 +2,26 @@ import re
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.domain.user.constraints import EMAIL_MAX_LENGTH, PLAYER_NAME_MIN_LENGTH, PLAYER_NAME_MAX_LENGTH
+from app.domain.user.constraints import PLAYER_NAME_MIN_LENGTH, PLAYER_NAME_MAX_LENGTH
+from app.domain.user.value_objects import Email
+from app.utils.security import BCRYPT_MAX_BYTES
 
 
-import zxcvbn
+def _validate_password_shape(v: str) -> str:
+    """Cheap structural checks that run inside Pydantic validation.
 
-def _validate_password_strength(v: str) -> str:
+    The expensive zxcvbn dictionary check has been moved to the application
+    service (B-ARCH-18) so it executes after the per-route rate limiter
+    rather than burning CPU on every unauthenticated POST body.
+    """
     if len(v) < 8:
         raise ValueError("Password must be at least 8 characters")
-    if len(v.encode("utf-8")) > 72:
+    if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
         raise ValueError("Password is too long")
     if not re.search(r'[a-zA-Z]', v):
         raise ValueError("Password must contain at least one letter")
     if not re.search(r'[0-9]', v):
         raise ValueError("Password must contain at least one digit")
-
-    result = zxcvbn.zxcvbn(v)
-    if result['score'] < 2:
-        feedback = result['feedback']['warning'] or "Password is too weak or common."
-        raise ValueError(f"Password is too weak: {feedback}")
-
     return v
 
 
@@ -43,12 +43,9 @@ class RegisterRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def email_valid(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not v or len(v) > EMAIL_MAX_LENGTH:
-            raise ValueError(f"Email must be 1-{EMAIL_MAX_LENGTH} characters")
-        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
-            raise ValueError("Invalid email format")
-        return v
+        # Single source of truth: the Email VO does normalisation + format /
+        # length validation. Pydantic only surfaces the resulting message.
+        return Email(v).value
 
     @field_validator("player_name")
     @classmethod
@@ -61,7 +58,7 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def password_valid(cls, v: str) -> str:
-        return _validate_password_strength(v)
+        return _validate_password_shape(v)
 
 
 class LoginRequest(BaseModel):
@@ -73,14 +70,12 @@ class LoginRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def email_max_length(cls, v: str) -> str:
-        if len(v) > 255:
-            raise ValueError("Email must not exceed 255 characters")
-        return v.strip().lower()
+        return Email(v).value
 
     @field_validator("password")
     @classmethod
     def validate_password_length(cls, v: str) -> str:
-        if len(v.encode("utf-8")) > 72:
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
             raise ValueError("Password is too long")
         return v
 
@@ -107,7 +102,7 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("current_password")
     @classmethod
     def current_password_max_length(cls, v: str) -> str:
-        if len(v.encode("utf-8")) > 72:
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
             raise ValueError("Password is too long")
         return v
 
@@ -116,7 +111,7 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def new_password_valid(cls, v: str) -> str:
-        return _validate_password_strength(v)
+        return _validate_password_shape(v)
 
 
 class AuthMeResponse(BaseModel):
@@ -211,10 +206,21 @@ class DisableMFARequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     current_password: str
+    # Step-up: a fresh TOTP from the authenticator app is required even
+    # though the access cookie has already cleared MFA on this login. See
+    # AuthApplicationService.disable_mfa for the rationale.
+    code: str
 
     @field_validator("current_password")
     @classmethod
     def current_password_max_length(cls, v: str) -> str:
-        if len(v.encode("utf-8")) > 72:
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
             raise ValueError("Password is too long")
+        return v
+
+    @field_validator("code")
+    @classmethod
+    def code_digits(cls, v: str) -> str:
+        if not re.match(r'^\d{6}$', v):
+            raise ValueError("TOTP code must be exactly 6 digits")
         return v

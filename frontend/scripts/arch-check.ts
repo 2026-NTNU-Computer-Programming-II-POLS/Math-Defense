@@ -12,6 +12,9 @@
  *      Pinia, nor anything from `src/engine/`, `src/systems/`,
  *      `src/components/`, `src/stores/`, `src/composables/`.
  *   3. Files under `src/components/` may not import from `src/domain/`.
+ *   4. Files under `src/views/`     may not import from `src/domain/`.
+ *      (audit F-ARCH-6: views must go through `src/services/` for
+ *      domain-level operations like level generation.)
  *
  * Invocation: `npm run arch-check` (cwd = frontend/). Exits non-zero on
  * any violation; prints one violation per line.
@@ -38,7 +41,14 @@ const SRC_ROOT = resolve(process.cwd(), 'src')
 const PRE_EXISTING_ALLOWLIST: ReadonlyArray<{
   fileSuffix: string
   importPath: string
-}> = []
+}> = [
+  // Audit F-ARCH-6 fix relocated only the level-generator branching to a
+  // service. The two remaining views→domain imports below predate that fix
+  // and will be migrated in follow-up work; ratcheted here so the new
+  // views/-vs-domain rule still catches *new* violations.
+  { fileSuffix: 'src/views/InitialAnswerView.vue', importPath: '@/domain/level/distractor-generator' },
+  { fileSuffix: 'src/views/ScoreResultView.vue', importPath: '@/domain/scoring/score-calculator' },
+]
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -61,7 +71,8 @@ function fileLayer(file: string): Layer | null {
   if (
     n.includes('/src/components/') ||
     n.includes('/src/stores/') ||
-    n.includes('/src/composables/')
+    n.includes('/src/composables/') ||
+    n.includes('/src/views/')
   ) return 'presentation'
   return null
 }
@@ -73,7 +84,8 @@ function aliasLayer(importPath: string): Layer | 'other' | null {
   if (
     importPath.startsWith('@/components/') ||
     importPath.startsWith('@/stores/') ||
-    importPath.startsWith('@/composables/')
+    importPath.startsWith('@/composables/') ||
+    importPath.startsWith('@/views/')
   ) return 'presentation'
   if (importPath.startsWith('@/')) return 'other'
   return null
@@ -151,6 +163,12 @@ function check(): Violation[] {
       if (layer === 'presentation' && normalize(file).includes('/src/components/')) {
         if (t.kind === 'layer' && t.layer === 'domain') {
           violations.push({ file, importPath, reason: 'components/ must not import domain' })
+        }
+      }
+
+      if (layer === 'presentation' && normalize(file).includes('/src/views/')) {
+        if (t.kind === 'layer' && t.layer === 'domain') {
+          violations.push({ file, importPath, reason: 'views/ must not import domain (use services/ instead)' })
         }
       }
     }

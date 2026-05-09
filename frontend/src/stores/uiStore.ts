@@ -4,6 +4,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { appBus } from '@/lib/app-bus'
 import type { TowerType } from '@/data/constants'
 
 const PRINCIPLE_OVERLAY_PREF_KEY = 'mdf.principleOverlayEnabled'
@@ -63,6 +64,12 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 }
 
 export const useUiStore = defineStore('ui', () => {
+  // Subscribe once on init to dismiss any open modal on logout. Replaces the
+  // dynamic-import that authStore.logout used to do (F-ARCH-2).
+  appBus.on('auth:logout', () => {
+    if (modalVisible.value) dismissModal()
+  })
+
   // currently selected tower type (tower bar selection)
   const selectedTowerType = ref<TowerType | null>(null)
 
@@ -73,7 +80,7 @@ export const useUiStore = defineStore('ui', () => {
   // Buff Card Panel
   const buffPanelVisible = ref(false)
 
-  // Modal (replaces alert)
+  // Modal (replaces alert/confirm)
   const modalVisible = ref(false)
   const modalTitle = ref('')
   const modalMessage = ref('')
@@ -82,6 +89,13 @@ export const useUiStore = defineStore('ui', () => {
   // Sticky modals survive re-entrant side-effects (e.g. a 401-triggered logout
   // must not silently dismiss a "Sync Failed" modal the user hasn't read yet).
   const modalSticky = ref(false)
+  // F-BUG-19: confirm-mode shows a Cancel button alongside OK. modalConfirmResolver
+  // is a single-shot promise resolver wired up by showConfirm() and consumed
+  // by closeModal()/cancelModal().
+  const modalConfirmMode = ref(false)
+  const modalConfirmLabel = ref('OK')
+  const modalCancelLabel = ref('Cancel')
+  let modalConfirmResolver: ((ok: boolean) => void) | null = null
 
   // Tutorial
   const tutorialVisible = ref(false)
@@ -153,6 +167,14 @@ export const useUiStore = defineStore('ui', () => {
     onClose?: () => unknown,
     opts: { sticky?: boolean } = {},
   ): void {
+    // If a confirm is already open, resolve its pending promise as cancelled
+    // before replacing the slot — otherwise the awaiting caller would hang.
+    if (modalConfirmResolver) {
+      const prev = modalConfirmResolver
+      modalConfirmResolver = null
+      prev(false)
+    }
+    modalConfirmMode.value = false
     modalTitle.value = title
     modalMessage.value = message
     modalCallback.value = onClose ?? null
@@ -167,6 +189,41 @@ export const useUiStore = defineStore('ui', () => {
     modalCallback.value = null
     modalSticky.value = false
     modalVisible.value = false
+    if (modalConfirmResolver) {
+      const resolve = modalConfirmResolver
+      modalConfirmResolver = null
+      modalConfirmMode.value = false
+      resolve(false)
+    }
+  }
+
+  // F-BUG-19: replaces native confirm(). Returns true on OK, false on Cancel
+  // / Esc / overlay click. Routing through the modal system gives us
+  // consistent styling, focus trapping, and avoids the synchronous-blocking
+  // behavior of window.confirm.
+  function showConfirm(
+    title: string,
+    message: string,
+    opts: { confirmLabel?: string; cancelLabel?: string } = {},
+  ): Promise<boolean> {
+    // If a previous confirm is still open, resolve it as cancelled so the
+    // pending caller doesn't hang forever.
+    if (modalConfirmResolver) {
+      const prev = modalConfirmResolver
+      modalConfirmResolver = null
+      prev(false)
+    }
+    modalTitle.value = title
+    modalMessage.value = message
+    modalCallback.value = null
+    modalSticky.value = false
+    modalConfirmMode.value = true
+    modalConfirmLabel.value = opts.confirmLabel ?? 'OK'
+    modalCancelLabel.value = opts.cancelLabel ?? 'Cancel'
+    modalVisible.value = true
+    return new Promise<boolean>((resolve) => {
+      modalConfirmResolver = resolve
+    })
   }
 
   function _showErrorFallback(): void {
@@ -178,11 +235,17 @@ export const useUiStore = defineStore('ui', () => {
 
   function closeModal(): void {
     const cb = modalCallback.value
+    const resolver = modalConfirmResolver
+    const wasConfirm = modalConfirmMode.value
     // Clear state first so that if cb throws / rejects we open a fresh error
     // modal on top of a cleared slot instead of re-opening on top of itself.
     modalCallback.value = null
     modalSticky.value = false
+    modalConfirmMode.value = false
+    modalConfirmResolver = null
     modalVisible.value = false
+    if (resolver) resolver(true)
+    if (wasConfirm) return
     if (!cb) return
     try {
       const result = cb()
@@ -237,13 +300,14 @@ export const useUiStore = defineStore('ui', () => {
     buildPanelVisible, buildPanelTowerId,
     buffPanelVisible,
     modalVisible, modalTitle, modalMessage, modalCallback,
+    modalConfirmMode, modalConfirmLabel, modalCancelLabel,
     tutorialVisible, tutorialStep,
     buildHintStep,
     hoveredSegmentId,
     principleOverlayEnabled,
     audioMuted, audioVolume,
     sliderFallbackEnabled,
-    showModal, closeModal, dismissModal, selectTower,
+    showModal, showConfirm, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
     setBuildHintStep,
     setHoveredSegmentId,

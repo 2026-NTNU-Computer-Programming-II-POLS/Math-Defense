@@ -7,8 +7,7 @@
  * validation errors reference `PathSegmentDef` ids and coordinates
  * without a detour through `buildLevelPath`.
  *
- * Callers: `scripts/validate-levels.ts` in CI (Phase 6) and, in dev
- * builds only, `createLevelContext` as a defensive assert (Phase 3).
+ * Caller: `createLevelContext` as a dev-build defensive assert.
  */
 import {
   GRID_MAX_X,
@@ -38,8 +37,6 @@ export type PathValidationError =
 
 /**
  * Structural shape `validateLevelPath` reads from a level definition.
- * `LevelDef` gains these fields in Phase 6; the structural type here
- * lets the validator land in Phase 1 without touching `data/level-defs.ts`.
  */
 export interface ValidatableLevel {
   readonly path: PathLayout

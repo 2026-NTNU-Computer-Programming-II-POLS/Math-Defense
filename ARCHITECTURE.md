@@ -921,7 +921,7 @@ frontend/
                                  # systems/, renderers/, replay/, domain/
     math/                        # WasmBridge, MathUtils, evaluators, wasm/
     entities/                    # Tower/Enemy/Projectile/Pet types + factories
-    data/                        # tower-defs, enemy-defs, level-defs, ...
+    data/                        # tower-defs, enemy-defs, achievement-defs, ...
   tests/                         # Vitest suites
 
 wasm/                            # C99 sources + Makefile (Emscripten)

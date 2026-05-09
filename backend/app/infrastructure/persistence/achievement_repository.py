@@ -28,13 +28,19 @@ class SqlAlchemyAchievementRepository:
         )
         return self._to_domain(row) if row else None
 
-    def save(self, achievement: UserAchievement) -> None:
+    def save(self, achievement: UserAchievement) -> bool:
+        # Returns True iff a new row was inserted. B-BUG-3: the on-conflict
+        # short-circuit is silent, so without surfacing rowcount the service
+        # treats every save() as an unlock — double-counting Beta evidence
+        # and double-toasting the client when two concurrent end-session
+        # paths both find the achievement "unlocked".
         row = self._db.query(AchievementModel).filter(AchievementModel.id == achievement.id).first()
         if row:
             row.achievement_id = achievement.achievement_id
             row.talent_points = achievement.talent_points
             self._db.flush()
-            return
+            # The same id already existed — by definition not a new unlock.
+            return False
         stmt = pg_insert(AchievementModel).values(
             id=achievement.id,
             user_id=achievement.user_id,
@@ -42,8 +48,9 @@ class SqlAlchemyAchievementRepository:
             talent_points=achievement.talent_points,
             unlocked_at=achievement.unlocked_at,
         ).on_conflict_do_nothing(constraint="uq_user_achievement")
-        self._db.execute(stmt)
+        result = self._db.execute(stmt)
         self._db.flush()
+        return (result.rowcount or 0) > 0
 
     def delete_by_user(self, user_id: str) -> None:
         self._db.query(AchievementModel).filter(AchievementModel.user_id == user_id).delete()

@@ -24,7 +24,7 @@ import { Events } from '@/data/constants'
 const route = useRoute()
 const router = useRouter()
 
-const status = ref<'connecting' | 'live' | 'closed' | 'error'>('connecting')
+const status = ref<'connecting' | 'live' | 'closed' | 'error' | 'auth' | 'forbidden'>('connecting')
 const snapshot = ref<SpectateSnapshot | null>(null)
 const eventCount = ref(0)
 const lastEvent = ref<ReplayEventOut | null>(null)
@@ -65,7 +65,12 @@ onMounted(() => {
       status.value = 'live'
     },
     onEvent: applyEvent,
-    onClose: () => { status.value = 'closed' },
+    onClose: (_code, _reason, classification) => {
+      if (classification === 'auth') status.value = 'auth'
+      else if (classification === 'forbidden') status.value = 'forbidden'
+      else if (classification === 'normal') status.value = 'closed'
+      else status.value = 'closed'
+    },
     onError: () => { status.value = 'error' },
   })
   client.start()
@@ -92,6 +97,8 @@ function exit(): void {
     <main class="body">
       <p v-if="status === 'connecting'">Connecting…</p>
       <p v-else-if="status === 'error'" class="err">Connection error.</p>
+      <p v-else-if="status === 'auth'" class="err">Sign-in required to spectate this session.</p>
+      <p v-else-if="status === 'forbidden'" class="err">You don't have permission to spectate this session.</p>
       <p v-else-if="status === 'closed'">Session ended.</p>
 
       <section class="hud" v-if="snapshot">

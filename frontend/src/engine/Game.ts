@@ -23,7 +23,8 @@ import type { ChainRuleQuestion } from '@/math/chain-rule-generator'
 import type { LevelContext } from './level-context'
 import { isGeneratedLevelContext, type GeneratedLevelContext } from './generated-level-context'
 import type { GeneratedLevel } from '@/math/curve-types'
-import type { WaveDef } from '@/data/level-defs'
+import type { WaveDef } from '@/domain/wave/wave-generator'
+import type { Checkpoint } from '@/domain/level/checkpoint'
 import type { BuffSystem } from '@/systems/BuffSystem'
 import type { CombatSystem } from '@/systems/CombatSystem'
 import type { MovementSystem } from '@/systems/MovementSystem'
@@ -336,29 +337,16 @@ export class Game {
   }
 
   // ── State operations ──
+  //
+  // Audit F-ARCH-7: gold/hp/score/cost mutations have moved to EconomySystem
+  // (`game.economy.changeGold(...)` etc.) — the engine layer no longer owns
+  // economy-domain logic. The `economy` accessor below is the typed shortcut.
 
-  changeGold(amount: number): void {
-    if (import.meta.env.DEV && amount < 0 && this.state.gold + amount < 0) {
-      console.warn(`[Game] gold underflow: attempted ${amount} from ${this.state.gold}`)
-    }
-    this.state.gold = Math.max(0, this.state.gold + amount)
-    this.eventBus.emit(Events.GOLD_CHANGED, this.state.gold)
-  }
-
-  changeHp(amount: number): void {
-    this.state.hp = Math.max(0, Math.min(this.state.maxHp, this.state.hp + amount))
-    this.eventBus.emit(Events.HP_CHANGED, this.state.hp)
-    if (this.state.hp <= 0) this.setPhase(GamePhase.GAME_OVER)
-  }
-
-  addScore(points: number): void {
-    this.state.score += points
-    this.eventBus.emit(Events.SCORE_CHANGED, this.state.score)
-  }
-
-  addCost(amount: number): void {
-    this.state.costTotal = Math.round(this.state.costTotal + amount)
-    this.eventBus.emit(Events.COST_TOTAL_CHANGED, this.state.costTotal)
+  /** Typed accessor for the EconomySystem instance registered on this Game. */
+  get economy(): EconomySystem {
+    const s = this.getSystem('economy')
+    if (!s) throw new Error('[Game] EconomySystem is not registered')
+    return s as EconomySystem
   }
 
   addKillValue(value: number): void {
@@ -412,6 +400,31 @@ export class Game {
     // that targets towers/enemies has nothing to revert — BuffSystem's
     // LEVEL_START handler only needs to drop its own tracking.
     this.eventBus.emit(Events.LEVEL_START, levelIndex)
+  }
+
+  /**
+   * Patch live engine state from a §12 Star-5 checkpoint AFTER {@link startLevel}
+   * has reset everything. Centralizes the pre-seed dance previously inlined in
+   * useGameLoop.wireEngine (F-ARCH-5):
+   *
+   *   - gold / hp restored to the post-clear snapshot
+   *   - healthOrigin scoped to the resumed run so the score formula's HP-bonus
+   *     baseline isn't penalised by the abandoned session
+   *   - costTotal / cumulativeKillValue restored so the Score Result View
+   *     reports the cumulative figures
+   *   - wave pre-seeded so the next startWave() emits the correct number
+   *
+   * Callers that want the gameStore mirror to reflect the patched values must
+   * call store.syncFromEngine(this) afterwards (the LEVEL_START handler that
+   * already ran would have mirrored the post-reset values).
+   */
+  restoreFromCheckpoint(cp: Checkpoint): void {
+    this.state.gold = cp.gold
+    this.state.hp = cp.hp
+    this.state.healthOrigin = cp.hp
+    this.state.costTotal = cp.costTotal
+    this.state.cumulativeKillValue = cp.killValue
+    this.state.wave = cp.waveIndex - 1
   }
 
   startWave(): void {

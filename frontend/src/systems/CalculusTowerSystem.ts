@@ -56,8 +56,8 @@ export class CalculusTowerSystem {
         if (payload.operation && tower.calculusState) {
           if (tower.calculusState.opApplied) {
             if (game.state.gold < CALCULUS_OP_COST) return
-            game.changeGold(-CALCULUS_OP_COST)
-            game.addCost(CALCULUS_OP_COST)
+            game.economy.changeGold(-CALCULUS_OP_COST)
+            game.economy.addCost(CALCULUS_OP_COST)
           }
           tower.calculusState.opApplied = true
           this._applyOperation(tower, payload.operation, game)

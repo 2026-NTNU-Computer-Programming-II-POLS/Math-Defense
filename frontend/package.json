@@ -8,14 +8,14 @@
     "prebuild": "cd ../wasm && make",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "test": "npm run arch-check && vitest run",
+    "test": "npm run arch-check && npm run event-registry-check && vitest run",
     "test:watch": "vitest",
     "arch-check": "tsx scripts/arch-check.ts",
-    "validate-levels": "vite-node scripts/validate-levels.ts",
+    "event-registry-check": "tsx scripts/event-registry-check.ts",
     "lint-chinese-comments": "tsx scripts/lint-chinese-comments.ts",
     "lint-determinism": "tsx scripts/lint-determinism.ts",
     "bench": "vitest run --config dev/vitest.bench.config.ts",
-    "ci": "npm run arch-check && npm run validate-levels && npm run lint-chinese-comments && npm run lint-determinism && vitest run"
+    "ci": "npm run arch-check && npm run event-registry-check && npm run lint-chinese-comments && npm run lint-determinism && vitest run"
   },
   "dependencies": {
     "katex": "^0.16.45",

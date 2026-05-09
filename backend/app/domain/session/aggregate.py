@@ -21,20 +21,16 @@ from app.shared_constants import INITIAL_GOLD, INITIAL_HP
 
 DEFAULT_STALE_CUTOFF_HOURS = 2.0
 
-# Module-level knob so the domain does not import app.config. The bootstrap
-# code (see app.main) calls ``set_stale_cutoff_hours`` at startup to forward
-# the operator-configured value; tests mutate it directly in isolation.
-_stale_cutoff_hours: float = DEFAULT_STALE_CUTOFF_HOURS
-
 
 def set_stale_cutoff_hours(hours: float) -> None:
-    """Override the global stale-session cutoff. Called from app bootstrap."""
-    global _stale_cutoff_hours
-    _stale_cutoff_hours = hours
+    """Override the stale-session cutoff for the GameSession aggregate.
 
-
-def _stale_cutoff() -> timedelta:
-    return timedelta(hours=_stale_cutoff_hours)
+    Bootstrap (``app.main``) calls this once with the operator-configured
+    value; tests rebind it in isolation. The state lives on the aggregate
+    class itself rather than as a free module-level global (B-ARCH-15) so it
+    is namespaced with the rule that consumes it.
+    """
+    GameSession._stale_cutoff_hours = hours
 
 # Bounds live in domain.constraints; the aggregate enforces game rules
 # (hp can't exceed maxHp, score can't decrease, wave can't jump past the max).
@@ -57,6 +53,12 @@ class GameSession:
     3. Status transitions must follow the valid transition table
     4. Completing a session emits the SessionCompleted domain event
     """
+
+    # Class-level knob (B-ARCH-15). Bootstrap rebinds via
+    # ``set_stale_cutoff_hours``; tests mutate ``GameSession._stale_cutoff_hours``
+    # directly. Kept on the class so the value is namespaced with the rule
+    # that reads it rather than living as a free module global.
+    _stale_cutoff_hours: float = DEFAULT_STALE_CUTOFF_HOURS
 
     def __init__(
         self,
@@ -169,7 +171,7 @@ class GameSession:
         # SQLite returns naive datetime; normalize to aware before comparing
         if started.tzinfo is None:
             started = started.replace(tzinfo=UTC)
-        return now - started > _stale_cutoff()
+        return now - started > timedelta(hours=type(self)._stale_cutoff_hours)
 
     # ── Commands (state-mutating methods) ──
 
@@ -261,6 +263,7 @@ class GameSession:
                 kills=result.kills,
                 waves_survived=result.waves_survived,
                 challenge_id=self.challenge_id,
+                practice_mode=self.practice_mode,
             )
         )
 

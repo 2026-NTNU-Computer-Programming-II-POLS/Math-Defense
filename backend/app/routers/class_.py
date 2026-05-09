@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
-from app.factories import build_class_service, build_session_service
+from app.factories import build_class_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, require_role
 from app.schemas.class_ import (
@@ -164,24 +164,20 @@ def list_class_reflections(
     user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    pairs = build_class_service(db).list_students_with_users(class_id, user.id, user.role)
-    student_users = {m.student_id: u for m, u in pairs}
-    if not student_users:
-        return []
-    sessions = build_session_service(db).list_reflections_for_users(
-        list(student_users.keys())
+    views = build_class_service(db).list_class_reflections(
+        class_id, user.id, user.role,
     )
     return [
         ClassReflectionOut(
-            session_id=s.id,
-            student_id=s.user_id,
-            student_name=(student_users[s.user_id].player_name if student_users.get(s.user_id) else ""),
-            star_rating=int(s.level),
-            score=s.score,
-            reflection_text=s.reflection_text or "",
-            ended_at=s.ended_at,
+            session_id=v.session_id,
+            student_id=v.student_id,
+            student_name=v.student_name,
+            star_rating=v.star_rating,
+            score=v.score,
+            reflection_text=v.reflection_text,
+            ended_at=v.ended_at,
         )
-        for s in sessions
+        for v in views
     ]
 
 

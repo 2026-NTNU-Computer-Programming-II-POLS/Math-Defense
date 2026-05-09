@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import UTC
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session as DbSession
 
 from app.domain.talent.aggregate import TalentAllocation
@@ -26,6 +27,18 @@ class SqlAlchemyTalentRepository:
             .all()
         )
         return [self._to_domain(r) for r in rows]
+
+    def acquire_user_lock(self, user_id: str) -> None:
+        # B-BUG-2: with_for_update on talent_allocations returns no rows when
+        # the user has never allocated, so two concurrent first-time
+        # allocations both pass the budget check and INSERT in different
+        # transactions, driving points_available negative. Locking the
+        # users row anchors the critical section at the user-aggregate
+        # level regardless of whether allocations exist yet.
+        self._db.execute(
+            text("SELECT id FROM users WHERE id = :uid FOR UPDATE"),
+            {"uid": user_id},
+        )
 
     def find_by_user_and_node(self, user_id: str, talent_node_id: str) -> TalentAllocation | None:
         row = (

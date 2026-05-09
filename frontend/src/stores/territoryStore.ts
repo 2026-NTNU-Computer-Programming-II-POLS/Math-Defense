@@ -8,11 +8,14 @@ import {
   type PlayResult,
   type SlotDefinition,
 } from '@/services/territoryService'
+import { appBus } from '@/lib/app-bus'
 
 export const useTerritoryStore = defineStore('territory', () => {
   const activities = ref<ActivityInfo[]>([])
   const currentDetail = ref<ActivityDetail | null>(null)
   const rankings = ref<RankingEntry[]>([])
+
+  appBus.on('auth:logout', () => { clear() })
 
   const loadingActivities = ref(false)
   const loadingDetail = ref(false)

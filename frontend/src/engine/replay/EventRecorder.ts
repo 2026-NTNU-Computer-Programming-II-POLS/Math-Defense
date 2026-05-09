@@ -39,6 +39,16 @@ export interface RecordedEvent {
 
 const FLUSH_INTERVAL_MS = 2_000
 
+// Hard cap on the in-memory queue. Sustained network failure on mobile
+// Safari OOMs the tab if the buffer grows unbounded; once we hit this the
+// oldest events are dropped (a replay gap is preferable to a tab crash).
+const MAX_BUFFER_LENGTH = 5_000
+
+// After this many consecutive flush failures we stop trying — the user
+// has bigger problems than a missing replay log, and we don't want to
+// burn CPU / battery hammering a hopeless endpoint forever.
+const MAX_CONSECUTIVE_FAILURES = 10
+
 // Curated set of "input" events — anything driven by a player decision or
 // a phase boundary the replayer needs to schedule its own startWave / etc
 // against. Keeping this list explicit (rather than "everything") means
@@ -99,6 +109,8 @@ export class EventRecorder {
   private _intervalId: ReturnType<typeof setInterval> | null = null
   private _flushInflight = false
   private _disposed = false
+  private _consecutiveFailures = 0
+  private _giveUp = false
   private _onBeforeUnload: ((ev: BeforeUnloadEvent) => void) | null = null
 
   constructor(game: Game, getSessionId: () => string | null) {
@@ -108,6 +120,16 @@ export class EventRecorder {
 
   start(): void {
     if (this._unsubs.length > 0) return
+    // F-BUG-12: a destroy() + start() cycle (e.g. retry()/checkpoint restore
+    // re-using the same recorder, or a future caller) would otherwise re-emit
+    // seq numbers from where the previous run stopped, colliding with already-
+    // posted events for the same session. Reset the per-run counters here so
+    // start() is safely idempotent across re-arms.
+    this._seq = 0
+    this._buffer = []
+    this._consecutiveFailures = 0
+    this._giveUp = false
+    this._disposed = false
     for (const eventType of RECORDED_EVENTS) {
       const unsub = this._game.eventBus.on(eventType, (payload) => {
         this._record(eventType, payload)
@@ -148,13 +170,19 @@ export class EventRecorder {
   }
 
   private _record(eventType: string, payload: unknown): void {
-    if (this._disposed) return
+    if (this._disposed || this._giveUp) return
     this._buffer.push({
       seq: this._seq++,
       ts: this._game.time,
       event_type: eventType,
       payload: this._sanitize(payload),
     })
+    // Drop the oldest entries if we've blown past the cap. Better to lose
+    // some early replay context than to OOM the tab — the seq numbers stay
+    // monotonic so the backend can detect the gap.
+    if (this._buffer.length > MAX_BUFFER_LENGTH) {
+      this._buffer.splice(0, this._buffer.length - MAX_BUFFER_LENGTH)
+    }
   }
 
   /**
@@ -184,7 +212,7 @@ export class EventRecorder {
   }
 
   private async _flush(): Promise<void> {
-    if (this._flushInflight) return
+    if (this._flushInflight || this._giveUp) return
     if (this._buffer.length === 0) return
     const sessionId = this._getSessionId()
     if (!sessionId) return
@@ -194,10 +222,30 @@ export class EventRecorder {
     this._flushInflight = true
     try {
       await sessionService.appendReplayEvents(sessionId, batch)
+      this._consecutiveFailures = 0
     } catch (e) {
-      // Re-queue on failure; the next interval will retry. We splice
-      // rather than concat-prepend so the merged buffer keeps event order.
-      this._buffer = [...batch, ...this._buffer]
+      this._consecutiveFailures += 1
+      if (this._consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        // Give up entirely — the network is dead or we've been auth-rotated
+        // out. Drop the in-flight batch on the floor and stop accepting
+        // new events; better than burning CPU on a hopeless retry loop.
+        this._giveUp = true
+        if (this._intervalId !== null) {
+          clearInterval(this._intervalId)
+          this._intervalId = null
+        }
+        console.warn('[EventRecorder] giving up after consecutive flush failures', e)
+        return
+      }
+      // Re-queue on failure; the next interval will retry. Cap the
+      // re-queued buffer so a multi-minute outage doesn't grow it past
+      // MAX_BUFFER_LENGTH (drop the OLDEST events on overflow).
+      const merged = [...batch, ...this._buffer]
+      if (merged.length > MAX_BUFFER_LENGTH) {
+        this._buffer = merged.slice(merged.length - MAX_BUFFER_LENGTH)
+      } else {
+        this._buffer = merged
+      }
       console.warn('[EventRecorder] flush failed; will retry', e)
     } finally {
       this._flushInflight = false

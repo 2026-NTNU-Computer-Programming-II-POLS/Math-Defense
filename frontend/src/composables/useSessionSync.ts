@@ -1,16 +1,18 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
-import { sessionService } from '@/services/sessionService'
 import { achievementService } from '@/services/achievementService'
 import { ApiError } from '@/services/api'
+import {
+  cleanupOrphanSession,
+  createSessionWithRetry,
+  pushWaveSnapshot,
+  endSession as endSessionRequest,
+} from '@/services/sessionLifecycleService'
 import { Events, GamePhase } from '@/data/constants'
 import type { Game, WaveEndSnapshot } from '@/engine/Game'
-import { calculateScore } from '@/domain/scoring/score-calculator'
 import { isUsingWasm } from '@/math/WasmBridge'
 
-const MAX_CREATE_RETRIES = 2
-const RETRY_DELAY_MS = 1000
 const UPDATE_FAIL_ALERT_THRESHOLD = 3
 
 // Backlog §23 — ChallengeView.vue writes the active challenge id here before
@@ -35,15 +37,18 @@ function clearActiveChallengeId(): void {
   }
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 export interface UnlockedAchievement {
   id: string
   talent_points: number
 }
 
+/**
+ * Vue glue around `sessionLifecycleService` (audit F-ARCH-8). Holds the
+ * reactive session state, subscribes to engine events, and surfaces UI
+ * concerns (modals on persistent sync failure, achievement-cache
+ * invalidation, sessionStorage challenge binding). All API traffic goes
+ * through the service.
+ */
 export function useSessionSync() {
   const authStore = useAuthStore()
   const uiStore = useUiStore()
@@ -70,70 +75,44 @@ export function useSessionSync() {
   type PendingWrite = { snapshot: WaveEndSnapshot; gen: number }
   const pending = ref<PendingWrite | null>(null)
 
-  async function createSessionWithRetry(_levelNum: number, gen: number, game: Game): Promise<string | null> {
-    for (let attempt = 0; attempt <= MAX_CREATE_RETRIES; attempt++) {
-      if (gen !== createGeneration) return null
-      try {
-        const challengeId = readActiveChallengeId()
-        // construction plan §3.8 — tag the session with replay protocol version 2
-        // only when the WASM determinism module is loaded *and* in use.
-        // Otherwise the session keeps the default v1 acceptance budget,
-        // which is what the JS-fallback bit stream actually delivers.
-        const replayVersion = isUsingWasm() ? 2 : 1
-        const session = await sessionService.create(
-          game.state.starRating,
-          undefined,
-          game.state.initialAnswer === 1,
-          uiStore.sliderFallbackEnabled,
-          challengeId,
-          // Backlog §24 — persist the seed so a Replay can reconstruct the
-          // exact same RNG stream when re-driving the engine against the
-          // recorded event log.
-          game.seed,
-          replayVersion,
-        )
-        if (gen !== createGeneration) {
-          sessionService.abandon(session.id).catch((err) =>
-            console.warn('[SessionSync] Failed to abandon late-arrival session:', err),
-          )
-          return null
-        }
-        // Reflect the server-confirmed flag (server is authoritative — it
-        // could in principle reject practice_mode for a tournament account).
-        isPracticeMode.value = !!session.practice_mode
-        activeChallengeId.value = session.challenge_id ?? null
-        // Single-shot: a successful create consumes the stored challenge_id so
-        // the next freshly-launched run isn't accidentally tagged.
-        clearActiveChallengeId()
-        return session.id
-      } catch (e) {
-        console.warn(`[SessionSync] Create attempt ${attempt + 1} failed:`, e)
-        if (e instanceof ApiError && (e.status === 401 || e.status === 403 || e.status === 422)) {
-          return null
-        }
-        if (attempt < MAX_CREATE_RETRIES) {
-          await wait(RETRY_DELAY_MS)
-        }
-      }
-    }
-    return null
-  }
-
-  async function cleanupOrphanSession(): Promise<void> {
-    if (!authStore.isLoggedIn) return
-    try {
-      const active = await sessionService.getActive()
-      if (!active) return
-      await sessionService.abandon(active.id)
-    } catch (e) {
-      console.warn('[SessionSync] Failed to clean up orphan session:', e)
-    }
+  async function createSession(_levelNum: number, gen: number, game: Game): Promise<string | null> {
+    const challengeId = readActiveChallengeId()
+    // construction plan §3.8 — tag the session with replay protocol version 2
+    // only when the WASM determinism module is loaded *and* in use.
+    // Otherwise the session keeps the default v1 acceptance budget,
+    // which is what the JS-fallback bit stream actually delivers.
+    const replayVersion = isUsingWasm() ? 2 : 1
+    const session = await createSessionWithRetry(
+      {
+        starRating: game.state.starRating,
+        initialAnswer: game.state.initialAnswer === 1,
+        practiceMode: uiStore.sliderFallbackEnabled,
+        challengeId,
+        // Backlog §24 — persist the seed so a Replay can reconstruct the
+        // exact same RNG stream when re-driving the engine against the
+        // recorded event log.
+        seed: game.seed,
+        replayVersion,
+      },
+      () => gen === createGeneration,
+    )
+    if (!session || gen !== createGeneration) return null
+    // Reflect the server-confirmed flag (server is authoritative — it
+    // could in principle reject practice_mode for a tournament account).
+    isPracticeMode.value = !!session.practice_mode
+    activeChallengeId.value = session.challenge_id ?? null
+    // Single-shot: a successful create consumes the stored challenge_id so
+    // the next freshly-launched run isn't accidentally tagged.
+    clearActiveChallengeId()
+    return session.id
   }
 
   function bind(game: Game): (() => void)[] {
     const unsubs: (() => void)[] = []
 
-    cleanupOrphanSession()
+    if (authStore.isLoggedIn) {
+      cleanupOrphanSession()
+    }
 
     // LEVEL_START → create session
     unsubs.push(game.eventBus.on(Events.LEVEL_START, async (levelNum) => {
@@ -142,7 +121,7 @@ export function useSessionSync() {
       isPracticeMode.value = false
       pendingLevel = levelNum as number
       const gen = ++createGeneration
-      const id = await createSessionWithRetry(pendingLevel, gen, game)
+      const id = await createSession(pendingLevel, gen, game)
       if (gen !== createGeneration) return
       sessionId.value = id
       sessionGeneration = gen
@@ -163,14 +142,7 @@ export function useSessionSync() {
           if (!sessionId.value) break
           if (job.gen !== sessionGeneration) break
           if (job.snapshot.wave === lastSyncedWave) continue
-          await sessionService.update(sessionId.value, {
-            current_wave: job.snapshot.wave,
-            gold: job.snapshot.gold,
-            hp: job.snapshot.hp,
-            score: job.snapshot.score,
-            kill_value: job.snapshot.killValue,
-            cost_total: job.snapshot.costTotal,
-          })
+          await pushWaveSnapshot(sessionId.value, job.snapshot)
           lastSyncedWave = job.snapshot.wave
           consecutiveUpdateFailures = 0
           alertedForFailures = false
@@ -205,13 +177,13 @@ export function useSessionSync() {
 
     // LEVEL_END → end session with V2 scoring payload
     unsubs.push(game.eventBus.on(Events.LEVEL_END, async () => {
-      await endSession(game)
+      await endRun(game)
     }))
 
     // GAME_OVER → end session
     unsubs.push(game.eventBus.on(Events.PHASE_CHANGED, async ({ to }) => {
       if (to === GamePhase.GAME_OVER) {
-        await endSession(game)
+        await endRun(game)
       }
     }))
 
@@ -220,40 +192,32 @@ export function useSessionSync() {
     return unsubs
   }
 
-  async function endSession(game: Game): Promise<void> {
+  async function endRun(game: Game): Promise<void> {
     if (!authStore.isLoggedIn) return
+
+    // F-BUG-20: a WAVE_END flush may still be in flight (or queued in
+    // `pending`) when LEVEL_END / GAME_OVER fires. If we POST /end before
+    // those updates land, the server's snapshot is stale and the final
+    // score+leaderboard row are computed against pre-final-wave state.
+    // Wait for the in-flight WAVE_END loop to drain (and any newly enqueued
+    // job to flush) before sending the terminal payload. Bounded so a wedged
+    // request (server hang past the 10s fetch timeout) can't permanently
+    // block the score-submission path; better to send a slightly-stale
+    // wave snapshot than never end the session at all.
+    const drainDeadline = Date.now() + 12_000
+    while ((syncing.value || pending.value) && Date.now() < drainDeadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 25))
+    }
 
     if (!sessionId.value && pendingLevel != null) {
       const gen = ++createGeneration
-      sessionId.value = await createSessionWithRetry(pendingLevel, gen, game)
+      sessionId.value = await createSession(pendingLevel, gen, game)
     }
 
     if (!sessionId.value) return
     const id = sessionId.value
-    const s = game.state
     try {
-      const { totalScore } = calculateScore({
-        killValue: s.cumulativeKillValue,
-        timeTotal: s.timeTotal,
-        timeExcludePrepare: s.timeExcludePrepare,
-        costTotal: s.costTotal,
-        healthOrigin: s.healthOrigin,
-        healthFinal: s.hp,
-        initialAnswer: s.initialAnswer,
-      })
-      const result = await sessionService.end(id, {
-        score: totalScore,
-        kills: s.kills,
-        waves_survived: s.wave,
-        kill_value: s.cumulativeKillValue,
-        cost_total: s.costTotal,
-        time_total: s.timeTotal,
-        health_origin: s.healthOrigin,
-        health_final: s.hp,
-        time_exclude_prepare: s.timeExcludePrepare,
-        n_prep_phases: s.timeExcludePrepare.length,
-        total_score: totalScore,
-      })
+      const result = await endSessionRequest(id, game.state)
       if (result.newly_unlocked_achievements?.length) {
         newlyUnlockedAchievements.value = result.newly_unlocked_achievements
         // Drop the cached unlocked-id set so panels (e.g. MagicModePanel's

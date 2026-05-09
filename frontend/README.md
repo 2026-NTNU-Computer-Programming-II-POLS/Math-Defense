@@ -176,6 +176,11 @@ frontend/
 │   │   │   └── legal-positions.ts        Grid intersection point legality computation
 │   │   ├── scoring/
 │   │   │   └── score-calculator.ts       S1/S2/K/TotalScore formula (mirrors backend)
+│   │   ├── study/
+│   │   │   └── probe-items.ts            Item pool for the Empirical Validity Probe forms (pre/post/delay) + affect items
+│   │   ├── wave/
+│   │   │   ├── wave-generator.ts         buildWavesForStar + WaveDef/EnemySpawnEntry types
+│   │   │   └── wave-templates.ts         Composable wave-content templates
 │   │   └── formatters.ts           Centralised presentation formatters (formatScore, etc.)
 │   │
 │   ├── systems/                    ECS systems — pure update logic
@@ -189,7 +194,7 @@ frontend/
 │   │   ├── LimitTowerSystem.ts     Multiple-choice limit question + range-based attack
 │   │   ├── CalculusTowerSystem.ts  Derivative/integral picker + pet spawning
 │   │   ├── MovementSystem.ts       Path movement with arc-length correction
-│   │   ├── WaveSystem.ts           Enemy spawn queue per level-defs + wave-generator
+│   │   ├── WaveSystem.ts           Enemy spawn queue driven by domain/wave/wave-generator
 │   │   ├── BuffSystem.ts           Time-based buff/curse strategy map; applyExternalBuff() public API
 │   │   ├── SpellSystem.ts          4 spells (Fireball/Frost Nova/Lightning/Rejuvenate) + cooldown mgmt
 │   │   ├── MontyHallSystem.ts      Kill-value threshold triggers; door reveal + switch logic; reward injection
@@ -234,7 +239,6 @@ frontend/
 │   │   ├── constants.ts            GamePhase / TowerType / EnemyType / Events (`as const`)
 │   │   ├── tower-defs.ts           Cost, damage, range, math concept, V2 params (7 tower types) + glyph + examRelevance
 │   │   ├── enemy-defs.ts           HP, speed, reward, split/helper/boss config + triggerHpRange (7 enemy types)
-│   │   ├── level-defs.ts           V2 wave definitions with enemy distribution
 │   │   ├── difficulty-defs.ts      DIFFICULTY_TABLE, MultisetEntry, pickRandomMultiset
 │   │   ├── buff-defs.ts            Time-based buff/curse IDs, labels, effect strategies (30+ effects)
 │   │   ├── spell-defs.ts           4 spell definitions (Fireball/Frost Nova/Lightning/Rejuvenate)
@@ -242,9 +246,6 @@ frontend/
 │   │   ├── achievement-defs.ts     Achievement definitions (5 categories) — lint-tested against trait-praise vocabulary
 │   │   ├── talent-defs.ts          21 talent node definitions (7 tower types, prereq chains)
 │   │   ├── principle-defs.ts       7 mathematical-principle definitions surfaced by `PrincipleOverlay` after the matching gameplay moment
-│   │   ├── probe-items.ts          Item pool for the Empirical Validity Probe forms (pre/post/delay)
-│   │   ├── wave-templates.ts       Wave template definitions
-│   │   ├── wave-generator.ts       Dynamic wave generation utilities
 │   │   ├── path-segment-types.ts   Piecewise path segment type constants
 │   │   └── ui-defs.ts              Panel layout, colour palette
 │   │

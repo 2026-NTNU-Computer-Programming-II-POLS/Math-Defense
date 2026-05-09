@@ -63,6 +63,14 @@ class ReplayEventRepository(Protocol):
         ``MAX_EVENTS_PER_SESSION`` server-side."""
         ...
 
+    def max_seq_for_session(self, session_id: str) -> int:
+        """Highest ``seq`` recorded for ``session_id``, or -1 when no events
+        exist. Used by the ingest path to enforce that a new batch's seqs
+        strictly exceed every previously recorded seq — without this, a
+        replay-spliced batch with stale or interleaved seqs could be
+        accepted into a session even if its top seq fell behind history."""
+        ...
+
     def list_for_session(self, session_id: str) -> list[ReplayEvent]:
         """All events for a session, ordered by ``seq`` ascending. The
         Replay player consumes this in a single batch — pagination would

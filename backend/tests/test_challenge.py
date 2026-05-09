@@ -183,6 +183,17 @@ def test_challenge_wave_count_enforced_on_end(client, db_session):
         json={"star_rating": 1, "challenge_id": cid},
         headers=_auth(student_token),
     ).json()["id"]
+    # B-BUG-8: post the waveEnd events the server uses to derive
+    # authoritative waves_survived; without them the server would clamp
+    # waves_survived to 0 and the cap-exceeded rejection wouldn't fire.
+    client.post(
+        f"/api/sessions/{sid}/events",
+        json={"events": [
+            {"seq": 1, "ts": 1.0, "event_type": "waveEnd", "payload": None},
+            {"seq": 2, "ts": 2.0, "event_type": "waveEnd", "payload": None},
+        ]},
+        headers=_auth(student_token),
+    )
     res = client.post(
         f"/api/sessions/{sid}/end",
         json={"score": 200, "kills": 5, "waves_survived": 2},

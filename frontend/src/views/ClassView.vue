@@ -2,11 +2,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useUiStore } from '@/stores/uiStore'
 import { classService, type ClassInfo, type Membership } from '@/services/classService'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const ui = useUiStore()
 
 const classes = ref<ClassInfo[]>([])
 const loading = ref(false)
@@ -119,7 +121,8 @@ async function addStudent(): Promise<void> {
 
 async function removeStudent(studentId: string, displayName: string): Promise<void> {
   if (!selectedClassId.value) return
-  if (!confirm(`Remove student "${displayName}"?`)) return
+  const ok = await ui.showConfirm('Remove student', `Remove student "${displayName}"?`, { confirmLabel: 'Remove' })
+  if (!ok) return
   try {
     await classService.removeStudent(selectedClassId.value, studentId)
     await selectClass(selectedClassId.value)
@@ -130,7 +133,12 @@ async function removeStudent(studentId: string, displayName: string): Promise<vo
 
 async function regenerateCode(classId: string): Promise<void> {
   if (regeneratingId.value) return
-  if (!confirm('Regenerate join code? The current code will stop working.')) return
+  const ok = await ui.showConfirm(
+    'Regenerate join code',
+    'Regenerate join code? The current code will stop working.',
+    { confirmLabel: 'Regenerate' },
+  )
+  if (!ok) return
   regeneratingId.value = classId
   try {
     const res = await classService.regenerateCode(classId)
@@ -192,7 +200,12 @@ async function saveRename(classId: string): Promise<void> {
 
 async function deleteClass(classId: string, className: string): Promise<void> {
   if (deletingClassId.value) return
-  if (!confirm(`Delete class "${className}"? This cannot be undone.`)) return
+  const ok = await ui.showConfirm(
+    'Delete class',
+    `Delete class "${className}"? This cannot be undone.`,
+    { confirmLabel: 'Delete' },
+  )
+  if (!ok) return
   deletingClassId.value = classId
   error.value = ''
   try {

@@ -45,8 +45,8 @@ export class TowerUpgradeSystem {
     const tier = def.upgrades[oldLevel - 1]
     if (!tier) return
 
-    game.changeGold(-cost)
-    game.addCost(cost)
+    game.economy.changeGold(-cost)
+    game.economy.addCost(cost)
     tower.upgradeSpend ??= 0
     tower.upgradeSpend += cost
     tower.level = oldLevel + 1
@@ -85,8 +85,8 @@ export class TowerUpgradeSystem {
     game.towers.splice(idx, 1)
     const base = Math.floor(tower.cost / 2) + Math.floor((tower.upgradeSpend ?? 0) / 2)
     const refund = Math.round(base * game.state.goldMultiplier)
-    game.changeGold(refund)
-    game.addCost(-refund)
+    game.economy.changeGold(refund)
+    game.economy.addCost(-refund)
     game.getSystem('buff')?.onTowerRemoved(game, towerId)
     game.eventBus.emit(Events.TOWER_REFUND_RESULT, { success: true, towerId })
   }

@@ -1,5 +1,13 @@
-import { EnemyType } from './constants'
-import type { WaveDef, EnemySpawnEntry } from './level-defs'
+import { EnemyType } from '@/data/constants'
+
+export interface EnemySpawnEntry {
+  readonly type: EnemyType
+}
+
+export interface WaveDef {
+  readonly spawnInterval: number
+  readonly enemies: ReadonlyArray<EnemySpawnEntry>
+}
 
 function s(type: EnemyType, n = 1): EnemySpawnEntry[] {
   return Array.from({ length: n }, () => ({ type }))

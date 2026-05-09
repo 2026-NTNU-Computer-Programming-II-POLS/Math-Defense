@@ -25,7 +25,7 @@ DTS = $(MAKEFILE_DIR)../frontend/src/math/wasm-exports.d.ts
 # Comma-list form is portable across cmd / sh. Kept on one line because Make
 # collapses backslash-continuations to a single space, and emcc's parser
 # rejects spaces embedded inside the comma list.
-EXPORTED_FUNCTIONS = _matrix_multiply,_sector_coverage,_point_in_sector,_numerical_integrate,_power_f64,_prng_seed,_prng_next_u32,_prng_next_f64,_curve_evaluate,_curve_derivative,_curve_in_domain,_find_pair_intersections,_find_all_curves_common_point,_count_common_intersections_in_interval,_compute_spawn_points,_generate_level,_malloc,_free
+EXPORTED_FUNCTIONS = _matrix_multiply,_sector_coverage,_point_in_sector,_numerical_integrate,_power_f64,_compute_total_score,_prng_seed,_prng_next_u32,_prng_next_f64,_curve_evaluate,_curve_derivative,_curve_in_domain,_find_pair_intersections,_find_all_curves_common_point,_count_common_intersections_in_interval,_compute_spawn_points,_generate_level,_malloc,_free
 EXPORTED_RUNTIME = ccall,cwrap,getValue,setValue
 
 # Determinism flags: forbid the compiler from rewriting transcendentals or

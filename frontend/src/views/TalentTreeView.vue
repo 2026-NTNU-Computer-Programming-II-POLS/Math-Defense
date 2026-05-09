@@ -6,9 +6,13 @@ import { recommendationService } from '@/services/recommendationService'
 import { TowerType } from '@/data/constants'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { useTalentStore } from '@/stores/talentStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useUiStore } from '@/stores/uiStore'
 
 const router = useRouter()
 const talentStore = useTalentStore()
+const authStore = useAuthStore()
+const uiStore = useUiStore()
 const tree = ref<TalentTreeOut | null>(null)
 const loading = ref(true)
 const loadError = ref('')
@@ -20,10 +24,17 @@ const allocating = computed(() => allocatingNodeId.value !== null)
 // two surfaces share one autonomy preference.
 const recommendedNodeId = ref<string | null>(null)
 const recommendedCompetency = ref<string | null>(null)
-const RECOMMENDATION_DISMISS_KEY = 'recommendation:dismissed'
+// F-BUG-7: namespace per user — shared lab devices used to leak one
+// student's "dismissed" pref onto the next student to log in. Falls back
+// to a sentinel namespace pre-login so the unauthenticated path never
+// cross-contaminates a real user.
+function dismissKey(): string {
+  const uid = authStore.user?.id ?? '__anon__'
+  return `recommendation:dismissed:${uid}`
+}
 const recommendationDismissed = ref<boolean>(
   typeof localStorage !== 'undefined'
-    && localStorage.getItem(RECOMMENDATION_DISMISS_KEY) === '1',
+    && localStorage.getItem(dismissKey()) === '1',
 )
 const showRecommendation = computed(
   () => recommendedNodeId.value !== null && !recommendationDismissed.value,
@@ -31,7 +42,7 @@ const showRecommendation = computed(
 function dismissRecommendation() {
   recommendationDismissed.value = true
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(RECOMMENDATION_DISMISS_KEY, '1')
+    localStorage.setItem(dismissKey(), '1')
   }
 }
 
@@ -77,7 +88,12 @@ async function allocate(nodeId: string): Promise<void> {
 
 async function resetTree(): Promise<void> {
   if (allocating.value) return
-  if (!confirm('Reset all talent points? All allocations will be refunded.')) return
+  const ok = await uiStore.showConfirm(
+    'Reset talent tree',
+    'Reset all talent points? All allocations will be refunded.',
+    { confirmLabel: 'Reset' },
+  )
+  if (!ok) return
   allocError.value = ''
   allocatingNodeId.value = '__reset__'
   try {

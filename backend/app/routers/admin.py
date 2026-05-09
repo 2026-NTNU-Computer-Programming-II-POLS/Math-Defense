@@ -62,10 +62,10 @@ def set_user_active(
     request: Request,
     user_id: str,
     req: SetUserActiveRequest,
-    _user: User = Depends(require_role(Role.ADMIN)),
+    requester: User = Depends(require_role(Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    u = build_admin_service(db).set_user_active(user_id, req.is_active)
+    u = build_admin_service(db).set_user_active(user_id, req.is_active, requester.id)
     return _to_user_out(u)
 
 

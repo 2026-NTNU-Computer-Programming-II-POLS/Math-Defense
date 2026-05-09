@@ -5,7 +5,11 @@ import uuid
 from datetime import datetime, UTC
 
 from app.domain.challenge.constraint_dsl import ChallengeConstraints
-from app.domain.errors import DomainValueError, PermissionDeniedError
+from app.domain.errors import (
+    ChallengeImmutableError,
+    DomainValueError,
+    PermissionDeniedError,
+)
 
 TITLE_MAX_LENGTH = 120
 DESCRIPTION_MAX_LENGTH = 500
@@ -112,7 +116,11 @@ class Challenge:
         does not import LeaderboardRepository.
         """
         if has_play_history:
-            raise DomainValueError(
+            # Raise the specific subtype directly so the application service
+            # does not need to translate based on its own input flag
+            # (B-ARCH-14 / B-ARCH-20). The aggregate owns the rule, so it
+            # also owns the error class that names it.
+            raise ChallengeImmutableError(
                 "constraints are immutable once the challenge has been played"
             )
         self.constraints = new_constraints

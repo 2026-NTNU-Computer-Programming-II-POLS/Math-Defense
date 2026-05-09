@@ -17,31 +17,15 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { Game } from '@/engine/Game'
-import { mulberry32 } from '@/math/MathUtils'
-import { generateLevel, generateLevelDeterministicFromSeed } from '@/domain/level/level-generator'
+import { registerSystems } from '@/engine/register-systems'
+import {
+  regenerate as regenerateLevel,
+  LevelGenerationFailedError,
+} from '@/services/levelGenerationService'
 import { initWasm, isUsingWasm, whenWasmReady } from '@/math/WasmBridge'
-import { buildWavesForStar } from '@/data/wave-generator'
+import { buildWavesForStar } from '@/domain/wave/wave-generator'
 import { sessionService, type ReplayBundleOut } from '@/services/sessionService'
 import { EventPlayer } from '@/engine/replay/EventPlayer'
-
-import { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
-import { CombatSystem } from '@/systems/CombatSystem'
-import { MovementSystem } from '@/systems/MovementSystem'
-import { WaveSystem } from '@/systems/WaveSystem'
-import { BuffSystem } from '@/systems/BuffSystem'
-import { EconomySystem } from '@/systems/EconomySystem'
-import { MagicTowerSystem } from '@/systems/MagicTowerSystem'
-import { RadarTowerSystem } from '@/systems/RadarTowerSystem'
-import { MatrixTowerSystem } from '@/systems/MatrixTowerSystem'
-import { LimitTowerSystem } from '@/systems/LimitTowerSystem'
-import { CalculusTowerSystem, PetCombatSystem } from '@/systems/CalculusTowerSystem'
-import { TowerUpgradeSystem } from '@/systems/TowerUpgradeSystem'
-import { EnemyAbilitySystem } from '@/systems/EnemyAbilitySystem'
-import { SpellSystem } from '@/systems/SpellSystem'
-import { MontyHallSystem } from '@/systems/MontyHallSystem'
-import { EnemyRenderer } from '@/renderers/EnemyRenderer'
-import { TowerRenderer } from '@/renderers/TowerRenderer'
-import { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
 import { createGeneratedLevelContext } from '@/engine/generated-level-context'
 import { Events } from '@/data/constants'
 
@@ -114,49 +98,41 @@ async function wireEngine(): Promise<void> {
   const seed = b.rng_seed ?? Date.now()
   g.setSeed(seed)
 
-  // Re-generate the level deterministically from the same seed. The level
-  // generator is pure on (starRating, rng), so a fresh stream from the
-  // same seed reproduces the exact GeneratedLevel that the live run saw.
-  // construction plan §3.8: v2 sessions go through the WASM determinism path so
+  // Re-generate the level deterministically from the recorded (seed,
+  // replay_version) pair. The level generator is pure on (starRating, rng),
+  // so a fresh stream from the same seed reproduces the exact GeneratedLevel
+  // the live run saw. v2 sessions go through the WASM determinism path so
   // every browser produces a bit-identical level; v1 stays on the JS path
-  // (mulberry32 + Math.* — within ε = 0.0005).
+  // within ε = 0.0005 (construction plan §3.8).
   let generatedLevel
-  if ((b.replay_version ?? 1) === 2) {
-    const v2Level = generateLevelDeterministicFromSeed(b.star_rating, seed)
-    if (!v2Level) {
-      loadError.value = 'Level could not be regenerated from the recorded seed (WASM v2 path).'
+  try {
+    generatedLevel = regenerateLevel(
+      b.star_rating,
+      seed,
+      (b.replay_version ?? 1) === 2 ? 2 : 1,
+    )
+  } catch (e) {
+    if (e instanceof LevelGenerationFailedError) {
+      loadError.value = e.message
       return
     }
-    generatedLevel = v2Level
-  } else {
-    const levelRng = mulberry32(seed)
-    generatedLevel = generateLevel(b.star_rating, levelRng)
+    throw e
   }
   g.generatedLevel = generatedLevel
   g.currentWaves = buildWavesForStar(b.star_rating)
 
-  // Wire systems (mirror useGameLoop's order). We omit session-sync,
-  // achievement toasts, and audio because none of those make sense in a
-  // historical replay.
-  g.addSystem('placement', new TowerPlacementSystem())
-  g.addSystem('enemyAbility', new EnemyAbilitySystem())
-  g.addSystem('combat', new CombatSystem())
-  g.addSystem('movement', new MovementSystem())
-  g.addSystem('wave', new WaveSystem())
-  g.addSystem('buff', new BuffSystem())
-  g.addSystem('economy', new EconomySystem())
-  g.addSystem('magicTower', new MagicTowerSystem())
-  g.addSystem('radarTower', new RadarTowerSystem())
-  g.addSystem('matrixTower', new MatrixTowerSystem())
-  g.addSystem('limitTower', new LimitTowerSystem())
-  g.addSystem('calculusTower', new CalculusTowerSystem())
-  g.addSystem('petCombat', new PetCombatSystem())
-  g.addSystem('towerUpgrade', new TowerUpgradeSystem())
-  g.addSystem('spell', new SpellSystem())
-  g.addSystem('montyHall', new MontyHallSystem())
-  g.addSystem('enemyRenderer', new EnemyRenderer())
-  g.addSystem('towerRenderer', new TowerRenderer())
-  g.addSystem('projectileRenderer', new ProjectileRenderer())
+  // Wire the canonical engine system list. Replay omits session-sync,
+  // achievement toasts, and audio (none of those make sense in a historical
+  // replay), but the system/renderer set itself is shared with the live
+  // GameView via registerSystems — preventing the silent drift that would
+  // happen if a new system were added in only one place. The placement /
+  // movement callbacks default to no-ops, which is correct for replay since
+  // tower placements come from the recorded event stream rather than UI.
+  registerSystems(g, {
+    getSelectedTowerType: () => null,
+    clearSelectedTowerType: () => { /* replay: no UI selection */ },
+    setLeadEnemyX: () => { /* replay: no path-panel mirror */ },
+  })
 
   // Bridge LEVEL_START so the level context is created before systems read
   // it (mirrors useGameLoop's setup minus the audio + session bits).

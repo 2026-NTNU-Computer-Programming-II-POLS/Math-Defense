@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, UTC
 
+from app.domain.user.constraints import PLAYER_NAME_MAX_LENGTH, PLAYER_NAME_MIN_LENGTH
 from app.domain.user.value_objects import Role
 
 
@@ -74,6 +75,62 @@ class User:
             role=role,
             password_hash=password_hash,
         )
+
+    AVATAR_URL_MAX_LENGTH = 2048
+
+    def rename(self, player_name: str) -> None:
+        """Validate and assign a new display name (B-BUG-19).
+
+        Domain-layer validation so direct attribute mutation cannot bypass
+        the rules. Empty / whitespace-only names are rejected; lengths are
+        bounded by the shared PLAYER_NAME_MIN/MAX_LENGTH constants so the
+        schema and the aggregate cannot drift.
+        """
+        if not isinstance(player_name, str):
+            raise ValueError("player_name must be a string")
+        cleaned = player_name.strip()
+        if len(cleaned) < PLAYER_NAME_MIN_LENGTH:
+            raise ValueError(
+                f"player_name must be at least {PLAYER_NAME_MIN_LENGTH} characters"
+            )
+        if len(cleaned) > PLAYER_NAME_MAX_LENGTH:
+            raise ValueError(
+                f"player_name exceeds {PLAYER_NAME_MAX_LENGTH} characters"
+            )
+        self.player_name = cleaned
+
+    def update_avatar(self, avatar_url: str | None) -> None:
+        """Validate and assign a new avatar URL (B-BUG-19).
+
+        ``None`` clears the avatar. Otherwise the URL must be non-empty and
+        within the column's storage bound.
+        """
+        if avatar_url is None:
+            self.avatar_url = None
+            return
+        if not isinstance(avatar_url, str):
+            raise ValueError("avatar_url must be a string or None")
+        cleaned = avatar_url.strip()
+        if not cleaned:
+            self.avatar_url = None
+            return
+        if len(cleaned) > self.AVATAR_URL_MAX_LENGTH:
+            raise ValueError(
+                f"avatar_url exceeds {self.AVATAR_URL_MAX_LENGTH} characters"
+            )
+        self.avatar_url = cleaned
+
+    def update_ia_accuracy(self, value: float) -> None:
+        """Set the rolling Initial-Answer accuracy (0.0–1.0). Clamps out-of-
+        range inputs rather than raising — callers come from the session
+        completion path and a slightly drifted reading is preferable to a
+        rolled-back end-session. Domain command lives here so cross-aggregate
+        callers don't mutate the field directly (B-ARCH-19)."""
+        if value < 0.0:
+            value = 0.0
+        elif value > 1.0:
+            value = 1.0
+        self.ia_recent_accuracy = value
 
     @property
     def is_admin(self) -> bool:

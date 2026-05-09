@@ -68,12 +68,14 @@ backend/data/
 *.db
 *.sqlite
 *.sqlite3
+backend/postgres
 
 # TLS certificates
 certs/
 
 # Claude Code
 .claude/
+**/CLAUDE.md
 
 # emsdk
 emsdk/

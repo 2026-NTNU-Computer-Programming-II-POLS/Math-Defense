@@ -15,6 +15,10 @@ function close(): void {
   uiStore.closeModal()
 }
 
+function cancel(): void {
+  uiStore.dismissModal({ force: true })
+}
+
 function trapFocus(event: KeyboardEvent): void {
   // Keep keyboard focus inside the modal while it's open
   if (event.key !== 'Tab') return
@@ -62,8 +66,8 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="modal-overlay"
-    @click.self="close"
-    @keydown.esc.prevent.stop="close"
+    @click.self="uiStore.modalConfirmMode ? cancel() : close()"
+    @keydown.esc.prevent.stop="uiStore.modalConfirmMode ? cancel() : close()"
     @keydown="trapFocus"
   >
     <div
@@ -76,7 +80,16 @@ onBeforeUnmount(() => {
     >
       <h3 :id="titleId" class="modal-title">{{ uiStore.modalTitle }}</h3>
       <p class="modal-message">{{ uiStore.modalMessage }}</p>
-      <button ref="okBtnRef" class="btn modal-ok" @click="close">OK</button>
+      <div class="modal-actions">
+        <button
+          v-if="uiStore.modalConfirmMode"
+          class="btn modal-cancel"
+          @click="cancel"
+        >{{ uiStore.modalCancelLabel }}</button>
+        <button ref="okBtnRef" class="btn modal-ok" @click="close">
+          {{ uiStore.modalConfirmMode ? uiStore.modalConfirmLabel : 'OK' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -113,5 +126,12 @@ onBeforeUnmount(() => {
   line-height: 1.8;
 }
 
-.modal-ok { align-self: center; min-width: 120px; }
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.modal-ok { min-width: 120px; }
+.modal-cancel { min-width: 120px; border-color: var(--axis); color: var(--axis); }
+.modal-cancel:hover { background: var(--axis); color: var(--stone-dark); }
 </style>

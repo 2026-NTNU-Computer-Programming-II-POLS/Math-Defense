@@ -15,6 +15,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.database import SessionLocal, get_db
 from app.domain.session.events_log import ReplayEvent
 from app.domain.user.aggregate import User
@@ -22,7 +23,6 @@ from app.factories import build_auth_service, build_replay_service
 from app.infrastructure.spectate_hub import hub as spectate_hub
 from app.limiter import limiter
 from app.middleware.auth import AUTH_COOKIE_NAME, get_current_user
-from app.models.game_session import GameSession as GameSessionModel
 from app.schemas.replay import (
     ReplayBatchIn,
     ReplayBatchOut,
@@ -115,11 +115,28 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
     # Authenticate via the access-token cookie (browser sends it on the WS
     # handshake automatically). Raw cookie parsing because Starlette's
     # Request is not available here.
+    # CSWSH defence: cookies attach to WS handshakes automatically and the
+    # CSRF middleware does not run on WS, so without an Origin check a
+    # malicious page could open a same-cookie WS to the victim's session.
+    # Reject any handshake whose Origin is not in the configured CORS
+    # allow-list. Browsers always send Origin on WS upgrades; a missing
+    # header indicates a non-browser client and is treated as untrusted.
+    origin = websocket.headers.get("origin")
+    if not origin or origin not in settings.cors_origins:
+        await websocket.close(code=4403, reason="forbidden origin")
+        return
+
     token = websocket.cookies.get(AUTH_COOKIE_NAME)
     if not token:
         await websocket.close(code=4401, reason="unauthenticated")
         return
 
+    # B-BUG-5: open the DB session only for auth + history bootstrap, then
+    # close it before entering the streaming loop. Holding a SessionLocal
+    # for the WS lifetime starves the connection pool — 11 spectators on a
+    # pool_size=10 engine block every HTTP route. The streaming loop reads
+    # from the in-process SpectateHub and does not need the database.
+    # Periodic auth re-validation reopens its own short-lived session.
     db = SessionLocal()
     try:
         try:
@@ -128,25 +145,15 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
             await websocket.close(code=4401, reason="unauthenticated")
             return
 
-        session_row = (
-            db.query(GameSessionModel)
-            .filter(GameSessionModel.id == str(session_id))
-            .first()
-        )
-        if session_row is None:
+        # Spectator authorization v1: owner-only via the application
+        # service so the router does not reach into ORM models. To extend
+        # to "class peers" later, swap the predicate inside
+        # ReplayApplicationService.authorize_spectator.
+        from app.domain.errors import SessionNotFoundError
+        try:
+            build_replay_service(db).authorize_spectator(str(session_id), user.id)
+        except SessionNotFoundError:
             await websocket.close(code=4404, reason="session not found")
-            return
-
-        # Spectator authorization v1: owner-only. The spec calls for
-        # "class peers" but classroom-scoped spectating depends on the
-        # teacher-class membership invariants (which session owner is
-        # in which class) being wired into a separate predicate. Until
-        # that lands, owner-only avoids leaking another student's
-        # input stream to anyone authenticated. To extend: replace the
-        # comparison below with a class-membership check that admits
-        # peers + teachers of the owner's class.
-        if session_row.user_id != user.id:
-            await websocket.close(code=4403, reason="forbidden")
             return
 
         await websocket.accept()
@@ -159,30 +166,60 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
         bundle = build_replay_service(db).get_replay(
             str(session_id), user.id,
         )
-        await websocket.send_json({
-            "kind": "snapshot",
-            "session_id": bundle.session_id,
-            "rng_seed": bundle.rng_seed,
-            "star_rating": bundle.star_rating,
-            "events": [
-                {
-                    "seq": e.seq,
-                    "ts": e.ts,
-                    "event_type": e.event_type,
-                    "payload": e.payload,
-                }
-                for e in bundle.events
-            ],
-        })
-
-        queue = await spectate_hub.subscribe(str(session_id))
-        try:
-            while True:
-                event = await queue.get()
-                await websocket.send_json({"kind": "event", **event})
-        except WebSocketDisconnect:
-            return
-        finally:
-            await spectate_hub.unsubscribe(str(session_id), queue)
     finally:
         db.close()
+
+    await websocket.send_json({
+        "kind": "snapshot",
+        "session_id": bundle.session_id,
+        "rng_seed": bundle.rng_seed,
+        "star_rating": bundle.star_rating,
+        "events": [
+            {
+                "seq": e.seq,
+                "ts": e.ts,
+                "event_type": e.event_type,
+                "payload": e.payload,
+            }
+            for e in bundle.events
+        ],
+    })
+
+    # Periodic auth re-validation (B-SEC-14): a long-lived WS would
+    # otherwise keep streaming after the underlying session was
+    # disabled (account banned, password rotated). Re-decode the
+    # cookie every N events and bail if the user is no longer
+    # entitled. Asynchronous I/O is bounded — this only runs when a
+    # frame arrives, which is the same cadence as the recorder's
+    # 1 Hz flushes, so worst case is a 1-second extension of access
+    # past revocation.
+    from app.domain.errors import DomainError
+
+    queue = await spectate_hub.subscribe(str(session_id))
+    events_since_revalidation = 0
+    revalidation_interval = 30
+    try:
+        while True:
+            event = await queue.get()
+            events_since_revalidation += 1
+            if events_since_revalidation >= revalidation_interval:
+                events_since_revalidation = 0
+                # B-BUG-5: re-validate against a fresh, short-lived session
+                # rather than holding one open for the WS lifetime.
+                revalidate_db = SessionLocal()
+                try:
+                    try:
+                        re_user = build_auth_service(revalidate_db).authenticate_token(token)
+                    except DomainError:
+                        await websocket.close(code=4401, reason="auth revoked")
+                        return
+                    if re_user.id != user.id or not re_user.is_active:
+                        await websocket.close(code=4401, reason="auth revoked")
+                        return
+                finally:
+                    revalidate_db.close()
+            await websocket.send_json({"kind": "event", **event})
+    except WebSocketDisconnect:
+        return
+    finally:
+        await spectate_hub.unsubscribe(str(session_id), queue)

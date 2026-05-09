@@ -8,7 +8,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/services/api'
-import { AFFECT_ITEMS, LIKERT_ANCHORS } from '@/data/probe-items'
+import { AFFECT_ITEMS, LIKERT_ANCHORS } from '@/domain/study/probe-items'
 import { isAffectPhase } from '@/views/study-helpers'
 import { studyService } from '@/services/studyService'
 

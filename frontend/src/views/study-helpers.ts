@@ -1,7 +1,7 @@
 /**
  * Shared utilities for the study probe + affect survey views.
  */
-import type { ProbeForm } from '@/data/probe-items'
+import type { ProbeForm } from '@/domain/study/probe-items'
 
 export const PROBE_FORMS_DEFAULT: ProbeForm = 'pre'
 

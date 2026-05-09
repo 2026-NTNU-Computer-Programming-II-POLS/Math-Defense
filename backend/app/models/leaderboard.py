@@ -28,7 +28,13 @@ class LeaderboardEntry(Base):
     session_id: Mapped[str | None] = mapped_column(String, ForeignKey("game_sessions.id", ondelete="SET NULL"), nullable=True)
     # Backlog §23 — non-NULL when entry comes from a challenge run; queried via
     # query_ranked_by_challenge so global / per-level leaderboards still work.
+    # B-BUG-4: CASCADE — when a challenge is deleted, its (potentially
+    # uncapped or wave-restricted) leaderboard entries must be removed too.
+    # Previously SET NULL caused those entries to fall back into the global
+    # ranking, where they polluted standings with scores that bypassed the
+    # normal per-level invariants. Cascading the delete keeps challenge runs
+    # contained to their challenge ranking.
     challenge_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("challenges.id", ondelete="SET NULL"), nullable=True,
+        String, ForeignKey("challenges.id", ondelete="CASCADE"), nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

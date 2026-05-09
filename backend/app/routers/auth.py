@@ -8,9 +8,8 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.database import get_db
 from app.domain.user.aggregate import User
-from app.factories import build_auth_service
-from app.infrastructure.persistence.session_repository import SqlAlchemySessionRepository
-from app.limiter import limiter
+from app.factories import build_auth_service, build_session_service
+from app.limiter import limiter, login_email_throttle_exceeded
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.middleware.csrf import mint_csrf_cookie
 from app.schemas.auth import (
@@ -99,7 +98,7 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         role=req.role,
     )
     logger.info("User registered: anon=%s", _anon(str(user.id)))
-    record_audit_event(request, "REGISTER", user.id, {"email": req.email, "role": user.role.value})
+    record_audit_event(request, "REGISTER", user.id, {"email_anon": _anon(req.email), "role": user.role.value})
     _set_auth_cookie(response, access_token)
     _set_refresh_cookie(response, refresh_token)
     mint_csrf_cookie(response)
@@ -116,11 +115,21 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def login(request: Request, response: Response, req: LoginRequest, db: Session = Depends(get_db)):
+    # B-SEC-12: layer a per-email throttle on top of per-IP rate-limiting and
+    # per-account lockout. Refuse before authentication so a distributed
+    # credential-stuffing attack against one account is bounded to
+    # LOGIN_EMAIL_LIMIT attempts per minute regardless of source IP.
+    if login_email_throttle_exceeded(req.email):
+        record_audit_event(request, "LOGIN_THROTTLED", None, {"email_anon": _anon(req.email)})
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts for this account. Try again in a minute.",
+        )
     try:
         user, token, mfa_required, refresh_token = build_auth_service(db).login(req.email, req.password)
         if mfa_required:
             logger.info("MFA challenge issued: anon=%s", _anon(str(user.id)))
-            record_audit_event(request, "LOGIN_MFA_REQUIRED", user.id, {"email": req.email})
+            record_audit_event(request, "LOGIN_MFA_REQUIRED", user.id, {"email_anon": _anon(req.email)})
             return TokenResponse(
                 id="",
                 email="",
@@ -130,7 +139,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
                 mfa_token=token,
             )
         logger.info("User logged in: anon=%s", _anon(str(user.id)))
-        record_audit_event(request, "LOGIN_SUCCESS", user.id, {"email": req.email})
+        record_audit_event(request, "LOGIN_SUCCESS", user.id, {"email_anon": _anon(req.email)})
         _set_auth_cookie(response, token)
         _set_refresh_cookie(response, refresh_token)
         mint_csrf_cookie(response)
@@ -143,7 +152,7 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
             is_email_verified=user.is_email_verified,
         )
     except Exception as e:
-        record_audit_event(request, "LOGIN_FAILURE", None, {"email": req.email, "error_type": type(e).__name__})
+        record_audit_event(request, "LOGIN_FAILURE", None, {"email_anon": _anon(req.email), "error_type": type(e).__name__})
         raise
 
 
@@ -164,8 +173,21 @@ def logout(
             build_auth_service(db).logout_token(token, refresh_token)
             record_audit_event(request, "LOGOUT", None, {"status": "success"})
         except Exception as exc:
-            logger.debug("Logout token revocation failed; proceeding with client-side logout", exc_info=exc)
-            record_audit_event(request, "LOGOUT", None, {"status": "failed_token_revocation"})
+            # B-SEC-20: surface revocation failures at WARNING (not DEBUG)
+            # so a denylist outage that silently leaves access tokens valid
+            # is visible in production logs. We still proceed with client-
+            # side cookie clear so a user trying to log out is never stuck.
+            logger.warning(
+                "Logout token revocation failed; cookies cleared client-side: %s",
+                type(exc).__name__,
+                exc_info=exc,
+            )
+            record_audit_event(
+                request,
+                "LOGOUT",
+                None,
+                {"status": "failed_token_revocation", "error_type": type(exc).__name__},
+            )
     _clear_auth_cookie(response)
     _clear_refresh_cookie(response)
     mint_csrf_cookie(response)
@@ -211,9 +233,7 @@ def get_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    ia_unlock_earned = SqlAlchemySessionRepository(db).has_correct_ia_session(
-        current_user.id
-    )
+    ia_unlock_earned = build_session_service(db).has_correct_ia_session(current_user.id)
     return AuthMeResponse(
         id=current_user.id,
         email=current_user.email,
@@ -328,7 +348,7 @@ def mfa_disable(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    build_auth_service(db).disable_mfa(current_user.id, req.current_password)
+    build_auth_service(db).disable_mfa(current_user.id, req.current_password, req.code)
     logger.info("MFA disabled: id=%s", current_user.id)
     record_audit_event(request, "MFA_DISABLED", current_user.id)
 

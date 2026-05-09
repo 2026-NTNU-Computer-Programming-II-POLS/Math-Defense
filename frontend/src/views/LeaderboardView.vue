@@ -24,7 +24,7 @@ const perPage = 20
 const DEBOUNCE_MS = 250
 
 // Global tab state
-const { entries, total, loading, error, fetch: fetchLb } = useLeaderboard()
+const { entries, total, loading, error, load: loadLb } = useLeaderboard()
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 
 // Personal tab state
@@ -63,7 +63,7 @@ function scheduleFetch(): void {
   if (debounceTimer !== null) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
     debounceTimer = null
-    if (activeTab.value === 'global') fetchLb(selectedLevel.value, currentPage.value)
+    if (activeTab.value === 'global') loadLb(selectedLevel.value, currentPage.value)
     else fetchPersonal(selectedLevel.value)
   }, DEBOUNCE_MS)
 }
@@ -95,7 +95,7 @@ watch(() => auth.isLoggedIn, (loggedIn) => {
 
 onMounted(() => {
   if (activeTab.value === 'personal') fetchPersonal(selectedLevel.value)
-  else fetchLb()
+  else loadLb()
 })
 onBeforeUnmount(() => {
   if (debounceTimer !== null) clearTimeout(debounceTimer)

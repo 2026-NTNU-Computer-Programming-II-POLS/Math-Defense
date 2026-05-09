@@ -37,6 +37,14 @@ class GameSessionRepository(Protocol):
 
     def find_stale_sessions(self, user_id: str) -> list[GameSession]: pass
 
+    def acquire_user_create_lock(self, user_id: str) -> None:
+        """Serialise concurrent create_session calls for the same user.
+
+        On PG, a transaction-scoped advisory lock keyed off the user id;
+        elsewhere a no-op (the unique-partial-index retry handles it).
+        Held until the surrounding transaction commits or rolls back."""
+        pass
+
     def save(self, session: GameSession) -> None: pass
 
     def save_all(self, sessions: list[GameSession]) -> None: pass

@@ -5,7 +5,10 @@ import bcrypt
 import jwt
 from app.config import settings
 
-_BCRYPT_MAX_BYTES = 72
+# Single source of truth for the bcrypt 72-byte input limit. Schema validators
+# and the demo-seed strength check both import this constant rather than
+# re-encoding the magic number (B-ARCH-16).
+BCRYPT_MAX_BYTES = 72
 
 
 def _encode_or_raise(password: str) -> bytes:
@@ -15,8 +18,8 @@ def _encode_or_raise(password: str) -> bytes:
     # callers (tests, scripts) can still reach these helpers; raise here so
     # truncation is never silently applied regardless of entry point.
     encoded = password.encode("utf-8")
-    if len(encoded) > _BCRYPT_MAX_BYTES:
-        raise ValueError(f"password exceeds bcrypt's {_BCRYPT_MAX_BYTES}-byte limit")
+    if len(encoded) > BCRYPT_MAX_BYTES:
+        raise ValueError(f"password exceeds bcrypt's {BCRYPT_MAX_BYTES}-byte limit")
     return encoded
 
 

@@ -10,6 +10,9 @@ const uiStore = useUiStore()
 
 const barRef = ref<HTMLDivElement | null>(null)
 let ro: ResizeObserver | null = null
+// Declared up here so onBeforeUnmount (which sits before selectTower) can
+// see it without a TDZ reference. selectTower assigns it.
+let shakeTimer: number | null = null
 
 // Publish the bar's rendered height as a CSS variable on the overlay root so
 // BuildPanel / Start Wave can reactively sit above it even if the bar ever
@@ -34,6 +37,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   ro?.disconnect()
   ro = null
+  // F-BUG-9: cancel the unaffordable-shake timeout so it doesn't fire
+  // against a torn-down component (Vue logs a warning, and shakingType
+  // mutates after unmount needlessly).
+  if (shakeTimer !== null) {
+    window.clearTimeout(shakeTimer)
+    shakeTimer = null
+  }
 })
 
 // ── Category filter ───────────────────────────────────────────────────────
@@ -118,7 +128,6 @@ function categoryCount(c: Category): number {
 // selection; now we refuse and trigger a one-shot shake so the click isn't
 // silent. Tracked per type so only the pressed button rattles.
 const shakingType = ref<TowerType | null>(null)
-let shakeTimer: number | null = null
 
 function selectTower(type: TowerType, def: { cost: number }): void {
   if (!canAfford(def.cost)) {

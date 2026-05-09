@@ -1,5 +1,5 @@
-import { EnemyType } from './constants'
-import type { EnemySpawnEntry } from './level-defs'
+import { EnemyType } from '@/data/constants'
+import type { EnemySpawnEntry } from './wave-generator'
 
 function s(type: EnemyType, n = 1): EnemySpawnEntry[] {
   return Array.from({ length: n }, () => ({ type }))

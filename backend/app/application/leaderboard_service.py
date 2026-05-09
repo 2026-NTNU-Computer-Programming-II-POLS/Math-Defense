@@ -5,7 +5,6 @@ import logging
 import uuid
 from typing import TYPE_CHECKING
 
-from app.domain.constraints import LEVEL_MAX_KILLS, LEVEL_MAX_WAVES
 from app.domain.errors import (
     ConstraintViolationError,
     DuplicateSubmissionError,
@@ -114,28 +113,11 @@ class LeaderboardApplicationService:
                     "Practice-mode sessions are not eligible for the leaderboard"
                 )
 
-            # Cross-validate client-reported ancillary stats against server
-            # state. `score` and `level` are taken directly from the session
-            # below; `kills`/`waves_survived` aren't persisted on the session
-            # (they live only on the SessionCompleted event), so we re-apply
-            # the same per-level ceilings the aggregate enforced at complete()
-            # time. This closes the A1/V1 forgery path where a client posts
-            # inflated ancillary stats on an otherwise legitimate session.
-            level_int = int(session.level)
-            if waves_survived > session.waves_survived:
-                raise SessionValidationError(
-                    "waves_survived exceeds server-tracked wave count"
-                )
-            wave_cap = LEVEL_MAX_WAVES.get(level_int)
-            if wave_cap is not None and waves_survived > wave_cap:
-                raise SessionValidationError(
-                    "waves_survived exceeds level maximum"
-                )
-            kill_cap = LEVEL_MAX_KILLS.get(level_int)
-            if kill_cap is not None and kills > kill_cap:
-                raise SessionValidationError(
-                    "kills exceed level maximum"
-                )
+            # The leaderboard entry below uses the session's authoritative
+            # kills / waves_survived (capped by GameSession.complete() at the
+            # aggregate boundary), so client-supplied values are ignored.
+            # No cap re-check is needed here — duplicating LEVEL_MAX_* would
+            # split the rule across two layers.
 
             # Domain rule: duplicate submission check
             existing = self._leaderboard_repo.find_by_session_id(session_id)

@@ -1,34 +1,34 @@
-"""Territory domain errors"""
+"""Territory domain errors. Status codes live in app.http_status_map."""
 from app.domain.errors import DomainError
 
 
 class ActivityNotFoundError(DomainError):
-    status_code = 404
+    pass
 
 
 class ActivityExpiredError(DomainError):
-    status_code = 409
+    pass
 
 
 class ActivityAlreadySettledError(DomainError):
-    status_code = 409
+    pass
 
 
 class SlotNotFoundError(DomainError):
-    status_code = 404
+    pass
 
 
 class TerritoryCapReachedError(DomainError):
-    status_code = 409
+    pass
 
 
 class ScoreNotHighEnoughError(DomainError):
-    status_code = 409
+    pass
 
 
 class NotActivityOwnerError(DomainError):
-    status_code = 403
+    pass
 
 
 class InvalidSessionError(DomainError):
-    status_code = 422
+    pass

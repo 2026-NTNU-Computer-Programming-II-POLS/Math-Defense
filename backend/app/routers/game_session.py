@@ -76,8 +76,6 @@ def update_session(
         str(session_id),
         current_user.id,
         current_wave=req.current_wave,
-        gold=req.gold,
-        hp=req.hp,
         score=req.score,
         kill_value=req.kill_value,
         cost_total=req.cost_total,

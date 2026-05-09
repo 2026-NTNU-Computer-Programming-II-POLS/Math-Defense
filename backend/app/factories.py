@@ -72,6 +72,22 @@ from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session as DbSession
 
+# B-ARCH-11: every builder previously instantiated its own
+# ``SqlAlchemyUnitOfWork(db)``. Multiple builders in the same request meant
+# multiple UoW wrappers — harmless because the underlying SQLAlchemy session
+# is shared, but architecturally noisy. Cache one UoW per ``db`` (which is
+# already request-scoped via ``Depends(get_db)``) so the request gets a
+# single UoW that is threaded through every service it touches.
+_UOW_ATTR = "_arch_request_uow"
+
+
+def _get_uow(db: "DbSession") -> SqlAlchemyUnitOfWork:
+    uow = getattr(db, _UOW_ATTR, None)
+    if uow is None:
+        uow = SqlAlchemyUnitOfWork(db)
+        setattr(db, _UOW_ATTR, uow)
+    return uow
+
 
 def build_auth_service(db: "DbSession") -> AuthApplicationService:
     return AuthApplicationService(
@@ -80,7 +96,7 @@ def build_auth_service(db: "DbSession") -> AuthApplicationService:
         token_denylist_repo=SqlAlchemyTokenDenylistRepository(db),
         email_verification_repo=SqlAlchemyEmailVerificationRepository(db),
         email_svc=SmtpEmailService(settings),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
         refresh_token_repo=SqlAlchemyRefreshTokenRepository(db),
     )
 
@@ -89,7 +105,7 @@ def build_admin_service(db: "DbSession") -> AdminApplicationService:
     return AdminApplicationService(
         user_repo=SqlAlchemyUserRepository(db),
         class_repo=SqlAlchemyClassRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )
 
 
@@ -97,8 +113,9 @@ def build_class_service(db: "DbSession") -> ClassApplicationService:
     return ClassApplicationService(
         class_repo=SqlAlchemyClassRepository(db),
         user_repo=SqlAlchemyUserRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
         territory_repo=SqlAlchemyTerritoryRepository(db),
+        session_repo=SqlAlchemySessionRepository(db),
     )
 
 
@@ -106,7 +123,7 @@ def build_replay_service(db: "DbSession") -> ReplayApplicationService:
     return ReplayApplicationService(
         session_repo=SqlAlchemySessionRepository(db),
         event_repo=SqlAlchemySessionEventRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )
 
 
@@ -114,19 +131,22 @@ def build_session_service(db: "DbSession") -> SessionApplicationService:
     return SessionApplicationService(
         session_repo=SqlAlchemySessionRepository(db),
         leaderboard_repo=SqlAlchemyLeaderboardRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
         achievement_svc=build_achievement_service(db),
         territory_repo=SqlAlchemyTerritoryRepository(db),
         assessment_svc=build_assessment_service(db),
         user_repo=SqlAlchemyUserRepository(db),
         challenge_repo=SqlAlchemyChallengeRepository(db),
+        # B-BUG-8: wire the replay event repo so end_session can derive
+        # waves_survived from the persisted log instead of trusting client.
+        event_repo=SqlAlchemySessionEventRepository(db),
     )
 
 
 def build_challenge_service(db: "DbSession") -> ChallengeApplicationService:
     return ChallengeApplicationService(
         challenge_repo=SqlAlchemyChallengeRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )
 
 
@@ -134,7 +154,7 @@ def build_assessment_service(db: "DbSession") -> AssessmentApplicationService:
     return AssessmentApplicationService(
         competency_repo=SqlAlchemyCompetencyStateRepository(db),
         q_matrix=Q_MATRIX,
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
         class_repo=SqlAlchemyClassRepository(db),
         user_repo=SqlAlchemyUserRepository(db),
     )
@@ -150,7 +170,7 @@ def build_leaderboard_service(db: "DbSession") -> LeaderboardApplicationService:
     return LeaderboardApplicationService(
         leaderboard_repo=SqlAlchemyLeaderboardRepository(db),
         session_repo=SqlAlchemySessionRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )
 
 
@@ -158,7 +178,7 @@ def build_achievement_service(db: "DbSession") -> AchievementApplicationService:
     return AchievementApplicationService(
         achievement_repo=SqlAlchemyAchievementRepository(db),
         session_repo=SqlAlchemySessionRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
         season_repo=SqlAlchemySeasonRepository(db),
     )
 
@@ -166,7 +186,7 @@ def build_achievement_service(db: "DbSession") -> AchievementApplicationService:
 def build_season_service(db: "DbSession") -> SeasonApplicationService:
     return SeasonApplicationService(
         season_repo=SqlAlchemySeasonRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )
 
 
@@ -175,14 +195,14 @@ def build_territory_service(db: "DbSession") -> TerritoryApplicationService:
         territory_repo=SqlAlchemyTerritoryRepository(db),
         class_repo=SqlAlchemyClassRepository(db),
         session_repo=SqlAlchemySessionRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )
 
 
 def build_study_service(db: "DbSession") -> StudyApplicationService:
     return StudyApplicationService(
         study_repo=SqlAlchemyStudyRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )
 
 
@@ -190,5 +210,5 @@ def build_talent_service(db: "DbSession") -> TalentApplicationService:
     return TalentApplicationService(
         talent_repo=SqlAlchemyTalentRepository(db),
         achievement_repo=SqlAlchemyAchievementRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
+        uow=_get_uow(db),
     )

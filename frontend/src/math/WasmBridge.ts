@@ -230,6 +230,72 @@ export function powerF64(base: number, exp: number): number {
   return Math.pow(base, exp)
 }
 
+// F-ARCH-3: single-source-of-truth V2 score formula. The C definition in
+// wasm/math_engine.c::compute_total_score is canonical; this wrapper calls
+// it when the WASM module exposes the export, otherwise it re-implements
+// the same algebra in JS so frontend builds continue to work against an
+// older .wasm that hasn't been rebuilt yet. The Python backend has the
+// matching mirror in app/domain/scoring/score_calculator.py and parity is
+// guarded by shared/score_parity_fixtures.json.
+//
+// Caller responsibility: pre-sum prep durations into prepSum so the WASM
+// ABI stays a flat scalar list (variable-length arrays would force a heap
+// allocation and complicate the parity fixtures).
+export function computeTotalScoreWasm(
+  killValue: number,
+  timeTotal: number,
+  prepSum: number,
+  costTotal: number,
+  healthOrigin: number,
+  healthFinal: number,
+  initialAnswer: 0 | 1,
+): number {
+  const m = _module
+  if (_useWasm && m && _hasComputeTotalScoreExport(m)) {
+    return m.ccall(
+      'compute_total_score',
+      'number',
+      ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [killValue, timeTotal, prepSum, costTotal, healthOrigin, healthFinal, initialAnswer],
+    )
+  }
+  return _computeTotalScoreJsFallback(
+    killValue, timeTotal, prepSum, costTotal, healthOrigin, healthFinal, initialAnswer,
+  )
+}
+
+// Cached so the export-existence probe only runs once per module load.
+let _hasComputeTotalScoreCache: boolean | null = null
+function _hasComputeTotalScoreExport(m: WasmModule): boolean {
+  if (_hasComputeTotalScoreCache !== null) return _hasComputeTotalScoreCache
+  // Emscripten exposes each EXPORTED_FUNCTIONS entry as Module._<name>; the
+  // property is undefined when the .wasm was built without it. cwrap doesn't
+  // validate at bind time (it lazily looks up Module['_' + name] only when
+  // called) so probing via cwrap would always return a function and route
+  // every call into a runtime throw on older binaries. Reading the export
+  // directly is the only safe pre-flight.
+  const direct = (m as unknown as Record<string, unknown>)._compute_total_score
+  _hasComputeTotalScoreCache = typeof direct === 'function'
+  return _hasComputeTotalScoreCache
+}
+
+function _computeTotalScoreJsFallback(
+  killValue: number,
+  timeTotal: number,
+  prepSum: number,
+  costTotal: number,
+  healthOrigin: number,
+  healthFinal: number,
+  initialAnswer: number,
+): number {
+  const activeTime = Math.max(0.001, timeTotal - prepSum)
+  const s1 = killValue / activeTime
+  const s2 = costTotal > 0 ? killValue / costTotal : 0
+  const k = s1 >= s2 ? 0.7 * s1 + 0.3 * s2 : 0.5 * s1 + 0.5 * s2
+  const exponentDenom = Math.max(1, 1 + (2 + healthOrigin - healthFinal - initialAnswer))
+  return powerF64(Math.max(0, k), 1 / exponentDenom)
+}
+
 // ── Bit-deterministic PRNG (PCG XSL-RR 64/32) ──
 //
 // Phase 1 of the determinism work (construction plan.md). Replaces mulberry32 for

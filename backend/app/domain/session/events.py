@@ -27,6 +27,9 @@ class SessionCompleted:
     # Backlog §23: when set, the leaderboard entry is tagged with this id so
     # it ranks under the challenge-specific view, not the global / per-level one.
     challenge_id: str | None = None
+    # B-BUG-20: surfaced on the event so the leaderboard handler can skip
+    # practice-mode runs without re-reading the session row.
+    practice_mode: bool = False
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
+import { gameCommands } from '@/services/gameCommandService'
 import { GamePhase } from '@/data/constants'
 
 const gameStore = useGameStore()
@@ -109,14 +110,14 @@ function selectCard(cardId: string): void {
   if (selectingCardId.value !== null) return
   selectingCardId.value = cardId
   armGuardFailsafe()
-  gameStore.selectBuffCard(cardId)
+  gameCommands.selectBuffCard(cardId)
 }
 
 function skipBuff(): void {
   if (selectingCardId.value !== null) return
   selectingCardId.value = ''
   armGuardFailsafe()
-  gameStore.selectBuffCard('')
+  gameCommands.selectBuffCard('')
 }
 </script>
 

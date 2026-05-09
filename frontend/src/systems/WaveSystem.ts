@@ -5,7 +5,7 @@ import {
   type SpawnDescriptor,
 } from '@/engine/generated-level-context'
 import type { Game } from '@/engine/Game'
-import type { EnemySpawnEntry } from '@/data/level-defs'
+import type { EnemySpawnEntry } from '@/domain/wave/wave-generator'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 
 export class WaveSystem {

@@ -7,7 +7,8 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authService } from '@/services/authService'
+import { authService, type MeResponse } from '@/services/authService'
+import { appBus } from '@/lib/app-bus'
 import router from '@/router'
 
 export type UserRole = 'admin' | 'teacher' | 'student'
@@ -27,10 +28,24 @@ export interface User {
 
 const TOKEN_PROBE_INTERVAL_MS = 15_000
 
+function mapMeResponseToUser(res: MeResponse): User {
+  return {
+    id: res.id,
+    email: res.email,
+    player_name: res.player_name,
+    role: res.role as UserRole,
+    avatar_url: res.avatar_url ?? null,
+    ia_unlock_earned: res.ia_unlock_earned ?? false,
+    ia_recent_accuracy: res.ia_recent_accuracy ?? 0,
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const initializing = ref(false)
   let probeTimer: ReturnType<typeof setInterval> | null = null
+  let probePageHideListener: (() => void) | null = null
+  let probePageShowListener: (() => void) | null = null
 
   let _initResolve: (() => void) | null = null
   const initPromise = ref<Promise<void> | null>(null)
@@ -46,15 +61,7 @@ export const useAuthStore = defineStore('auth', () => {
     initPromise.value = new Promise<void>((resolve) => { _initResolve = resolve })
     try {
       const res = await authService.me()
-      user.value = {
-        id: res.id,
-        email: res.email,
-        player_name: res.player_name,
-        role: res.role as UserRole,
-        avatar_url: res.avatar_url ?? null,
-        ia_unlock_earned: res.ia_unlock_earned ?? false,
-        ia_recent_accuracy: res.ia_recent_accuracy ?? 0,
-      }
+      user.value = mapMeResponseToUser(res)
       startTokenProbe()
     } catch {
       user.value = null
@@ -90,21 +97,56 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function startTokenProbe(): void {
-    if (probeTimer !== null) return
+    // Defensive: if a previous interval is still alive (race during BFCache
+    // restore or rapid login/logout cycles), kill it first so we never run
+    // two intervals against the same store.
+    if (probeTimer !== null) {
+      clearInterval(probeTimer)
+      probeTimer = null
+    }
     probeTimer = setInterval(async () => {
       if (user.value === null) { stopTokenProbe(); return }
+      if (typeof document !== 'undefined' && document.hidden) return
       try {
         await authService.me()
       } catch {
         // 401 branch in api.ts handles logout
       }
     }, TOKEN_PROBE_INTERVAL_MS)
+
+    // Install page-lifecycle listeners once. They persist across stop/start
+    // so a BFCache restore can resume polling even after stopTokenProbe.
+    if (typeof window !== 'undefined' && probePageHideListener === null) {
+      probePageHideListener = () => {
+        if (probeTimer !== null) {
+          clearInterval(probeTimer)
+          probeTimer = null
+        }
+      }
+      window.addEventListener('pagehide', probePageHideListener)
+    }
+    if (typeof window !== 'undefined' && probePageShowListener === null) {
+      probePageShowListener = () => {
+        // Resume only if we still believe we are logged in.
+        if (user.value !== null) startTokenProbe()
+      }
+      window.addEventListener('pageshow', probePageShowListener)
+    }
   }
 
   function stopTokenProbe(): void {
-    if (probeTimer === null) return
-    clearInterval(probeTimer)
-    probeTimer = null
+    if (probeTimer !== null) {
+      clearInterval(probeTimer)
+      probeTimer = null
+    }
+    if (probePageHideListener !== null && typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', probePageHideListener)
+      probePageHideListener = null
+    }
+    if (probePageShowListener !== null && typeof window !== 'undefined') {
+      window.removeEventListener('pageshow', probePageShowListener)
+      probePageShowListener = null
+    }
   }
 
   async function refreshProfile(): Promise<void> {
@@ -115,15 +157,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!user.value) return
     try {
       const res = await authService.me()
-      user.value = {
-        id: res.id,
-        email: res.email,
-        player_name: res.player_name,
-        role: res.role as UserRole,
-        avatar_url: res.avatar_url ?? null,
-        ia_unlock_earned: res.ia_unlock_earned ?? false,
-        ia_recent_accuracy: res.ia_recent_accuracy ?? 0,
-      }
+      user.value = mapMeResponseToUser(res)
     } catch {
       // 401 handler in api.ts deals with auth failures; transient errors are
       // intentionally swallowed so Star-5 keeps its previous gating state.
@@ -141,28 +175,28 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
+    // F-BUG-7: capture the user-id BEFORE clearAuth so we can scrub the
+    // per-user recommendation-dismiss key. Without this a shared lab
+    // device would leak one student's pref onto the next sign-in.
+    const previousUserId = user.value?.id ?? null
     try {
       await authService.logout()
     } catch {
       // Server-side invalidation is best-effort; always clear local state.
     }
     clearAuth()
+    if (previousUserId !== null && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(`recommendation:dismissed:${previousUserId}`)
+      } catch {
+        // localStorage unavailable (private mode); non-critical.
+      }
+    }
 
-    try {
-      const { useTalentStore } = await import('@/stores/talentStore')
-      useTalentStore().clear()
-    } catch { /* Pinia not installed yet */ }
-
-    try {
-      const { useTerritoryStore } = await import('@/stores/territoryStore')
-      useTerritoryStore().clear()
-    } catch { /* Pinia not installed yet */ }
-
-    try {
-      const { useUiStore } = await import('@/stores/uiStore')
-      const uiStore = useUiStore()
-      if (uiStore.modalVisible) uiStore.dismissModal()
-    } catch { /* Pinia not installed yet */ }
+    // F-ARCH-2: broadcast a single signal instead of dynamic-importing each
+    // store. Each store subscribes to its own teardown on init, so adding a
+    // new user-scoped store no longer requires editing this file.
+    appBus.emit('auth:logout', { previousUserId })
 
     const meta = router.currentRoute.value.meta
     if (meta.requiresAuth) {

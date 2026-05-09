@@ -48,9 +48,7 @@ export interface LevelContext {
 
 /**
  * Thrown by `createLevelContext` in dev builds when the level fails
- * `validateLevelPath`. Production builds skip the defensive assert and
- * assume CI (see `scripts/validate-levels.ts` from Phase 6) has already
- * caught structural issues.
+ * `validateLevelPath`. Production builds skip the defensive assert.
  */
 export class LevelValidationError extends Error {
   readonly errors: PathValidationError[]

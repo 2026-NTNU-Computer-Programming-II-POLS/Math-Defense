@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from app.domain.challenge.aggregate import Challenge
 from app.domain.challenge.constraint_dsl import ChallengeConstraints
-from app.domain.errors import ChallengeImmutableError, ChallengeNotFoundError
+from app.domain.errors import ChallengeNotFoundError
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
@@ -79,15 +79,12 @@ class ChallengeApplicationService:
             challenge = self.get(challenge_id)
             challenge.assert_owned_by(teacher_id)
             played = self._repo.has_play_history(challenge_id)
-            try:
-                challenge.replace_constraints(
-                    new_constraints, has_play_history=played
-                )
-            except ValueError as e:
-                # Aggregate raises DomainValueError when played; surface as 409.
-                if played:
-                    raise ChallengeImmutableError(str(e)) from e
-                raise
+            # The aggregate raises ChallengeImmutableError directly when
+            # ``played`` is True, so no service-level translation is needed
+            # (B-ARCH-14 / B-ARCH-20).
+            challenge.replace_constraints(
+                new_constraints, has_play_history=played
+            )
             self._repo.save(challenge)
             self._uow.commit()
             return challenge

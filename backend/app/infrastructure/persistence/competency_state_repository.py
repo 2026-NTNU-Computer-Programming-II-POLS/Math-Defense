@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session as DbSession
 
@@ -24,11 +25,35 @@ class SqlAlchemyCompetencyStateRepository:
 
     def find_by_user(self, user_id: str) -> CompetencyState:
         """Single SELECT: spec §8.5 forbids N+1 access."""
-        rows = (
+        return self._read_state(user_id, for_update=False)
+
+    def find_by_user_for_update(self, user_id: str) -> CompetencyState:
+        # B-BUG-6: read-modify-write on the Beta posterior under READ
+        # COMMITTED loses one of two concurrent updates because both
+        # transactions read the same alpha/beta and both upsert their
+        # locally-incremented value with `excluded.alpha`. Two layers of
+        # locking close the window:
+        #   1. Anchor on users.id FOR UPDATE so concurrent transactions
+        #      serialise even when no competency rows exist yet (with_for_
+        #      update on an empty competency rowset locks nothing — the
+        #      same cold-start trap as B-BUG-2).
+        #   2. with_for_update on the competency rows themselves so that
+        #      once rows exist, the read sees the post-commit state of the
+        #      previous winner.
+        self._db.execute(
+            text("SELECT id FROM users WHERE id = :uid FOR UPDATE"),
+            {"uid": user_id},
+        )
+        return self._read_state(user_id, for_update=True)
+
+    def _read_state(self, user_id: str, for_update: bool) -> CompetencyState:
+        q = (
             self._db.query(CompetencyStateModel)
             .filter(CompetencyStateModel.user_id == user_id)
-            .all()
         )
+        if for_update:
+            q = q.with_for_update()
+        rows = q.all()
         posteriors: dict[Competency, Beta] = {}
         for row in rows:
             try:

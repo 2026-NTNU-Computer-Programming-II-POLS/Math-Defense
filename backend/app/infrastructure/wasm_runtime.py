@@ -45,14 +45,35 @@ _lock = threading.Lock()
 _pow_fn: Callable[[float, float], float] | None = None
 _load_attempted = False
 
+# F-ARCH-3: cached binding for the canonical V2 score formula export. When
+# present, both client and server route the entire formula through this single
+# C function, removing the algebraic duplication the audit flagged. When the
+# .wasm hasn't been rebuilt with the export yet, get_total_score_fn() returns
+# None and the domain layer falls back to the Python mirror in score_calculator.
+_total_score_fn: Callable[[float, float, float, float, float, float, int], float] | None = None
+_total_score_load_attempted = False
+
 
 def _resolve_wasm_path() -> Path | None:
     override = os.environ.get("WASM_ENGINE_PATH")
     if override:
-        p = Path(override)
-        if p.is_file():
+        # Defence-in-depth: refuse to load a wasm binary from a path that
+        # walks outside an allowed root (.., symlink chains, /etc/...).
+        # An attacker who can flip an env var into the process is already
+        # game-over, but bounding it lets log review surface tampering and
+        # prevents a misconfiguration (e.g. WASM_ENGINE_PATH=/dev/zero)
+        # from instantiating wasmtime against arbitrary content.
+        try:
+            p = Path(override).resolve(strict=True)
+        except (OSError, RuntimeError):
+            logger.warning("WASM_ENGINE_PATH=%s could not be resolved", override)
+            p = None
+        if p is not None and p.is_file() and p.suffix == ".wasm":
             return p
-        logger.warning("WASM_ENGINE_PATH=%s does not exist, falling back to defaults", override)
+        logger.warning(
+            "WASM_ENGINE_PATH=%s rejected (must be an existing .wasm file); falling back to defaults",
+            override,
+        )
     for p in _DEFAULT_PATHS:
         if p.is_file():
             return p
@@ -153,3 +174,88 @@ def is_wasm_loaded() -> bool:
     rejection (v2 + WASM) and tolerance-based logging (everything else)."""
     fn = get_pow_fn()
     return fn is not pow  # type: ignore[comparison-overlap]
+
+
+def _load_wasm_total_score() -> Callable[[float, float, float, float, float, float, int], float] | None:
+    """Bind ``compute_total_score`` from math_engine.wasm.
+
+    Re-instantiates the module rather than reusing the pow store because the
+    pow loader closes over its own (Store, Instance) pair and does not expose
+    them. Total-score calls happen only at session-end (low rate), so the
+    extra instance is negligible.
+    """
+    try:
+        import wasmtime  # type: ignore[import-untyped]
+    except ImportError:
+        return None
+
+    path = _resolve_wasm_path()
+    if path is None:
+        return None
+
+    try:
+        engine = wasmtime.Engine()
+        module = wasmtime.Module.from_file(engine, str(path))
+        linker = wasmtime.Linker(engine)
+
+        def _resize_heap_stub(_pages: int) -> int:
+            logger.error("emscripten_resize_heap fired during compute_total_score path — should not happen")
+            return 0
+
+        linker.define_func(
+            "env",
+            "emscripten_resize_heap",
+            wasmtime.FuncType([wasmtime.ValType.i32()], [wasmtime.ValType.i32()]),
+            _resize_heap_stub,
+        )
+
+        store = wasmtime.Store(engine)
+        instance = linker.instantiate(store, module)
+        exports = instance.exports(store)
+
+        ctors = exports.get("__wasm_call_ctors")
+        if ctors is not None:
+            ctors(store)
+
+        wasm_fn = exports.get("compute_total_score")
+        if wasm_fn is None:
+            # Older binary that hasn't been rebuilt with the F-ARCH-3 export yet.
+            # Domain layer falls back to its Python mirror; parity stays guarded by
+            # shared/score_parity_fixtures.json.
+            return None
+
+        def _compute(kill_value: float, time_total: float, prep_sum: float,
+                     cost_total: float, health_origin: float, health_final: float,
+                     initial_answer: int) -> float:
+            with _lock:
+                return float(wasm_fn(
+                    store,
+                    float(kill_value), float(time_total), float(prep_sum),
+                    float(cost_total), float(health_origin), float(health_final),
+                    int(initial_answer),
+                ))
+
+        logger.info("[wasm_runtime] loaded compute_total_score — score path bit-exact")
+        return _compute
+    except Exception:
+        logger.exception("[wasm_runtime] failed to load compute_total_score")
+        return None
+
+
+def get_total_score_fn() -> Callable[[float, float, float, float, float, float, int], float] | None:
+    """Return a WASM-backed compute_total_score callable, or None when the
+    binary lacks the export. Caller must fall back to the Python mirror.
+
+    Cached across the process lifetime; failed lookups are not retried for the
+    same reason as get_pow_fn.
+    """
+    global _total_score_fn, _total_score_load_attempted
+    if _total_score_fn is not None:
+        return _total_score_fn
+    with _lock:
+        if _total_score_fn is not None:
+            return _total_score_fn
+        if not _total_score_load_attempted:
+            _total_score_load_attempted = True
+            _total_score_fn = _load_wasm_total_score()
+        return _total_score_fn

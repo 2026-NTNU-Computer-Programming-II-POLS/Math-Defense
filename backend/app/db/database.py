@@ -18,12 +18,17 @@ class Base(DeclarativeBase):
 
 
 def get_db():
+    # B-BUG-9: no auto-commit on yield exit. All writes go through UoW; an
+    # auto-commit here would race the UoW pattern and flush mid-state work
+    # that a route deliberately did not commit. Rollback any uncommitted
+    # state so a half-built transaction never escapes.
     db = SessionLocal()
     try:
         yield db
-        db.commit()
     except Exception:
         db.rollback()
         raise
+    else:
+        db.rollback()
     finally:
         db.close()

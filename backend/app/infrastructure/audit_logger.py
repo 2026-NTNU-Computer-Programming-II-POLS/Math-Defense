@@ -24,7 +24,10 @@ def record_audit_event(
     from app.db.database import SessionLocal
 
     ip_address = _get_real_client_ip(request)
-    user_agent = request.headers.get("user-agent", "")
+    # Cap UA so a hostile or buggy client cannot inflate audit storage with a
+    # multi-megabyte header. 512 chars is generous for legitimate UAs while
+    # bounding the worst-case row size for the (uncapped) audit_logs table.
+    user_agent = (request.headers.get("user-agent", "") or "")[:512]
     details_str = json.dumps(details) if details else None
 
     log_entry = AuditLog(

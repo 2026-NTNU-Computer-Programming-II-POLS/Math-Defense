@@ -212,8 +212,9 @@ const router = createRouter({
 router.beforeEach(() => {
   const ui = useUiStore()
   if (ui.modalVisible) {
-    ui.modalCallback = null
-    ui.modalVisible = false
+    // dismissModal handles resolving any pending showConfirm promise as
+    // cancelled — direct mutation of modalVisible/modalCallback would leak it.
+    ui.dismissModal({ force: true })
   }
   return true
 })

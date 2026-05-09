@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class CompetencyStateRepository(Protocol):
     def find_by_user(self, user_id: str) -> CompetencyState: ...
+    def find_by_user_for_update(self, user_id: str) -> CompetencyState: ...
     def find_by_users(self, user_ids: list[str]) -> dict[str, CompetencyState]: ...
     def save(self, state: CompetencyState) -> None: ...
 
@@ -84,7 +85,9 @@ class AssessmentApplicationService:
         if all(w == 0.0 for w in row.values()):
             return
         with self._uow:
-            state = self._repo.find_by_user(user_id)
+            # B-BUG-6: lock rows on the read so concurrent evidence events
+            # for the same (user, competency) cannot lose-update each other.
+            state = self._repo.find_by_user_for_update(user_id)
             updated = state.apply_event(self._q_matrix, event_id, success)
             self._repo.save(state)
             self._uow.commit()
@@ -105,7 +108,9 @@ class AssessmentApplicationService:
         if not events:
             return
         with self._uow:
-            state = self._repo.find_by_user(user_id)
+            # B-BUG-6: lock rows on the read so concurrent evidence events
+            # for the same (user, competency) cannot lose-update each other.
+            state = self._repo.find_by_user_for_update(user_id)
             for event_id, success in events:
                 try:
                     state.apply_event(self._q_matrix, event_id, success)
