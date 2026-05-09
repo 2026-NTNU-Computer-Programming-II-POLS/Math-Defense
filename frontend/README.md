@@ -561,7 +561,7 @@ npm install
 npm run dev        # Vite dev server at http://localhost:5173
 npm run build      # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
 npm run preview    # Preview the production build
-npm test           # Vitest — 41 test files
+npm test           # Vitest — 50 test files
 npm run test:watch # Vitest in watch mode
 ```
 
@@ -604,20 +604,28 @@ src/components/game/LimitQuestionPanel.test.ts
 src/components/game/RadarConfigPanel.test.ts
 src/components/game/PrincipleOverlay.test.ts
 src/views/LevelSelectView.test.ts
-src/data/principle-defs.test.ts                Principle/tower/moment integrity
+src/composables/principle-defs.test.ts         Principle/tower/moment integrity
 src/data/tower-defs.test.ts
 src/data/achievement-defs.test.ts              Bans trait-praise vocabulary; verb-led descriptions
 src/math/limit-evaluator.test.ts
 src/math/curve-renderer.test.ts
-src/math/WasmBridge.test.ts                    JS-only parity (fallback surface + numerical invariants)
-src/math/WasmBridge.wasm.test.ts               JS ↔ WASM parity under Node (requires math_engine.* built)
+src/math/WasmBridge.test.ts                    JS fallback surface + core numerical invariants
+src/math/WasmBridge.curve.test.ts              JS curve evaluator / derivative / in-domain parity
+src/math/WasmBridge.prng.test.ts               JS PCG PRNG output parity
+src/math/WasmBridge.wasm.test.ts               WASM vs JS top-level parity gate (requires math_engine.* built)
+src/math/WasmBridge.curve.wasm.test.ts         WASM curve functions numerical parity
+src/math/WasmBridge.prng.wasm.test.ts          WASM PCG PRNG sequence parity
+src/math/WasmBridge.intersect.wasm.test.ts     WASM intersection-solver parity
+src/math/WasmBridge.spawn.wasm.test.ts         WASM spawn-point calculator parity
+src/math/WasmBridge.levelgen.wasm.test.ts      WASM generate_level end-to-end parity
+src/domain/scoring/score-calculator.parity.test.ts  Frontend ↔ backend S1/S2/K score formula parity
 src/systems/__tests__/*.test.ts                BuffSystem, BuffSystem.duration, BuffSystem.effects,
                                                CombatSystem, EconomySystem, EnemyAbilitySystem,
                                                MovementSystem, TowerPlacementSystem,
                                                TowerUpgradeSystem, WaveSystem
 ```
 
-Vitest is configured with `happy-dom` so systems can be tested without a real browser. The WASM-bridge test files split responsibilities: `WasmBridge.test.ts` pins the JS fallback's behaviour without loading the binary, and `WasmBridge.wasm.test.ts` loads the compiled module under Node to assert numerical parity (skipped if the WASM build is absent).
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. The WASM-bridge test files are split by concern: `WasmBridge.test.ts` pins the JS fallback surface; `WasmBridge.curve.test.ts` / `WasmBridge.prng.test.ts` cover JS-only parity for curve and PRNG subsystems; `WasmBridge.wasm.test.ts` and the seven `*.wasm.test.ts` siblings load the compiled binary under Node and assert bit-level parity for each subsystem (skipped if the WASM build is absent).
 
 ---
 

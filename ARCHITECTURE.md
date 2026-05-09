@@ -18,13 +18,13 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 
 | Path | Role |
 |---|---|
-| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~49 Vitest files (~329 cases). |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic migrations, ~26 pytest files (~325 cases). |
+| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~50 Vitest files (~329 cases). |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic migrations, ~25 pytest files (~325 cases). |
 | `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (16 exported functions: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). |
 | `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
 | `shared/` | `game-constants.json` — single source of truth for canvas/grid/economy values. |
 | `assets/` | Sprites, audio, fonts (referenced as `frontend/public/`). |
-| `docs/` | Project documentation (this file lives here). |
+| `docs/` | Project documentation (analysis, audit, educational theory). |
 | `docker-compose.yml` | Dev orchestration: Postgres + backend (hot reload) + Vite dev server. |
 | `docker-compose.prod.yml` | Production: self-contained images, nginx + TLS termination. |
 | `nginx.conf`, `nginx-tls.conf` | SPA fallback + `/api` reverse proxy + CSP headers. |
@@ -130,7 +130,7 @@ flowchart LR
 
     subgraph Infra["Infrastructure Layer<br/>backend/app/infrastructure/"]
         UoW["SqlAlchemyUnitOfWork"]
-        Repos["SqlAlchemy Repositories<br/>session · user · leaderboard ·<br/>achievement · talent · class ·<br/>territory · challenge · season"]
+        Repos["SqlAlchemy Repositories<br/>session · user · leaderboard ·<br/>achievement · talent · class ·<br/>territory · challenge · season ·<br/>competency_state · session_event · study"]
         LoginGuard[LoginGuard<br/>brute-force lockout]
         Denylist[Token Denylist]
         Refresh[Refresh-Token Store<br/>rotating · hashed]
@@ -299,7 +299,7 @@ sequenceDiagram
 | `challenge.py` | `/api/challenges` | constraint DSL CRUD, soft-delete |
 | `replay.py` | `/api/sessions/{id}/events`, `/replay`, `/spectate` (WS) | append-only event log + live spectate |
 | `study.py` | `/api/study` | enroll, probe, affect, CSV export |
-| `season.py` | `/api/seasons` | windowed multipliers (admin) |
+| `achievement.py` (seasons_router) | `/api/seasons` | windowed multipliers (admin); `seasons_router` is a sub-router defined in `achievement.py` and mounted separately — there is no standalone `season.py` |
 
 Cross-cutting: `slowapi` rate limits per endpoint, `CsrfMiddleware` (double-submit cookie), `SecurityHeadersMiddleware` (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, no-store on `/api/auth`), `CORSMiddleware` (explicit allow-list, mirrored in nginx for production).
 
@@ -417,7 +417,7 @@ flowchart TB
 
     subgraph Math["math/ (frontend/src/math)"]
         Bridge["WasmBridge.ts<br/>RAII float buffers · JS fallback"]
-        Wasm[("math_engine.wasm<br/>9 exported C functions")]
+        Wasm[("math_engine.wasm<br/>16 exported C functions")]
         Utils[MathUtils · RandomUtils · curve-evaluator ·<br/>intersection-solver · limit-evaluator ·<br/>chain-rule-generator · expressionParser]
     end
 
@@ -622,7 +622,7 @@ erDiagram
         int score
         int kills
         int waves_survived
-        int total_score
+        float total_score
         bigint rng_seed
         uuid challenge_id FK "nullable"
         timestamptz started_at
@@ -639,7 +639,7 @@ erDiagram
         bigserial id PK
         uuid session_id FK
         int seq
-        timestamptz ts
+        float ts
         string event_type
         jsonb payload
     }
@@ -774,7 +774,7 @@ sequenceDiagram
 ### 8.2 Defenses at a glance
 
 - **Password storage**: bcrypt; minimum length and char-class checks.
-- **Access tokens**: HS256 JWT, 30-minute TTL, claims include `sub`, `jti`, `password_version` (changing password globally invalidates outstanding tokens).
+- **Access tokens**: HS256 JWT, 15-minute TTL (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`), claims include `sub`, `jti`, `pv` (password_version), `exp`, `iat`, `iss`, `aud`. Changing the password increments `pv`, globally invalidating outstanding tokens.
 - **Refresh tokens**: rotating; SHA-256 hashed at rest; `used` flag flips on rotation; `revoked` flag for logout-all.
 - **Token denylist**: `denied_tokens.jti` set on logout; pruned at natural expiry by the auth janitor (every 10 min).
 - **Brute-force lockout**: per-account 5 failures / 5 min → 5m, 15m, 1h, 24h backoff. Returns `429` + `Retry-After`.
@@ -843,14 +843,14 @@ All scheduled inside the FastAPI lifespan as asyncio tasks (`backend/app/infrast
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~325 tests across 26 files)
+### Backend (pytest, ~325 tests across 25 files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
 - **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
 
-### Frontend (Vitest + happy-dom, ~49 files)
+### Frontend (Vitest + happy-dom, ~50 files)
 
 - Engine systems, GameState and PhaseStateMachine.
 - Domain policies (split, level-generator, path-validator, placement-policy).
@@ -906,7 +906,7 @@ backend/
     routers/                     # FastAPI routers (thin adapters)
     schemas/                     # Pydantic DTOs
   alembic/                       # migrations
-  tests/                         # ~315 pytest tests
+  tests/                         # ~325 pytest tests
 
 frontend/
   src/

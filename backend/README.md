@@ -173,6 +173,7 @@ backend/
 │   ├── test_domain_invariants.py          — cross-aggregate invariant tests
 │   ├── test_shared_constants_parity.py    — Python ↔ shared/game-constants.json parity
 │   ├── test_score_verify.py               — server-side score recomputation vs client claim
+│   ├── test_score_calculator_parity.py    — backend ↔ frontend S1/S2/K score formula parity
 │   ├── test_achievement.py                — achievement unlock / summary / isolation / seasonal multiplier
 │   ├── test_talent.py                     — talent tree allocate / reset / modifiers
 │   ├── test_class.py                      — class CRUD, join, rename, student management
@@ -185,7 +186,7 @@ backend/
 │   ├── test_study.py                      — enrollment, probe + affect submission, admin CSV export
 │   ├── test_recommender.py                — adaptive recommendation against synthetic posteriors
 │   └── test_wasm_runtime.py               — wasmtime-py singleton load + fallback + thread-safety (FU-A); v2 strict-rejection lives in test_score_verify.py
-│   # 26 test files / ~325 tests total
+│   # 25 test files / ~325 tests total
 │
 ├── requirements.txt
 └── Dockerfile
@@ -277,7 +278,7 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 | POST | `/api/auth/logout` | 30/min | Revoke current token — adds JTI to deny-list until natural expiry; clears cookie |
 | GET | `/api/auth/me` | 30/min | Current user |
 
-Token: HS256 JWT, 30-minute expiry (configurable). Passwords: bcrypt, ≥8 chars with letter + digit. Logout is server-side: the JTI is denied even if the token has not yet expired. Login failures are tracked per-account (`login_guard`): 5 consecutive failures within 5 minutes trigger a 5-minute lockout (`AccountLockedError` → `429`).
+Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`); claims include `sub`, `jti`, `pv`, `exp`, `iat`, `iss`, `aud`. Passwords: bcrypt, ≥8 chars with letter + digit. Logout is server-side: the JTI is denied even if the token has not yet expired. Login failures are tracked per-account (`login_guard`): 5 consecutive failures within 5 minutes trigger a 5-minute lockout (`AccountLockedError` → `429`).
 
 ### Game Sessions — `/api/sessions`
 
@@ -525,7 +526,7 @@ docker-compose up backend        # from project root
 | `POSTGRES_PASSWORD` | Yes (Docker) | Password for the `postgres` service. Must match the password embedded in `DATABASE_URL`. |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins. No default — an absent value raises at startup rather than silently defaulting to localhost in prod. |
 | `ALGORITHM` | No | JWT algorithm (default `HS256`) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `30` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `15` |
 | `SESSION_STALE_CUTOFF_HOURS` | No | Default `2.0`; active sessions older than this are auto-abandoned |
 | `COOKIE_SECURE` | No | Default `true`. Sets `Secure` flag on the auth cookie. Only `false` is honoured under CI/pytest — outside tests, startup aborts so plain-HTTP deployments cannot silently leak cookies. |
 | `CSRF_ENABLED` | No | Default `true` outside the pytest/CI harness. `CsrfMiddleware` enforces a double-submit cookie (`csrf_token` cookie + `X-CSRF-Token` header) on unsafe methods whenever the auth cookie is present. Only `false` is honoured under CI/pytest; deployed environments that set it to `false` abort at startup. |
@@ -537,7 +538,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                      # ~325 tests across 26 files
+pytest                                      # ~325 tests across 25 files
 pytest tests/test_session_aggregate.py -v   # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v       # audit-driven edge cases
 pytest tests/test_territory.py -v           # territory integration tests
@@ -582,9 +583,25 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter).
 | `GET /talents/modifiers` | 60/min |
 | `POST /talents/{node_id}/allocate` | 30/min |
 | `POST /talents/reset` | 10/min |
+| `POST /classes` | 10/min |
+| `GET /classes` | 30/min |
+| `GET /classes/{id}` | 30/min |
+| `PUT /classes/{id}` | 10/min |
+| `DELETE /classes/{id}` | 10/min |
+| `POST /classes/join` | 10/min |
+| `POST /classes/{id}/regenerate-code` | 5/min |
+| `POST /classes/{id}/students` | 30/min |
+| `GET /classes/{id}/students` | 30/min |
+| `DELETE /classes/{id}/students/{student_id}` | 30/min |
+| `GET /admin/teachers` | 30/min |
+| `GET /admin/classes` | 30/min |
+| `GET /admin/students` | 30/min |
 | `POST /activities` | 10/min |
 | `GET /activities` | 30/min |
+| `GET /activities/{id}` | 30/min |
 | `POST /activities/{id}/slots/{slot_id}/play` | 30/min |
+| `GET /activities/{id}/rankings` | 30/min |
+| `GET /activities/{id}/external-rankings` | 30/min |
 | `POST /activities/{id}/settle` | 5/min |
 | `GET /seasons` | 60/min |
 | `POST /seasons` | 10/min |

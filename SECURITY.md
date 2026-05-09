@@ -26,7 +26,7 @@ The application is a Vue 3 single-page application backed by a FastAPI REST API 
 
 ### Tokens and Cookies
 
-Authentication uses short-lived JWT tokens (30-minute expiry by default, configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). Tokens are delivered as `HttpOnly`, `SameSite=Lax` cookies. The `Secure` flag is enforced at startup: attempting to disable it outside of the CI/test harness causes the application to refuse to start.
+Authentication uses short-lived JWT tokens (15-minute expiry by default, configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). Tokens are delivered as `HttpOnly`, `SameSite=Lax` cookies. The `Secure` flag is enforced at startup: attempting to disable it outside of the CI/test harness causes the application to refuse to start.
 
 Tokens carry the following claims, all of which are validated at decode time:
 
@@ -42,13 +42,13 @@ The signing algorithm is pinned to `HS256` in the decode call; the library's def
 
 ### Token Revocation
 
-On logout, the token's `jti` is inserted into a persistent PostgreSQL deny-list table with its expiry timestamp. Expired entries are pruned on insertion so the table does not grow unboundedly. This means revocation survives application restarts.
+On logout, the token's `jti` is inserted into a persistent PostgreSQL deny-list table with its expiry timestamp. A background janitor task runs every 10 minutes and bulk-deletes rows whose `expires_at` has passed, so the table stays bounded without touching the hot insertion path. This means revocation survives application restarts.
 
 Password changes increment the user's `password_version` field. Any token whose `pv` claim does not match the current value is rejected at the dependency level before reaching route handlers.
 
 ### Account Lockout
 
-After five consecutive failed login attempts within a five-minute window, the account is locked for five minutes. The lockout state is stored in the database and updated with a PostgreSQL `INSERT ... ON CONFLICT DO UPDATE` statement to avoid race conditions under concurrent login attempts. A dummy bcrypt comparison is performed for usernames that do not exist, so response timing does not reveal whether an account exists.
+After five consecutive failed login attempts within a five-minute window, the account is locked. The lockout duration escalates with each successive lockout: 5 minutes → 15 minutes → 1 hour → 24 hours (exponential backoff tracked by `login_attempts.lockout_count`). The lockout state is stored in the database and updated with a PostgreSQL `INSERT ... ON CONFLICT DO UPDATE` statement to avoid race conditions under concurrent login attempts. A dummy bcrypt comparison is performed for usernames that do not exist, so response timing does not reveal whether an account exists.
 
 ### Password Hashing
 
@@ -95,18 +95,14 @@ Allowed origins are read from the `CORS_ORIGINS` environment variable (comma-sep
 
 ## Rate Limiting
 
-The following per-IP rate limits are enforced via `slowapi`:
+Per-IP rate limits are enforced via `slowapi`. The auth-critical endpoints are listed here; the full table (sessions, leaderboard, achievements, talents, challenges, etc.) is in `backend/README.md`.
 
 | Endpoint | Limit |
 |---|---|
-| `POST /register` | 5 requests/minute |
-| `POST /login` | 10 requests/minute |
-| `POST /logout` | 30 requests/minute |
-| `POST /change-password` | 5 requests/minute |
-| `GET /me` | 30 requests/minute |
-| `PATCH /profile/avatar` | 10 requests/minute |
-
-When running behind a reverse proxy, set `PROXY_MODE=true` and `TRUSTED_PROXY_IPS` to a comma-separated list of trusted proxy IP addresses. If `PROXY_MODE=true` is set without `TRUSTED_PROXY_IPS`, the application logs a warning and falls back to the raw socket IP, which may not correctly identify client IPs behind load balancers.
+| `POST /api/auth/register` | 5 requests/minute |
+| `POST /api/auth/login` | 10 requests/minute |
+| `POST /api/auth/logout` | 30 requests/minute |
+| `GET /api/auth/me` | 30 requests/minute |
 
 ---
 
@@ -168,9 +164,9 @@ The following are areas where this project makes deliberate trade-offs given its
 
 **No email verification**: Registration does not verify email ownership. Any email address that passes format validation can be used to create an account.
 
-**No multi-factor authentication**: MFA is not implemented. For an educational game this is a reasonable trade-off, but it means account security relies entirely on password strength and account lockout.
+**MFA is optional and not enforced at registration**: TOTP-based MFA is implemented (`totp_secret`, `mfa_enabled`, `totp_last_used_at` columns; step-replay guard active). However, enabling MFA is the user's choice — registration does not require it. Accounts that have not enrolled TOTP rely entirely on password strength and account lockout.
 
-**No persistent audit log**: Sensitive events such as login, logout, and password changes are written to application logs but not stored in the database as a structured audit trail.
+**Audit log table requires manual provisioning**: The `audit_logs` table, the ORM model, and the writer infrastructure (`audit_logger.record_audit_event`) are all implemented and write via an isolated transaction that survives surrounding rollbacks. However, no Alembic migration creates the table — on a freshly migrated database the writer swallows insertion errors as warnings, so audit events are silently dropped until the table is created out-of-band. A follow-up migration is needed to bring this fully online.
 
 **Rate limiting is per-IP**: Account lockout is per email address, but rate limiting is per client IP. A single user connecting from multiple IPs can exceed per-user expectations, and a shared IP (e.g., a NAT gateway) can trigger rate limits for multiple users.
 
@@ -188,7 +184,7 @@ Before deploying to a publicly accessible environment:
 - [ ] Confirm `COOKIE_SECURE=true` (the default) is not overridden.
 - [ ] Confirm `CSRF_ENABLED=true` (the default) is not overridden.
 - [ ] Deploy behind the provided nginx TLS configuration and obtain a valid TLS certificate.
-- [ ] If using a reverse proxy or load balancer, set `PROXY_MODE=true` and `TRUSTED_PROXY_IPS`.
+- [ ] Ensure nginx is the only publicly reachable entry point; the backend should not be exposed directly to the internet.
 - [ ] Ensure the `.env` file is excluded from version control and has restrictive file permissions.
 - [ ] Confirm `DEBUG=false` (the default in non-CI environments).
 - [ ] Run `pip-audit` and `npm audit` and address any high-severity findings before going live.
