@@ -27,17 +27,29 @@ function purchase(itemId: string, cost: number): void {
     <button
       v-if="collapsed"
       class="shop-icon-btn"
-      title="open shop"
+      type="button"
+      aria-label="Open shop"
+      aria-expanded="false"
+      aria-controls="shop-grid"
       @click="collapsed = false"
     >
-      🏪
+      <span aria-hidden="true">🏪</span>
     </button>
     <template v-else>
-      <h3 class="shop-title" @click="collapsed = true">
+      <h3 class="shop-title">
         <span>Shop</span>
-        <span class="collapse-icon">✕</span>
+        <button
+          class="collapse-icon"
+          type="button"
+          aria-label="Close shop"
+          aria-expanded="true"
+          aria-controls="shop-grid"
+          @click="collapsed = true"
+        >
+          ✕
+        </button>
       </h3>
-      <div class="shop-grid">
+      <div id="shop-grid" class="shop-grid">
         <button
           v-for="item in items"
           :key="item.id"
@@ -72,7 +84,10 @@ function purchase(itemId: string, cost: number): void {
   z-index: var(--z-chrome);
   max-height: 400px;
   overflow-y: auto;
-  transition: all 200ms ease-out;
+  transition:
+    width 200ms ease-out,
+    padding 200ms ease-out,
+    background 200ms ease-out;
 }
 
 .shop-panel.collapsed {
@@ -93,7 +108,9 @@ function purchase(itemId: string, cost: number): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 120ms;
+  transition:
+    background 120ms,
+    border-color 120ms;
 }
 
 .shop-icon-btn:hover {
@@ -110,13 +127,17 @@ function purchase(itemId: string, cost: number): void {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  cursor: pointer;
   user-select: none;
 }
 
-.collapse-icon { 
-  font-size: 12px; 
-  color: var(--axis); 
+.collapse-icon {
+  padding: 0 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--axis);
   cursor: pointer;
 }
 
