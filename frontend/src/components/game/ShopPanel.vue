@@ -5,7 +5,7 @@ import { PURCHASABLE_BUFFS } from '@/data/buff-defs'
 import { Events } from '@/data/constants'
 
 const g = useGameStore()
-const collapsed = ref(false)
+const collapsed = ref(true)
 
 const items = computed(() =>
   PURCHASABLE_BUFFS.map((b) => ({
@@ -24,28 +24,38 @@ function purchase(itemId: string, cost: number): void {
 
 <template>
   <div class="shop-panel" :class="{ collapsed }">
-    <h3 class="shop-title" @click="collapsed = !collapsed">
-      <span>Shop</span>
-      <span class="collapse-icon">{{ collapsed ? '▶' : '▼' }}</span>
-    </h3>
-    <div v-if="!collapsed" class="shop-grid">
-      <button
-        v-for="item in items"
-        :key="item.id"
-        class="shop-item"
-        :class="{
-          unaffordable: !item.affordable,
-          active: item.alreadyActive,
-        }"
-        :disabled="!item.affordable || item.alreadyActive"
-        :title="item.description"
-        @click="purchase(item.id, item.cost)"
-      >
-        <span class="item-name">{{ item.name }}</span>
-        <span class="item-cost">{{ item.cost }}g</span>
-        <span class="item-desc">{{ item.description }}</span>
-      </button>
-    </div>
+    <button
+      v-if="collapsed"
+      class="shop-icon-btn"
+      title="open shop"
+      @click="collapsed = false"
+    >
+      🏪
+    </button>
+    <template v-else>
+      <h3 class="shop-title" @click="collapsed = true">
+        <span>Shop</span>
+        <span class="collapse-icon">✕</span>
+      </h3>
+      <div class="shop-grid">
+        <button
+          v-for="item in items"
+          :key="item.id"
+          class="shop-item"
+          :class="{
+            unaffordable: !item.affordable,
+            active: item.alreadyActive,
+          }"
+          :disabled="!item.affordable || item.alreadyActive"
+          :title="item.description"
+          @click="purchase(item.id, item.cost)"
+        >
+          <span class="item-name">{{ item.name }}</span>
+          <span class="item-cost">{{ item.cost }}g</span>
+          <span class="item-desc">{{ item.description }}</span>
+        </button>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -62,6 +72,33 @@ function purchase(itemId: string, cost: number): void {
   z-index: var(--z-chrome);
   max-height: 400px;
   overflow-y: auto;
+  transition: all 200ms ease-out;
+}
+
+.shop-panel.collapsed {
+  width: auto;
+  padding: 4px;
+  background: rgba(26, 21, 32, 0.9);
+}
+
+.shop-icon-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: rgba(255, 215, 0, 0.1);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 120ms;
+}
+
+.shop-icon-btn:hover {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: var(--gold);
 }
 
 .shop-title {
@@ -76,8 +113,16 @@ function purchase(itemId: string, cost: number): void {
   cursor: pointer;
   user-select: none;
 }
-.shop-panel.collapsed .shop-title { margin-bottom: 0; }
-.collapse-icon { font-size: 9px; color: var(--axis); }
+
+.collapse-icon { 
+  font-size: 12px; 
+  color: var(--axis); 
+  cursor: pointer;
+}
+
+.collapse-icon:hover {
+  color: var(--gold);
+}
 
 .shop-grid {
   display: flex;
