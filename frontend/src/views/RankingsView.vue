@@ -3,7 +3,20 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { rankingService, type ExternalRankingEntry } from '@/services/rankingService'
 import { classService, type ClassInfo } from '@/services/classService'
-import { territoryService, type ActivityInfo, type RankingEntry } from '@/services/territoryService'
+import {
+  territoryService,
+  type ActivityInfo,
+  type RankingEntry,
+  type RankingsMeta,
+} from '@/services/territoryService'
+import {
+  sortRankings,
+  formatRankChange,
+  formatComposition,
+  formatRelativeTime,
+  type SortMode,
+} from '@/services/territory/rankingSort'
+import { usePolling } from '@/composables/usePolling'
 import {
   leaderboardService,
   type LeaderboardEntry,
@@ -45,6 +58,34 @@ const activities = ref<ActivityInfo[]>([])
 const selectedActivityId = ref<string | null>(null)
 const territoryRankings = ref<RankingEntry[]>([])
 const externalRankings = ref<ExternalRankingEntry[]>([])
+
+// Internal-tab enhancements: hierarchical leaderboard with delta tracking.
+const internalMeta = ref<RankingsMeta | null>(null)
+const internalScope = ref<'school' | 'class'>('school')
+const internalScopeClassId = ref<string | null>(null)
+const internalSort = ref<SortMode>('territory_value')
+const internalNowMs = ref(Date.now())
+const internalPollingEnabled = computed(
+  () => activeTab.value === 'internal' && selectedActivityId.value !== null,
+)
+const sortedInternalEntries = computed(() => {
+  const entries = internalMeta.value?.entries ?? []
+  return sortRankings(entries, internalSort.value)
+})
+const selectedActivity = computed(() =>
+  activities.value.find(a => a.id === selectedActivityId.value) ?? null,
+)
+const internalCanScope = computed(() =>
+  // Class scope only meaningful for inter-class activities (class_id is null).
+  selectedActivity.value?.class_id === null,
+)
+const sortNullDeltaHint = computed(() => {
+  if (internalSort.value !== 'rank_change') return ''
+  const entries = internalMeta.value?.entries ?? []
+  return entries.some(e => e.rank_change === null)
+    ? 'Rank changes appear after the next snapshot is taken.'
+    : ''
+})
 
 const personalEntries = ref<PersonalHistoryEntry[]>([])
 const personalLevel = ref<number | undefined>(undefined)
@@ -123,26 +164,46 @@ async function loadClass(): Promise<void> {
   }
 }
 
-async function loadInternal(): Promise<void> {
+async function loadInternal(opts: { silent?: boolean } = {}): Promise<void> {
   if (!selectedActivityId.value) return
-  cancelInflight()
-  const controller = new AbortController()
-  inflight = controller
+  // Class-scope was selected but no class chosen yet: skip the fetch
+  // rather than silently falling back to a school-wide query.
+  if (internalScope.value === 'class' && !internalScopeClassId.value) {
+    internalMeta.value = null
+    territoryRankings.value = []
+    return
+  }
+  // Polling refreshes are silent so they don't flash a loading spinner.
+  const silent = opts.silent === true
+  if (!silent) {
+    cancelInflight()
+    loading.value = true
+    error.value = ''
+  }
   const thisId = ++fetchId
-  loading.value = true
-  error.value = ''
   try {
-    const res = await rankingService.getInternal(selectedActivityId.value, controller.signal)
+    const classId = internalScope.value === 'class' ? internalScopeClassId.value : null
+    const res = await territoryService.getRankingsWithMeta(selectedActivityId.value, { classId })
     if (thisId !== fetchId) return
-    territoryRankings.value = res
+    internalMeta.value = res
+    internalNowMs.value = Date.now()
+    territoryRankings.value = res.entries.map(e => ({
+      rank: e.rank,
+      student_id: e.student_id,
+      player_name: e.player_name,
+      territory_value: e.territory_value,
+    }))
   } catch (e) {
     if (thisId !== fetchId) return
     if (e instanceof DOMException && e.name === 'AbortError') return
-    error.value = e instanceof Error ? e.message : 'Failed'
+    if (!silent) error.value = e instanceof Error ? e.message : 'Failed'
   } finally {
-    if (thisId === fetchId) { loading.value = false; inflight = null }
+    if (thisId === fetchId && !silent) { loading.value = false; inflight = null }
   }
 }
+
+// Poll internal rankings every ~30s with ±5s jitter; gated to the active tab + selected activity.
+usePolling(() => loadInternal({ silent: true }), 30_000, internalPollingEnabled, 5_000)
 
 async function loadPersonal(): Promise<void> {
   cancelInflight()
@@ -189,11 +250,20 @@ function resetData(): void {
   entries.value = []
   total.value = 0
   territoryRankings.value = []
+  internalMeta.value = null
   externalRankings.value = []
   personalEntries.value = []
   page.value = 1
   error.value = ''
 }
+
+watch([internalScope, internalScopeClassId], () => {
+  if (activeTab.value === 'internal') loadInternal()
+})
+
+watch(internalSort, () => {
+  // Sorting is local; nothing to refetch.
+})
 
 function switchTab(tab: TabId): void {
   activeTab.value = tab
@@ -325,22 +395,81 @@ onBeforeUnmount(cancelInflight)
         </tbody>
       </table>
 
-      <!-- Internal rankings: per-student territory value -->
-      <table v-else-if="activeTab === 'internal'" class="rk-table">
-        <thead>
-          <tr>
-            <th>#</th><th>Student</th><th>Territory Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in territoryRankings" :key="r.student_id">
-            <td class="rank">{{ r.rank }}</td>
-            <td class="player-name">{{ r.player_name ?? '—' }}</td>
-            <td class="score">{{ r.territory_value }}</td>
-          </tr>
-          <tr v-if="territoryRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>
-        </tbody>
-      </table>
+      <!-- Internal rankings: per-student territory value with delta + composition -->
+      <div v-else-if="activeTab === 'internal'" class="rk-internal">
+        <div v-if="internalMeta" class="rk-internal-controls">
+          <div v-if="internalCanScope" class="rk-control-group">
+            <span class="filter-label">Scope:</span>
+            <button
+              :class="['btn', 'tab-btn', { active: internalScope === 'school' }]"
+              @click="internalScope = 'school'"
+            >School</button>
+            <button
+              :class="['btn', 'tab-btn', { active: internalScope === 'class' }]"
+              :disabled="classes.length === 0"
+              @click="internalScope = 'class'"
+            >Class</button>
+            <select
+              v-if="internalScope === 'class'"
+              v-model="internalScopeClassId"
+              class="rune-input rk-scope-class"
+            >
+              <option :value="null" disabled>Choose class</option>
+              <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+          <div class="rk-control-group">
+            <span class="filter-label">Sort:</span>
+            <button
+              :class="['btn', 'tab-btn', { active: internalSort === 'territory_value' }]"
+              @click="internalSort = 'territory_value'"
+            >Value</button>
+            <button
+              :class="['btn', 'tab-btn', { active: internalSort === 'rank_change' }]"
+              @click="internalSort = 'rank_change'"
+            >Δ Rank</button>
+            <button
+              :class="['btn', 'tab-btn', { active: internalSort === 'last_occupation_at' }]"
+              @click="internalSort = 'last_occupation_at'"
+            >Recent</button>
+          </div>
+          <div v-if="internalMeta.user_rank !== null" class="user-rank-pill">
+            Your rank: <strong>#{{ internalMeta.user_rank }}</strong>
+          </div>
+        </div>
+        <div v-if="sortNullDeltaHint" class="rk-hint">{{ sortNullDeltaHint }}</div>
+        <table class="rk-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Δ</th>
+              <th>Student</th>
+              <th>Territory</th>
+              <th>Composition</th>
+              <th>Last play</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="r in sortedInternalEntries"
+              :key="r.student_id"
+              :class="{ 'is-user': internalMeta && r.student_id === auth.user?.id }"
+            >
+              <td class="rank">{{ r.rank }}</td>
+              <td :class="['delta', r.rank_change === null ? '' : r.rank_change > 0 ? 'up' : r.rank_change < 0 ? 'down' : '']">
+                {{ formatRankChange(r.rank_change) }}
+              </td>
+              <td class="player-name">{{ r.player_name ?? '—' }}</td>
+              <td class="score">{{ r.territory_value }}</td>
+              <td class="composition">{{ formatComposition(r.composition) }}</td>
+              <td class="last-occ">{{ formatRelativeTime(r.last_occupation_at, internalNowMs) }}</td>
+            </tr>
+            <tr v-if="sortedInternalEntries.length === 0">
+              <td colspan="6" class="empty">No records</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- External rankings: per-class average territory value -->
       <table v-else-if="activeTab === 'external'" class="rk-table">
@@ -406,4 +535,18 @@ th { color: var(--axis); font-size: 10px; letter-spacing: 2px; text-transform: u
 .rk-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .page-info { font-size: 12px; color: var(--axis); }
 .page-btn:disabled { opacity: 0.3; cursor: default; }
+
+.rk-internal { display: flex; flex-direction: column; gap: 10px; }
+.rk-internal-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.rk-control-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rk-scope-class { font-size: 11px; padding: 2px 6px; }
+.user-rank-pill { margin-left: auto; padding: 4px 10px; border: 1px solid var(--gold); color: var(--gold); font-size: 11px; }
+.user-rank-pill strong { color: var(--gold-bright); }
+.rk-hint { font-size: 10px; color: var(--axis); opacity: 0.8; }
+
+.rk-table tr.is-user { background: rgba(255, 215, 0, 0.06); }
+.delta { font-size: 12px; color: var(--axis); }
+.delta.up { color: #6abf85; }
+.delta.down { color: #d05050; }
+.composition, .last-occ { font-size: 10px; color: var(--axis); }
 </style>

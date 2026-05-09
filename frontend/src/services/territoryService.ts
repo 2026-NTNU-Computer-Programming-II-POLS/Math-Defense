@@ -46,9 +46,42 @@ export interface RankingEntry {
   territory_value: number
 }
 
+export interface CompositionBucket {
+  star: number
+  count: number
+}
+
+export interface RankingEntryWithMeta {
+  rank: number
+  student_id: string
+  player_name: string | null
+  territory_value: number
+  rank_change: number | null
+  last_occupation_at: string | null
+  composition: CompositionBucket[]
+}
+
+export interface RankingsMeta {
+  activity_id: string
+  entries: RankingEntryWithMeta[]
+  user_rank: number | null
+  refreshed_at: string
+}
+
 export interface SlotDefinition {
   star_rating: number
   path_config?: Record<string, unknown> | null
+}
+
+export type TerritoryRecommendationRationale = 'step_up_one_level' | 'first_attempt'
+
+export interface TerritoryRecommendation {
+  slot_id: string
+  slot_index: number
+  star_rating: number
+  rationale_code: TerritoryRecommendationRationale
+  user_avg_at_target: number | null
+  occupant_score: number | null
 }
 
 export const territoryService = {
@@ -76,6 +109,15 @@ export const territoryService = {
 
   getRankings(activityId: string) {
     return api.get<RankingEntry[]>(`/api/activities/${activityId}/rankings`)
+  },
+
+  getRankingsWithMeta(activityId: string, opts: { classId?: string | null } = {}) {
+    const qs = opts.classId ? `?class_id=${encodeURIComponent(opts.classId)}` : ''
+    return api.get<RankingsMeta>(`/api/activities/${activityId}/rankings/with-meta${qs}`)
+  },
+
+  getTerritoryRecommendation(activityId: string) {
+    return api.get<TerritoryRecommendation | null>(`/api/recommendation/territory/${activityId}`)
   },
 
   settleActivity(activityId: string) {

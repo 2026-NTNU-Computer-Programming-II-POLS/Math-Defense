@@ -1,27 +1,33 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { SlotInfo } from '@/services/territoryService'
+import { getChallengeMode, CHALLENGE_MODE_LABEL } from '@/services/territory/challengeMode'
 
 const props = defineProps<{
   slot: SlotInfo
   disabledReason?: string
+  userId?: string | null
+  highlighted?: boolean
 }>()
 
 defineEmits<{
   play: [slotId: string]
 }>()
 
+const mode = computed(() => getChallengeMode(props.slot, props.userId ?? null))
 const state = computed(() => {
-  if (!props.slot.occupation) return 'unoccupied'
-  if (props.slot.occupation.is_own) return 'mine'
+  if (mode.value === 'seize') return 'unoccupied'
+  if (mode.value === 'improve') return 'mine'
   return 'occupied'
 })
+const buttonLabel = computed(() => CHALLENGE_MODE_LABEL[mode.value])
 
 const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat(5 - props.slot.star_rating))
 </script>
 
 <template>
-  <div :class="['slot-card', state]">
+  <div :class="['slot-card', state, { highlighted }]">
+    <div v-if="highlighted" class="slot-recommend-badge" aria-label="Recommended">★ Recommended</div>
     <div class="slot-stars">{{ stars }}</div>
     <div class="slot-index">#{{ slot.slot_index + 1 }}</div>
     <div v-if="slot.occupation" class="slot-occupant">
@@ -33,10 +39,10 @@ const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat
       class="btn slot-play-btn"
       :disabled="!!disabledReason"
       :title="disabledReason"
-      :aria-label="`${state === 'mine' ? 'Improve' : state === 'occupied' ? 'Challenge' : 'Seize'} slot #${slot.slot_index + 1}`"
+      :aria-label="`${buttonLabel} slot #${slot.slot_index + 1}`"
       @click="$emit('play', slot.id)"
     >
-      {{ disabledReason ? 'Closed' : state === 'mine' ? 'Improve' : state === 'occupied' ? 'Challenge' : 'Seize' }}
+      {{ disabledReason ? 'Closed' : buttonLabel }}
     </button>
   </div>
 </template>
@@ -55,6 +61,12 @@ const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat
 .slot-card.mine { border-color: var(--gold); background: rgba(255, 215, 0, 0.05); }
 .slot-card.occupied { border-color: var(--enemy-red); }
 .slot-card.unoccupied { border-color: var(--axis); opacity: 0.8; }
+.slot-card.highlighted { box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); position: relative; }
+.slot-recommend-badge {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  background: var(--gold); color: var(--stone-dark);
+  padding: 2px 8px; font-size: 9px; letter-spacing: 1px; white-space: nowrap;
+}
 
 .slot-stars { color: var(--gold); font-size: 14px; letter-spacing: 2px; }
 .slot-index { font-size: 10px; color: var(--axis); }

@@ -5,6 +5,7 @@ import {
   type ActivityInfo,
   type ActivityDetail,
   type RankingEntry,
+  type RankingsMeta,
   type PlayResult,
   type SlotDefinition,
 } from '@/services/territoryService'
@@ -14,6 +15,7 @@ export const useTerritoryStore = defineStore('territory', () => {
   const activities = ref<ActivityInfo[]>([])
   const currentDetail = ref<ActivityDetail | null>(null)
   const rankings = ref<RankingEntry[]>([])
+  const rankingsMeta = ref<RankingsMeta | null>(null)
 
   appBus.on('auth:logout', () => { clear() })
 
@@ -90,6 +92,18 @@ export const useTerritoryStore = defineStore('territory', () => {
     }
   }
 
+  async function loadRankingsWithMeta(activityId: string, classId: string | null = null): Promise<void> {
+    loadingRankings.value = true
+    errorRankings.value = ''
+    try {
+      rankingsMeta.value = await territoryService.getRankingsWithMeta(activityId, { classId })
+    } catch (e) {
+      errorRankings.value = e instanceof Error ? e.message : 'Failed to load rankings'
+    } finally {
+      loadingRankings.value = false
+    }
+  }
+
   async function settleActivity(activityId: string): Promise<boolean> {
     errorSettle.value = ''
     try {
@@ -105,6 +119,7 @@ export const useTerritoryStore = defineStore('territory', () => {
     activities.value = []
     currentDetail.value = null
     rankings.value = []
+    rankingsMeta.value = null
     errorActivities.value = ''
     errorDetail.value = ''
     errorPlay.value = ''
@@ -117,6 +132,7 @@ export const useTerritoryStore = defineStore('territory', () => {
     activities,
     currentDetail,
     rankings,
+    rankingsMeta,
     loadingActivities,
     loadingDetail,
     loadingRankings,
@@ -131,6 +147,7 @@ export const useTerritoryStore = defineStore('territory', () => {
     createActivity,
     playSlot,
     loadRankings,
+    loadRankingsWithMeta,
     settleActivity,
     clear,
   }

@@ -80,6 +80,33 @@ class TerritoryOccupation(Base):
     )
 
 
+class TerritoryRankingsSnapshot(Base):
+    """Point-in-time ranking record per (activity, student).
+
+    Written at settle time (and any future scheduled cadence) so the
+    rankings endpoint can compute rank deltas against the most recent
+    prior snapshot. Older snapshots are retained for historical queries.
+    """
+    __tablename__ = "territory_rankings_snapshot"
+    __table_args__ = (
+        Index("ix_snap_activity_time", "activity_id", "snapshot_at"),
+        Index("ix_snap_activity_student_time", "activity_id", "student_id", "snapshot_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    activity_id: Mapped[str] = mapped_column(
+        String, ForeignKey("grabbing_territory_activities.id", ondelete="CASCADE"), nullable=False,
+    )
+    student_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+    )
+    territory_value: Mapped[float] = mapped_column(Float, nullable=False)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC),
+    )
+
+
 class TerritorySessionUse(Base):
     """Durable record of every session_id consumed for territory captures.
 

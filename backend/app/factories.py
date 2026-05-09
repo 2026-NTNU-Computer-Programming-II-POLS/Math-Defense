@@ -19,6 +19,9 @@ from app.application.replay_service import ReplayApplicationService
 from app.application.session_service import SessionApplicationService
 from app.application.study_service import StudyApplicationService
 from app.application.talent_service import TalentApplicationService
+from app.application.territory_recommendation_service import (
+    TerritoryRecommendationApplicationService,
+)
 from app.application.territory_service import TerritoryApplicationService
 from app.infrastructure.persistence.achievement_repository import (
     SqlAlchemyAchievementRepository,
@@ -196,6 +199,16 @@ def build_territory_service(db: "DbSession") -> TerritoryApplicationService:
         class_repo=SqlAlchemyClassRepository(db),
         session_repo=SqlAlchemySessionRepository(db),
         uow=_get_uow(db),
+    )
+
+
+def build_territory_recommendation_service(
+    db: "DbSession",
+) -> TerritoryRecommendationApplicationService:
+    return TerritoryRecommendationApplicationService(
+        session_repo=SqlAlchemySessionRepository(db),
+        territory_repo=SqlAlchemyTerritoryRepository(db),
+        class_repo=SqlAlchemyClassRepository(db),
     )
 
 

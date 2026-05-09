@@ -302,6 +302,58 @@ class TerritoryApplicationService:
         # B-H-11: repo join includes player_name
         return self._territory_repo.get_internal_rankings(activity_id)
 
+    def get_rankings_with_meta(
+        self,
+        activity_id: str,
+        user_id: str,
+        user_role: Role,
+        class_id: str | None = None,
+    ) -> dict:
+        """Hierarchical rankings + delta + composition + last-occupation timestamp.
+
+        ``class_id`` is optional: None means activity-default scope (the
+        activity's own class for class-scoped activities, or all
+        participants for inter-class activities). For inter-class
+        activities, students may pass their own class to drill down.
+        """
+        activity = self._get_activity_or_raise(activity_id)
+        self._verify_activity_access(activity, user_id, user_role)
+
+        # For class-scoped activities, additional class filtering is
+        # nonsensical (entries are already that class).
+        effective_class_id: str | None
+        if activity.class_id is not None:
+            effective_class_id = None
+        else:
+            effective_class_id = class_id
+
+        rows = self._territory_repo.get_internal_rankings_full(
+            activity_id, class_id=effective_class_id,
+        )
+        prior_ranks = self._territory_repo.get_latest_snapshot_ranks(activity_id)
+
+        entries: list[dict] = []
+        for r in rows:
+            prev = prior_ranks.get(r["student_id"])
+            # Convention: positive = climbed (rank number decreased).
+            rank_change = (prev - r["rank"]) if prev is not None else None
+            entries.append({
+                "rank": r["rank"],
+                "student_id": r["student_id"],
+                "player_name": r["player_name"],
+                "territory_value": r["territory_value"],
+                "rank_change": rank_change,
+                "last_occupation_at": r["last_occupation_at"],
+                "composition": r["composition"],
+            })
+        user_rank = next((e["rank"] for e in entries if e["student_id"] == user_id), None)
+        return {
+            "activity_id": activity_id,
+            "entries": entries,
+            "user_rank": user_rank,
+            "refreshed_at": datetime.now(UTC),
+        }
+
     def settle_activity(
         self,
         activity_id: str,
@@ -314,6 +366,10 @@ class TerritoryApplicationService:
             self._verify_owner_or_admin(activity, requester_id, requester_role)
             activity.settle(settled_by=requester_id)
             self._territory_repo.save_activity(activity)
+            # Snapshot final rankings so the rank-change column has a baseline
+            # (the codebase has no scheduler today; settle-time is the
+            # earliest reliable trigger we can rely on).
+            self._territory_repo.write_rankings_snapshot(activity_id)
             self._uow.commit()
             logger.info("GT activity settled: id=%s by=%s", activity_id, requester_id)
 
@@ -331,6 +387,7 @@ class TerritoryApplicationService:
                         continue
                     activity.settle(settled_by=None)
                     self._territory_repo.save_activity(activity)
+                    self._territory_repo.write_rankings_snapshot(activity_id)
                     self._uow.commit()
                     count += 1
             except ActivityAlreadySettledError:

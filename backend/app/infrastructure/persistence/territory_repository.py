@@ -19,6 +19,7 @@ from app.models.territory import (
     GrabbingTerritoryActivity as ActivityModel,
     TerritorySlot as SlotModel,
     TerritoryOccupation as OccupationModel,
+    TerritoryRankingsSnapshot as SnapshotModel,
     TerritorySessionUse as SessionUseModel,
 )
 from app.models.user import User as UserModel
@@ -348,6 +349,131 @@ class SqlAlchemyTerritoryRepository:
                 "territory_value": tv,
             })
         return result
+
+    def get_internal_rankings_full(
+        self,
+        activity_id: str,
+        class_id: str | None = None,
+    ) -> list[dict]:
+        """Like get_internal_rankings but returns last_occupation_at and composition.
+
+        Composition is a sorted list of {star, count} for the slots the
+        student currently occupies in this activity.
+
+        ``class_id`` restricts entries to students in the given class
+        (None = no scope filter; the caller decides school vs. activity-class).
+        """
+        territory_value = func.sum(SlotModel.star_rating)
+        last_occ = func.max(OccupationModel.occupied_at)
+        q = (
+            self._db.query(
+                OccupationModel.student_id,
+                UserModel.player_name,
+                territory_value.label("territory_value"),
+                last_occ.label("last_occupation_at"),
+            )
+            .join(SlotModel, OccupationModel.slot_id == SlotModel.id)
+            .join(UserModel, OccupationModel.student_id == UserModel.id)
+            .filter(SlotModel.activity_id == activity_id)
+        )
+        if class_id is not None:
+            q = q.join(
+                MembershipModel,
+                MembershipModel.student_id == OccupationModel.student_id,
+            ).filter(MembershipModel.class_id == class_id)
+        rows = (
+            q.group_by(OccupationModel.student_id, UserModel.player_name)
+            .order_by(territory_value.desc(), UserModel.player_name.asc())
+            .all()
+        )
+
+        # Composition lookup — single grouped query keyed by (student_id, star).
+        comp_q = (
+            self._db.query(
+                OccupationModel.student_id,
+                SlotModel.star_rating,
+                func.count(OccupationModel.id).label("cnt"),
+            )
+            .join(SlotModel, OccupationModel.slot_id == SlotModel.id)
+            .filter(SlotModel.activity_id == activity_id)
+        )
+        if class_id is not None:
+            comp_q = comp_q.join(
+                MembershipModel,
+                MembershipModel.student_id == OccupationModel.student_id,
+            ).filter(MembershipModel.class_id == class_id)
+        comp_rows = comp_q.group_by(OccupationModel.student_id, SlotModel.star_rating).all()
+        comp_by_student: dict[str, list[dict]] = {}
+        for r in comp_rows:
+            comp_by_student.setdefault(r.student_id, []).append(
+                {"star": int(r.star_rating), "count": int(r.cnt)}
+            )
+        for buckets in comp_by_student.values():
+            buckets.sort(key=lambda b: b["star"])
+
+        result: list[dict] = []
+        rank = 0
+        prev_value: float | None = None
+        for i, row in enumerate(rows):
+            tv = float(row.territory_value)
+            if tv != prev_value:
+                rank = i + 1
+                prev_value = tv
+            result.append({
+                "rank": rank,
+                "student_id": row.student_id,
+                "player_name": row.player_name,
+                "territory_value": tv,
+                "last_occupation_at": _ensure_utc(row.last_occupation_at),
+                "composition": comp_by_student.get(row.student_id, []),
+            })
+        return result
+
+    def write_rankings_snapshot(self, activity_id: str) -> int:
+        """Persist a (rank, territory_value) row per student for this activity.
+
+        Returns number of rows written. Idempotent in the sense that older
+        snapshots are retained — duplicate calls just append a new layer.
+        """
+        rows = self.get_internal_rankings_full(activity_id, class_id=None)
+        for r in rows:
+            self._db.add(SnapshotModel(
+                activity_id=activity_id,
+                student_id=r["student_id"],
+                territory_value=r["territory_value"],
+                rank=r["rank"],
+            ))
+        self._db.flush()
+        return len(rows)
+
+    def get_latest_snapshot_ranks(self, activity_id: str) -> dict[str, int]:
+        """Return the most recent prior snapshot rank per student.
+
+        ``most recent prior`` means the latest snapshot taken at any time
+        before *now*. The caller computes the delta against the current
+        live rank.
+        """
+        # Per-student latest snapshot id via correlated max(snapshot_at).
+        sub = (
+            select(
+                SnapshotModel.student_id,
+                func.max(SnapshotModel.snapshot_at).label("latest_at"),
+            )
+            .where(SnapshotModel.activity_id == activity_id)
+            .group_by(SnapshotModel.student_id)
+            .subquery()
+        )
+        rows = (
+            self._db.query(SnapshotModel.student_id, SnapshotModel.rank)
+            .join(
+                sub,
+                (SnapshotModel.student_id == sub.c.student_id)
+                & (SnapshotModel.snapshot_at == sub.c.latest_at),
+            )
+            .filter(SnapshotModel.activity_id == activity_id)
+            .all()
+        )
+        return {r.student_id: int(r.rank) for r in rows}
 
     def find_occupations_by_activity(self, activity_id: str) -> list[TerritoryOccupation]:
         rows = (

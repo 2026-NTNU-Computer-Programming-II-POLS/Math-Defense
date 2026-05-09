@@ -1,7 +1,25 @@
 """Pydantic schemas for the recommendation router (Pedagogical_Backlog_Spec §28)."""
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
+
+
+class TerritoryRecommendationOut(BaseModel):
+    """Per-activity slot suggestion returned by the territory recommender.
+
+    The endpoint can also return ``null`` (the strategy has no usable
+    candidate); the frontend renders that as no recommendation banner.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    slot_id: str
+    slot_index: int
+    star_rating: int
+    rationale_code: Literal["step_up_one_level", "first_attempt"]
+    user_avg_at_target: float | None = None
+    occupant_score: float | None = None
 
 
 class RecommendationOut(BaseModel):

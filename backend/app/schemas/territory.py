@@ -149,3 +149,31 @@ class ExternalRankingEntryOut(BaseModel):
     class_id: str
     class_name: str | None = None
     avg_territory_value: float
+
+
+class CompositionBucket(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    star: int
+    count: int
+
+
+class RankingEntryWithMetaOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    rank: int
+    student_id: str
+    player_name: str | None = None
+    territory_value: float
+    rank_change: int | None = None
+    last_occupation_at: datetime | None = None
+    composition: list[CompositionBucket] = []
+
+
+class RankingsMetaOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    activity_id: str
+    entries: list[RankingEntryWithMetaOut]
+    user_rank: int | None = None
+    refreshed_at: datetime

@@ -11,6 +11,14 @@ import {
 } from '@/services/levelGenerationService'
 import { sessionService } from '@/services/sessionService'
 import TerritorySlotCard from '@/components/territory/TerritorySlotCard.vue'
+import DeadlineProgressBar from '@/components/territory/DeadlineProgressBar.vue'
+import SlotChallengePreview from '@/components/territory/SlotChallengePreview.vue'
+import { useCountdown } from '@/composables/useCountdown'
+import { useChallengePreviewPreference } from '@/composables/useChallengePreviewPreference'
+import {
+  useTerritoryRecommendation,
+  RECOMMENDATION_RATIONALE_COPY,
+} from '@/composables/useTerritoryRecommendation'
 
 const router = useRouter()
 const route = useRoute()
@@ -32,6 +40,16 @@ const canSettle = computed(() => {
 })
 const settling = ref(false)
 
+const deadlineRef = computed(() => detail.value?.activity.deadline ?? null)
+const countdown = useCountdown(deadlineRef)
+const totalDurationMs = computed(() => {
+  const a = detail.value?.activity
+  if (!a) return 0
+  const end = new Date(a.deadline).getTime()
+  const start = new Date(a.created_at).getTime()
+  return Number.isFinite(end - start) ? Math.max(0, end - start) : 0
+})
+
 // B-H-12: propagate activity state so slot cards can disable the Play button
 const slotDisabledReason = computed((): string | undefined => {
   const a = detail.value?.activity
@@ -40,6 +58,46 @@ const slotDisabledReason = computed((): string | undefined => {
   if (new Date(a.deadline) <= new Date()) return 'Activity deadline has passed'
   return undefined
 })
+
+// Pre-challenge preview state
+const previewSlotId = ref<string | null>(null)
+const previewSlot = computed(() =>
+  previewSlotId.value ? detail.value?.slots.find(s => s.id === previewSlotId.value) ?? null : null,
+)
+const { skipChallengePreview } = useChallengePreviewPreference()
+const { data: recommendationData } = useTerritoryRecommendation(activityId)
+const recommendedSlotId = computed(() => recommendationData.value?.slot_id ?? null)
+const recommendationCopy = computed(() => {
+  const code = recommendationData.value?.rationale_code
+  return code ? RECOMMENDATION_RATIONALE_COPY[code] ?? '' : ''
+})
+// Only surface the recommendation's avg-at-target when the previewed
+// slot is actually at that level — otherwise the "Your avg at this
+// level" line in the modal would silently mislabel a different level.
+const previewUserAvg = computed<number | null>(() => {
+  const rec = recommendationData.value
+  const slot = previewSlot.value
+  if (!rec || !slot || rec.user_avg_at_target == null) return null
+  return slot.star_rating === rec.star_rating ? rec.user_avg_at_target : null
+})
+
+function onSlotClick(slotId: string): void {
+  if (slotDisabledReason.value) return
+  if (skipChallengePreview.value) {
+    void handlePlay(slotId)
+  } else {
+    previewSlotId.value = slotId
+  }
+}
+
+function onPreviewConfirm(slotId: string): void {
+  previewSlotId.value = null
+  void handlePlay(slotId)
+}
+
+function onPreviewCancel(): void {
+  previewSlotId.value = null
+}
 
 async function handlePlay(slotId: string): Promise<void> {
   const slot = detail.value?.slots.find(s => s.id === slotId)
@@ -136,13 +194,36 @@ watch(activityId, (id) => {
           <span v-if="detail.activity.class_id === null" class="scope-tag">All Classes</span>
         </div>
 
+        <DeadlineProgressBar
+          :readout="countdown"
+          :total-duration-ms="totalDurationMs"
+          :settled="detail.activity.settled"
+        />
+
+        <div
+          v-if="recommendationData && !slotDisabledReason"
+          class="recommendation-bar"
+        >
+          <span class="rec-icon" aria-hidden="true">★</span>
+          <span class="rec-text">
+            <strong>Slot #{{ recommendationData.slot_index + 1 }}</strong>
+            ({{ '★'.repeat(recommendationData.star_rating) }})
+            — {{ recommendationCopy }}
+          </span>
+          <button class="btn rec-btn" @click="onSlotClick(recommendationData.slot_id)">
+            Try it
+          </button>
+        </div>
+
         <div class="slot-grid">
           <TerritorySlotCard
             v-for="s in detail.slots"
             :key="s.id"
             :slot="s"
             :disabled-reason="slotDisabledReason"
-            @play="handlePlay"
+            :user-id="auth.user?.id ?? null"
+            :highlighted="s.id === recommendedSlotId"
+            @play="onSlotClick"
           />
         </div>
 
@@ -155,6 +236,15 @@ watch(activityId, (id) => {
         </div>
       </template>
     </div>
+
+    <SlotChallengePreview
+      v-if="previewSlot"
+      :slot="previewSlot"
+      :user-id="auth.user?.id ?? null"
+      :user-avg-at-level="previewUserAvg"
+      @confirm="onPreviewConfirm"
+      @cancel="onPreviewCancel"
+    />
   </div>
 </template>
 
@@ -220,4 +310,18 @@ watch(activityId, (id) => {
 .loading, .error-msg { text-align: center; padding: 20px; font-size: 11px; }
 .loading { color: var(--axis); }
 .error-msg { color: var(--enemy-red); }
+
+.recommendation-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border: 1px dashed var(--gold);
+  background: rgba(255, 215, 0, 0.05);
+  font-size: 11px;
+  color: #e8dcc8;
+}
+.rec-icon { color: var(--gold); font-size: 14px; }
+.rec-text { flex: 1; }
+.rec-text strong { color: var(--gold); }
+.rec-btn { border-color: var(--gold); color: var(--gold); padding: 4px 10px; font-size: 10px; }
+.rec-btn:hover { background: var(--gold); color: var(--stone-dark); }
 </style>

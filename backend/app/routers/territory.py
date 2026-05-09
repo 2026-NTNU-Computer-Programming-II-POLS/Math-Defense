@@ -25,6 +25,7 @@ from app.schemas.territory import (
     PlayResultOut,
     PlayTerritoryRequest,
     RankingEntryOut,
+    RankingsMetaOut,
     SlotOut,
 )
 
@@ -115,6 +116,23 @@ def get_activity_rankings(
     db: Session = Depends(get_db),
 ):
     return build_territory_service(db).get_activity_rankings(activity_id, user.id, user.role)
+
+
+@router.get("/{activity_id}/rankings/with-meta", response_model=RankingsMetaOut)
+@limiter.limit("60/minute")
+def get_activity_rankings_with_meta(
+    request: Request,
+    activity_id: str,
+    class_id: str | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return build_territory_service(db).get_rankings_with_meta(
+        activity_id=activity_id,
+        user_id=user.id,
+        user_role=user.role,
+        class_id=class_id,
+    )
 
 
 @router.get("/{activity_id}/external-rankings", response_model=list[ExternalRankingEntryOut])

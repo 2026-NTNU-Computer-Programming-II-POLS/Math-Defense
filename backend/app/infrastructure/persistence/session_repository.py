@@ -154,6 +154,24 @@ class SqlAlchemySessionRepository:
         )
         return [self._to_domain(r) for r in rows]
 
+    def find_recent_completed_by_student(
+        self, student_id: str, limit: int = 10
+    ) -> list[GameSession]:
+        rows = (
+            self._db.query(GameSessionModel)
+            .filter(
+                GameSessionModel.user_id == student_id,
+                GameSessionModel.status == SessionStatus.COMPLETED.value,
+            )
+            .order_by(
+                GameSessionModel.ended_at.desc(),
+                GameSessionModel.started_at.desc(),
+            )
+            .limit(limit)
+            .all()
+        )
+        return [self._to_domain(r) for r in rows]
+
     def compute_ia_recent_accuracy(self, user_id: str, window: int = 10) -> float:
         # Last ``window`` completed sessions ordered by ended_at DESC, with
         # started_at as a tiebreaker so rapid sequential ends (microsecond

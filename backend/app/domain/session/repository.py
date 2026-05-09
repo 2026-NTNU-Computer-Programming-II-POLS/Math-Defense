@@ -76,3 +76,11 @@ class GameSessionRepository(Protocol):
         """Most-recent completed sessions with a non-empty reflection_text,
         scoped to the given users. Used by the teacher dashboard."""
         pass
+
+    def find_recent_completed_by_student(
+        self, student_id: str, limit: int = 10
+    ) -> list[GameSession]:
+        """Most-recent ``limit`` completed sessions for the given student,
+        ordered ended_at DESC. Used by the territory recommender to
+        compute per-level average scores."""
+        pass
