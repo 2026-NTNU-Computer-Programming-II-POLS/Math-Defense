@@ -20,6 +20,7 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, shallowRef, computed } from 'vue'
 import { GamePhase, Events } from '@/data/constants'
+import { appBus } from '@/lib/app-bus'
 import type { Game } from '@/engine/Game'
 import type { ActiveBuffEntry } from '@/engine/GameState'
 import type { BuffCard } from '@/data/buff-defs'
@@ -288,6 +289,39 @@ export const useGameStore = defineStore('game', () => {
   function getEngine(): Game | null {
     return _game
   }
+
+  function clear(): void {
+    unbindEngine()
+    phase.value = GamePhase.MENU
+    level.value = 1
+    starRating.value = 1
+    wave.value = 0
+    totalWaves.value = 0
+    gold.value = 200
+    hp.value = 20
+    maxHp.value = 20
+    score.value = 0
+    kills.value = 0
+    cumulativeKillValue.value = 0
+    enemiesAlive.value = 0
+    costTotal.value = 0
+    healthOrigin.value = 20
+    timeTotal.value = 0
+    timeExcludePrepare.value = []
+    initialAnswer.value = 0
+    pathsVisible.value = false
+    buffCards.value = []
+    montyHallProgress.value = 0
+    montyHallState.value = null
+    activeBuffs.value = []
+    activeBuffsSnapshotTime.value = 0
+    spellCooldowns.value = {}
+    calculusStates.value = {}
+    pathLabelOpacity.value = 0
+    clearPathPanel()
+  }
+
+  appBus.on('auth:logout', () => { clear() })
 
   return {
     phase, level, starRating, wave, totalWaves,

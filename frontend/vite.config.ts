@@ -13,11 +13,11 @@ export default defineConfig({
   },
   server: {
     fs: {
-      // @shared resolves to ../shared (the repo-root shared/ directory).
-      // Locally this is under the repo root that Vite auto-allows; inside the
-      // Docker dev container it's mounted at /shared, which lives outside the
-      // /app workspace, so allow it explicitly.
-      allow: [resolve(__dirname, '..')],
+      // Enumerate exactly the two directories the dev server needs to serve:
+      // frontend/ (auto-allowed by Vite but listed for explicitness) and
+      // shared/ (needed for the @shared alias; in Docker it lives outside the
+      // /app workspace so Vite's auto-allow would miss it).
+      allow: [__dirname, resolve(__dirname, '..', 'shared')],
     },
     proxy: {
       '/api': {
@@ -38,6 +38,7 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.test.ts'],
+    setupFiles: ['src/test-setup.ts'],
     // WasmBridge.test.ts runs under happy-dom and covers the pure-JS fallback.
     // WasmBridge.wasm.test.ts opts into the Node environment via its own
     // `// @vitest-environment node` pragma and loads the real math_engine.js from

@@ -20,14 +20,14 @@ class Season:
     ) -> None:
         if not season_id:
             raise ValueError("season_id must not be empty")
-        if not name:
+        if not name or not name.strip():
             raise ValueError("name must not be empty")
         if starts_at.tzinfo is None or ends_at.tzinfo is None:
             raise ValueError("season timestamps must be timezone-aware")
         if ends_at <= starts_at:
             raise ValueError("ends_at must be after starts_at")
         self.season_id = season_id
-        self.name = name
+        self.name = name.strip()
         self.starts_at = starts_at
         self.ends_at = ends_at
 

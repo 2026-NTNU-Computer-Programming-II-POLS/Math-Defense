@@ -6,11 +6,10 @@ import uuid
 from datetime import datetime, UTC
 
 from app.domain.user.constraints import (
-    EMAIL_MAX_LENGTH,
     PLAYER_NAME_MAX_LENGTH,
     PLAYER_NAME_MIN_LENGTH,
 )
-from app.domain.user.value_objects import Role
+from app.domain.user.value_objects import Email, Role
 
 _PASSWORD_HASH_MAX_LENGTH = 1024
 
@@ -95,12 +94,7 @@ class User:
     def _validate_email(email: str) -> str:
         if not isinstance(email, str):
             raise ValueError("email must be a string")
-        cleaned = email.strip()
-        if not cleaned:
-            raise ValueError("email must not be empty")
-        if len(cleaned) > EMAIL_MAX_LENGTH:
-            raise ValueError(f"email exceeds {EMAIL_MAX_LENGTH} characters")
-        return cleaned
+        return Email(email).value
 
     @staticmethod
     def _validate_player_name(player_name: str) -> str:

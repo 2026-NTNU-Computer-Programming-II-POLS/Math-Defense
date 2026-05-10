@@ -121,7 +121,11 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
     # credential-stuffing attack against one account is bounded to
     # LOGIN_EMAIL_LIMIT attempts per minute regardless of source IP.
     if login_email_throttle_exceeded(req.email):
-        record_audit_event(request, "LOGIN_THROTTLED", None, {"email_anon": _anon(req.email)})
+        # Log to the application logger only — writing an audit DB row on every
+        # throttled request is an unbounded write amplification vector under a
+        # credential-stuffing attack. The rate-limiter state already captures
+        # the throttle; the application log is sufficient for forensics here.
+        logger.warning("login throttled: anon=%s", _anon(req.email))
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts for this account. Try again in a minute.",

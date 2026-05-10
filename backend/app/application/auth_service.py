@@ -121,8 +121,6 @@ class AuthApplicationService:
         except ValueError:
             raise DomainValueError(f"Invalid role: {role}. Must be one of: admin, teacher, student")
 
-        _assert_password_strength(password)
-        password_hash = hash_password(password)
         with self._uow:
             # B-SEC-17 trade-off: this surfaces account existence to a
             # registrant who guesses an email. For a school math game the
@@ -134,6 +132,10 @@ class AuthApplicationService:
             # message for clearer failure diagnosis until that lands.
             if self._user_repo.find_by_email(email_vo.value):
                 raise DomainValueError("Email already registered")
+            # Check password strength after the existence check so we don't
+            # burn CPU on zxcvbn for emails that will be rejected immediately.
+            _assert_password_strength(password)
+            password_hash = hash_password(password)
             user = User.create(
                 email=email_vo.value,
                 player_name=player_name,

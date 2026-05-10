@@ -39,14 +39,21 @@ class SqlAlchemySessionRepository:
         row = self._db.query(GameSessionModel).filter(
             GameSessionModel.user_id == user_id,
             GameSessionModel.status == SessionStatus.ACTIVE.value,
+        ).first()
+        return self._to_domain(row) if row else None
+
+    def find_active_by_user_for_update(self, user_id: str) -> GameSession | None:
+        row = self._db.query(GameSessionModel).filter(
+            GameSessionModel.user_id == user_id,
+            GameSessionModel.status == SessionStatus.ACTIVE.value,
         ).with_for_update().first()
         return self._to_domain(row) if row else None
 
     def acquire_user_create_lock(self, user_id: str) -> None:
         # B-BUG-12: serialise concurrent create_session for the same user.
-        # find_active_by_user's row lock is empty until the first row exists,
-        # so 3+ concurrent inserts can all reach the unique partial index and
-        # exhaust the depth-1 retry → RuntimeError("unreachable"). A
+        # Without this, concurrent inserts can all pass the find_active_by_user
+        # check (no row to lock) and then race to the unique partial index,
+        # exhausting the depth-1 retry → RuntimeError("unreachable"). A
         # transaction-scoped advisory lock keyed on hashtext(user_id) makes
         # the create path strictly serial per user; auto-released at commit.
         # No-op on non-PG dialects (legacy tests) — the existing retry covers
@@ -249,7 +256,7 @@ class SqlAlchemySessionRepository:
             practice_mode=bool(row.practice_mode),
             challenge_id=row.challenge_id,
             rng_seed=row.rng_seed,
-            replay_version=getattr(row, "replay_version", 1) or 1,
+            replay_version=row.replay_version if row.replay_version is not None else 1,
             started_at=_ensure_utc(row.started_at),
             ended_at=_ensure_utc(row.ended_at),
         )

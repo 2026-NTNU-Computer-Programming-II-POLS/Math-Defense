@@ -25,6 +25,7 @@ Design notes:
 """
 from __future__ import annotations
 import logging
+import math
 from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ def recompute_total_score(
     health_origin: int | None,
     health_final: int | None,
     initial_answer: bool | None,
-    pow_fn: Callable[[float, float], float] = pow,
+    pow_fn: Callable[[float, float], float] = math.pow,
     total_score_fn: TotalScoreFn | None = None,
 ) -> float | None:
     if (

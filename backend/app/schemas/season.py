@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class SeasonCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    season_id: str = Field(min_length=1, max_length=64)
+    season_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
     name: str = Field(min_length=1, max_length=120)
     starts_at: datetime
     ends_at: datetime

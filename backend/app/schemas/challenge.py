@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -49,7 +50,7 @@ class ChallengeConstraintsIn(BaseModel):
     magic_param_bounds: MagicParamBoundsIn = Field(
         default_factory=MagicParamBoundsIn
     )
-    forbidden_mechanics: list[str] = Field(default_factory=list, max_length=10)
+    forbidden_mechanics: list[Annotated[str, Field(max_length=64)]] = Field(default_factory=list, max_length=10)
     wave_count: int = Field(ge=WAVE_COUNT_MIN, le=WAVE_COUNT_MAX)
     target_score: int = Field(ge=TARGET_SCORE_MIN, le=TARGET_SCORE_MAX)
 

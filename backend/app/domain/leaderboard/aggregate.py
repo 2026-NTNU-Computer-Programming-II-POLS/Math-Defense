@@ -30,6 +30,8 @@ class LeaderboardEntry:
         challenge_id: str | None = None,
         created_at: datetime | None = None,
     ) -> None:
+        if not isinstance(level, Level):
+            raise DomainValueError("level must be a Level instance")
         if kills < 0:
             raise DomainValueError("kills must be non-negative")
         if waves_survived < 0:

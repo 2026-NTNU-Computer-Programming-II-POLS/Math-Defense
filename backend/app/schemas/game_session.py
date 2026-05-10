@@ -58,6 +58,12 @@ class SessionCreate(BaseModel):
     # v3 forces an explicit migration.
     replay_version: int = Field(default=1, ge=1, le=2)
 
+    @model_validator(mode="after")
+    def no_practice_with_challenge(self) -> "SessionCreate":
+        if self.practice_mode and self.challenge_id is not None:
+            raise ValueError("practice_mode and challenge_id are mutually exclusive")
+        return self
+
     @field_validator("path_config")
     @classmethod
     def path_config_size(cls, v: dict | None) -> dict | None:
@@ -115,6 +121,13 @@ class SessionEnd(BaseModel):
     time_exclude_prepare: list[_PrepareFloat] | None = Field(default=None, max_length=50)
     n_prep_phases: int | None = Field(default=None, ge=0, le=50)
     total_score: float | None = Field(default=None, ge=0, le=1_000_000)
+
+    @field_validator("time_exclude_prepare")
+    @classmethod
+    def prep_list_sum_bound(cls, v: list[float] | None) -> list[float] | None:
+        if v is not None and sum(v) > 7200.0 + 0.001:
+            raise ValueError("sum(time_exclude_prepare) must not exceed 7200 s")
+        return v
 
     @model_validator(mode="after")
     def prep_sum_le_time_total(self) -> "SessionEnd":

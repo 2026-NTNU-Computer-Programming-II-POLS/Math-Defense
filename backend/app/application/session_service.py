@@ -130,10 +130,10 @@ class SessionApplicationService:
         rng_seed: int | None = None,
         replay_version: int = 1,
     ) -> GameSession:
-        # Under PG, find_active_by_user holds a row lock via with_for_update, so the
-        # race between concurrent creates is closed. The retry here is defence-in-depth
-        # for the case where no row exists yet (FOR UPDATE has nothing to lock) and
-        # two inserts both reach the unique partial index simultaneously.
+        # Under PG, acquire_user_create_lock takes a per-user advisory lock so
+        # concurrent creates are serialised before any row exists. The retry here
+        # is defence-in-depth for the rare case where two inserts still both reach
+        # the unique partial index simultaneously.
         for attempt in range(2):
             try:
                 return self._create_session_once(
@@ -178,7 +178,7 @@ class SessionApplicationService:
             self._session_repo.save_all(stale)
 
             # 2. Abandon existing active session (one per user limit)
-            existing = self._session_repo.find_active_by_user(user_id)
+            existing = self._session_repo.find_active_by_user_for_update(user_id)
             if existing:
                 existing.abandon()
                 self._session_repo.save(existing)

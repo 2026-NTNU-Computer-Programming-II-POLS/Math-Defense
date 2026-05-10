@@ -191,7 +191,7 @@ class GrabbingTerritoryActivity:
             # B-M-2: return new object instead of mutating current in place so
             # a rollback (IntegrityError) cannot leave the aggregate in a dirty state.
             return TerritoryOccupation(
-                id=current.id,
+                id=str(uuid.uuid4()),
                 slot_id=current.slot_id,
                 student_id=current.student_id,
                 score=new_score,

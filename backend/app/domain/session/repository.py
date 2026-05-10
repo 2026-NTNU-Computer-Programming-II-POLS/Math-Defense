@@ -35,6 +35,11 @@ class GameSessionRepository(Protocol):
         pass
     def find_active_by_user(self, user_id: str) -> GameSession | None: pass
 
+    def find_active_by_user_for_update(self, user_id: str) -> GameSession | None:
+        """Like find_active_by_user, but acquires a row-level lock to serialise
+        concurrent create/abandon races. Use only on write paths."""
+        pass
+
     def find_stale_sessions(self, user_id: str) -> list[GameSession]: pass
 
     def acquire_user_create_lock(self, user_id: str) -> None:

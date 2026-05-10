@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_MIN_SECRET_KEY_LENGTH = 16
+_MIN_SECRET_KEY_LENGTH = 32
 
 _logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class Settings(BaseSettings):
         if len(v) < _MIN_SECRET_KEY_LENGTH:
             raise ValueError(
                 f"SECRET_KEY must be at least {_MIN_SECRET_KEY_LENGTH} characters; "
-                "a short key compromises JWT security"
+                "generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
             )
         return v
 
