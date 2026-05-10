@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain.user.constraints import PLAYER_NAME_MIN_LENGTH, PLAYER_NAME_MAX_LENGTH
 from app.domain.user.value_objects import Email
@@ -191,7 +191,7 @@ class MFAConfirmRequest(BaseModel):
 class MFAChallengeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    mfa_token: str
+    mfa_token: str = Field(min_length=20, max_length=2048)
     code: str
 
     @field_validator("code")

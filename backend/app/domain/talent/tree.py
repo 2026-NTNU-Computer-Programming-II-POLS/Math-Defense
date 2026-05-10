@@ -11,6 +11,7 @@ updated allocations. Domain errors are raised here, not in the service.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from app.domain.errors import (
@@ -21,6 +22,8 @@ from app.domain.errors import (
 )
 from app.domain.talent.aggregate import TalentAllocation
 from app.domain.talent.definitions import TALENT_NODE_DEFS
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -53,12 +56,14 @@ class TalentTree:
         for alloc in self._allocations:
             node_def = TALENT_NODE_DEFS.get(alloc.talent_node_id)
             if node_def is None:
-                # Data integrity: a persisted allocation refers to a node that
-                # no longer has a definition. Surface as ValueError so the
-                # service-level UoW rolls back cleanly.
-                raise ValueError(
-                    f"Talent node '{alloc.talent_node_id}' has no definition"
+                # Stale allocation: a persisted node whose definition was removed.
+                # Treat as 0-cost so a retired node doesn't break every player's
+                # tree load. Emit telemetry so the data issue is visible.
+                logger.warning(
+                    "talent_node_undefined node_id=%s user_id=%s",
+                    alloc.talent_node_id, self._user_id,
                 )
+                continue
             total += node_def.cost_per_level * alloc.current_level
         return total
 

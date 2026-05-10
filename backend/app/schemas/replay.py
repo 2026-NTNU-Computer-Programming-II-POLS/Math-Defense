@@ -15,6 +15,22 @@ from app.domain.session.events_log import MAX_BATCH_SIZE
 # (a chain-rule question with both functions LaTeX-encoded ~2 KB).
 _PAYLOAD_MAX_BYTES = 8_192
 
+# M7: whitelist derived from EventRecorder.RECORDED_EVENTS (frontend).
+# Spectators re-consume whatever the recorder posted, so constraining
+# ingest to this set prevents arbitrary strings from reaching the DB
+# and keeps spectate payloads to known shapes.
+_ALLOWED_EVENT_TYPES: frozenset[str] = frozenset({
+    "levelStart", "levelEnd", "gameOver",
+    "waveStart", "waveEnd",
+    "towerPlaced", "towerParamsSet", "towerUpgrade", "towerRefund",
+    "towerRemoved", "towerTargetingChanged",
+    "magicFunctionSelected", "magicModeChanged", "radarArcChanged",
+    "matrixPairChanged", "limitAnswer", "calculusOperation",
+    "buffCardSelected", "shopPurchase",
+    "montyHallDoorSelected", "montyHallSwitchDecision",
+    "chainRuleAnswer", "spellCast",
+})
+
 
 class ReplayEventIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -26,6 +42,13 @@ class ReplayEventIn(BaseModel):
     ts: float = Field(ge=0, le=7_200.0)
     event_type: str = Field(min_length=1, max_length=64)
     payload: Any = None
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, v: str) -> str:
+        if v not in _ALLOWED_EVENT_TYPES:
+            raise ValueError(f"unknown event_type: {v!r}")
+        return v
 
     @field_validator("payload")
     @classmethod

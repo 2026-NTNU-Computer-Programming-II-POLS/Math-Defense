@@ -123,6 +123,31 @@ class AssessmentApplicationService:
             self._repo.save(state)
             self._uow.commit()
 
+    def apply_evidence_in_open_uow(
+        self, user_id: str, events: list[tuple[str, bool]]
+    ) -> None:
+        """Write Beta-evidence rows using the caller's already-open DB session.
+
+        Does NOT open or commit a UoW — the caller is responsible for both.
+        Used by AchievementCheckHandler so achievement unlocks and their
+        corresponding Beta-evidence land in the same DB commit (H3 atomicity).
+        All services share one SqlAlchemyUnitOfWork per request (see factories
+        _get_uow), so writes here participate in the caller's transaction.
+        """
+        if not events:
+            return
+        state = self._repo.find_by_user_for_update(user_id)
+        for event_id, success in events:
+            try:
+                state.apply_event(self._q_matrix, event_id, success)
+            except UnknownEventError:
+                logger.warning(
+                    "assessment.apply_evidence_in_open_uow: unknown event id %r — skipping (user=%s)",
+                    event_id,
+                    user_id,
+                )
+        self._repo.save(state)
+
     def get_posteriors(self, user_id: str) -> dict[Competency, BetaSummary]:
         """Return a summary per competency. Single SELECT under the hood —
         spec §8.5 acceptance criterion."""

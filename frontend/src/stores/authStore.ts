@@ -179,10 +179,16 @@ export const useAuthStore = defineStore('auth', () => {
     // per-user recommendation-dismiss key. Without this a shared lab
     // device would leak one student's pref onto the next sign-in.
     const previousUserId = user.value?.id ?? null
+    // M14: retry once on network / transient failure so a 5xx blip doesn't
+    // leave the server-side cookie live. Local state is cleared regardless.
     try {
       await authService.logout()
     } catch {
-      // Server-side invalidation is best-effort; always clear local state.
+      try {
+        await authService.logout()
+      } catch {
+        // Server-side invalidation is best-effort; always clear local state.
+      }
     }
     clearAuth()
     if (previousUserId !== null && typeof localStorage !== 'undefined') {

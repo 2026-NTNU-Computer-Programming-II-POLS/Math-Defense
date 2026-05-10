@@ -57,16 +57,20 @@ class LeaderboardApplicationService:
         self,
         user_id: str,
         level: int | None = None,
-    ) -> list[PersonalHistoryEntry]:
-        """Personal-best timeline: every entry the user has, newest first,
-        with an ``is_personal_best`` flag set on entries that beat every
-        prior submission (within the same level filter, if any).
+        page: int = 1,
+        per_page: int = 50,
+    ) -> tuple[list[PersonalHistoryEntry], int]:
+        """Personal-best timeline, paginated.
 
-        The repository returns rows in DESC order for caller convenience;
-        we walk them in chronological (ASC) order to compute the rolling
-        max, then re-emit in the original DESC order.
+        Returns (entries_for_page, total_count). PB flags are computed over
+        the full history first so the flag is stable regardless of page —
+        an entry that is a personal best is always marked as such, even if
+        it falls on page 3. The repo returns the full list (one user's
+        sessions); we paginate in Python after PB detection.
         """
         history = self._leaderboard_repo.get_user_history(user_id, level)
+        total = len(history)
+        # Walk chronologically (ASC) to compute the rolling-max PB set.
         chronological = list(reversed(history))
         running_best = -1
         pb_ids: set[str] = set()
@@ -74,7 +78,8 @@ class LeaderboardApplicationService:
             if entry.score.value > running_best:
                 running_best = entry.score.value
                 pb_ids.add(entry.id)
-        return [
+        # Build the full annotated list (DESC order), then slice for the page.
+        annotated = [
             PersonalHistoryEntry(
                 id=entry.id,
                 level=int(entry.level),
@@ -86,6 +91,8 @@ class LeaderboardApplicationService:
             )
             for entry in history
         ]
+        start = (page - 1) * per_page
+        return annotated[start : start + per_page], total
 
     def submit_score(
         self,

@@ -212,7 +212,8 @@ class GameSession:
                 raise DomainValueError("score exceeds level maximum")
             self.score = score
         if kill_value is not None:
-            self.kill_value = max(0, kill_value)
+            level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
+            self.kill_value = max(0, min(kill_value, level_cap))
         if cost_total is not None:
             self.cost_total = max(0, cost_total)
         self._events.append(SessionUpdated(session_id=self.id))
@@ -284,7 +285,8 @@ class GameSession:
         GameResult; they do not participate in state-transition invariants.
         """
         if kill_value is not None:
-            self.kill_value = max(0, kill_value)
+            level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
+            self.kill_value = max(0, min(kill_value, level_cap))
         if cost_total is not None:
             self.cost_total = max(0, cost_total)
         if time_total is not None:

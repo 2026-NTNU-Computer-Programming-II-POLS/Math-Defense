@@ -9,6 +9,7 @@ seconds) without affecting the session CRUD limits.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -195,17 +196,23 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
     # past revocation.
     from app.domain.errors import DomainError
 
+    # Re-auth fires every _SPECTATE_REAUTH_INTERVAL seconds even when the
+    # session is idle and no events arrive (wall-clock gate). This closes the
+    # gap where a banned/password-rotated user could keep streaming indefinitely
+    # on a quiet session that never accumulated N events.
+    _SPECTATE_REAUTH_INTERVAL = 60
+
     queue = await spectate_hub.subscribe(str(session_id))
-    events_since_revalidation = 0
-    revalidation_interval = 30
     try:
         while True:
-            event = await queue.get()
-            events_since_revalidation += 1
-            if events_since_revalidation >= revalidation_interval:
-                events_since_revalidation = 0
-                # B-BUG-5: re-validate against a fresh, short-lived session
-                # rather than holding one open for the WS lifetime.
+            try:
+                event = await asyncio.wait_for(
+                    queue.get(), timeout=_SPECTATE_REAUTH_INTERVAL,
+                )
+            except asyncio.TimeoutError:
+                event = None
+
+            if event is None:
                 revalidate_db = SessionLocal()
                 try:
                     try:
@@ -218,6 +225,8 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
                         return
                 finally:
                     revalidate_db.close()
+                continue
+
             await websocket.send_json({"kind": "event", **event})
     except WebSocketDisconnect:
         return

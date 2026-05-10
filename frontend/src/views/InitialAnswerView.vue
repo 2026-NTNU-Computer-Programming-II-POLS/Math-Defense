@@ -6,6 +6,7 @@ import { curveToLatex } from '@/math/curve-evaluator'
 import { generateDistractors, type AnswerOption } from '@/domain/level/distractor-generator'
 import { mulberry32 } from '@/math/MathUtils'
 import type { GeneratedLevel } from '@/math/curve-types'
+import { parseLevelJson } from '@/utils/parseHistoryState'
 
 const router = useRouter()
 
@@ -16,27 +17,6 @@ const answered = ref(false)
 const iaResult = ref<'correct' | 'wrong' | 'paid' | 'ignored' | null>(null)
 const territoryContext = ref<string | undefined>(undefined)
 
-// F-BUG-14: cap the size of any JSON payload we accept from history.state /
-// sessionStorage. A malformed or attacker-tampered entry could otherwise
-// stall JSON.parse on a multi-MB string before failing the shape check.
-const MAX_LEVEL_JSON_BYTES = 64 * 1024
-
-function isPlainObject(x: unknown): x is Record<string, unknown> {
-  return typeof x === 'object' && x !== null && !Array.isArray(x)
-}
-
-function parseLevelJson(raw: unknown): GeneratedLevel | null {
-  if (typeof raw !== 'string') return null
-  if (raw.length > MAX_LEVEL_JSON_BYTES) return null
-  let parsed: unknown
-  try { parsed = JSON.parse(raw) } catch { return null }
-  if (!isPlainObject(parsed)) return null
-  if (!Array.isArray(parsed.curves)) return null
-  if (!isPlainObject(parsed.endpoint)) return null
-  if (!Array.isArray(parsed.interval) || parsed.interval.length !== 2) return null
-  if (typeof parsed.starRating !== 'number') return null
-  return parsed as unknown as GeneratedLevel
-}
 
 onMounted(() => {
   const raw = history.state?.level

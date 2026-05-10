@@ -10,6 +10,8 @@ maps to an empty CSV cell).
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from sqlalchemy.orm import Session as DbSession
 
 from app.models.study import (
@@ -17,6 +19,12 @@ from app.models.study import (
     StudyEnrollment,
     StudyProbeAttempt,
 )
+
+
+@dataclass(frozen=True)
+class StudyEnrollmentRecord:
+    """Thin domain record returned by find_enrollment — not an ORM model."""
+    group: str
 
 
 class StudyExportRow:
@@ -63,8 +71,8 @@ class SqlAlchemyStudyRepository:
     # ── Enrollment ────────────────────────────────────────────────────
     def find_enrollment(
         self, user_id: str, study_id: str,
-    ) -> StudyEnrollment | None:
-        return (
+    ) -> StudyEnrollmentRecord | None:
+        row = (
             self._db.query(StudyEnrollment)
             .filter(
                 StudyEnrollment.user_id == user_id,
@@ -72,6 +80,11 @@ class SqlAlchemyStudyRepository:
             )
             .first()
         )
+        return self._enrollment_to_domain(row) if row else None
+
+    @staticmethod
+    def _enrollment_to_domain(row: StudyEnrollment) -> StudyEnrollmentRecord:
+        return StudyEnrollmentRecord(group=row.group)
 
     def add_enrollment(
         self, user_id: str, study_id: str, group: str,

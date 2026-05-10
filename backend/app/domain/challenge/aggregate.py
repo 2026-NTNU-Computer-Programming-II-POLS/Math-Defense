@@ -46,6 +46,7 @@ class Challenge:
             raise DomainValueError(
                 f"title exceeds {TITLE_MAX_LENGTH} characters"
             )
+        description = (description or "").strip()
         if len(description) > DESCRIPTION_MAX_LENGTH:
             raise DomainValueError(
                 f"description exceeds {DESCRIPTION_MAX_LENGTH} characters"
@@ -53,7 +54,7 @@ class Challenge:
         self.id = id
         self.teacher_id = teacher_id
         self.title = title
-        self.description = description.strip()
+        self.description = description
         self.constraints = constraints
         self.created_at = created_at or datetime.now(UTC)
         self.updated_at = updated_at or self.created_at
@@ -95,12 +96,13 @@ class Challenge:
             raise DomainValueError(
                 f"title exceeds {TITLE_MAX_LENGTH} characters"
             )
+        description = (description or "").strip()
         if len(description) > DESCRIPTION_MAX_LENGTH:
             raise DomainValueError(
                 f"description exceeds {DESCRIPTION_MAX_LENGTH} characters"
             )
         self.title = title
-        self.description = description.strip()
+        self.description = description
         self.updated_at = datetime.now(UTC)
 
     def replace_constraints(

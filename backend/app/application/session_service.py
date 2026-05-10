@@ -6,6 +6,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import OperationalError
+
 from app.domain.errors import (
     ConstraintViolationError,
     PersistenceError,
@@ -32,10 +34,11 @@ if TYPE_CHECKING:
     from app.domain.user.repository import UserRepository
 
 
-# B-BUG-8: event_type strings emitted by the EventRecorder for wave boundaries
-# (kept in sync with frontend/src/data/constants.ts). Used to derive an
-# authoritative waves_survived count from the persisted event log so the
-# value submitted at end_session cannot be inflated by a tampered client.
+# B-BUG-8 / C-01: event_type strings emitted by the EventRecorder for wave
+# boundaries (kept in sync with frontend/src/data/constants.ts). Used to
+# derive authoritative waves_survived and timing inputs from the persisted
+# event log so neither can be forged by a tampered client.
+_WAVE_START_EVENT_TYPE = "waveStart"
 _WAVE_END_EVENT_TYPE = "waveEnd"
 
 logger = logging.getLogger(__name__)
@@ -101,7 +104,6 @@ class SessionApplicationService:
         # behind an event bus so this service stays a thin lifecycle module.
         from app.application.session_event_handlers import (
             AchievementCheckHandler,
-            AssessmentEventHandler,
             IaAccuracyRefreshHandler,
             LeaderboardInsertHandler,
             SessionEventBus,
@@ -110,8 +112,8 @@ class SessionApplicationService:
             leaderboard_handler=LeaderboardInsertHandler(leaderboard_repo, uow),
             achievement_handler=AchievementCheckHandler(
                 achievement_svc, session_repo, territory_repo, uow,
+                assessment_svc=assessment_svc,
             ),
-            assessment_handler=AssessmentEventHandler(assessment_svc),
             ia_accuracy_handler=IaAccuracyRefreshHandler(
                 session_repo, user_repo, uow,
             ),
@@ -237,16 +239,21 @@ class SessionApplicationService:
         total_score: float | None = None,
     ) -> EndSessionResult:
         pending_events: list = []
+        # M22: replay_leaderboard opens its own UoW (via LeaderboardInsertHandler).
+        # Calling it inside the outer `with self._uow:` would trigger the
+        # non-reentrant guard. For the COMPLETED path we snapshot all scalar
+        # data before the UoW exits, then call replay_leaderboard outside.
+        _catch_up_event: SessionCompleted | None = None
+
         with self._uow:
             session = self._session_repo.find_by_id_for_update(session_id, user_id)
             if not session:
                 raise SessionNotFoundError("Session not found")
-            # Idempotent retry: if the session is already completed, return it.
-            # Catch up only the leaderboard handler (idempotent via find_by_session_id)
-            # — skip achievement re-evaluation to avoid re-triggering cumulative
-            # stat checks against totals that already include this session.
+            # Idempotent retry: if the session is already completed, snapshot the
+            # event data and fall through without committing.  replay_leaderboard
+            # runs below, outside this UoW, in its own transaction.
             if session.status == SessionStatus.COMPLETED:
-                catch_up = SessionCompleted(
+                _catch_up_event = SessionCompleted(
                     session_id=session.id,
                     user_id=session.user_id,
                     level=int(session.level),
@@ -257,86 +264,93 @@ class SessionApplicationService:
                     challenge_id=session.challenge_id,
                     practice_mode=session.practice_mode,
                 )
-                try:
-                    self._event_bus.replay_leaderboard(catch_up)
-                except PersistenceError:
-                    logger.exception("leaderboard catch-up failed session=%s", session.id)
-                return EndSessionResult(session=session, newly_unlocked=[])
-            self._ensure_not_stale_or_abandon(session)
-            # B-BUG-8: derive waves_survived from the persisted event log
-            # rather than trusting the client. The recorder emits a
-            # ``waveEnd`` event on every wave boundary; counting them gives
-            # the server an authoritative value that survives any tampering
-            # at the end_session edge. Kills aren't recorded in the event
-            # stream by design (see EventRecorder docstring — output events
-            # are derivable from input + seed and would 10–100× the log
-            # size), so the per-level cap enforced inside session.complete()
-            # remains the kill-side defense. Falls back to the client value
-            # only when the event_repo dep is absent (legacy unit tests).
-            authoritative_waves = self._derive_waves_from_events(session.id)
-            if authoritative_waves is not None:
-                if waves_survived > authoritative_waves:
-                    logger.warning(
-                        "waves_survived inflated session=%s submitted=%d derived=%d",
-                        session.id, waves_survived, authoritative_waves,
-                    )
-                waves_survived = authoritative_waves
-            result = GameResult(
-                score=Score(score),
-                kills=kills,
-                waves_survived=waves_survived,
-            )
-            # Backlog §23 — when this session was launched from a challenge,
-            # narrow the wave cap to the challenge's wave_count. Server-side
-            # enforcement: a tampered client cannot bypass the per-challenge
-            # ceiling.
-            wave_cap_override = self._challenge_wave_cap(session.challenge_id)
-            session.complete(result, wave_cap_override=wave_cap_override)
-            session.record_scoring_context(
-                kill_value=kill_value,
-                cost_total=cost_total,
-                time_total=time_total,
-                health_origin=health_origin,
-                health_final=health_final,
-                time_exclude_prepare=time_exclude_prepare,
-                total_score=total_score,
-            )
-            # Overwrite client-submitted total_score with server-recomputed value
-            # before committing so the DB always stores the canonical figure.
-            self._verify_score(session)
-            self._session_repo.save(session)
+                # Exiting without commit — __exit__ rolls back (releasing the
+                # FOR UPDATE lock) and replay_leaderboard runs below.
+            else:
+                self._ensure_not_stale_or_abandon(session)
+                # B-BUG-8 / C-01: load the replay event log once; reuse it for
+                # both the waves_survived derivation below and the timing derivation
+                # inside _verify_score to avoid two DB round-trips per end_session.
+                # Kills aren't in the event stream by design (see EventRecorder
+                # docstring — output events are derivable from input + seed and
+                # would 10–100× the log size); the per-level cap in the aggregate
+                # remains the kill-side defense.
+                replay_events = self._load_events_for_session(session.id)
+                authoritative_waves = self._derive_waves_from_events(
+                    session.id, events=replay_events
+                )
+                if authoritative_waves is not None:
+                    if waves_survived > authoritative_waves:
+                        logger.warning(
+                            "waves_survived inflated session=%s submitted=%d derived=%d",
+                            session.id, waves_survived, authoritative_waves,
+                        )
+                    waves_survived = authoritative_waves
+                result = GameResult(
+                    score=Score(score),
+                    kills=kills,
+                    waves_survived=waves_survived,
+                )
+                # Backlog §23 — when this session was launched from a challenge,
+                # narrow the wave cap to the challenge's wave_count. Server-side
+                # enforcement: a tampered client cannot bypass the per-challenge
+                # ceiling.
+                wave_cap_override = self._challenge_wave_cap(session.challenge_id)
+                session.complete(result, wave_cap_override=wave_cap_override)
+                session.record_scoring_context(
+                    kill_value=kill_value,
+                    cost_total=cost_total,
+                    time_total=time_total,
+                    health_origin=health_origin,
+                    health_final=health_final,
+                    time_exclude_prepare=time_exclude_prepare,
+                    total_score=total_score,
+                )
+                # Overwrite client-submitted total_score with server-recomputed value
+                # before committing so the DB always stores the canonical figure.
+                self._verify_score(session, events=replay_events)
+                self._session_repo.save(session)
 
-            # Rolling-10 IA accuracy is recomputed by IaAccuracyRefreshHandler
-            # post-commit (B-ARCH-19) so the cross-aggregate User write does
-            # not live inside the session use case. The handler is idempotent,
-            # so end_session's COMPLETED-status retry path still re-converges
-            # the user's ia_recent_accuracy on transient failures.
+                # Rolling-10 IA accuracy is recomputed by IaAccuracyRefreshHandler
+                # post-commit (B-ARCH-19) so the cross-aggregate User write does
+                # not live inside the session use case. The handler is idempotent,
+                # so end_session's COMPLETED-status retry path still re-converges
+                # the user's ia_recent_accuracy on transient failures.
 
-            # Snapshot events and backfill total_score now that _verify_score has
-            # set the authoritative value. The aggregate emits SessionCompleted
-            # during complete() before total_score is known, so we patch it here.
-            pending_events = [
-                dataclasses.replace(e, total_score=session.total_score)
-                if isinstance(e, SessionCompleted) else e
-                for e in session.collect_events()
-            ]
-            # B-BUG-14: drain the event buffer now that we've snapshotted it.
-            # Without this the aggregate retains processed events; harmless
-            # today (we never read collect_events twice on the same instance)
-            # but latches the moment any aggregate cache lets the same
-            # GameSession instance be reused — events would re-dispatch.
-            session.clear_events()
+                # Snapshot events and backfill total_score now that _verify_score has
+                # set the authoritative value. The aggregate emits SessionCompleted
+                # during complete() before total_score is known, so we patch it here.
+                pending_events = [
+                    dataclasses.replace(e, total_score=session.total_score)
+                    if isinstance(e, SessionCompleted) else e
+                    for e in session.collect_events()
+                ]
+                # B-BUG-14: drain the event buffer now that we've snapshotted it.
+                # Without this the aggregate retains processed events; harmless
+                # today (we never read collect_events twice on the same instance)
+                # but latches the moment any aggregate cache lets the same
+                # GameSession instance be reused — events would re-dispatch.
+                session.clear_events()
 
-            self._uow.commit()
-            logger.info(
-                "Session ended: session=%s user=%s score=%d",
-                session.id, user_id, score,
-            )
+                self._uow.commit()
+                logger.info(
+                    "Session ended: session=%s user=%s score=%d",
+                    session.id, user_id, score,
+                )
 
-        # Post-commit dispatch: session completion is now durable. Handler runs
-        # in a separate UoW so a leaderboard-insert failure cannot roll back the
-        # already-committed session. Handler idempotency makes retries
-        # (via end_session catch-up or background sweeper) safe.
+        if _catch_up_event is not None:
+            # COMPLETED path: run leaderboard catch-up outside the UoW so the
+            # handler's own `with self._uow:` does not nest inside ours.
+            try:
+                self._event_bus.replay_leaderboard(_catch_up_event)
+            except PersistenceError:
+                logger.exception("leaderboard catch-up failed session=%s", session.id)
+            return EndSessionResult(session=session, newly_unlocked=[])
+
+        # Normal path post-commit dispatch: session completion is now durable.
+        # Handler runs in a separate UoW so a leaderboard-insert failure cannot
+        # roll back the already-committed session. Handler idempotency makes
+        # retries (via end_session catch-up or background sweeper) safe.
         newly_unlocked = self._dispatch_post_commit(pending_events)
         newly_unlocked_dicts = [
             {"id": a.achievement_id, "talent_points": a.talent_points}
@@ -424,25 +438,73 @@ class SessionApplicationService:
             self._uow.commit()
             return session
 
-    def _derive_waves_from_events(self, session_id: str) -> int | None:
-        """Count ``waveEnd`` events in the replay log for ``session_id``.
+    def _load_events_for_session(self, session_id: str):
+        """Fetch the full replay event log, returning None on missing repo or error.
 
-        Returns ``None`` when the event_repo dep is not wired (legacy
-        construction in unit tests). Errors fall through as None — the
-        deriver is a defense-in-depth check, not a hard requirement, so a
-        replay-log read failure must not break end_session.
+        Centralises the try/except so both wave-count and timing derivation
+        share a single DB round-trip when called from ``end_session``.
         """
         if self._event_repo is None:
             return None
         try:
-            events = self._event_repo.list_for_session(session_id)
+            return self._event_repo.list_for_session(session_id)
+        except OperationalError:
+            raise
         except Exception:
-            logger.exception(
-                "failed reading event log for waves_survived derivation session=%s",
-                session_id,
-            )
+            logger.exception("failed reading event log session=%s", session_id)
+            return None
+
+    def _derive_waves_from_events(
+        self, session_id: str, events=None
+    ) -> int | None:
+        """Count ``waveEnd`` events in the replay log for ``session_id``.
+
+        ``events`` may be pre-fetched by the caller to avoid a second DB read;
+        if None the log is fetched here. Returns None when the event_repo dep
+        is not wired (legacy unit tests). Errors fall through as None — the
+        deriver is a defense-in-depth check, not a hard requirement.
+        """
+        if events is None:
+            events = self._load_events_for_session(session_id)
+        if events is None:
             return None
         return sum(1 for e in events if e.event_type == _WAVE_END_EVENT_TYPE)
+
+    def _derive_timing_from_events(
+        self, session_id: str, events=None
+    ) -> tuple[float, list[float]] | None:
+        """Derive (time_total_min, time_exclude_prepare) from waveStart/waveEnd timestamps.
+
+        C-01 anti-cheat: the replay log stores game-time ``ts`` for each
+        recorded event. The gap between consecutive waveEnd[i] and
+        waveStart[i+1] is the prepare (build) phase duration — that is exactly
+        what ``time_exclude_prepare[i]`` should contain. The last event's ``ts``
+        gives a floor on ``time_total`` (the game ran for at least that long).
+
+        ``events`` may be pre-fetched by the caller to avoid a second DB read.
+        Returns None when the event_repo is absent or the log is empty.
+        Errors fall through as None so a log-read failure never breaks end_session.
+        """
+        if events is None:
+            events = self._load_events_for_session(session_id)
+        if not events:
+            return None
+
+        all_ts = [e.ts for e in events]
+        wave_end_ts = sorted(e.ts for e in events if e.event_type == _WAVE_END_EVENT_TYPE)
+        wave_start_ts = sorted(e.ts for e in events if e.event_type == _WAVE_START_EVENT_TYPE)
+
+        time_total_min = max(all_ts)
+
+        prepare_durations: list[float] = []
+        for end_ts in wave_end_ts:
+            next_starts = [s for s in wave_start_ts if s > end_ts]
+            if next_starts:
+                gap = min(next_starts) - end_ts
+                if gap > 0:
+                    prepare_durations.append(gap)
+
+        return time_total_min, prepare_durations
 
     def _challenge_wave_cap(self, challenge_id: str | None) -> int | None:
         """Look up the wave_count for a challenge, or None when no challenge
@@ -475,7 +537,7 @@ class SessionApplicationService:
             "Session timed out (over 2 hours) and was automatically abandoned"
         )
 
-    def _verify_score(self, session: GameSession) -> None:
+    def _verify_score(self, session: GameSession, events=None) -> None:
         """Recompute total_score server-side and overwrite session.total_score.
 
         v1 sessions: log a warning on mismatch and replace the client value
@@ -488,25 +550,86 @@ class SessionApplicationService:
         Strict-rejection mode only kicks in when the WASM runtime actually
         loaded — without it the backend falls back to Python pow and we widen
         to v1's ε tolerance because bit-equality cannot be guaranteed.
+
+        C-01: timing inputs (time_total, time_exclude_prepare) are derived
+        server-side from the replay event log (pre-fetched via ``events``) and
+        used to validate / floor the client-supplied values:
+        - time_total: floored at the last event timestamp; a submitted value
+          more than 0.5 s below the floor is replaced. This correctly rejects
+          the time_total=0.001 attack because the recomputed score then
+          diverges from the submitted one.
+        - time_exclude_prepare: replaced only when the client claims more than
+          max(5 s, 5 % of the derived sum) extra prepare time, indicating clear
+          inflation. Unconditional replacement is intentionally avoided — even
+          0.1 s of game-time precision drift changes s1 by far more than the
+          1e-4 strict-mode tolerance and would falsely reject legitimate v2
+          submissions.
         """
-        recomputed = recompute_total_score(
-            kill_value=session.kill_value,
-            time_total=session.time_total,
-            time_exclude_prepare=session.time_exclude_prepare,
-            cost_total=session.cost_total,
-            health_origin=session.health_origin,
-            health_final=session.health_final,
-            initial_answer=session.initial_answer,
-            pow_fn=get_pow_fn(),
-            total_score_fn=get_total_score_fn(),
-        )
+        time_total = session.time_total
+        time_exclude_prepare = session.time_exclude_prepare
+
+        derived = self._derive_timing_from_events(session.id, events=events)
+        if derived is not None:
+            derived_time_total_min, derived_prepare = derived
+            # Floor time_total: a submitted value below the event-log proof is
+            # impossible, so we raise it. For v2 this causes a score mismatch
+            # → ReplayMismatchError (correct rejection). For v1 the existing
+            # warn-and-overwrite path handles it.
+            if time_total is None or time_total < derived_time_total_min - 0.5:
+                if time_total is not None:
+                    logger.warning(
+                        "time_total underflow session=%s submitted=%.3f derived_min=%.3f",
+                        session.id, time_total, derived_time_total_min,
+                    )
+                time_total = derived_time_total_min
+            # Validate prepare sum: replace only when the client claims
+            # substantially more prepare time than events show. The threshold
+            # (max 5 s, 5 % of derived sum) is far above real timing precision
+            # (< 0.1 s per phase) so legitimate submissions are never affected.
+            if time_exclude_prepare is not None:
+                client_sum = sum(time_exclude_prepare)
+                server_sum = sum(derived_prepare)
+                if client_sum > server_sum + max(5.0, server_sum * 0.05):
+                    logger.warning(
+                        "time_exclude_prepare inflated session=%s "
+                        "client_sum=%.3f derived_sum=%.3f; using server values",
+                        session.id, client_sum, server_sum,
+                    )
+                    time_exclude_prepare = derived_prepare
+
+        # H1: cost_total=0 with kills is economically impossible (towers must be
+        # purchased to kill). Force recomputed=0 so the comparison below always
+        # flags a mismatch when the client submits an inflated score. This check
+        # lives here, not in recompute_total_score, to keep the canonical formula
+        # intact for parity testing between Python/WASM/JS.
+        if (session.kill_value or 0) > 0 and session.cost_total == 0:
+            logger.warning(
+                "impossible_submission cost_total=0 kill_value=%s session=%s; forcing recomputed=0",
+                session.kill_value, session.id,
+            )
+            recomputed = 0.0
+        else:
+            recomputed = recompute_total_score(
+                kill_value=session.kill_value,
+                time_total=time_total,
+                time_exclude_prepare=time_exclude_prepare,
+                cost_total=session.cost_total,
+                health_origin=session.health_origin,
+                health_final=session.health_final,
+                initial_answer=session.initial_answer,
+                pow_fn=get_pow_fn(),
+                total_score_fn=get_total_score_fn(),
+            )
         if recomputed is None:
             if session.total_score is not None:
                 logger.warning(
                     "total_score submitted but V2 fields incomplete session=%s; discarding client value",
                     session.id,
                 )
-                session.override_total_score(None)
+            # M6: always clear the client value when we cannot compute a
+            # server-authoritative score — not only when the client happened
+            # to submit one. The server wins unconditionally.
+            session.override_total_score(None)
             return
         submitted = session.total_score
         if submitted is not None:

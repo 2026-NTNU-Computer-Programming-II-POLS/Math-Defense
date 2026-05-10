@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -36,7 +38,7 @@ def get_talent_modifiers(
 @limiter.limit("30/minute")
 def allocate_talent_point(
     request: Request,
-    node_id: str,
+    node_id: Annotated[str, Path(max_length=64, pattern=r"^[A-Za-z0-9_]+$")],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

@@ -7,15 +7,19 @@ SessionCompleted via a tiny event bus. Each handler runs in its own UoW so
 a downstream failure cannot roll back the already-durable session row;
 isolation per-handler also keeps a programming error in one effect from
 suppressing the others.
+
+H3 atomicity: AchievementCheckHandler optionally accepts an
+AssessmentApplicationService and calls apply_evidence_in_open_uow inside
+its UoW so achievement-unlock rows and their Beta-evidence rows commit
+atomically. All services share one SqlAlchemyUnitOfWork per request
+(see factories._get_uow), making this a single DB commit.
 """
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import SQLAlchemyError
-
-from app.domain.errors import DomainError
+from app.domain.errors import ConstraintViolationError, DomainError
 from app.domain.leaderboard.aggregate import LeaderboardEntry
 from app.domain.session.events import SessionCompleted
 
@@ -46,26 +50,36 @@ class LeaderboardInsertHandler:
     def __call__(self, event: SessionCompleted) -> None:
         if event.practice_mode:
             return
-        with self._uow:
-            existing = self._leaderboard_repo.find_by_session_id(event.session_id)
-            if existing is None:
-                entry = LeaderboardEntry.create_from_session(
-                    user_id=event.user_id,
-                    level=event.level,
-                    score=event.score,
-                    kills=event.kills,
-                    waves_survived=event.waves_survived,
-                    session_id=event.session_id,
-                    challenge_id=event.challenge_id,
-                )
-                self._leaderboard_repo.save(entry)
-            self._uow.commit()
+        try:
+            with self._uow:
+                existing = self._leaderboard_repo.find_by_session_id(event.session_id)
+                if existing is None:
+                    entry = LeaderboardEntry.create_from_session(
+                        user_id=event.user_id,
+                        level=event.level,
+                        score=event.score,
+                        kills=event.kills,
+                        waves_survived=event.waves_survived,
+                        session_id=event.session_id,
+                        challenge_id=event.challenge_id,
+                    )
+                    self._leaderboard_repo.save(entry)
+                self._uow.commit()
+        except ConstraintViolationError:
+            # M4: a concurrent handler (post-commit retry or duplicate delivery)
+            # already inserted the row; uq_leaderboard_session_id guarantees
+            # exactly-one entry, so this is the expected idempotent outcome.
+            pass
 
 
 class AchievementCheckHandler:
     """Run the achievement evaluator for a completed session and return the
     list of newly unlocked achievements so downstream handlers (and the
-    end_session caller) can react to them."""
+    end_session caller) can react to them.
+
+    When assessment_svc is provided, Beta-evidence for the unlocked
+    achievements is written inside the same UoW commit (H3 atomicity).
+    """
 
     def __init__(
         self,
@@ -73,11 +87,13 @@ class AchievementCheckHandler:
         session_repo: "GameSessionRepository",
         territory_repo: "TerritoryRepository | None",
         uow: "UnitOfWork",
+        assessment_svc: "AssessmentApplicationService | None" = None,
     ) -> None:
         self._achievement_svc = achievement_svc
         self._session_repo = session_repo
         self._territory_repo = territory_repo
         self._uow = uow
+        self._assessment_svc = assessment_svc
 
     def __call__(self, event: SessionCompleted) -> list:
         if self._achievement_svc is None:
@@ -109,6 +125,9 @@ class AchievementCheckHandler:
                 territories_held=territories_held,
                 territory_max_star=territory_max_star,
             )
+            if result and self._assessment_svc is not None:
+                evidence = [(a.achievement_id, True) for a in result]
+                self._assessment_svc.apply_evidence_in_open_uow(event.user_id, evidence)
             self._uow.commit()
         return result
 
@@ -146,45 +165,33 @@ class IaAccuracyRefreshHandler:
             self._uow.commit()
 
 
-class AssessmentEventHandler:
-    """Translate newly-unlocked achievements into competency-evidence events
-    for the stealth-assessment subsystem (Pedagogical_Backlog_Spec.md §8).
-    Skips silently when the assessment subsystem is not wired."""
-
-    def __init__(self, assessment_svc: "AssessmentApplicationService | None") -> None:
-        self._assessment_svc = assessment_svc
-
-    def __call__(self, user_id: str, unlocked: list) -> None:
-        if self._assessment_svc is None or not unlocked:
-            return
-        events = [(a.achievement_id, True) for a in unlocked]
-        self._assessment_svc.record_events(user_id, events)
-
-
 class SessionEventBus:
     """Tiny dispatcher: end_session collects domain events from the aggregate,
     hands them to dispatch(), and gets back the achievement-unlock list so it
     can be threaded into the HTTP response. Each subscriber failure is
     isolated — a SQLAlchemy / DomainError surface in one handler does not
-    suppress the others."""
+    suppress the others.
+
+    Achievement unlocks and their Beta-evidence are committed atomically
+    inside AchievementCheckHandler (H3 fix); there is no separate assessment
+    handler step in dispatch().
+    """
 
     def __init__(
         self,
         leaderboard_handler: LeaderboardInsertHandler,
         achievement_handler: AchievementCheckHandler,
-        assessment_handler: AssessmentEventHandler,
         ia_accuracy_handler: IaAccuracyRefreshHandler | None = None,
     ) -> None:
         self.leaderboard = leaderboard_handler
         self.achievement = achievement_handler
-        self.assessment = assessment_handler
         self.ia_accuracy = ia_accuracy_handler
 
     def replay_leaderboard(self, event: SessionCompleted) -> None:
         """Idempotent leaderboard-only replay used by end_session's
         catch-up branch when the session is already COMPLETED. Skips the
-        achievement / assessment handlers to avoid re-evaluating cumulative
-        stats that already include this session."""
+        achievement handler to avoid re-evaluating cumulative stats that
+        already include this session."""
         self.leaderboard(event)
 
     def dispatch(self, events: list) -> list:
@@ -194,28 +201,21 @@ class SessionEventBus:
                 continue
             try:
                 self.leaderboard(event)
-            except (SQLAlchemyError, DomainError):
+            except DomainError:
                 logger.exception(
                     "leaderboard handler failed session=%s", event.session_id
                 )
-            unlocked: list = []
             try:
                 unlocked = self.achievement(event)
                 newly_unlocked.extend(unlocked)
-            except (SQLAlchemyError, DomainError):
+            except DomainError:
                 logger.exception(
                     "achievement handler failed session=%s", event.session_id
-                )
-            try:
-                self.assessment(event.user_id, unlocked)
-            except (SQLAlchemyError, DomainError):
-                logger.exception(
-                    "assessment handler failed session=%s", event.session_id
                 )
             if self.ia_accuracy is not None:
                 try:
                     self.ia_accuracy(event)
-                except (SQLAlchemyError, DomainError):
+                except DomainError:
                     logger.exception(
                         "ia_accuracy handler failed session=%s", event.session_id
                     )

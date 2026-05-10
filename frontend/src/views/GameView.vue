@@ -8,6 +8,7 @@ import { useGameLoop } from '@/composables/useGameLoop'
 import { useKeyboardPlacement } from '@/composables/useKeyboardPlacement'
 import { GamePhase, CANVAS_WIDTH, CANVAS_HEIGHT } from '@/data/constants'
 import { formatScore } from '@/utils/formatters'
+import { parseLevelJson, parseTerritoryContext } from '@/utils/parseHistoryState'
 import { iaAccuracyToLabelOpacity } from '@/math/curve-renderer'
 
 import HUD from '@/components/game/HUD.vue'
@@ -44,18 +45,14 @@ watch(
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 // Read generated level + IA result forwarded via history state from InitialAnswerView.
-const _rawLevel = history.state?.level as string | undefined
+// parseLevelJson enforces a size cap and a shape check (F-BUG-14 / M13).
+const _generatedLevel = parseLevelJson(history.state?.level)
 const _rawIa = history.state?.iaResult as string | undefined
-const _generatedLevel = _rawLevel
-  ? (() => { try { return JSON.parse(_rawLevel) } catch { return null } })()
-  : null
 const _iaResult = (_rawIa === 'correct' || _rawIa === 'wrong' || _rawIa === 'paid' || _rawIa === 'ignored')
   ? _rawIa
   : null
-const _rawTerritoryCtx = history.state?.territoryContext as string | undefined
-const _territoryContext = _rawTerritoryCtx
-  ? (() => { try { return JSON.parse(_rawTerritoryCtx) as { activityId: string; slotId: string } } catch { return null } })()
-  : null
+// parseTerritoryContext enforces a size cap and validates the expected shape.
+const _territoryContext = parseTerritoryContext(history.state?.territoryContext)
 
 // Replay/Spectate determinism (Backlog §24): the seed travels via
 // LevelSelectView → InitialAnswerView → here. Falling back to Date.now() is

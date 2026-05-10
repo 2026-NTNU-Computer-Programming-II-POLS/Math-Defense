@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -136,6 +136,15 @@ onBeforeUnmount(() => {
   }
 })
 
+// M12: mirror the backend allowlist client-side. Any avatar_url that doesn't
+// start with '/avatars/' is silently replaced with the default so a future
+// backend regression can't load an arbitrary URL.
+const safeAvatarUrl = computed(() => {
+  const url = auth.user?.avatar_url ?? null
+  if (url && url.startsWith('/avatars/')) return url
+  return PRESET_AVATARS[0]
+})
+
 async function selectAvatar(url: string): Promise<void> {
   if (!auth.user || auth.user.avatar_url === url) return
   avatarSaving.value = true
@@ -158,7 +167,7 @@ async function selectAvatar(url: string): Promise<void> {
       <div v-if="auth.user" class="avatar-section">
         <img
           class="avatar-current"
-          :src="auth.user.avatar_url ?? PRESET_AVATARS[0]"
+          :src="safeAvatarUrl"
           alt="Avatar"
         />
         <div class="avatar-grid">

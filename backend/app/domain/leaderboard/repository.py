@@ -53,7 +53,8 @@ class LeaderboardRepository(Protocol):
     ) -> list[LeaderboardEntry]:
         """Personal history — all of a user's entries, newest first.
 
-        Optional ``level`` filter scopes the timeline to a single star-rating.
-        Caller (application service) applies personal-best markers.
+        Returns the full un-paginated list so the caller can compute
+        personal-best markers over the complete history before slicing for
+        display. Optional ``level`` filter scopes to a single star-rating.
         """
         pass

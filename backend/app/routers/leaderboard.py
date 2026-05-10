@@ -70,6 +70,8 @@ def get_leaderboard(
 def get_my_history(
     request: Request,
     level: int | None = Query(None, ge=1, le=5),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -79,7 +81,9 @@ def get_my_history(
     never from a query/body parameter, so the endpoint cannot return another
     user's history regardless of the query string.
     """
-    history = build_leaderboard_service(db).get_user_history(current_user.id, level)
+    history, total = build_leaderboard_service(db).get_user_history(
+        current_user.id, level, page, per_page
+    )
     entries = [
         PersonalHistoryEntryOut(
             id=h.id,
@@ -92,7 +96,7 @@ def get_my_history(
         )
         for h in history
     ]
-    return PersonalHistoryOut(entries=entries)
+    return PersonalHistoryOut(entries=entries, total=total)
 
 
 @router.post("", status_code=201, response_model=ScoreSubmissionResponse)

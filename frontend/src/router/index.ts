@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
+import { parseLevelJson } from '@/utils/parseHistoryState'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -34,10 +35,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/GameView.vue'),
     meta: { requiresAuth: true},
     beforeEnter: () => {
-      try {
-        if (!history.state?.level) return { name: 'level-select', replace: true }
-        JSON.parse(history.state.level)
-      } catch {
+      if (!parseLevelJson(history.state?.level)) {
         return { name: 'level-select', replace: true }
       }
     },

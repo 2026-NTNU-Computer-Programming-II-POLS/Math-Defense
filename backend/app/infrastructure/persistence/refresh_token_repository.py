@@ -26,9 +26,14 @@ class SqlAlchemyRefreshTokenRepository:
         self._db.flush()
 
     def consume(self, token_hash: str) -> str | None:
+        # M3: SELECT FOR UPDATE serialises concurrent refreshes with the same
+        # raw token so the used=False check is atomic. Without it two requests
+        # arriving within the same READ COMMITTED snapshot can both pass the
+        # check and both mint new tokens, leaving a third stolen copy valid.
         record = (
             self._db.query(RefreshToken)
             .filter(RefreshToken.token_hash == token_hash)
+            .with_for_update()
             .first()
         )
         if record is None:

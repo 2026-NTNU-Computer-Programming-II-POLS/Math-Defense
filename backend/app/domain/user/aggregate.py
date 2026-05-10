@@ -1,11 +1,18 @@
 """User Aggregate Root"""
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import datetime, UTC
 
-from app.domain.user.constraints import PLAYER_NAME_MAX_LENGTH, PLAYER_NAME_MIN_LENGTH
+from app.domain.user.constraints import (
+    EMAIL_MAX_LENGTH,
+    PLAYER_NAME_MAX_LENGTH,
+    PLAYER_NAME_MIN_LENGTH,
+)
 from app.domain.user.value_objects import Role
+
+_PASSWORD_HASH_MAX_LENGTH = 1024
 
 
 class User:
@@ -36,9 +43,15 @@ class User:
         totp_last_used_at: datetime | None = None,
         ia_recent_accuracy: float = 0.0,
     ) -> None:
+        if not isinstance(role, Role):
+            raise ValueError("role must be a Role instance")
+        if not isinstance(password_hash, str) or len(password_hash) > _PASSWORD_HASH_MAX_LENGTH:
+            raise ValueError(
+                f"password_hash must be a string of at most {_PASSWORD_HASH_MAX_LENGTH} characters"
+            )
         self.id = id
-        self.email = email
-        self.player_name = player_name
+        self.email = self._validate_email(email)
+        self.player_name = self._validate_player_name(player_name)
         self.role = role
         self.password_hash = password_hash
         self.avatar_url = avatar_url
@@ -78,14 +91,19 @@ class User:
 
     AVATAR_URL_MAX_LENGTH = 2048
 
-    def rename(self, player_name: str) -> None:
-        """Validate and assign a new display name (B-BUG-19).
+    @staticmethod
+    def _validate_email(email: str) -> str:
+        if not isinstance(email, str):
+            raise ValueError("email must be a string")
+        cleaned = email.strip()
+        if not cleaned:
+            raise ValueError("email must not be empty")
+        if len(cleaned) > EMAIL_MAX_LENGTH:
+            raise ValueError(f"email exceeds {EMAIL_MAX_LENGTH} characters")
+        return cleaned
 
-        Domain-layer validation so direct attribute mutation cannot bypass
-        the rules. Empty / whitespace-only names are rejected; lengths are
-        bounded by the shared PLAYER_NAME_MIN/MAX_LENGTH constants so the
-        schema and the aggregate cannot drift.
-        """
+    @staticmethod
+    def _validate_player_name(player_name: str) -> str:
         if not isinstance(player_name, str):
             raise ValueError("player_name must be a string")
         cleaned = player_name.strip()
@@ -97,7 +115,10 @@ class User:
             raise ValueError(
                 f"player_name exceeds {PLAYER_NAME_MAX_LENGTH} characters"
             )
-        self.player_name = cleaned
+        return cleaned
+
+    def rename(self, player_name: str) -> None:
+        self.player_name = self._validate_player_name(player_name)
 
     def update_avatar(self, avatar_url: str | None) -> None:
         """Validate and assign a new avatar URL (B-BUG-19).
@@ -126,6 +147,8 @@ class User:
         completion path and a slightly drifted reading is preferable to a
         rolled-back end-session. Domain command lives here so cross-aggregate
         callers don't mutate the field directly (B-ARCH-19)."""
+        if math.isnan(value) or math.isinf(value):
+            value = 0.0
         if value < 0.0:
             value = 0.0
         elif value > 1.0:

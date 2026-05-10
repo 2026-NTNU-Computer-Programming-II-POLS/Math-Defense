@@ -179,7 +179,12 @@ class GrabbingTerritoryActivity:
         current = slot.occupation
 
         if current is not None and current.student_id == student_id:
-            if new_score <= current.score:
+            if new_score == current.score:
+                # No improvement — return the unchanged occupation as a no-op
+                # success rather than a 4xx so a duplicate submission (e.g.
+                # network retry) is idempotent.
+                return current
+            if new_score < current.score:
                 raise ScoreNotHighEnoughError(
                     "Your new score does not beat your current score on this territory"
                 )

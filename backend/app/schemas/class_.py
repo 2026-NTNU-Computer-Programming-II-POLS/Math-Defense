@@ -1,6 +1,7 @@
-import re
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.domain.user.value_objects import Email
 
 
 class CreateClassRequest(BaseModel):
@@ -60,12 +61,7 @@ class AddStudentRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def email_valid(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not v:
-            raise ValueError("Email is required")
-        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
-            raise ValueError("Invalid email format")
-        return v
+        return Email(v).value
 
 
 class JoinClassRequest(BaseModel):

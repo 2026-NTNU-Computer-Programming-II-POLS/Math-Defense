@@ -14,6 +14,8 @@ class TalentAllocation:
         current_level: int,
         updated_at: datetime | None = None,
     ) -> None:
+        if current_level < 0:
+            raise ValueError("current_level must not be negative")
         self.id = id
         self.user_id = user_id
         self.talent_node_id = talent_node_id

@@ -46,7 +46,7 @@ class SessionCreate(BaseModel):
     # global leaderboard; achievements & talent points still award.
     practice_mode: bool = False
     # Backlog §23 — set when the session is launched from a challenge deep-link.
-    challenge_id: str | None = None
+    challenge_id: str | None = Field(default=None, max_length=64)
     # Backlog §24 — per-session RNG seed for replay. 32-bit unsigned range
     # (matches the mulberry32 input on the frontend). Nullable so non-replay
     # clients (legacy tests, third-party tooling) can still create sessions.

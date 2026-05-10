@@ -97,6 +97,10 @@ class TalentApplicationService:
 
     def reset_tree(self, user_id: str) -> dict:
         with self._uow:
+            # Mirror the lock order in allocate_point: anchor on the user row
+            # before mutating allocations to prevent TOCTOU with concurrent
+            # allocate + reset interleaving.
+            self._talent_repo.acquire_user_lock(user_id)
             self._talent_repo.delete_by_user(user_id)
             self._uow.commit()
             logger.info("Talent tree reset: user=%s", user_id)

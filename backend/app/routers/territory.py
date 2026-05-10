@@ -25,6 +25,7 @@ from app.schemas.territory import (
     PlayResultOut,
     PlayTerritoryRequest,
     RankingEntryOut,
+    RankingEntryWithMetaOut,
     RankingsMetaOut,
     SlotOut,
 )
@@ -115,7 +116,8 @@ def get_activity_rankings(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return build_territory_service(db).get_activity_rankings(activity_id, user.id, user.role)
+    entries = build_territory_service(db).get_activity_rankings(activity_id, user.id, user.role)
+    return [_ranking_entry_out(e, user.id, user.role) for e in entries]
 
 
 @router.get("/{activity_id}/rankings/with-meta", response_model=RankingsMetaOut)
@@ -127,11 +129,17 @@ def get_activity_rankings_with_meta(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return build_territory_service(db).get_rankings_with_meta(
+    result = build_territory_service(db).get_rankings_with_meta(
         activity_id=activity_id,
         user_id=user.id,
         user_role=user.role,
         class_id=class_id,
+    )
+    return RankingsMetaOut(
+        activity_id=result["activity_id"],
+        entries=[_ranking_entry_with_meta_out(e, user.id, user.role) for e in result["entries"]],
+        user_rank=result["user_rank"],
+        refreshed_at=result["refreshed_at"],
     )
 
 
@@ -197,4 +205,27 @@ def _occupation_out(o, requesting_user_id: str | None = None, requesting_user_ro
         occupied_at=o.occupied_at,
         player_name=getattr(o, "player_name", None),
         is_own=is_own,
+    )
+
+
+def _ranking_entry_out(entry: dict, requesting_user_id: str, requesting_user_role: Role) -> RankingEntryOut:
+    show_id = entry["student_id"] == requesting_user_id or requesting_user_role in (Role.TEACHER, Role.ADMIN)
+    return RankingEntryOut(
+        rank=entry["rank"],
+        student_id=entry["student_id"] if show_id else None,
+        player_name=entry.get("player_name"),
+        territory_value=entry["territory_value"],
+    )
+
+
+def _ranking_entry_with_meta_out(entry: dict, requesting_user_id: str, requesting_user_role: Role) -> RankingEntryWithMetaOut:
+    show_id = entry["student_id"] == requesting_user_id or requesting_user_role in (Role.TEACHER, Role.ADMIN)
+    return RankingEntryWithMetaOut(
+        rank=entry["rank"],
+        student_id=entry["student_id"] if show_id else None,
+        player_name=entry.get("player_name"),
+        territory_value=entry["territory_value"],
+        rank_change=entry.get("rank_change"),
+        last_occupation_at=entry.get("last_occupation_at"),
+        composition=entry.get("composition", []),
     )

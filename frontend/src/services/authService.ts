@@ -69,8 +69,11 @@ export const authService = {
       credentials: 'include',
       headers,
       signal: controller.signal,
-    }).then(() => {
+    }).then((res) => {
       clearTimeout(timeoutId)
+      // M14: surface 5xx so the caller can retry. 4xx (e.g. 401 on an already-
+      // expired cookie) is treated as success — the session is already gone.
+      if (res.status >= 500) throw new Error(`logout ${res.status}`)
     }).catch((err) => {
       clearTimeout(timeoutId)
       // Abort (timeout) is swallowed — local state will still be cleared by the caller.

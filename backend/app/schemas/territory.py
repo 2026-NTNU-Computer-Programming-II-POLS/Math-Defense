@@ -137,7 +137,7 @@ class RankingEntryOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     rank: int
-    student_id: str
+    student_id: str | None = None
     player_name: str | None = None
     territory_value: float
 
@@ -162,7 +162,7 @@ class RankingEntryWithMetaOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     rank: int
-    student_id: str
+    student_id: str | None = None
     player_name: str | None = None
     territory_value: float
     rank_change: int | None = None

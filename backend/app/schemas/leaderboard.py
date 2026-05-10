@@ -64,3 +64,4 @@ class PersonalHistoryOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     entries: list[PersonalHistoryEntryOut]
+    total: int

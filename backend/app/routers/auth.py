@@ -2,6 +2,7 @@ import hashlib
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -173,12 +174,12 @@ def logout(
             build_auth_service(db).logout_token(token, refresh_token)
             record_audit_event(request, "LOGOUT", None, {"status": "success"})
         except Exception as exc:
-            # B-SEC-20: surface revocation failures at WARNING (not DEBUG)
-            # so a denylist outage that silently leaves access tokens valid
-            # is visible in production logs. We still proceed with client-
-            # side cookie clear so a user trying to log out is never stuck.
+            # M1: revocation failure means the access JWT remains valid for
+            # the rest of its TTL. Return 500 so the caller knows and can
+            # retry; still clear cookies so the browser loses its session
+            # (best-effort client-side logout even if server-side fails).
             logger.warning(
-                "Logout token revocation failed; cookies cleared client-side: %s",
+                "Logout token revocation failed: %s",
                 type(exc).__name__,
                 exc_info=exc,
             )
@@ -188,6 +189,14 @@ def logout(
                 None,
                 {"status": "failed_token_revocation", "error_type": type(exc).__name__},
             )
+            err = JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "token_revocation_failed"},
+            )
+            _clear_auth_cookie(err)
+            _clear_refresh_cookie(err)
+            mint_csrf_cookie(err)
+            return err
     _clear_auth_cookie(response)
     _clear_refresh_cookie(response)
     mint_csrf_cookie(response)
@@ -217,6 +226,7 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
 @limiter.limit("5/minute")
 def change_password(
     request: Request,
+    response: Response,
     req: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -224,6 +234,11 @@ def change_password(
     build_auth_service(db).change_password(current_user.id, req.current_password, req.new_password)
     logger.info("Password changed: id=%s", current_user.id)
     record_audit_event(request, "PASSWORD_CHANGE", current_user.id)
+    # M2: close the current browser window; pv-bump already invalidates
+    # outstanding access tokens on next use, but clearing the cookies
+    # means the client cannot silently reuse the old token before it expires.
+    _clear_auth_cookie(response)
+    _clear_refresh_cookie(response)
 
 
 @router.get("/me", response_model=AuthMeResponse)

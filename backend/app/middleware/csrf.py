@@ -23,6 +23,8 @@ from app.middleware.auth import AUTH_COOKIE_NAME
 
 CSRF_COOKIE_NAME = "csrf_token"
 CSRF_HEADER_NAME = "x-csrf-token"
+# Must stay in sync with REFRESH_COOKIE_NAME in app.routers.auth.
+_REFRESH_COOKIE_NAME = "refresh_token"
 _UNSAFE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 # Endpoints that can't have a CSRF cookie yet: login and register both arrive
 # before the auth cookie (and the CSRF cookie) exist, so there is no
@@ -48,7 +50,10 @@ class CsrfMiddleware(BaseHTTPMiddleware):
             settings.csrf_enabled
             and request.method.upper() in _UNSAFE_METHODS
             and request.url.path not in _EXEMPT_PATHS
-            and request.cookies.get(AUTH_COOKIE_NAME) is not None
+            and (
+                request.cookies.get(AUTH_COOKIE_NAME) is not None
+                or request.cookies.get(_REFRESH_COOKIE_NAME) is not None
+            )
         ):
             cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
             header_token = request.headers.get(CSRF_HEADER_NAME)
