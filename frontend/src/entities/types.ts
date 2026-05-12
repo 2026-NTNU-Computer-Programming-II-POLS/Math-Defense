@@ -76,9 +76,8 @@ export interface Pet {
   ownerId: string
   x: number
   y: number
-  hp: number
-  maxHp: number
   damage: number
+  speed: number
   attackSpeed: number
   range: number
   trait: PetTrait

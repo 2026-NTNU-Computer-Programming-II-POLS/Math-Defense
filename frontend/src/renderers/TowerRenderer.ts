@@ -5,10 +5,11 @@
  */
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
-import { TowerType, UNIT_PX } from '@/data/constants'
+import { UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import { projectTowerScene } from '@/engine/projections/project-towers'
 import type { TowerSceneView, TowerView } from '@/engine/projections/views'
+import { drawOrbitRing, drawDiamondCrystal } from './primitives'
 
 const TOWER_RADIUS = 14
 const BASE_DARK = '#17131d'
@@ -110,25 +111,25 @@ export class TowerRenderer {
     this._drawBasePlate(ctx, px, py, tower.color)
 
     switch (tower.type) {
-      case TowerType.MAGIC:
+      case 'magic':
         this._drawMagicTower(ctx, px, py, tower.color)
         break
-      case TowerType.RADAR_A:
+      case 'radarA':
         this._drawSweepRadar(ctx, px, py, tower.color)
         break
-      case TowerType.RADAR_B:
+      case 'radarB':
         this._drawRapidRadar(ctx, px, py, tower.color)
         break
-      case TowerType.RADAR_C:
+      case 'radarC':
         this._drawSniperRadar(ctx, px, py, tower.color)
         break
-      case TowerType.MATRIX:
+      case 'matrix':
         this._drawMatrixTower(ctx, px, py, tower.color)
         break
-      case TowerType.LIMIT:
+      case 'limit':
         this._drawLimitTower(ctx, px, py, tower.color)
         break
-      case TowerType.CALCULUS:
+      case 'calculus':
         this._drawCalculusTower(ctx, px, py, tower.color)
         break
     }
@@ -158,10 +159,10 @@ export class TowerRenderer {
   }
 
   private _drawMagicTower(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    this._drawOrbit(ctx, px, py, 11, -0.45, color)
+    drawOrbitRing(ctx, px, py, 11, -0.45, color, 0.48, 1.5, 'bb')
     this._drawSpark(ctx, px - 8, py - 5, 2.5, color)
     this._drawSpark(ctx, px + 8, py + 4, 2, color)
-    this._drawCrystal(ctx, px, py - 2, 8, color, true)
+    drawDiamondCrystal(ctx, px, py - 2, 8, color, 0.75, BASE_DARK, 0.22, HIGHLIGHT, 1.5, true)
   }
 
   private _drawSweepRadar(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
@@ -278,7 +279,7 @@ export class TowerRenderer {
   }
 
   private _drawCalculusTower(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    this._drawOrbit(ctx, px, py, 10, 0.75, color)
+    drawOrbitRing(ctx, px, py, 10, 0.75, color, 0.48, 1.5, 'bb')
     ctx.strokeStyle = color
     ctx.lineWidth = 2.6
     ctx.beginPath()
@@ -287,7 +288,7 @@ export class TowerRenderer {
     ctx.moveTo(px + 2, py - 6)
     ctx.bezierCurveTo(px - 6, py - 3, px + 6, py + 4, px - 2, py + 9)
     ctx.stroke()
-    this._drawCrystal(ctx, px + 5, py + 3, 4, color, false)
+    drawDiamondCrystal(ctx, px + 5, py + 3, 4, color, 0.75, BASE_DARK, 0.22, HIGHLIGHT, 1.5, false)
   }
 
   private _drawDish(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
@@ -304,19 +305,6 @@ export class TowerRenderer {
     ctx.fill()
   }
 
-  private _drawOrbit(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, tilt: number, color: string): void {
-    ctx.save()
-    ctx.translate(px, py)
-    ctx.rotate(tilt)
-    ctx.scale(1, 0.48)
-    ctx.strokeStyle = `${color}bb`
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.arc(0, 0, radius, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.restore()
-  }
-
   private _drawSpark(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, color: string): void {
     ctx.strokeStyle = color
     ctx.lineWidth = 1.4
@@ -325,40 +313,6 @@ export class TowerRenderer {
     ctx.lineTo(px + size, py)
     ctx.moveTo(px, py - size)
     ctx.lineTo(px, py + size)
-    ctx.stroke()
-  }
-
-  private _drawCrystal(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    color: string,
-    facet: boolean,
-  ): void {
-    const g = ctx.createLinearGradient(px, py - size, px, py + size)
-    g.addColorStop(0, '#ffffff')
-    g.addColorStop(0.22, color)
-    g.addColorStop(1, BASE_DARK)
-    ctx.fillStyle = g
-    ctx.strokeStyle = HIGHLIGHT
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.moveTo(px, py - size)
-    ctx.lineTo(px + size * 0.75, py)
-    ctx.lineTo(px, py + size)
-    ctx.lineTo(px - size * 0.75, py)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-    if (!facet) return
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(px, py - size)
-    ctx.lineTo(px, py + size)
-    ctx.moveTo(px - size * 0.75, py)
-    ctx.lineTo(px + size * 0.75, py)
     ctx.stroke()
   }
 

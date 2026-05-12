@@ -6,9 +6,9 @@
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
-import { EnemyType, UNIT_PX } from '@/data/constants'
+import { UNIT_PX } from '@/data/constants'
 import { projectEnemyScene } from '@/engine/projections/project-enemies'
-import type { EnemyView } from '@/engine/projections/views'
+import type { EnemyAppearance, EnemyView } from '@/engine/projections/views'
 
 export class EnemyRenderer {
   private _time = 0
@@ -81,22 +81,22 @@ export class EnemyRenderer {
     this._drawSlimeBody(ctx, 0, 0, size, enemy.color)
 
     switch (enemy.type) {
-      case EnemyType.FAST:
+      case 'fast':
         this._drawFastDetails(ctx, 0, 0, size, enemy.color)
         break
-      case EnemyType.STRONG:
+      case 'strong':
         this._drawStrongDetails(ctx, 0, 0, size)
         break
-      case EnemyType.SPLIT:
+      case 'split':
         this._drawWizardSplitDetails(ctx, 0, 0, size, enemy.color)
         break
-      case EnemyType.HELPER:
+      case 'helper':
         this._drawHelperDetails(ctx, 0, 0, size)
         break
-      case EnemyType.BOSS_A:
+      case 'bossA':
         this._drawBossADetails(ctx, 0, 0, size)
         break
-      case EnemyType.BOSS_B:
+      case 'bossB':
         this._drawBossBDetails(ctx, 0, 0, size)
         break
       default:
@@ -142,19 +142,19 @@ export class EnemyRenderer {
     ctx.stroke()
   }
 
-  private _drawFace(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, type: EnemyType): void {
+  private _drawFace(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, type: EnemyAppearance): void {
     const eyeR = Math.max(1.8, size / 9)
     const eyeY = py - size * 0.12
     const eyeGap = size * 0.22
-    const pupilX = type === EnemyType.FAST ? size * 0.02 : 0
+    const pupilX = type === 'fast' ? size * 0.02 : 0
 
     this._drawEye(ctx, px - eyeGap, eyeY, eyeR, pupilX)
     this._drawEye(ctx, px + eyeGap, eyeY, eyeR, pupilX)
 
-    ctx.strokeStyle = type === EnemyType.STRONG || type === EnemyType.BOSS_A ? '#1b0b0b' : 'rgba(20,12,22,0.75)'
+    ctx.strokeStyle = type === 'strong' || type === 'bossA' ? '#1b0b0b' : 'rgba(20,12,22,0.75)'
     ctx.lineWidth = Math.max(1, size / 18)
     ctx.beginPath()
-    if (type === EnemyType.BOSS_B) {
+    if (type === 'bossB') {
       ctx.moveTo(px - size * 0.18, py + size * 0.15)
       ctx.quadraticCurveTo(px, py + size * 0.28, px + size * 0.18, py + size * 0.15)
     } else {
@@ -385,5 +385,4 @@ export class EnemyRenderer {
     ctx.arc(px + size * 0.08, py - size * 0.02, size * 0.04, 0, Math.PI * 2)
     ctx.fill()
   }
-
 }

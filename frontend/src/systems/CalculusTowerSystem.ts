@@ -1,9 +1,9 @@
-import { Events, GamePhase, TowerType } from '@/data/constants'
+import { Events, TowerType } from '@/data/constants'
 import { hashStr, mulberry32 } from '@/math/RandomUtils'
 import { spawnPets } from '@/entities/PetFactory'
-import { applyDamage } from '@/domain/combat/SplitPolicy'
+import { toFraction } from '@/utils/formatters'
 import type { Game } from '@/engine/Game'
-import type { Tower, Enemy } from '@/entities/types'
+import type { Tower } from '@/entities/types'
 
 export const CALCULUS_OP_COST = 50
 
@@ -163,19 +163,20 @@ export class CalculusTowerSystem {
     this._removePets(tower.id, game)
     const combinedMods = {
       ...tower.talentMods,
-      pet_hp: (tower.talentMods['pet_hp'] ?? 0) + (tower.upgradeExtras?.['petHp'] ?? 0),
-      pet_count: (tower.talentMods['pet_count'] ?? 0) + (tower.upgradeExtras?.['petCount'] ?? 0),
+      pet_damage: (tower.talentMods['pet_damage'] ?? 0) + (tower.upgradeExtras?.['petDamage'] ?? 0),
+      pet_count:  (tower.talentMods['pet_count']  ?? 0) + (tower.upgradeExtras?.['petCount']  ?? 0),
+      pet_speed:  (tower.talentMods['pet_speed']  ?? 0) + (tower.upgradeExtras?.['petSpeed']  ?? 0),
     }
     const towerDmgMult = tower.damageBonus * tower.magicBuff
     const pets = spawnPets(
       tower.id,
       tower.x,
       tower.y,
-      tower.effectiveRange,
       state.coefficient,
       state.exponent,
       combinedMods,
       towerDmgMult,
+      tower.level,
     )
     game.pets.push(...pets)
     for (const pet of pets) {
@@ -199,80 +200,5 @@ export class CalculusTowerSystem {
     }
   }
 
-  update(_dt: number, game: Game): void {
-    game.pets = game.pets.filter(p => p.active)
-  }
-
   render(): void {}
-}
-
-export class PetCombatSystem {
-  update(dt: number, game: Game): void {
-    if (game.state.phase !== GamePhase.WAVE) return
-
-    for (const pet of game.pets) {
-      if (!pet.active) continue
-
-      pet.cooldownTimer -= dt
-
-      if (pet.trait === 'slow') {
-        for (const enemy of game.enemies) {
-          if (!enemy.alive) continue
-          const dx = pet.x - enemy.x
-          const dy = pet.y - enemy.y
-          if (dx * dx + dy * dy < pet.range * pet.range) {
-            enemy.slowFactor = Math.max(enemy.slowFactor, 0.3 * pet.abilityMod)
-          }
-        }
-      }
-
-      if (pet.cooldownTimer > 0) continue
-      pet.cooldownTimer = pet.attackSpeed
-
-      let target = pet.targetId
-        ? game.enemies.find((e) => e.id === pet.targetId && e.alive)
-        : null
-
-      if (!target) {
-        let bestDist = Infinity
-        for (const enemy of game.enemies) {
-          if (!enemy.alive) continue
-          const dx = pet.x - enemy.x
-          const dy = pet.y - enemy.y
-          const d = dx * dx + dy * dy
-          if (d < pet.range * pet.range && d < bestDist) {
-            target = enemy
-            bestDist = d
-          }
-        }
-        pet.targetId = target?.id ?? null
-      }
-
-      if (!target) continue
-
-      if (!target.alive) {
-        pet.targetId = null
-        continue
-      }
-      this._dealDamage(target, pet.damage, game)
-      if (!target.alive) pet.targetId = null
-    }
-  }
-
-  private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    if (!enemy.alive) return
-    applyDamage(enemy, amount, game)
-  }
-
-  render(): void {}
-}
-
-function toFraction(n: number): string | null {
-  for (let d = 2; d <= 10; d++) {
-    const num = n * d
-    if (Math.abs(num - Math.round(num)) < 1e-9) {
-      return `${Math.round(num)}/${d}`
-    }
-  }
-  return null
 }
