@@ -1,7 +1,7 @@
 import { Events, TowerType } from '@/data/constants'
 import { hashStr, mulberry32 } from '@/math/RandomUtils'
 import { spawnPets } from '@/entities/PetFactory'
-import { toFraction } from '@/utils/formatters'
+import { formatCoefficient } from '@/utils/formatters'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 
@@ -146,8 +146,8 @@ export class CalculusTowerSystem {
     state.coefficient = newCoeff
     state.exponent = newExp
     state.currentExpr = newExp === 1
-      ? `${this._formatCoeff(newCoeff)}x`
-      : `${this._formatCoeff(newCoeff)}x^${newExp}`
+      ? `${formatCoefficient(newCoeff)}x`
+      : `${formatCoefficient(newCoeff)}x^${newExp}`
 
     tower.configured = true
     tower.disabled = false
@@ -184,21 +184,9 @@ export class CalculusTowerSystem {
     }
   }
 
-  private _formatCoeff(c: number): string {
-    if (Number.isInteger(c)) {
-      if (c === 1) return ''
-      if (c === -1) return '-'
-      return `${c}`
-    }
-    const frac = toFraction(c)
-    return frac ? `(${frac})` : `${c.toFixed(2)}`
-  }
-
   private _removePets(ownerId: string, game: Game): void {
     for (const pet of game.pets) {
       if (pet.ownerId === ownerId) pet.active = false
     }
   }
-
-  render(): void {}
 }

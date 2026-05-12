@@ -25,3 +25,17 @@ export function toFraction(n: number): string | null {
   }
   return null
 }
+
+/**
+ * Formats a polynomial coefficient for display in an expression string.
+ * Returns '' for 1 and '-' for -1 (implicit coefficient convention).
+ */
+export function formatCoefficient(c: number): string {
+  if (Number.isInteger(c)) {
+    if (c === 1) return ''
+    if (c === -1) return '-'
+    return `${c}`
+  }
+  const frac = toFraction(c)
+  return frac ? `(${frac})` : `${c.toFixed(2)}`
+}

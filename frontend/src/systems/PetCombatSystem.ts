@@ -7,7 +7,7 @@ const SLOW_AURA_RADIUS = 40
 
 export class PetCombatSystem {
   update(dt: number, game: Game): void {
-    game.pets = game.pets.filter((p) => p.active)
+    this._pruneInactivePets(game)
 
     if (game.state.phase !== GamePhase.WAVE) return
 
@@ -58,6 +58,14 @@ export class PetCombatSystem {
     }
   }
 
+  // Deactivated pets are flagged with active=false by CalculusTowerSystem._removePets.
+  // Flushing them here keeps game.pets from growing unboundedly between waves.
+  private _pruneInactivePets(game: Game): void {
+    game.pets = game.pets.filter((p) => p.active)
+  }
+
+  // enemy.slowFactor is reset to 0 by CombatSystem each frame when slowTimer <= 0,
+  // so this must be called every frame to sustain the aura effect.
   private _applySlowAura(pet: Pet, enemies: Enemy[]): void {
     for (const enemy of enemies) {
       if (!enemy.alive) continue
@@ -73,6 +81,4 @@ export class PetCombatSystem {
     if (!enemy.alive) return
     applyDamage(enemy, amount, game)
   }
-
-  render(): void {}
 }
