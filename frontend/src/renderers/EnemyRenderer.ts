@@ -88,7 +88,7 @@ export class EnemyRenderer {
         this._drawStrongDetails(ctx, 0, 0, size)
         break
       case 'split':
-        this._drawSplitDetails(ctx, 0, 0, size, enemy.color)
+        this._drawWizardSplitDetails(ctx, 0, 0, size, enemy.color)
         break
       case 'helper':
         this._drawHelperDetails(ctx, 0, 0, size)
@@ -235,15 +235,18 @@ export class EnemyRenderer {
     ctx.stroke()
   }
 
-  private _drawSplitDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, color: string): void {
+  private _drawWizardSplitDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, color: string): void {
+    this._drawWizardHat(ctx, px, py - size * 0.5, size, color)
+    this._drawStaff(ctx, px + size * 0.46, py - size * 0.06, size)
+    this._drawBat(ctx, px - size * 0.42, py + size * 0.17, size * 0.34, color)
+    this._drawBat(ctx, px + size * 0.22, py + size * 0.2, size * 0.3, color)
+
     ctx.strokeStyle = 'rgba(255,255,255,0.42)'
-    ctx.lineWidth = Math.max(1, size / 16)
+    ctx.lineWidth = Math.max(1, size / 18)
     ctx.beginPath()
-    ctx.moveTo(px, py - size * 0.48)
-    ctx.bezierCurveTo(px - size * 0.18, py - size * 0.1, px + size * 0.18, py + size * 0.06, px, py + size * 0.4)
+    ctx.moveTo(px, py - size * 0.32)
+    ctx.bezierCurveTo(px - size * 0.12, py - size * 0.04, px + size * 0.12, py + size * 0.12, px, py + size * 0.38)
     ctx.stroke()
-    this._drawMiniBubble(ctx, px - size * 0.34, py + size * 0.18, size * 0.14, color)
-    this._drawMiniBubble(ctx, px + size * 0.34, py + size * 0.18, size * 0.14, color)
   }
 
   private _drawHelperDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
@@ -308,19 +311,78 @@ export class EnemyRenderer {
     ctx.stroke()
   }
 
-  private _drawMiniBubble(
+  private _drawWizardHat(
     ctx: CanvasRenderingContext2D,
     px: number,
     py: number,
-    radius: number,
+    size: number,
     color: string,
   ): void {
-    ctx.fillStyle = color
-    ctx.strokeStyle = 'rgba(255,255,255,0.65)'
-    ctx.lineWidth = 1
+    ctx.fillStyle = '#2a1745'
+    ctx.strokeStyle = '#f5d0fe'
+    ctx.lineWidth = Math.max(1, size / 24)
     ctx.beginPath()
-    ctx.arc(px, py, radius, 0, Math.PI * 2)
+    ctx.moveTo(px - size * 0.24, py + size * 0.17)
+    ctx.quadraticCurveTo(px - size * 0.08, py - size * 0.42, px + size * 0.23, py - size * 0.2)
+    ctx.quadraticCurveTo(px + size * 0.08, py - size * 0.02, px + size * 0.3, py + size * 0.17)
+    ctx.closePath()
     ctx.fill()
     ctx.stroke()
+
+    ctx.fillStyle = `${color}dd`
+    ctx.beginPath()
+    ctx.ellipse(px, py + size * 0.18, size * 0.35, size * 0.08, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.fillStyle = '#fde68a'
+    ctx.beginPath()
+    ctx.arc(px + size * 0.08, py - size * 0.13, size * 0.045, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  private _drawStaff(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
+    ctx.strokeStyle = '#6b3f20'
+    ctx.lineWidth = Math.max(1.2, size / 16)
+    ctx.beginPath()
+    ctx.moveTo(px, py - size * 0.28)
+    ctx.lineTo(px, py + size * 0.42)
+    ctx.stroke()
+
+    ctx.fillStyle = '#f0abfc'
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.arc(px, py - size * 0.33, size * 0.08, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+  }
+
+  private _drawBat(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    size: number,
+    color: string,
+  ): void {
+    ctx.fillStyle = '#21112f'
+    ctx.strokeStyle = `${color}dd`
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(px, py)
+    ctx.quadraticCurveTo(px - size * 0.35, py - size * 0.36, px - size * 0.68, py - size * 0.05)
+    ctx.quadraticCurveTo(px - size * 0.38, py - size * 0.02, px - size * 0.22, py + size * 0.18)
+    ctx.lineTo(px, py + size * 0.1)
+    ctx.quadraticCurveTo(px + size * 0.35, py - size * 0.36, px + size * 0.68, py - size * 0.05)
+    ctx.quadraticCurveTo(px + size * 0.38, py - size * 0.02, px + size * 0.22, py + size * 0.18)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.fillStyle = '#f5d0fe'
+    ctx.beginPath()
+    ctx.arc(px - size * 0.08, py - size * 0.02, size * 0.04, 0, Math.PI * 2)
+    ctx.arc(px + size * 0.08, py - size * 0.02, size * 0.04, 0, Math.PI * 2)
+    ctx.fill()
   }
 }

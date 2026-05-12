@@ -5,7 +5,6 @@
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, UNIT_PX,
   GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y,
-  Colors,
 } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import type { LevelLayoutService, TileClass } from '@/domain/level/level-layout-service'
@@ -27,19 +26,19 @@ export interface RendererPalette {
 }
 
 const NEUTRAL_PALETTE: RendererPalette = Object.freeze({
-  stoneDark: Colors.STONE_DARK,
-  stoneLight: Colors.STONE_LIGHT,
-  gridLine: Colors.GRID_LINE,
-  axis: Colors.AXIS,
-  forbiddenFill: Colors.STONE_DARK,
+  stoneDark: '#20323a',
+  stoneLight: '#2b4248',
+  gridLine: '#56737a',
+  axis: '#e1bd63',
+  forbiddenFill: '#26343f',
 })
 
 const WARM_PALETTE: RendererPalette = Object.freeze({
-  stoneDark: '#251a18',
-  stoneLight: '#2f231f',
-  gridLine: '#4a3525',
-  axis: '#9c7a40',
-  forbiddenFill: '#251a18',
+  stoneDark: '#2e3330',
+  stoneLight: '#3a443b',
+  gridLine: '#746f4c',
+  axis: '#f0c65e',
+  forbiddenFill: '#343834',
 })
 
 export class Renderer {
