@@ -62,7 +62,7 @@ const auth = useAuthStore()
   padding: 32px 0;
   overflow-y: auto;
   gap: 48px;
-  background: radial-gradient(ellipse at center, #1e1828 0%, #0d0a12 70%);
+  background: var(--bg-base);
 }
 
 .menu-title {

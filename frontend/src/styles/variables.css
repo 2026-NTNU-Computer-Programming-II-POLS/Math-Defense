@@ -1,8 +1,8 @@
 /* CSS variables — medieval fantasy pixel art theme */
 :root {
-  --bg-base:       #0b0a12;
-  --stone-dark:    #1a1520;
-  --stone-light:   #252030;
+  --bg-base:       #a4b9d4;
+  --stone-dark:    #a4b9d4;
+  --stone-light:   #b0c4de;
   --grid-line:     #3a3028;
   --axis:          #8b7342;
   --gold:          #d4a840;
@@ -16,7 +16,7 @@
   --hp-yellow:     #c89848;
   --hp-red:        #cc4444;
 
-  --panel-bg:      rgba(26, 21, 32, 0.95);
+  --panel-bg:      rgba(164, 185, 212, 0.95);
   --panel-border:  #8b7342;
   --panel-shadow:  0 0 20px rgba(0, 0, 0, 0.8);
 
@@ -52,8 +52,8 @@
    al. (2014) to reduce the cognitive friction of a first encounter. The
    override is static (no transition) so reduced-motion users get parity. */
 [data-star='1'] {
-  --bg-base:     #120a0e;
-  --stone-dark:  #251a18;
+  --bg-base:     #a4b9d4;
+  --stone-dark:  #a4b9d4;
   --gold:        #e0a838;
-  --panel-bg:    rgba(37, 26, 24, 0.95);
+  --panel-bg:    rgba(164, 185, 212, 0.95);
 }

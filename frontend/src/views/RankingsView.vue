@@ -506,7 +506,7 @@ onBeforeUnmount(cancelInflight)
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: radial-gradient(ellipse at center, #1e1828 0%, #0d0a12 70%);
+  background: var(--bg-base);
   min-height: 100vh;
   overflow-y: auto;
 }
