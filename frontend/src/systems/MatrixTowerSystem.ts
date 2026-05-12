@@ -160,5 +160,4 @@ export class MatrixTowerSystem {
     applyDamage(enemy, amount, game)
   }
 
-  render(): void {}
 }

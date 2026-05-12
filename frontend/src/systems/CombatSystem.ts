@@ -95,5 +95,4 @@ export class CombatSystem {
     applyDamage(enemy, amount, game)
   }
 
-  render(_renderer: unknown, _game: Game): void {}
 }

@@ -142,5 +142,4 @@ export class SpellSystem implements GameSystem {
     }
   }
 
-  render(_renderer: Renderer, _game: Game): void {}
 }

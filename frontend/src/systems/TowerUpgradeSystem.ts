@@ -91,6 +91,4 @@ export class TowerUpgradeSystem {
     game.eventBus.emit(Events.TOWER_REFUND_RESULT, { success: true, towerId })
   }
 
-  update(): void {}
-  render(): void {}
 }

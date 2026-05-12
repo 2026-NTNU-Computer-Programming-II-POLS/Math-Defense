@@ -74,7 +74,7 @@ export class MovementSystem {
     }
   }
 
-  render(_renderer: unknown, _game: Game): void {}
+
 
   private _advanceSegmented(
     enemy: Enemy,

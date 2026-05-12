@@ -171,5 +171,4 @@ export class EnemyAbilitySystem implements GameSystem {
     })
   }
 
-  render(_renderer: Renderer, _game: Game): void {}
 }

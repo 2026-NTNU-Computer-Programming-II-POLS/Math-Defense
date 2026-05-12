@@ -177,7 +177,6 @@ export class RadarTowerSystem {
     applyDamage(enemy, amount, game)
   }
 
-  render(): void {}
 }
 
 function normalizeAngle(a: number): number {

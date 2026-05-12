@@ -174,6 +174,4 @@ export class MontyHallSystem implements GameSystem {
     game.setPhase(GamePhase.BUILD)
   }
 
-  update(_dt: number, _game: Game): void {}
-  render(_renderer: Renderer, _game: Game): void {}
 }
