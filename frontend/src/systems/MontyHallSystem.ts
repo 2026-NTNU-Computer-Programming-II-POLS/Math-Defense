@@ -5,7 +5,6 @@ import {
   type MontyHallReward,
 } from '@/data/monty-hall-defs'
 import type { Game, GameSystem } from '@/engine/Game'
-import type { Renderer } from '@/engine/Renderer'
 
 export interface MontyHallState {
   doorCount: number
