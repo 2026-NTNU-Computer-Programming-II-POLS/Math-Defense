@@ -2,7 +2,7 @@ import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import { projectPetScene } from '@/engine/projections/project-pets'
-import type { PetTrait, PetView } from '@/engine/projections/views'
+import type { PetTrait } from '@/engine/projections/views'
 import { drawOrbitRing, drawDiamondCrystal } from './primitives'
 
 const TRAIT_COLORS: Record<PetTrait, string> = {
