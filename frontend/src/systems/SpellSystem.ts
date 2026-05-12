@@ -2,7 +2,6 @@ import { Events, GamePhase, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } fro
 import { SPELL_MAP } from '@/data/spell-defs'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
-import type { Renderer } from '@/engine/Renderer'
 
 function dist(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
@@ -142,5 +141,4 @@ export class SpellSystem implements GameSystem {
     }
   }
 
-  render(_renderer: Renderer, _game: Game): void {}
 }

@@ -235,5 +235,4 @@ export class BuffSystem implements GameSystem {
 
   onTowerRemoved(_game: Game, _towerId: string): void {}
 
-  render(_renderer: unknown, _game: Game): void {}
 }

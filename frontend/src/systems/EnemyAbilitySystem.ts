@@ -5,7 +5,6 @@ import { ENEMY_DEFS } from '@/data/enemy-defs'
 import { generateChainRuleQuestion, type ChainRuleQuestion } from '@/math/chain-rule-generator'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
-import type { Renderer } from '@/engine/Renderer'
 
 export class EnemyAbilitySystem implements GameSystem {
   private _unsubs: (() => void)[] = []
@@ -171,5 +170,4 @@ export class EnemyAbilitySystem implements GameSystem {
     })
   }
 
-  render(_renderer: Renderer, _game: Game): void {}
 }

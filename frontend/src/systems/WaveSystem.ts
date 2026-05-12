@@ -110,5 +110,4 @@ export class WaveSystem {
     }
   }
 
-  render(_renderer: unknown, _game: Game): void {}
 }

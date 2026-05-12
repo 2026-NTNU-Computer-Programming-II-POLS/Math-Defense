@@ -99,7 +99,7 @@ export class CalculusTowerSystem {
         presets.push({
           coefficient: coeff,
           exponent: exp,
-          expr: exp === 1 ? `${coeff}x` : `${coeff}x^${exp}`,
+          expr: exp === 1 ? `${formatCoefficient(coeff)}x` : `${formatCoefficient(coeff)}x^${exp}`,
         })
       }
     }

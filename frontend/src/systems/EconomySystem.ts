@@ -1,7 +1,6 @@
 import { Events, GamePhase } from '@/data/constants'
 import type { Game, GameSystem } from '@/engine/Game'
 import { isShielded } from '@/engine/GameState'
-import type { Renderer } from '@/engine/Renderer'
 import gameConstants from '@shared/game-constants.json'
 
 const economy = gameConstants.economy as {
@@ -73,7 +72,7 @@ export class EconomySystem implements GameSystem {
     game.state.timeTotal = game.time
   }
 
-  render(_renderer: Renderer, _game: Game): void {}
+
 
   // ── Resource-mutation API ────────────────────────────────────────────────
   // Audit F-ARCH-7: gold/hp/score/cost are economy-domain concerns and
