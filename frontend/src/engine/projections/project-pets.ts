@@ -17,7 +17,6 @@ export function projectPetScene(game: Game): PetSceneView {
       x: pet.x,
       y: pet.y,
       trait: pet.trait,
-      hpRatio: pet.hp < pet.maxHp ? pet.hp / pet.maxHp : null,
     })
   }
   return { pets }

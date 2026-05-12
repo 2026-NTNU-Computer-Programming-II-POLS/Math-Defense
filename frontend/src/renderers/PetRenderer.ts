@@ -30,17 +30,6 @@ export class PetRenderer {
 
       ctx.save()
       this._drawPet(ctx, px, py, color, pet.trait)
-
-      if (pet.hpRatio !== null) {
-        const barW = 12
-        const barH = 2
-        ctx.globalAlpha = 0.8
-        ctx.fillStyle = '#333'
-        ctx.fillRect(px - barW / 2, py + 8, barW, barH)
-        ctx.fillStyle = '#4ade80'
-        ctx.fillRect(px - barW / 2, py + 8, barW * pet.hpRatio, barH)
-      }
-
       ctx.restore()
     }
   }

@@ -179,8 +179,8 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     examRelevance: 'Differentiation and integration of polynomials are on AP Calculus AB Section I.',
     glyph: '∫',
     upgrades: [
-      { ...UPGRADE_TIER_2, extra: { petHp: 0.25 } },
-      { ...UPGRADE_TIER_3, extra: { petHp: 0.5, petCount: 1 } },
+      { ...UPGRADE_TIER_2, extra: { petDamage: 0.25 } },
+      { ...UPGRADE_TIER_3, extra: { petDamage: 0.5, petCount: 1, petSpeed: 0.2 } },
     ],
   },
 }

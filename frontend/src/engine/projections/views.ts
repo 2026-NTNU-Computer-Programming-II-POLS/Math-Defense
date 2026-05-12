@@ -59,8 +59,6 @@ export interface PetView {
   readonly x: number
   readonly y: number
   readonly trait: PetTrait
-  /** 0..1 hp ratio, or null when at full HP (renderer skips the bar). */
-  readonly hpRatio: number | null
 }
 
 // ── Scene aggregates ─────────────────────────────────────────────────────────
