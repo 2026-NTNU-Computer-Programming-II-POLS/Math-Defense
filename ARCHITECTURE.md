@@ -412,7 +412,7 @@ flowchart TB
         PP[placement-policy · legal-positions]
         MoveS[movement-strategy]
         Path[curve-path · segmented-path · path-builder · validator]
-        Score[score-calculator (mirror of backend)]
+        Score["score-calculator (mirror of backend)"]
     end
 
     subgraph Math["math/ (frontend/src/math)"]
