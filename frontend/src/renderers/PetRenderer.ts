@@ -1,11 +1,13 @@
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
-import { GamePhase } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import { projectPetScene } from '@/engine/projections/project-pets'
+import type { PetTrait, PetView } from '@/engine/projections/views'
+import { drawOrbitRing, drawDiamondCrystal } from './primitives'
 
-const TRAIT_COLORS: Record<string, string> = {
-  slow: '#60a5fa',
-  fast: '#facc15',
+const TRAIT_COLORS: Record<PetTrait, string> = {
+  slow:  '#60a5fa',
+  fast:  '#facc15',
   heavy: '#ef4444',
   basic: '#a3a3a3',
 }
@@ -18,27 +20,25 @@ export class PetRenderer {
   }
 
   render(renderer: Renderer, game: Game): void {
-    if (game.state.phase !== GamePhase.WAVE) return
+    const view = projectPetScene(game)
     const { ctx } = renderer
 
-    for (const pet of game.pets) {
-      if (!pet.active) continue
+    for (const pet of view.pets) {
       const px = gameToCanvasX(pet.x)
       const py = gameToCanvasY(pet.y)
-      const color = TRAIT_COLORS[pet.trait] ?? TRAIT_COLORS.basic
+      const color = TRAIT_COLORS[pet.trait]
 
       ctx.save()
       this._drawPet(ctx, px, py, color, pet.trait)
 
-      if (pet.hp < pet.maxHp) {
+      if (pet.hpRatio !== null) {
         const barW = 12
         const barH = 2
-        const ratio = pet.hp / pet.maxHp
         ctx.globalAlpha = 0.8
         ctx.fillStyle = '#333'
         ctx.fillRect(px - barW / 2, py + 8, barW, barH)
         ctx.fillStyle = '#4ade80'
-        ctx.fillRect(px - barW / 2, py + 8, barW * ratio, barH)
+        ctx.fillRect(px - barW / 2, py + 8, barW * pet.hpRatio, barH)
       }
 
       ctx.restore()
@@ -50,7 +50,7 @@ export class PetRenderer {
     px: number,
     py: number,
     color: string,
-    trait: string,
+    trait: PetTrait,
   ): void {
     const pulse = Math.sin(this._time * 5) * 0.5 + 0.5
     const bob = Math.sin(this._time * 4 + px * 0.05) * 1.2
@@ -114,9 +114,9 @@ export class PetRenderer {
   }
 
   private _drawSlowPet(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    this._drawOrbit(ctx, px, py, 10, -0.55, color)
-    this._drawOrbit(ctx, px, py, 7, 0.85, color)
-    this._drawCrystal(ctx, px, py, 6, color)
+    drawOrbitRing(ctx, px, py, 10, -0.55 + this._time * 0.9, color, 0.45, 1.4, 'cc')
+    drawOrbitRing(ctx, px, py, 7,   0.85 + this._time * 0.9, color, 0.45, 1.4, 'cc')
+    drawDiamondCrystal(ctx, px, py, 6, color, 0.8, '#172033', 0.3, '#e0f2fe', 1.2)
     this._drawRuneDot(ctx, px - 8, py - 3, color)
     this._drawRuneDot(ctx, px + 8, py + 3, color)
   }
@@ -147,7 +147,7 @@ export class PetRenderer {
   }
 
   private _drawHeavyPet(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    this._drawOrbit(ctx, px, py, 10, 0.2, color)
+    drawOrbitRing(ctx, px, py, 10, 0.2 + this._time * 0.9, color, 0.45, 1.4, 'cc')
     ctx.fillStyle = '#241517'
     ctx.strokeStyle = color
     ctx.lineWidth = 2
@@ -174,7 +174,7 @@ export class PetRenderer {
   }
 
   private _drawBasicPet(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    this._drawOrbit(ctx, px, py, 9, 0.65, color)
+    drawOrbitRing(ctx, px, py, 9, 0.65 + this._time * 0.9, color, 0.45, 1.4, 'cc')
     ctx.fillStyle = color
     ctx.strokeStyle = '#ffffff'
     ctx.lineWidth = 1.2
@@ -189,44 +189,6 @@ export class PetRenderer {
     ctx.arc(px - 2, py - 2, 1.6, 0, Math.PI * 2)
     ctx.fill()
     ctx.globalAlpha = 1
-  }
-
-  private _drawOrbit(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    tilt: number,
-    color: string,
-  ): void {
-    ctx.save()
-    ctx.translate(px, py)
-    ctx.rotate(tilt + this._time * 0.9)
-    ctx.scale(1, 0.45)
-    ctx.strokeStyle = `${color}cc`
-    ctx.lineWidth = 1.4
-    ctx.beginPath()
-    ctx.arc(0, 0, radius, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.restore()
-  }
-
-  private _drawCrystal(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, color: string): void {
-    const g = ctx.createLinearGradient(px, py - size, px, py + size)
-    g.addColorStop(0, '#ffffff')
-    g.addColorStop(0.3, color)
-    g.addColorStop(1, '#172033')
-    ctx.fillStyle = g
-    ctx.strokeStyle = '#e0f2fe'
-    ctx.lineWidth = 1.2
-    ctx.beginPath()
-    ctx.moveTo(px, py - size)
-    ctx.lineTo(px + size * 0.8, py)
-    ctx.lineTo(px, py + size)
-    ctx.lineTo(px - size * 0.8, py)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
   }
 
   private _drawRuneDot(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {

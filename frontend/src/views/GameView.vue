@@ -281,6 +281,14 @@ onBeforeUnmount(() => {
     :data-star="gameStore.starRating"
     :style="{ '--canvas-w': `${CANVAS_WIDTH}px`, '--canvas-h': `${CANVAS_HEIGHT}px` }"
   >
+    <!-- R-5: on portrait phones the 1280×720 world scales down to an
+         unusably small strip. Ask the user to rotate — the rest of the
+         game stays rendered underneath so landscape resumes instantly. -->
+    <div class="rotate-hint" role="alert">
+      <div class="rotate-icon" aria-hidden="true">⟳</div>
+      <p>Rotate your device to landscape for the best experience.</p>
+    </div>
+
     <!-- K-2: loading state while WASM / engine boot. Sits at shell level so
          the spinner isn't shrunk by the 1280×720 scale transform below. -->
     <div v-if="!ready && !loadError" class="boot-state loading" role="status" aria-live="polite">
@@ -469,6 +477,28 @@ onBeforeUnmount(() => {
   animation: boot-spin 0.9s linear infinite;
 }
 @keyframes boot-spin { to { transform: rotate(360deg); } }
+
+/* R-5: Portrait orientation overlay — only appears on narrow + tall
+   viewports that can't show the 1280×720 layout legibly. */
+.rotate-hint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-modal);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--bg-base);
+  color: var(--gold);
+  font-family: var(--font-mono);
+  text-align: center;
+  padding: 24px;
+}
+.rotate-icon { font-size: 48px; animation: boot-spin 2s linear infinite; }
+@media (orientation: portrait) and (max-width: 640px) {
+  .rotate-hint { display: flex; }
+}
 
 /* U-1: pause overlay */
 .pause-overlay {
