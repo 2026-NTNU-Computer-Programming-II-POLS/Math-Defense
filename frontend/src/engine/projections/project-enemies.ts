@@ -12,6 +12,7 @@ export function projectEnemyScene(game: Game): EnemySceneView {
     enemies.push({
       x: e.x,
       y: e.y,
+      type: e.type,
       size: e.size,
       color: e.color,
       hpRatio: e.hp < e.maxHp ? e.hp / e.maxHp : null,

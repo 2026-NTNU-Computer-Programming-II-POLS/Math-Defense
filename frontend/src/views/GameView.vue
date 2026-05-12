@@ -403,7 +403,9 @@ onBeforeUnmount(() => {
 .game-shell {
   position: fixed;
   inset: 0;
-  background: var(--bg-base);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(90, 138, 146, 0.22), transparent 42%),
+    linear-gradient(180deg, #162b36 0%, var(--bg-base) 100%);
 }
 
 .game-view {

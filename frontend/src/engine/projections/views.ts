@@ -12,7 +12,7 @@
  * the renderer back into entity-internal logic, expand the projection
  * instead. See AUDIT_REPORT_2026-05-09.md F-ARCH-4 for the precedent.
  */
-import type { GamePhase, TowerType } from '@/data/constants'
+import type { EnemyType, GamePhase, TowerType } from '@/data/constants'
 
 export interface TowerView {
   readonly x: number
@@ -28,6 +28,7 @@ export interface TowerView {
 export interface EnemyView {
   readonly x: number
   readonly y: number
+  readonly type: EnemyType
   readonly size: number
   readonly color: string
   /** 0..1 hp ratio, or null when full HP (renderer skips the bar). */
