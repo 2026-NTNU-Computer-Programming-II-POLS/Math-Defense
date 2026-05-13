@@ -102,7 +102,9 @@ const mathGlyphs = [
   overflow-x: hidden;
   overflow-y: auto;
   gap: 48px;
-  background: var(--bg-base);
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255,255,255,0.55) 0%, transparent 70%),
+    linear-gradient(160deg, #8aaecb 0%, #a4b9d4 45%, #b8cfe0 100%);
 }
 
 .math-field {
@@ -117,23 +119,23 @@ const mathGlyphs = [
   position: absolute;
   left: var(--glyph-left);
   top: var(--glyph-top);
-  color: rgba(255, 228, 145, 0.34);
+  color: rgba(15, 42, 88, 0.22);
   font-family: var(--font-mono);
   font-size: var(--glyph-size);
   font-weight: 700;
   line-height: 1;
-  text-shadow: 0 0 16px rgba(255, 215, 0, 0.22);
+  text-shadow: none;
   transform: translate3d(-50%, 0, 0) rotate(var(--glyph-rotate));
   animation: glyph-float var(--glyph-duration) linear infinite;
   animation-delay: var(--glyph-delay);
 }
 
 .math-glyph:nth-child(3n) {
-  color: rgba(139, 191, 220, 0.32);
+  color: rgba(25, 65, 140, 0.17);
 }
 
 .math-glyph:nth-child(4n) {
-  color: rgba(232, 220, 200, 0.24);
+  color: rgba(50, 90, 165, 0.14);
 }
 
 @keyframes glyph-float {
@@ -161,8 +163,8 @@ const mathGlyphs = [
 
 .title-main {
   font-size: 56px;
-  color: white;
-  text-shadow: 2px 2px 10px rgba(44, 62, 80, 0.2);
+  color: #0f2a4a;
+  text-shadow: 0 2px 20px rgba(255,255,255,0.8), 0 4px 12px rgba(164,185,212,0.4);
   letter-spacing: 12px;
   margin-bottom: 4px;
   font-weight: 800;
@@ -210,11 +212,12 @@ const mathGlyphs = [
   gap: 16px;
   width: 320px;
   padding: 32px;
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(15px);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 60px rgba(30, 60, 120, 0.12), 0 4px 16px rgba(30, 60, 120, 0.08);
 }
 
 .menu-btn {
@@ -222,15 +225,15 @@ const mathGlyphs = [
   padding: 14px 24px;
   letter-spacing: 4px;
   width: 100%;
-  background: rgba(13, 10, 18, 0.58);
-  backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.55);
+  color: #1a3a6a;
 }
 
 .menu-footer {
   position: relative;
   z-index: 1;
   font-size: 10px;
-  color: var(--grid-line);
+  color: rgba(15, 42, 88, 0.5);
   letter-spacing: 2px;
 }
 
@@ -239,7 +242,7 @@ const mathGlyphs = [
 }
 
 .menu-footer-link {
-  color: var(--grid-line);
+  color: rgba(15, 42, 88, 0.5);
   text-decoration: underline;
   cursor: pointer;
 }
