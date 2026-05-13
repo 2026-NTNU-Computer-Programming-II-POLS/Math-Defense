@@ -133,5 +133,5 @@ onBeforeUnmount(() => {
 }
 .modal-ok { min-width: 120px; }
 .modal-cancel { min-width: 120px; border-color: var(--gold); color: var(--text-primary); }
-.modal-cancel:hover { background: var(--gold); color: #1a2a3a; }
+.modal-cancel:hover { background: var(--gold); color: var(--text-on-accent); }
 </style>

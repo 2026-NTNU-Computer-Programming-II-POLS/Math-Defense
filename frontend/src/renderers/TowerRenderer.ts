@@ -3,7 +3,7 @@
  * Never reads Tower entity fields directly; engine/projections/project-towers.ts
  * owns that surface.
  */
-import type { Renderer } from '@/engine/Renderer'
+import type { Renderer, RendererPalette } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
@@ -12,14 +12,15 @@ import type { TowerSceneView, TowerView } from '@/engine/projections/views'
 import { drawOrbitRing, drawDiamondCrystal } from './primitives'
 
 const TOWER_RADIUS = 14
-const BASE_DARK = '#1a2a3a'
-const BASE_MID = '#2c3e50'
 const HIGHLIGHT = 'rgba(255,255,255,0.82)'
 
 export class TowerRenderer {
+  private _palette!: RendererPalette
+
   update(_dt: number, _game: Game): void {}
 
   render(renderer: Renderer, game: Game): void {
+    this._palette = renderer.palette
     const view = projectTowerScene(game)
     this._drawCursor(renderer, view)
     for (const t of view.towers) this._drawTower(renderer, view, t)
@@ -136,7 +137,7 @@ export class TowerRenderer {
   }
 
   private _drawBasePlate(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    ctx.fillStyle = BASE_MID
+    ctx.fillStyle = this._palette.stoneLight
     ctx.strokeStyle = `${color}cc`
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -162,7 +163,7 @@ export class TowerRenderer {
     drawOrbitRing(ctx, px, py, 11, -0.45, color, 0.48, 1.5, 'bb')
     this._drawSpark(ctx, px - 8, py - 5, 2.5, color)
     this._drawSpark(ctx, px + 8, py + 4, 2, color)
-    drawDiamondCrystal(ctx, px, py - 2, 8, color, 0.75, BASE_DARK, 0.22, HIGHLIGHT, 1.5, true)
+    drawDiamondCrystal(ctx, px, py - 2, 8, color, 0.75, this._palette.stoneDark, 0.22, HIGHLIGHT, 1.5, true)
   }
 
   private _drawSweepRadar(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
@@ -185,7 +186,7 @@ export class TowerRenderer {
   }
 
   private _drawRapidRadar(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    ctx.fillStyle = BASE_DARK
+    ctx.fillStyle = this._palette.stoneDark
     ctx.strokeStyle = color
     ctx.lineWidth = 1.6
     ctx.beginPath()
@@ -218,7 +219,7 @@ export class TowerRenderer {
   }
 
   private _drawMatrixTower(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    ctx.fillStyle = BASE_DARK
+    ctx.fillStyle = this._palette.stoneDark
     ctx.strokeStyle = `${color}ee`
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -288,7 +289,7 @@ export class TowerRenderer {
     ctx.moveTo(px + 2, py - 6)
     ctx.bezierCurveTo(px - 6, py - 3, px + 6, py + 4, px - 2, py + 9)
     ctx.stroke()
-    drawDiamondCrystal(ctx, px + 5, py + 3, 4, color, 0.75, BASE_DARK, 0.22, HIGHLIGHT, 1.5, false)
+    drawDiamondCrystal(ctx, px + 5, py + 3, 4, color, 0.75, this._palette.stoneDark, 0.22, HIGHLIGHT, 1.5, false)
   }
 
   private _drawDish(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
@@ -299,7 +300,7 @@ export class TowerRenderer {
     ctx.ellipse(px - 1, py + 1, 8, 6, -0.35, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
-    ctx.fillStyle = BASE_DARK
+    ctx.fillStyle = this._palette.stoneDark
     ctx.beginPath()
     ctx.arc(px - 1, py + 1, 3, 0, Math.PI * 2)
     ctx.fill()
@@ -328,7 +329,7 @@ export class TowerRenderer {
     ctx.save()
     ctx.translate(px, py)
     ctx.rotate(angle)
-    ctx.strokeStyle = BASE_DARK
+    ctx.strokeStyle = this._palette.stoneDark
     ctx.lineWidth = width + 2
     ctx.beginPath()
     ctx.moveTo(2, 0)

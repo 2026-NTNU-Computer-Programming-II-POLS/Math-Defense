@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 48px;
-  background: rgba(80, 100, 130, 0.95);
+  background: var(--bar-bg);
   border-bottom: 2px solid var(--gold);
   display: flex;
   align-items: center;

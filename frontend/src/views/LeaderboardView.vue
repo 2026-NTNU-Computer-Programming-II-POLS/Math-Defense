@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
 }
 
 .lb-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-.tab-btn.active { background: var(--gold); color: #1a2a3a; font-weight: bold; }
+.tab-btn.active { background: var(--gold); color: var(--text-on-accent); font-weight: bold; }
 .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .lb-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
 
 .filter-btn.active {
   background: var(--gold);
-  color: #1a2a3a;
+  color: var(--text-on-accent);
   font-weight: bold;
 }
 

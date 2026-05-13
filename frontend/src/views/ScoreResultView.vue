@@ -272,7 +272,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   border: 1px solid var(--gold);
   border-radius: 6px;
   background: var(--gold);
-  color: #1a2a3a;
+  color: var(--text-on-accent);
   font-family: var(--font-mono);
   font-size: 14px;
   font-weight: bold;

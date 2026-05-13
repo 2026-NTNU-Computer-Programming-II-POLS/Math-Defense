@@ -517,7 +517,7 @@ onBeforeUnmount(cancelInflight)
 .rk-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .rk-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .filter-label { font-size: 11px; color: var(--axis); }
-.tab-btn.active { background: var(--gold); color: #1a2a3a; font-weight: bold; }
+.tab-btn.active { background: var(--gold); color: var(--text-on-accent); font-weight: bold; }
 .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .rk-selector { max-width: 300px; }

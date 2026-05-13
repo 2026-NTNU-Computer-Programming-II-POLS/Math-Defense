@@ -403,7 +403,7 @@ onBeforeUnmount(() => {
 .game-shell {
   position: fixed;
   inset: 0;
-  background: linear-gradient(160deg, #6b84a8 0%, #8299b7 60%, #7a8fa5 100%);
+  background: var(--bg-base);
 }
 
 .game-view {
@@ -453,7 +453,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: rgba(91, 113, 143, 0.92);
+  background: var(--overlay-bg);
   color: #ffffff;
   font-family: var(--font-mono);
   z-index: var(--z-modal);
@@ -576,7 +576,7 @@ onBeforeUnmount(() => {
 }
 .btn-checkpoint.primary {
   border-color: var(--gold);
-  color: #1a2a3a;
+  color: var(--text-on-accent);
   background: rgba(255, 215, 0, 0.3);
   font-weight: bold;
 }

@@ -206,7 +206,7 @@ function canAfford(cost: number): boolean {
 .tower-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  background: rgba(80, 100, 130, 0.96);
+  background: var(--bar-bg);
   border-top: 2px solid var(--gold);
   padding: 8px 16px;
   display: flex;
@@ -254,7 +254,7 @@ function canAfford(cost: number): boolean {
 .chip--active {
   border-color: var(--gold);
   background: var(--gold);
-  color: #1a2a3a; /* Dark text on solid yellow background */
+  color: var(--text-on-accent);
 }
 .chip-count {
   font-size: 9px;
@@ -328,7 +328,7 @@ function canAfford(cost: number): boolean {
 .tower-btn.selected .tower-name,
 .tower-btn.selected .tower-cost,
 .tower-btn.selected .tower-glyph {
-  color: #1a2a3a; /* High contrast dark text on yellow */
+  color: var(--text-on-accent);
 }
 
 /* U-3: shake rejection cue for unaffordable clicks */

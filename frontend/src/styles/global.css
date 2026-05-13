@@ -52,7 +52,7 @@ body {
 
 .btn:hover {
   background: var(--gold);
-  color: #1a2a3a; /* Darker color for contrast on yellow */
+  color: var(--text-on-accent);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }

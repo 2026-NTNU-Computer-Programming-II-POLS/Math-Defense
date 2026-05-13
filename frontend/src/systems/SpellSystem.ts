@@ -65,9 +65,7 @@ export class SpellSystem implements GameSystem {
         {
           const target = this._applySingleDamage(targetId, x, y, def.damage!, game)
           if (!target) {
-            game.economy.changeGold(def.cost)
-            game.economy.addCost(-def.cost)
-            game.state.spellCooldowns[spellId] = 0
+            this._refundSpell(spellId, def.cost, game)
             return
           }
           x = target.x
@@ -145,6 +143,12 @@ export class SpellSystem implements GameSystem {
       bestDist = d
     }
     return best
+  }
+
+  private _refundSpell(spellId: string, cost: number, game: Game): void {
+    game.economy.changeGold(cost)
+    game.economy.addCost(-cost)
+    game.state.spellCooldowns[spellId] = 0
   }
 
   private _applyTowerBoost(duration: number, game: Game): void {
