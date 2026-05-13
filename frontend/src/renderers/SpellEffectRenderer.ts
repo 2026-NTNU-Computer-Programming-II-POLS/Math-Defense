@@ -43,7 +43,12 @@ function seedFor(spellId: string, x: number, y: number): number {
   return seed
 }
 
-const DEFAULT_VFX_DURATION = 0.65
+function effectAge(spellId: string): number {
+  if (spellId === 'lightning') return 0.85
+  if (spellId === 'slow') return 1.15
+  if (spellId === 'heal') return 1.05
+  return spellId === 'fireball' ? 1.35 : 0.65
+}
 
 export class SpellEffectRenderer implements GameSystem {
   private _effects: SpellVfx[] = []
@@ -60,7 +65,7 @@ export class SpellEffectRenderer implements GameSystem {
           y,
           radius: radius ?? 2,
           age: 0,
-          maxAge: def?.vfxDuration ?? DEFAULT_VFX_DURATION,
+          maxAge: def?.vfxDuration ?? effectAge(spellId),
           color: def?.color ?? '#ffffff',
           seed: seedFor(spellId, x, y),
         })
@@ -94,6 +99,10 @@ export class SpellEffectRenderer implements GameSystem {
         this._drawFireball(ctx, vfx)
       } else if (vfx.spellId === 'lightning') {
         this._drawLightning(ctx, vfx)
+      } else if (vfx.spellId === 'slow') {
+        this._drawFrostNova(ctx, vfx)
+      } else if (vfx.spellId === 'heal') {
+        this._drawHaste(ctx, vfx)
       } else {
         this._drawPulse(ctx, vfx)
       }
@@ -335,6 +344,384 @@ export class SpellEffectRenderer implements GameSystem {
       ctx.arc(sx, sy, r, 0, TAU)
       ctx.fill()
     }
+  }
+
+  private _drawFrostNova(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
+    const p = clamp01(vfx.age / vfx.maxAge)
+    const out = easeOutQuart(p)
+    const alpha = 1 - p
+    const freeze = 1 - easeInOut(p)
+    const px = gameToCanvasX(vfx.x)
+    const py = gameToCanvasY(vfx.y)
+    const baseR = Math.max(UNIT_PX * 1.2, vfx.radius * UNIT_PX)
+    const waveR = baseR * (0.12 + out * 0.98)
+    const coreR = baseR * (0.08 + out * 0.22)
+
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+
+    const bloom = ctx.createRadialGradient(px, py, 0, px, py, waveR)
+    bloom.addColorStop(0, `rgba(244, 255, 255, ${0.7 * alpha})`)
+    bloom.addColorStop(0.24, `rgba(142, 230, 255, ${0.42 * alpha})`)
+    bloom.addColorStop(0.58, `rgba(62, 166, 232, ${0.18 * alpha})`)
+    bloom.addColorStop(1, 'rgba(22, 72, 120, 0)')
+    ctx.fillStyle = bloom
+    ctx.beginPath()
+    ctx.arc(px, py, waveR, 0, TAU)
+    ctx.fill()
+
+    this._drawFrostRings(ctx, px, py, waveR, p, alpha, freeze)
+    this._drawFrostRunes(ctx, px, py, waveR, p, alpha, vfx.seed)
+    this._drawIceSpokes(ctx, px, py, coreR, waveR, p, alpha, vfx.seed)
+    this._drawIceFractures(ctx, px, py, waveR, out, alpha, vfx.seed)
+    this._drawIceShards(ctx, px, py, waveR, out, alpha, vfx.seed)
+    this._drawFrostMotes(ctx, px, py, waveR, out, alpha, vfx.seed)
+
+    const core = ctx.createRadialGradient(px, py, 0, px, py, coreR)
+    core.addColorStop(0, `rgba(255, 255, 255, ${0.9 * alpha})`)
+    core.addColorStop(0.5, `rgba(166, 241, 255, ${0.56 * alpha})`)
+    core.addColorStop(1, 'rgba(70, 178, 240, 0)')
+    ctx.fillStyle = core
+    ctx.beginPath()
+    ctx.arc(px, py, coreR, 0, TAU)
+    ctx.fill()
+
+    ctx.globalCompositeOperation = 'source-over'
+    this._drawColdMist(ctx, px, py, waveR, out, alpha, vfx.seed)
+    ctx.restore()
+  }
+
+  private _drawHaste(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
+    const p = clamp01(vfx.age / vfx.maxAge)
+    const out = easeOutQuart(p)
+    const alpha = 1 - p
+    const pulse = 1 - Math.abs(p * 2 - 1)
+    const px = gameToCanvasX(vfx.x)
+    const py = gameToCanvasY(vfx.y)
+    const baseR = Math.max(UNIT_PX * 1.4, vfx.radius * UNIT_PX)
+    const waveR = baseR * (0.18 + out * 0.84)
+    const coreR = baseR * (0.12 + pulse * 0.12)
+
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+
+    const aura = ctx.createRadialGradient(px, py, 0, px, py, waveR)
+    aura.addColorStop(0, `rgba(235, 255, 210, ${0.58 * alpha})`)
+    aura.addColorStop(0.28, `rgba(124, 247, 181, ${0.42 * alpha})`)
+    aura.addColorStop(0.62, `rgba(242, 208, 89, ${0.2 * alpha})`)
+    aura.addColorStop(1, 'rgba(62, 170, 96, 0)')
+    ctx.fillStyle = aura
+    ctx.beginPath()
+    ctx.arc(px, py, waveR, 0, TAU)
+    ctx.fill()
+
+    this._drawHasteArcs(ctx, px, py, waveR, p, alpha)
+    this._drawHasteChevrons(ctx, px, py, waveR, p, alpha)
+    this._drawHasteStreaks(ctx, px, py, waveR, out, alpha, vfx.seed)
+
+    const core = ctx.createRadialGradient(px, py, 0, px, py, coreR)
+    core.addColorStop(0, `rgba(255, 255, 224, ${0.82 * alpha})`)
+    core.addColorStop(0.44, `rgba(124, 247, 181, ${0.62 * alpha})`)
+    core.addColorStop(1, 'rgba(52, 206, 112, 0)')
+    ctx.fillStyle = core
+    ctx.beginPath()
+    ctx.arc(px, py, coreR, 0, TAU)
+    ctx.fill()
+
+    ctx.restore()
+  }
+
+  private _drawFrostRings(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    p: number,
+    alpha: number,
+    freeze: number,
+  ): void {
+    for (let i = 0; i < 4; i++) {
+      const r = radius * (0.36 + i * 0.18)
+      ctx.strokeStyle = i % 2 === 0
+        ? `rgba(230, 255, 255, ${0.5 * alpha})`
+        : `rgba(86, 208, 255, ${0.34 * alpha})`
+      ctx.lineWidth = 1.2 + freeze * (2.6 - i * 0.42)
+      ctx.setLineDash([r * 0.08, r * (0.04 + i * 0.015)])
+      ctx.beginPath()
+      ctx.arc(px, py, r, p * (1.6 + i * 0.3), TAU - i * 0.34)
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+  }
+
+  private _drawIceSpokes(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    coreR: number,
+    waveR: number,
+    p: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * TAU + seededUnit(seed, i + 760) * 0.18 + p * 0.35
+      const inner = coreR * (0.75 + seededUnit(seed, i + 780) * 0.35)
+      const outer = waveR * (0.52 + seededUnit(seed, i + 800) * 0.36)
+      ctx.strokeStyle = i % 3 === 0
+        ? `rgba(244, 255, 255, ${0.62 * alpha})`
+        : `rgba(116, 226, 255, ${0.46 * alpha})`
+      ctx.lineWidth = i % 3 === 0 ? 2.1 : 1.2
+      ctx.beginPath()
+      ctx.moveTo(px + Math.cos(a) * inner, py + Math.sin(a) * inner)
+      ctx.lineTo(px + Math.cos(a) * outer, py + Math.sin(a) * outer)
+      ctx.stroke()
+
+      const forkR = outer * 0.82
+      for (const offset of [-0.34, 0.34]) {
+        ctx.lineWidth = 0.9
+        ctx.beginPath()
+        ctx.moveTo(px + Math.cos(a) * forkR, py + Math.sin(a) * forkR)
+        ctx.lineTo(
+          px + Math.cos(a + offset) * (forkR + waveR * 0.1),
+          py + Math.sin(a + offset) * (forkR + waveR * 0.1),
+        )
+        ctx.stroke()
+      }
+    }
+    ctx.restore()
+  }
+
+  private _drawFrostRunes(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    p: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * TAU + p * 0.55 + seededUnit(seed, i + 1140) * 0.18
+      const r = radius * (0.42 + seededUnit(seed, i + 1160) * 0.36)
+      const sx = px + Math.cos(a) * r
+      const sy = py + Math.sin(a) * r
+      const size = radius * (0.035 + seededUnit(seed, i + 1180) * 0.025)
+      ctx.save()
+      ctx.translate(sx, sy)
+      ctx.rotate(a + Math.PI / 2)
+      ctx.strokeStyle = i % 3 === 0
+        ? `rgba(248, 255, 255, ${0.72 * alpha})`
+        : `rgba(116, 226, 255, ${0.46 * alpha})`
+      ctx.lineWidth = Math.max(1, size * 0.2)
+      this._traceSnowflake(ctx, size)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    ctx.restore()
+  }
+
+  private _traceSnowflake(ctx: CanvasRenderingContext2D, size: number): void {
+    for (let arm = 0; arm < 6; arm++) {
+      const a = (arm / 6) * TAU
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size)
+      ctx.moveTo(Math.cos(a) * size * 0.56, Math.sin(a) * size * 0.56)
+      ctx.lineTo(Math.cos(a + 0.55) * size * 0.78, Math.sin(a + 0.55) * size * 0.78)
+      ctx.moveTo(Math.cos(a) * size * 0.56, Math.sin(a) * size * 0.56)
+      ctx.lineTo(Math.cos(a - 0.55) * size * 0.78, Math.sin(a - 0.55) * size * 0.78)
+      ctx.stroke()
+    }
+  }
+
+  private _drawIceFractures(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    out: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    for (let i = 0; i < 14; i++) {
+      const a = seededUnit(seed, i + 1200) * TAU
+      const start = radius * (0.12 + seededUnit(seed, i + 1220) * 0.28) * out
+      const length = radius * (0.16 + seededUnit(seed, i + 1240) * 0.28) * out
+      const kinks = 2 + Math.floor(seededUnit(seed, i + 1260) * 3)
+      ctx.strokeStyle = i % 4 === 0
+        ? `rgba(250, 255, 255, ${0.54 * alpha})`
+        : `rgba(98, 206, 255, ${0.32 * alpha})`
+      ctx.lineWidth = i % 4 === 0 ? 1.7 : 1
+      ctx.beginPath()
+      for (let j = 0; j <= kinks; j++) {
+        const t = j / kinks
+        const jitter = (seededUnit(seed, i * 10 + j + 1280) - 0.5) * 0.24
+        const d = start + length * t
+        const x = px + Math.cos(a + jitter) * d
+        const y = py + Math.sin(a + jitter) * d
+        if (j === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  private _drawIceShards(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    out: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    for (let i = 0; i < 24; i++) {
+      const a = seededUnit(seed, i + 820) * TAU
+      const d = radius * (0.18 + seededUnit(seed, i + 840) * 0.76) * out
+      const length = 5 + seededUnit(seed, i + 860) * 13
+      const width = 1.8 + seededUnit(seed, i + 880) * 3.2
+      const sx = px + Math.cos(a) * d
+      const sy = py + Math.sin(a) * d
+      ctx.fillStyle = i % 4 === 0
+        ? `rgba(246, 255, 255, ${0.72 * alpha})`
+        : `rgba(112, 218, 255, ${0.46 * alpha})`
+      ctx.beginPath()
+      ctx.moveTo(sx + Math.cos(a) * length, sy + Math.sin(a) * length)
+      ctx.lineTo(sx + Math.cos(a + 1.9) * width, sy + Math.sin(a + 1.9) * width)
+      ctx.lineTo(sx + Math.cos(a - 1.9) * width, sy + Math.sin(a - 1.9) * width)
+      ctx.closePath()
+      ctx.fill()
+    }
+  }
+
+  private _drawFrostMotes(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    out: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    for (let i = 0; i < 36; i++) {
+      const a = seededUnit(seed, i + 900) * TAU
+      const d = radius * (0.08 + seededUnit(seed, i + 920) * 0.86) * out
+      const drift = (seededUnit(seed, i + 940) - 0.5) * 12 * out
+      const size = 0.8 + seededUnit(seed, i + 960) * 2.3
+      ctx.fillStyle = `rgba(226, 252, 255, ${0.64 * alpha})`
+      ctx.beginPath()
+      ctx.arc(px + Math.cos(a) * d + drift, py + Math.sin(a) * d - out * 8, size, 0, TAU)
+      ctx.fill()
+    }
+  }
+
+  private _drawColdMist(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    out: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    for (let i = 0; i < 14; i++) {
+      const a = seededUnit(seed, i + 980) * TAU
+      const d = radius * (0.18 + seededUnit(seed, i + 1000) * 0.74) * out
+      const r = 10 + seededUnit(seed, i + 1020) * 18
+      const sx = px + Math.cos(a) * d
+      const sy = py + Math.sin(a) * d - out * (8 + seededUnit(seed, i + 1040) * 14)
+      const mist = ctx.createRadialGradient(sx, sy, 0, sx, sy, r)
+      mist.addColorStop(0, `rgba(170, 232, 255, ${0.16 * alpha})`)
+      mist.addColorStop(0.7, `rgba(210, 250, 255, ${0.06 * alpha})`)
+      mist.addColorStop(1, 'rgba(80, 180, 230, 0)')
+      ctx.fillStyle = mist
+      ctx.beginPath()
+      ctx.arc(sx, sy, r, 0, TAU)
+      ctx.fill()
+    }
+  }
+
+  private _drawHasteArcs(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, p: number, alpha: number): void {
+    ctx.save()
+    ctx.lineCap = 'round'
+    for (let i = 0; i < 5; i++) {
+      const r = radius * (0.34 + i * 0.14)
+      const start = p * TAU * (1.25 + i * 0.12) + i * 0.9
+      ctx.strokeStyle = i % 2 === 0
+        ? `rgba(124, 247, 181, ${0.46 * alpha})`
+        : `rgba(255, 224, 112, ${0.38 * alpha})`
+      ctx.lineWidth = 2.2 - i * 0.16
+      ctx.beginPath()
+      ctx.arc(px, py, r, start, start + TAU * (0.32 + i * 0.02))
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  private _drawHasteChevrons(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, p: number, alpha: number): void {
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU + p * TAU * 0.72
+      const r = radius * (0.42 + (i % 3) * 0.16)
+      const size = radius * 0.055
+      const cx = px + Math.cos(a) * r
+      const cy = py + Math.sin(a) * r
+      ctx.strokeStyle = i % 2 === 0
+        ? `rgba(240, 255, 196, ${0.66 * alpha})`
+        : `rgba(94, 237, 148, ${0.5 * alpha})`
+      ctx.lineWidth = 1.8
+      ctx.beginPath()
+      ctx.moveTo(cx - Math.cos(a - 0.78) * size, cy - Math.sin(a - 0.78) * size)
+      ctx.lineTo(cx, cy)
+      ctx.lineTo(cx - Math.cos(a + 0.78) * size, cy - Math.sin(a + 0.78) * size)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  private _drawHasteStreaks(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    out: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    ctx.save()
+    ctx.lineCap = 'round'
+    for (let i = 0; i < 30; i++) {
+      const a = seededUnit(seed, i + 1060) * TAU + out * 1.8
+      const d = radius * (0.2 + seededUnit(seed, i + 1080) * 0.78) * out
+      const len = 8 + seededUnit(seed, i + 1100) * 18
+      const sx = px + Math.cos(a) * d
+      const sy = py + Math.sin(a) * d
+      ctx.strokeStyle = i % 4 === 0
+        ? `rgba(255, 236, 135, ${0.52 * alpha})`
+        : `rgba(103, 247, 163, ${0.42 * alpha})`
+      ctx.lineWidth = 1 + seededUnit(seed, i + 1120) * 1.8
+      ctx.beginPath()
+      ctx.moveTo(sx, sy)
+      ctx.lineTo(sx - Math.cos(a) * len, sy - Math.sin(a) * len)
+      ctx.stroke()
+    }
+    ctx.restore()
   }
 
   private _drawHeatBloom(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, alpha: number): void {
