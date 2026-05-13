@@ -121,8 +121,8 @@ onBeforeUnmount(() => {
 }
 
 .modal-message {
-  font-size: 12px;
-  color: #e8dcc8;
+  font-size: 13px;
+  color: var(--text-primary);
   line-height: 1.8;
 }
 
@@ -132,6 +132,6 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 .modal-ok { min-width: 120px; }
-.modal-cancel { min-width: 120px; border-color: var(--axis); color: var(--axis); }
-.modal-cancel:hover { background: var(--axis); color: var(--stone-dark); }
+.modal-cancel { min-width: 120px; border-color: var(--gold); color: var(--text-primary); }
+.modal-cancel:hover { background: var(--gold); color: #1a2a3a; }
 </style>

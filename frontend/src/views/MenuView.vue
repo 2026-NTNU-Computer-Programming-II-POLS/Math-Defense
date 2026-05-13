@@ -11,6 +11,7 @@ const auth = useAuthStore()
     <div class="menu-title">
       <h1 class="title-main">數學防線</h1>
       <h2 class="title-sub">Math Defense</h2>
+      <div class="title-divider"></div>
       <p class="title-motto">數學即魔法，守護座標原點</p>
     </div>
 
@@ -62,7 +63,7 @@ const auth = useAuthStore()
   padding: 32px 0;
   overflow-y: auto;
   gap: 48px;
-  background: var(--bg-base);
+  background: var(--bg-base); /* theme-updated */
 }
 
 .menu-title {
@@ -70,18 +71,29 @@ const auth = useAuthStore()
 }
 
 .title-main {
-  font-size: 48px;
-  color: var(--gold-bright);
-  text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
-  letter-spacing: 8px;
-  margin-bottom: 8px;
+  font-size: 56px;
+  color: white;
+  text-shadow: 2px 2px 10px rgba(44, 62, 80, 0.2);
+  letter-spacing: 12px;
+  margin-bottom: 4px;
+  font-weight: 800;
 }
 
 .title-sub {
-  font-size: 20px;
+  font-size: 24px;
   color: var(--gold);
-  letter-spacing: 12px;
-  margin-bottom: 16px;
+  letter-spacing: 16px;
+  margin-bottom: 24px;
+  font-weight: 300;
+  text-transform: uppercase;
+}
+
+.title-divider {
+  width: 60px;
+  height: 4px;
+  background: var(--gold);
+  margin: 0 auto 24px;
+  border-radius: 2px;
 }
 
 @media (max-width: 480px) {
@@ -104,8 +116,14 @@ const auth = useAuthStore()
 .menu-nav {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: 280px;
+  gap: 16px;
+  width: 320px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(15px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
 }
 
 .menu-btn {

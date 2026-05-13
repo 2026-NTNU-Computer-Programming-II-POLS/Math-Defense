@@ -293,9 +293,10 @@ function pendingLabel(op: CalcOp): string {
   flex-wrap: wrap;
   gap: 8px;
   font-size: 10px;
-  color: #c8b894;
+  color: var(--text-primary);
+  opacity: 0.8;
   padding: 4px 6px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.05);
   border-radius: 4px;
 }
 .legend-item { display: inline-flex; align-items: center; gap: 4px; }
@@ -316,14 +317,16 @@ function pendingLabel(op: CalcOp): string {
   align-items: center;
   gap: 6px;
   font-size: 10px;
-  color: #c8b894;
+  color: var(--text-primary);
+  opacity: 0.7;
   font-family: var(--font-sans, inherit);
 }
 .trait-label { font-weight: 600; }
 .preset-deriv {
   margin-left: auto;
   font-family: var(--font-mono);
-  color: #8a7a5e;
+  color: var(--text-primary);
+  opacity: 0.6;
   font-size: 10px;
 }
 .preset-deriv--warn { color: var(--hp-red); }
@@ -344,7 +347,7 @@ function pendingLabel(op: CalcOp): string {
 }
 .coeff-info {
   font-size: 11px;
-  color: #e8dcc8;
+  color: var(--text-primary);
   margin: 0;
   display: flex;
   flex-wrap: wrap;
@@ -356,14 +359,15 @@ function pendingLabel(op: CalcOp): string {
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  color: #c8b894;
+  color: var(--text-primary);
+  opacity: 0.8;
 }
 
 .chain-cost { font-size: 11px; margin: 0; color: var(--gold); }
 .chain-cost--free { color: #6ee7b7; }
 .chain-cost--broke { color: var(--hp-red); }
 
-.hint { font-size: 10px; color: #8a7a5e; margin: 0; }
+.hint { font-size: 10px; color: var(--text-primary); opacity: 0.5; margin: 0; }
 
 .op-btns { display: flex; gap: 6px; }
 .op-btn {
@@ -393,7 +397,8 @@ function pendingLabel(op: CalcOp): string {
 .op-preview {
   font-size: 9px;
   font-family: var(--font-mono);
-  color: #8a7a5e;
+  color: var(--text-primary);
+  opacity: 0.7;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -429,7 +434,7 @@ function pendingLabel(op: CalcOp): string {
 .confirm-text {
   font-size: 11px;
   margin: 0;
-  color: #e8dcc8;
+  color: var(--text-primary);
   line-height: 1.4;
 }
 .confirm-text code {

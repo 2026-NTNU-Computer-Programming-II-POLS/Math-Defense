@@ -206,8 +206,8 @@ function canAfford(cost: number): boolean {
 .tower-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  background: linear-gradient(0deg, rgba(26,21,32,0.97), rgba(26,21,32,0.8));
-  border-top: 1px solid var(--panel-border);
+  background: rgba(80, 100, 130, 0.96);
+  border-top: 2px solid var(--gold);
   padding: 8px 16px;
   display: flex;
   align-items: center;
@@ -227,12 +227,12 @@ function canAfford(cost: number): boolean {
   flex-wrap: nowrap;
 }
 .chip {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--grid-line);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 12px;
   padding: 4px 10px;
   font-size: 10px;
-  color: #c8b894;
+  color: #ffffff;
   cursor: pointer;
   white-space: nowrap;
   font-family: var(--font-mono);
@@ -241,22 +241,20 @@ function canAfford(cost: number): boolean {
   align-items: center;
   gap: 4px;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
-  /* WCAG min hit target: keep at least 32px tall via padding so it's
-     comfortably tappable on mobile without dominating the bar height. */
   min-height: 32px;
 }
 .chip:hover {
   border-color: var(--gold);
-  color: #e8dcc8;
+  color: var(--gold);
 }
 .chip:focus-visible {
   outline: 2px solid var(--gold-bright);
   outline-offset: 1px;
 }
 .chip--active {
-  border-color: var(--gold-bright);
-  background: rgba(255, 215, 0, 0.15);
-  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #1a2a3a; /* Dark text on solid yellow background */
 }
 .chip-count {
   font-size: 9px;
@@ -267,8 +265,8 @@ function canAfford(cost: number): boolean {
   font-weight: bold;
 }
 .chip--active .chip-count {
-  color: var(--gold-bright);
-  background: rgba(0, 0, 0, 0.4);
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .empty-msg {
@@ -299,8 +297,8 @@ function canAfford(cost: number): boolean {
 .tower-btn {
   display: flex; flex-direction: column; align-items: center;
   gap: 3px; padding: 8px 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--grid-line);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 6px;
   cursor: pointer;
   min-width: 90px;
@@ -310,7 +308,7 @@ function canAfford(cost: number): boolean {
 
 .tower-btn:hover:not(.unaffordable) {
   border-color: var(--gold);
-  background: rgba(212,168,64,0.08);
+  background: rgba(255, 215, 0, 0.15);
 }
 
 /* Keyboard focus must be visually distinct from inert state (A-8) */
@@ -322,11 +320,15 @@ function canAfford(cost: number): boolean {
 /* U-6: stronger selection cue — double inset stroke + richer tint so the
    selected state reads clearly against the gold-on-dark palette. */
 .tower-btn.selected {
-  border-color: var(--gold-bright);
-  background: rgba(255,215,0,0.18);
-  box-shadow:
-    inset 0 0 0 2px var(--gold-bright),
-    0 0 12px rgba(255, 215, 0, 0.35);
+  border-color: var(--gold);
+  background: var(--gold);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+.tower-btn.selected .tower-name,
+.tower-btn.selected .tower-cost,
+.tower-btn.selected .tower-glyph {
+  color: #1a2a3a; /* High contrast dark text on yellow */
 }
 
 /* U-3: shake rejection cue for unaffordable clicks */
@@ -352,7 +354,7 @@ function canAfford(cost: number): boolean {
 }
 
 .tower-icon { font-size: 18px; }
-.tower-name { font-size: 12px; color: #e8dcc8; letter-spacing: 1px; }
+.tower-name { font-size: 12px; color: #ffffff; letter-spacing: 1px; }
 /* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
    colour-blind players can identify tower type without relying on the
    colour of .tower-icon. Lives inline with the label. */
@@ -377,10 +379,10 @@ function canAfford(cost: number): boolean {
   width: max-content;
   max-width: 220px;
   padding: 6px 10px;
-  background: rgba(20, 16, 28, 0.96);
-  border: 1px solid var(--panel-border);
+  background: rgba(50, 68, 95, 0.97);
+  border: 1px solid var(--gold);
   border-radius: 6px;
-  color: #e8dcc8;
+  color: #ffffff;
   font-size: 11px;
   line-height: 1.4;
   white-space: pre-line;

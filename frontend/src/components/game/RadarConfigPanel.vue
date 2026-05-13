@@ -82,16 +82,16 @@ function apply() {
 
 <style scoped>
 .radar-panel { display: flex; flex-direction: column; gap: 8px; }
-.param-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #e8dcc8; }
+.param-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #ffffff; }
 .param-label { flex: 1; }
 .param-val { width: 16px; text-align: left; color: var(--gold); }
 .num-input {
   width: 64px;
   padding: 3px 6px;
   font-size: 12px;
-  background: rgba(0, 0, 0, 0.35);
-  color: #fff8e7;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--stone-dark);
+  color: #ffffff;
+  border: 1px solid var(--gold);
   border-radius: 4px;
   text-align: right;
 }

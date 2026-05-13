@@ -107,9 +107,9 @@ const fields = [
       <line x1="0" y1="0" x2="0" y2="1" stroke="#555" stroke-width="0.15" stroke-dasharray="0.2" />
       <!-- Transformed vectors -->
       <line x1="0" y1="0" :x2="transformPreview.e1.x" :y2="-transformPreview.e1.y" stroke="#9068c8" stroke-width="0.2" />
-      <line x1="0" y1="0" :x2="transformPreview.e2.x" :y2="-transformPreview.e2.y" stroke="#c89848" stroke-width="0.2" />
+      <line x1="0" y1="0" :x2="transformPreview.e2.x" :y2="-transformPreview.e2.y" stroke="var(--gold)" stroke-width="0.2" />
       <circle :cx="transformPreview.e1.x" :cy="-transformPreview.e1.y" r="0.2" fill="#9068c8" />
-      <circle :cx="transformPreview.e2.x" :cy="-transformPreview.e2.y" r="0.2" fill="#c89848" />
+      <circle :cx="transformPreview.e2.x" :cy="-transformPreview.e2.y" r="0.2" fill="var(--gold)" />
     </svg>
   </div>
 </template>
@@ -174,7 +174,7 @@ const fields = [
 
 .cell-value {
   font-size: 10px;
-  color: #e8dcc8;
+  color: #ffffff;
   font-family: var(--font-mono);
 }
 
