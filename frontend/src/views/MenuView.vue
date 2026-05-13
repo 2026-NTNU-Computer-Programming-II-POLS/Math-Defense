@@ -47,6 +47,7 @@ const mathGlyphs = [
     <div class="menu-title">
       <h1 class="title-main">數學防線</h1>
       <h2 class="title-sub">Math Defense</h2>
+      <div class="title-divider"></div>
       <p class="title-motto">數學即魔法，守護座標原點</p>
     </div>
 
@@ -101,33 +102,7 @@ const mathGlyphs = [
   overflow-x: hidden;
   overflow-y: auto;
   gap: 48px;
-  background:
-    radial-gradient(circle at 22% 18%, rgba(76, 160, 172, 0.24), transparent 32%),
-    radial-gradient(circle at 78% 74%, rgba(212, 168, 64, 0.2), transparent 34%),
-    radial-gradient(circle at 70% 20%, rgba(150, 72, 126, 0.16), transparent 28%),
-    linear-gradient(145deg, #16313a 0%, #221936 48%, #24142a 100%);
-}
-
-.menu-view::before,
-.menu-view::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.menu-view::before {
-  z-index: -2;
-  background:
-    linear-gradient(rgba(212, 168, 64, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(212, 168, 64, 0.05) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse at center, #000 0%, transparent 78%);
-}
-
-.menu-view::after {
-  z-index: -1;
-  background: radial-gradient(ellipse at center, transparent 0%, rgba(9, 14, 22, 0.42) 76%);
+  background: var(--bg-base);
 }
 
 .math-field {
@@ -185,18 +160,29 @@ const mathGlyphs = [
 }
 
 .title-main {
-  font-size: 48px;
-  color: var(--gold-bright);
-  text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
-  letter-spacing: 8px;
-  margin-bottom: 8px;
+  font-size: 56px;
+  color: white;
+  text-shadow: 2px 2px 10px rgba(44, 62, 80, 0.2);
+  letter-spacing: 12px;
+  margin-bottom: 4px;
+  font-weight: 800;
 }
 
 .title-sub {
-  font-size: 20px;
+  font-size: 24px;
   color: var(--gold);
-  letter-spacing: 12px;
-  margin-bottom: 16px;
+  letter-spacing: 16px;
+  margin-bottom: 24px;
+  font-weight: 300;
+  text-transform: uppercase;
+}
+
+.title-divider {
+  width: 60px;
+  height: 4px;
+  background: var(--gold);
+  margin: 0 auto 24px;
+  border-radius: 2px;
 }
 
 @media (max-width: 480px) {
@@ -221,8 +207,14 @@ const mathGlyphs = [
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: 280px;
+  gap: 16px;
+  width: 320px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(15px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
 }
 
 .menu-btn {

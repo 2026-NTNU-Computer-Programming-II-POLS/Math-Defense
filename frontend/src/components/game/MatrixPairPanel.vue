@@ -175,7 +175,7 @@ function pairWith(pairId: string) {
 
 <style scoped>
 .matrix-panel { display: flex; flex-direction: column; gap: 6px; }
-.info-line { font-size: 11px; color: #e8dcc8; margin: 0; }
+.info-line { font-size: 11px; color: var(--text-primary); margin: 0; }
 .info-line strong { color: var(--gold); }
 .section-label { font-size: 10px; color: var(--axis); margin: 4px 0 2px; }
 .no-pair .btn { font-size: 10px; margin-top: 4px; }
@@ -212,7 +212,8 @@ function pairWith(pairId: string) {
 }
 
 .ramp-label {
-  color: #c8b894;
+  color: var(--text-primary);
+  opacity: 0.8;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   display: inline-flex;
@@ -227,7 +228,7 @@ function pairWith(pairId: string) {
   text-transform: none;
   letter-spacing: 0;
 }
-.ramp-state--idle    { color: #8a7a5e; background: rgba(139, 122, 94, 0.15); }
+.ramp-state--idle    { color: var(--text-primary); opacity: 0.5; background: rgba(0, 0, 0, 0.05); }
 .ramp-state--active  { color: #6ee7b7; background: rgba(110, 231, 183, 0.15); }
 .ramp-state--invalid { color: var(--hp-red); background: rgba(204, 68, 68, 0.15); }
 
@@ -274,7 +275,7 @@ function pairWith(pairId: string) {
 
 .ramp-detail {
   font-size: 10px;
-  color: #e8dcc8;
+  color: var(--text-primary);
   margin: 0;
 }
 .ramp-detail strong { color: var(--gold); }

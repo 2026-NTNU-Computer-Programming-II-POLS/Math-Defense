@@ -403,9 +403,7 @@ onBeforeUnmount(() => {
 .game-shell {
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(circle at 50% 42%, rgba(90, 138, 146, 0.22), transparent 42%),
-    linear-gradient(180deg, #162b36 0%, var(--bg-base) 100%);
+  background: linear-gradient(160deg, #6b84a8 0%, #8299b7 60%, #7a8fa5 100%);
 }
 
 .game-view {
@@ -455,8 +453,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: rgba(11, 10, 18, 0.85);
-  color: #e8dcc8;
+  background: rgba(91, 113, 143, 0.92);
+  color: #ffffff;
   font-family: var(--font-mono);
   z-index: var(--z-modal);
 }
@@ -542,7 +540,7 @@ onBeforeUnmount(() => {
 .checkpoint-stat {
   margin: 0;
   font-size: 13px;
-  color: #e8dcc8;
+  color: var(--text-primary);
 }
 .checkpoint-hint {
   margin: 0;
@@ -566,23 +564,24 @@ onBeforeUnmount(() => {
   padding: 8px 20px;
   border: 1px solid var(--gold-dim);
   border-radius: 4px;
-  background: rgba(212, 168, 64, 0.1);
-  color: var(--gold);
+  background: rgba(255, 215, 0, 0.1);
+  color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 12px;
   cursor: pointer;
   transition: background 120ms;
 }
 .btn-checkpoint:hover {
-  background: rgba(212, 168, 64, 0.25);
+  background: rgba(255, 215, 0, 0.25);
 }
 .btn-checkpoint.primary {
   border-color: var(--gold);
-  color: var(--gold-bright);
-  background: rgba(212, 168, 64, 0.25);
+  color: #1a2a3a;
+  background: rgba(255, 215, 0, 0.3);
+  font-weight: bold;
 }
 .btn-checkpoint.primary:hover {
-  background: rgba(212, 168, 64, 0.4);
+  background: rgba(255, 215, 0, 0.5);
 }
 
 /* Backlog §20 — practice-mode badge */

@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  background: radial-gradient(ellipse at center, #1e1828 0%, #0d0a12 70%);
+  background: var(--bg-base);
   min-height: 100vh;
   overflow-y: auto;
 }
@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
 }
 
 .lb-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-.tab-btn.active { background: var(--gold); color: var(--stone-dark); }
+.tab-btn.active { background: var(--gold); color: #1a2a3a; font-weight: bold; }
 .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .lb-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -218,7 +218,8 @@ onBeforeUnmount(() => {
 
 .filter-btn.active {
   background: var(--gold);
-  color: var(--stone-dark);
+  color: #1a2a3a;
+  font-weight: bold;
 }
 
 .lb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -233,7 +234,7 @@ th, td {
 th { color: var(--axis); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
 
 .rank     { color: var(--gold); font-size: 14px; }
-.player-name { color: #e8dcc8; }
+.player-name { color: var(--text-primary); }
 .score    { color: var(--gold-bright); font-weight: bold; }
 .lb-loading, .lb-error, .empty { text-align: center; color: var(--axis); padding: 32px; }
 .lb-error { color: var(--enemy-red); }

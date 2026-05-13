@@ -122,17 +122,17 @@ function submitTyped(): void {
 
 <style scoped>
 .limit-panel { display: flex; flex-direction: column; gap: 8px; }
-.question-text { font-size: 12px; color: #e8dcc8; margin: 0; line-height: 1.5; }
+.question-text { font-size: 12px; color: var(--text-primary); margin: 0; line-height: 1.5; }
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .choice-btn { font-size: 11px; padding: 8px; }
 .result-text { font-size: 12px; color: var(--gold); margin: 0; }
 .typed-entry { display: flex; gap: 6px; }
 .typed-input {
   flex: 1; padding: 6px; font-size: 12px;
-  background: rgba(0, 0, 0, 0.4); color: #e8dcc8;
-  border: 1px solid #6a5b3e; border-radius: 4px;
+  background: var(--stone-dark); color: #ffffff;
+  border: 1px solid var(--gold); border-radius: 4px;
 }
 .submit-btn { font-size: 11px; padding: 6px 12px; }
 .error-text { font-size: 11px; color: #ff7a7a; margin: 0; }
-.hint-text { font-size: 10px; color: #a89977; margin: 0; font-style: italic; }
+.hint-text { font-size: 10px; color: var(--text-primary); opacity: 0.5; margin: 0; font-style: italic; }
 </style>

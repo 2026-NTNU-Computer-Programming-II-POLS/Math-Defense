@@ -185,13 +185,14 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .score-panel {
-  background: linear-gradient(135deg, #1a1520, #252030);
+  background: rgba(50, 68, 95, 0.98);
   border: 2px solid var(--gold);
   border-radius: 8px;
   padding: 24px 40px;
   text-align: center;
   min-width: 340px;
   font-family: var(--font-mono);
+  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.4);
 }
 
 .score-title {
@@ -221,12 +222,13 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .breakdown .label {
   text-align: left;
-  color: var(--axis);
+  color: #ffffff;
+  opacity: 0.8;
 }
 
 .breakdown .value {
   text-align: right;
-  color: #e8dcc8;
+  color: var(--gold);
   font-weight: bold;
 }
 
@@ -269,16 +271,18 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   padding: 10px 32px;
   border: 1px solid var(--gold);
   border-radius: 6px;
-  background: rgba(212, 168, 64, 0.2);
-  color: var(--gold);
+  background: var(--gold);
+  color: #1a2a3a;
   font-family: var(--font-mono);
   font-size: 14px;
+  font-weight: bold;
   cursor: pointer;
-  transition: background 120ms;
+  transition: transform 0.1s, background 0.1s;
 }
 
 .btn-continue:hover {
-  background: rgba(212, 168, 64, 0.4);
+  background: #ffea00;
+  transform: translateY(-1px);
 }
 
 .reflection {

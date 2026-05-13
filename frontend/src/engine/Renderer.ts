@@ -26,19 +26,19 @@ export interface RendererPalette {
 }
 
 const NEUTRAL_PALETTE: RendererPalette = Object.freeze({
-  stoneDark: '#20323a',
-  stoneLight: '#2b4248',
-  gridLine: '#56737a',
-  axis: '#e1bd63',
-  forbiddenFill: '#26343f',
+  stoneDark: '#7a8da8',
+  stoneLight: '#8ea1bd',
+  gridLine: 'rgba(255, 255, 255, 0.25)',
+  axis: '#ffd700',
+  forbiddenFill: '#6a7d99',
 })
 
 const WARM_PALETTE: RendererPalette = Object.freeze({
-  stoneDark: '#2e3330',
-  stoneLight: '#3a443b',
-  gridLine: '#746f4c',
-  axis: '#f0c65e',
-  forbiddenFill: '#343834',
+  stoneDark: '#8c7d6b',
+  stoneLight: '#9d8e7c',
+  gridLine: 'rgba(255, 215, 0, 0.25)',
+  axis: '#ffea00',
+  forbiddenFill: '#7c6d5b',
 })
 
 export class Renderer {
