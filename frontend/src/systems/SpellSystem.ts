@@ -72,6 +72,9 @@ export class SpellSystem implements GameSystem {
 
     // S-8: refund AoE cost when no enemies were in range
     if (hitCount === 0 && def.radius !== undefined) {
+      if (def.showVfxOnMiss) {
+        game.eventBus.emit(Events.SPELL_EFFECT, { spellId, x, y, radius: def.radius })
+      }
       game.economy.changeGold(def.cost)
       game.economy.addCost(-def.cost)
       game.state.spellCooldowns[spellId] = 0
@@ -122,7 +125,7 @@ export class SpellSystem implements GameSystem {
       'ALL_TOWERS_DAMAGE_MULTIPLY_1_5',
       'ALL_TOWERS_DAMAGE_DIVIDE_1_5',
       duration,
-      'Rejuvenate',
+      'Haste',
       game,
     )
   }

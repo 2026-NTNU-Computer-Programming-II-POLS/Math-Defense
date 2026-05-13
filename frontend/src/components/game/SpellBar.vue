@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { SPELL_DEFS } from '@/data/spell-defs'
 import { Events } from '@/data/constants'
+import SpellIcon from './SpellIcon.vue'
 
 const g = useGameStore()
 const castingSpell = ref<string | null>(null)
@@ -26,18 +27,11 @@ onBeforeUnmount(() => {
   _unsubClick = null
 })
 
-function shortName(name: string): string {
-  const words = name.split(/\s+/)
-  if (words.length >= 2) return words.map(w => w[0]).join('').toUpperCase()
-  return name.slice(0, 3)
-}
-
 const spells = computed(() =>
   SPELL_DEFS.map((s) => {
     const cd = g.spellCooldowns[s.id] ?? 0
     return {
       ...s,
-      abbrev: shortName(s.name),
       onCooldown: cd > 0,
       cooldownPct: cd > 0 ? (cd / s.cooldown) * 100 : 0,
       cooldownLabel: cd > 0 ? Math.ceil(cd) + 's' : '',
@@ -47,6 +41,14 @@ const spells = computed(() =>
 )
 
 function selectSpell(spellId: string): void {
+  const spell = SPELL_DEFS.find((s) => s.id === spellId)
+  if (spell?.targetMode === 'self') {
+    castingSpell.value = spellId
+    const point = g.selfCastCenter()
+    castAtPosition(point.x, point.y)
+    return
+  }
+
   if (castingSpell.value === spellId) {
     castingSpell.value = null
     return
@@ -88,7 +90,7 @@ defineExpose({ castingSpell, castAtPosition })
       :aria-label="`${spell.name}, costs ${spell.cost} gold${spell.onCooldown ? `, on cooldown ${spell.cooldownLabel}` : ''}`"
       @click="selectSpell(spell.id)"
     >
-      <span class="spell-icon">{{ spell.abbrev }}</span>
+      <SpellIcon :spell-id="spell.id" />
       <span v-if="spell.onCooldown" class="cd-overlay" :style="{ height: `${spell.cooldownPct}%` }" />
       <span v-if="spell.onCooldown" class="cd-label">{{ spell.cooldownLabel }}</span>
       <span class="spell-cost">{{ spell.cost }}</span>
@@ -135,11 +137,6 @@ defineExpose({ castingSpell, castAtPosition })
 
 .spell-btn.unaffordable {
   opacity: 0.3;
-}
-
-.spell-icon {
-  position: relative;
-  z-index: 1;
 }
 
 .cd-overlay {

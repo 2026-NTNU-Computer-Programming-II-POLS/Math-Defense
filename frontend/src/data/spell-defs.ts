@@ -12,6 +12,8 @@ export interface SpellDef {
   duration?: number       // seconds (for lingering effects)
   slowFactor?: number     // multiplier (e.g. 0.5 = 50% speed)
   color: string
+  vfxDuration?: number    // seconds — overrides the default VFX lifetime (0.65 s)
+  showVfxOnMiss?: boolean // emit SPELL_EFFECT even when the AoE refund path is taken
 }
 
 export const SPELL_DEFS: SpellDef[] = [
@@ -25,6 +27,8 @@ export const SPELL_DEFS: SpellDef[] = [
     radius: 3,
     damage: 60,
     color: '#ff6030',
+    vfxDuration: 1.35,
+    showVfxOnMiss: true,
   },
   {
     id: 'slow',
@@ -47,16 +51,17 @@ export const SPELL_DEFS: SpellDef[] = [
     targetMode: 'single',
     damage: 150,
     color: '#f0e060',
+    vfxDuration: 0.85,
   },
   {
     id: 'heal',
-    name: 'Rejuvenate',
-    description: 'Boost all tower stats briefly',
+    name: 'Haste',
+    description: 'Accelerate all towers briefly',
     cost: 120,
     cooldown: 25,
     targetMode: 'self',
     duration: 8,
-    color: '#60f090',
+    color: '#7cf7b5',
   },
 ]
 
