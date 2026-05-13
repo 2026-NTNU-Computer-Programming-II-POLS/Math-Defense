@@ -43,7 +43,16 @@ function seedFor(spellId: string, x: number, y: number): number {
   return seed
 }
 
+<<<<<<< HEAD
 const DEFAULT_VFX_DURATION = 0.65
+=======
+function effectAge(spellId: string): number {
+  if (spellId === 'lightning') return 0.85
+  if (spellId === 'slow') return 1.15
+  if (spellId === 'heal') return 1.05
+  return spellId === 'fireball' ? 1.35 : 0.65
+}
+>>>>>>> c7f3e3a17ced33e16b55171907ed26f2a28c268e
 
 export class SpellEffectRenderer implements GameSystem {
   private _effects: SpellVfx[] = []
@@ -366,9 +375,13 @@ export class SpellEffectRenderer implements GameSystem {
     ctx.fill()
 
     this._drawFrostRings(ctx, px, py, waveR, p, alpha, freeze)
+<<<<<<< HEAD
     this._drawFrostRunes(ctx, px, py, waveR, p, alpha, vfx.seed)
     this._drawIceSpokes(ctx, px, py, coreR, waveR, p, alpha, vfx.seed)
     this._drawIceFractures(ctx, px, py, waveR, out, alpha, vfx.seed)
+=======
+    this._drawIceSpokes(ctx, px, py, coreR, waveR, p, alpha, vfx.seed)
+>>>>>>> c7f3e3a17ced33e16b55171907ed26f2a28c268e
     this._drawIceShards(ctx, px, py, waveR, out, alpha, vfx.seed)
     this._drawFrostMotes(ctx, px, py, waveR, out, alpha, vfx.seed)
 
@@ -490,6 +503,7 @@ export class SpellEffectRenderer implements GameSystem {
     ctx.restore()
   }
 
+<<<<<<< HEAD
   private _drawFrostRunes(
     ctx: CanvasRenderingContext2D,
     px: number,
@@ -575,6 +589,8 @@ export class SpellEffectRenderer implements GameSystem {
     ctx.restore()
   }
 
+=======
+>>>>>>> c7f3e3a17ced33e16b55171907ed26f2a28c268e
   private _drawIceShards(
     ctx: CanvasRenderingContext2D,
     px: number,
