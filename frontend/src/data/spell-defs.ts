@@ -41,6 +41,7 @@ export const SPELL_DEFS: SpellDef[] = [
     duration: 5,
     slowFactor: 0.4,
     color: '#60c0ff',
+    vfxDuration: 1.45,
   },
   {
     id: 'lightning',
@@ -62,6 +63,7 @@ export const SPELL_DEFS: SpellDef[] = [
     targetMode: 'self',
     duration: 8,
     color: '#7cf7b5',
+    vfxDuration: 1.05,
   },
 ]
 

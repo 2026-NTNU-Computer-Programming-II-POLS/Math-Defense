@@ -45,6 +45,8 @@ export interface EnemyView {
   readonly type: EnemyAppearance
   readonly size: number
   readonly color: string
+  /** 0..1 frost visual intensity while speed-reduction effects are active. */
+  readonly frostRatio: number
   /** 0..1 hp ratio, or null when full HP (renderer skips the bar). */
   readonly hpRatio: number | null
   /** 0..1 shield ratio, or null when there is no shield slot. */
