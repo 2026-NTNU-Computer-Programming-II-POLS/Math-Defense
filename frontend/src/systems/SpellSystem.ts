@@ -1,6 +1,7 @@
 import { Events, GamePhase, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
 import { SPELL_MAP } from '@/data/spell-defs'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
+import type { Enemy } from '@/entities/types'
 import type { Game, GameSystem } from '@/engine/Game'
 
 function dist(ax: number, ay: number, bx: number, by: number): number {
@@ -61,8 +62,18 @@ export class SpellSystem implements GameSystem {
         hitCount = this._applyAreaSlow(x, y, def.radius!, def.slowFactor!, def.duration!, game)
         break
       case 'lightning':
-        this._applySingleDamage(targetId, def.damage!, game)
-        hitCount = 1
+        {
+          const target = this._applySingleDamage(targetId, x, y, def.damage!, game)
+          if (!target) {
+            game.economy.changeGold(def.cost)
+            game.economy.addCost(-def.cost)
+            game.state.spellCooldowns[spellId] = 0
+            return
+          }
+          x = target.x
+          y = target.y
+          hitCount = 1
+        }
         break
       case 'heal':
         this._applyTowerBoost(def.duration!, game)
@@ -108,12 +119,32 @@ export class SpellSystem implements GameSystem {
     return hits
   }
 
-  private _applySingleDamage(targetId: string | undefined, damage: number, game: Game): void {
+  private _applySingleDamage(
+    targetId: string | undefined,
+    x: number,
+    y: number,
+    damage: number,
+    game: Game,
+  ): Enemy | null {
     const target = targetId
       ? game.enemies.find((e) => e.id === targetId && e.alive)
-      : game.enemies.find((e) => e.alive)
-    if (!target) return
+      : this._findNearestEnemy(x, y, game.enemies)
+    if (!target) return null
     applyDamage(target, damage, game)
+    return target
+  }
+
+  private _findNearestEnemy(x: number, y: number, enemies: Enemy[]): Enemy | null {
+    let best: Enemy | null = null
+    let bestDist = Infinity
+    for (const enemy of enemies) {
+      if (!enemy.alive) continue
+      const d = dist(x, y, enemy.x, enemy.y)
+      if (d >= bestDist) continue
+      best = enemy
+      bestDist = d
+    }
+    return best
   }
 
   private _applyTowerBoost(duration: number, game: Game): void {
