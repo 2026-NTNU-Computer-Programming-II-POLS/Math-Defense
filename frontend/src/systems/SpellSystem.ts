@@ -84,9 +84,7 @@ export class SpellSystem implements GameSystem {
       if (def.showVfxOnMiss) {
         game.eventBus.emit(Events.SPELL_EFFECT, { spellId, x, y, radius: def.radius })
       }
-      game.economy.changeGold(def.cost)
-      game.economy.addCost(-def.cost)
-      game.state.spellCooldowns[spellId] = 0
+      this._refundSpell(spellId, def.cost, game)
       return
     }
 
