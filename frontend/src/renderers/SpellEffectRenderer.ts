@@ -43,10 +43,7 @@ function seedFor(spellId: string, x: number, y: number): number {
   return seed
 }
 
-function effectAge(spellId: string): number {
-  if (spellId === 'lightning') return 0.85
-  return spellId === 'fireball' ? 1.35 : 0.65
-}
+const DEFAULT_VFX_DURATION = 0.65
 
 export class SpellEffectRenderer implements GameSystem {
   private _effects: SpellVfx[] = []
@@ -63,7 +60,7 @@ export class SpellEffectRenderer implements GameSystem {
           y,
           radius: radius ?? 2,
           age: 0,
-          maxAge: effectAge(spellId),
+          maxAge: def?.vfxDuration ?? DEFAULT_VFX_DURATION,
           color: def?.color ?? '#ffffff',
           seed: seedFor(spellId, x, y),
         })

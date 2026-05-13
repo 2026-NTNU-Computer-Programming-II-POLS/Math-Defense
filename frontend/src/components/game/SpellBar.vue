@@ -44,7 +44,7 @@ function selectSpell(spellId: string): void {
   const spell = SPELL_DEFS.find((s) => s.id === spellId)
   if (spell?.targetMode === 'self') {
     castingSpell.value = spellId
-    const point = getSelfCastPoint()
+    const point = g.selfCastCenter()
     castAtPosition(point.x, point.y)
     return
   }
@@ -54,18 +54,6 @@ function selectSpell(spellId: string): void {
     return
   }
   castingSpell.value = spellId
-}
-
-function getSelfCastPoint(): { x: number; y: number } {
-  const engine = g.getEngine()
-  const towers = engine?.towers.filter((tower) => tower.active && !tower.disabled) ?? []
-  if (towers.length === 0) return { x: 0, y: 0 }
-
-  const sum = towers.reduce(
-    (acc, tower) => ({ x: acc.x + tower.x, y: acc.y + tower.y }),
-    { x: 0, y: 0 },
-  )
-  return { x: sum.x / towers.length, y: sum.y / towers.length }
 }
 
 function castAtPosition(x: number, y: number): void {

@@ -19,7 +19,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, reactive, shallowRef, computed } from 'vue'
-import { GamePhase, Events } from '@/data/constants'
+import { GamePhase, Events, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
 import { appBus } from '@/lib/app-bus'
 import type { Game } from '@/engine/Game'
 import type { ActiveBuffEntry } from '@/engine/GameState'
@@ -290,6 +290,13 @@ export const useGameStore = defineStore('game', () => {
     return _game
   }
 
+  function selfCastCenter(): { x: number; y: number } {
+    const towers = _game?.towers.filter((t) => t.active && !t.disabled) ?? []
+    if (!towers.length) return { x: (GRID_MIN_X + GRID_MAX_X) / 2, y: (GRID_MIN_Y + GRID_MAX_Y) / 2 }
+    const sum = towers.reduce((acc, t) => ({ x: acc.x + t.x, y: acc.y + t.y }), { x: 0, y: 0 })
+    return { x: sum.x / towers.length, y: sum.y / towers.length }
+  }
+
   function clear(): void {
     unbindEngine()
     phase.value = GamePhase.MENU
@@ -334,7 +341,7 @@ export const useGameStore = defineStore('game', () => {
     lastCheckpoint, isCheckpointRun,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, isMontyHall, hpPercent, activeTime,
-    bindEngine, unbindEngine, syncFromEngine, getEngine,
+    bindEngine, unbindEngine, syncFromEngine, getEngine, selfCastCenter,
     pushTimingTick,
     clearCheckpoint, setCheckpoint, markCheckpointRun,
   }
