@@ -50,13 +50,13 @@ export const SPELL_DEFS: SpellDef[] = [
   },
   {
     id: 'heal',
-    name: 'Rejuvenate',
-    description: 'Boost all tower stats briefly',
+    name: 'Haste',
+    description: 'Accelerate all towers briefly',
     cost: 120,
     cooldown: 25,
     targetMode: 'self',
     duration: 8,
-    color: '#60f090',
+    color: '#7cf7b5',
   },
 ]
 
