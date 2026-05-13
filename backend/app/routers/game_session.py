@@ -9,25 +9,21 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.application.mappers import session_to_out
-from app.application.session_service import SessionApplicationService
 from app.db.database import get_db
 from app.domain.user.aggregate import User
-from app.infrastructure.persistence.leaderboard_repository import SqlAlchemyLeaderboardRepository
-from app.infrastructure.persistence.session_repository import SqlAlchemySessionRepository
-from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from app.factories import build_session_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user
-from app.schemas.game_session import SessionCreate, SessionEnd, SessionOut, SessionUpdate
+from app.infrastructure.audit_logger import record_audit_event
+from app.schemas.game_session import (
+    ReflectionIn,
+    SessionCreate,
+    SessionEnd,
+    SessionOut,
+    SessionUpdate,
+)
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
-
-
-def _get_service(db: Session) -> SessionApplicationService:
-    return SessionApplicationService(
-        session_repo=SqlAlchemySessionRepository(db),
-        leaderboard_repo=SqlAlchemyLeaderboardRepository(db),
-        uow=SqlAlchemyUnitOfWork(db),
-    )
 
 
 @router.post("", response_model=SessionOut, status_code=201)
@@ -38,8 +34,17 @@ def create_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).create_session(current_user.id, req.level)
-    return session_to_out(session)
+    session = build_session_service(db).create_session(
+        current_user.id,
+        req.star_rating,
+        initial_answer=req.initial_answer,
+        path_config=req.path_config,
+        practice_mode=req.practice_mode,
+        challenge_id=req.challenge_id,
+        rng_seed=req.rng_seed,
+        replay_version=req.replay_version,
+    )
+    return session_to_out(session, ia_recent_accuracy=current_user.ia_recent_accuracy)
 
 
 @router.get("/active", response_model=SessionOut | None)
@@ -51,8 +56,11 @@ def get_active_session(
 ):
     # Lets the frontend adopt/clean an orphaned active session after a reload
     # or a rapid LEVEL_START race where the session id was lost client-side.
-    session = _get_service(db).get_active_for_user(current_user.id)
-    return session_to_out(session) if session else None
+    session = build_session_service(db).get_active_for_user(current_user.id)
+    return (
+        session_to_out(session, ia_recent_accuracy=current_user.ia_recent_accuracy)
+        if session else None
+    )
 
 
 @router.patch("/{session_id}", response_model=SessionOut)
@@ -64,15 +72,15 @@ def update_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).update_session(
+    session = build_session_service(db).update_session(
         str(session_id),
         current_user.id,
         current_wave=req.current_wave,
-        gold=req.gold,
-        hp=req.hp,
         score=req.score,
+        kill_value=req.kill_value,
+        cost_total=req.cost_total,
     )
-    return session_to_out(session)
+    return session_to_out(session, ia_recent_accuracy=current_user.ia_recent_accuracy)
 
 
 @router.post("/{session_id}/abandon", response_model=SessionOut)
@@ -83,8 +91,8 @@ def abandon_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).abandon_session(str(session_id), current_user.id)
-    return session_to_out(session)
+    session = build_session_service(db).abandon_session(str(session_id), current_user.id)
+    return session_to_out(session, ia_recent_accuracy=current_user.ia_recent_accuracy)
 
 
 @router.post("/{session_id}/end", response_model=SessionOut)
@@ -96,11 +104,44 @@ def end_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = _get_service(db).end_session(
+    result = build_session_service(db).end_session(
         str(session_id),
         current_user.id,
         score=req.score,
         kills=req.kills,
         waves_survived=req.waves_survived,
+        kill_value=req.kill_value,
+        cost_total=req.cost_total,
+        time_total=req.time_total,
+        health_origin=req.health_origin,
+        health_final=req.health_final,
+        time_exclude_prepare=req.time_exclude_prepare,
+        total_score=req.total_score,
     )
-    return session_to_out(session)
+    return session_to_out(
+        result.session,
+        result.newly_unlocked,
+        ia_recent_accuracy=current_user.ia_recent_accuracy,
+    )
+
+
+@router.post("/{session_id}/reflection", response_model=SessionOut)
+@limiter.limit("10/minute")
+def submit_reflection(
+    request: Request,
+    session_id: UUID,
+    req: ReflectionIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = build_session_service(db).attach_reflection(
+        str(session_id), current_user.id, req.text
+    )
+    if result.overwritten:
+        record_audit_event(
+            request,
+            event_type="session.reflection.overwritten",
+            user_id=current_user.id,
+            details={"session_id": str(session_id)},
+        )
+    return session_to_out(result.session, ia_recent_accuracy=current_user.ia_recent_accuracy)

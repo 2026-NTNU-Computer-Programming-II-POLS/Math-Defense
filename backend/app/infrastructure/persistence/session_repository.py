@@ -1,11 +1,13 @@
 """SQLAlchemy implementation of GameSessionRepository"""
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session as DbSession
 
-from app.domain.session.aggregate import GameSession, _stale_cutoff
+from app.domain.session.aggregate import GameSession
+from app.domain.session.repository import CumulativeStats
 from app.domain.value_objects import SessionStatus, Level
 from app.models.game_session import GameSession as GameSessionModel
 
@@ -26,7 +28,7 @@ class SqlAlchemySessionRepository:
         # Row-level lock prevents the TOCTOU race between the duplicate-submission
         # check and the leaderboard insert. On SQLite with_for_update is a no-op,
         # but the DB-level unique constraint on leaderboard.session_id is the
-        # fallback safety net (callers should also catch IntegrityError).
+        # fallback safety net (callers should catch ConstraintViolationError).
         row = self._db.query(GameSessionModel).filter(
             GameSessionModel.id == session_id,
             GameSessionModel.user_id == user_id,
@@ -37,11 +39,33 @@ class SqlAlchemySessionRepository:
         row = self._db.query(GameSessionModel).filter(
             GameSessionModel.user_id == user_id,
             GameSessionModel.status == SessionStatus.ACTIVE.value,
+        ).first()
+        return self._to_domain(row) if row else None
+
+    def find_active_by_user_for_update(self, user_id: str) -> GameSession | None:
+        row = self._db.query(GameSessionModel).filter(
+            GameSessionModel.user_id == user_id,
+            GameSessionModel.status == SessionStatus.ACTIVE.value,
         ).with_for_update().first()
         return self._to_domain(row) if row else None
 
+    def acquire_user_create_lock(self, user_id: str) -> None:
+        # B-BUG-12: serialise concurrent create_session for the same user.
+        # Without this, concurrent inserts can all pass the find_active_by_user
+        # check (no row to lock) and then race to the unique partial index,
+        # exhausting the depth-1 retry → RuntimeError("unreachable"). A
+        # transaction-scoped advisory lock keyed on hashtext(user_id) makes
+        # the create path strictly serial per user; auto-released at commit.
+        # No-op on non-PG dialects (legacy tests) — the existing retry covers
+        # the much narrower SQLite race.
+        if self._db.get_bind().dialect.name == "postgresql":
+            self._db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:uid))"),
+                {"uid": user_id},
+            )
+
     def find_stale_sessions(self, user_id: str) -> list[GameSession]:
-        cutoff = datetime.now(UTC) - _stale_cutoff()
+        cutoff = datetime.now(UTC) - timedelta(hours=GameSession._stale_cutoff_hours)
         rows = self._db.query(GameSessionModel).filter(
             GameSessionModel.user_id == user_id,
             GameSessionModel.status == SessionStatus.ACTIVE.value,
@@ -50,6 +74,12 @@ class SqlAlchemySessionRepository:
         return [self._to_domain(r) for r in rows]
 
     def save(self, session: GameSession) -> None:
+        # Normalise tz on the way out so the column never receives a naive
+        # datetime, mirroring _ensure_utc() on load. Keeps the entire round-trip
+        # UTC-aware even if an upstream caller handed us a naive datetime.
+        started_at = _ensure_utc(session.started_at)
+        ended_at = _ensure_utc(session.ended_at)
+
         row = self._db.query(GameSessionModel).filter(
             GameSessionModel.id == session.id
         ).first()
@@ -57,7 +87,7 @@ class SqlAlchemySessionRepository:
             # started_at is an aggregate invariant: it is set once at creation
             # and must never change. Surface future setters that break this
             # instead of silently dropping the mutation on update.
-            if _ensure_utc(row.started_at) != _ensure_utc(session.started_at):
+            if _ensure_utc(row.started_at) != started_at:
                 raise StartedAtMutationError(
                     f"started_at is immutable on GameSession (session={session.id})"
                 )
@@ -66,19 +96,45 @@ class SqlAlchemySessionRepository:
             row.gold = session.gold
             row.hp = session.hp
             row.score = session.score
-            row.ended_at = session.ended_at
+            row.kills = session.kills
+            row.waves_survived = session.waves_survived
+            row.kill_value = session.kill_value
+            row.cost_total = session.cost_total
+            row.time_total = session.time_total
+            row.health_origin = session.health_origin
+            row.health_final = session.health_final
+            row.time_exclude_prepare = session.time_exclude_prepare
+            row.total_score = session.total_score
+            row.reflection_text = session.reflection_text
+            row.ended_at = ended_at
         else:
             row = GameSessionModel(
                 id=session.id,
                 user_id=session.user_id,
-                level=int(session.level),
+                star_rating=int(session.level),
+                initial_answer=session.initial_answer,
+                practice_mode=session.practice_mode,
+                challenge_id=session.challenge_id,
+                rng_seed=session.rng_seed,
+                replay_version=session.replay_version,
+                path_config=session.path_config,
                 status=session.status.value,
                 current_wave=session.current_wave,
                 gold=session.gold,
                 hp=session.hp,
                 score=session.score,
-                started_at=session.started_at,
-                ended_at=session.ended_at,
+                kills=session.kills,
+                waves_survived=session.waves_survived,
+                kill_value=session.kill_value,
+                cost_total=session.cost_total,
+                time_total=session.time_total,
+                health_origin=session.health_origin,
+                health_final=session.health_final,
+                time_exclude_prepare=session.time_exclude_prepare,
+                total_score=session.total_score,
+                reflection_text=session.reflection_text,
+                started_at=started_at,
+                ended_at=ended_at,
             )
             self._db.add(row)
         self._db.flush()
@@ -87,20 +143,133 @@ class SqlAlchemySessionRepository:
         for s in sessions:
             self.save(s)
 
+    def find_reflections_for_users(
+        self, user_ids: list[str], limit: int = 100
+    ) -> list[GameSession]:
+        if not user_ids:
+            return []
+        rows = (
+            self._db.query(GameSessionModel)
+            .filter(
+                GameSessionModel.user_id.in_(user_ids),
+                GameSessionModel.status == SessionStatus.COMPLETED.value,
+                GameSessionModel.reflection_text.isnot(None),
+            )
+            .order_by(GameSessionModel.ended_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [self._to_domain(r) for r in rows]
+
+    def find_recent_completed_by_student(
+        self, student_id: str, limit: int = 10
+    ) -> list[GameSession]:
+        rows = (
+            self._db.query(GameSessionModel)
+            .filter(
+                GameSessionModel.user_id == student_id,
+                GameSessionModel.status == SessionStatus.COMPLETED.value,
+            )
+            .order_by(
+                GameSessionModel.ended_at.desc(),
+                GameSessionModel.started_at.desc(),
+            )
+            .limit(limit)
+            .all()
+        )
+        return [self._to_domain(r) for r in rows]
+
+    def compute_ia_recent_accuracy(self, user_id: str, window: int = 10) -> float:
+        # Last ``window`` completed sessions ordered by ended_at DESC, with
+        # started_at as a tiebreaker so rapid sequential ends (microsecond
+        # collisions in tests, clock skew on retries) still order in the
+        # direction of "more recent first". Empty history returns 0.0 so
+        # new players see full label scaffolding.
+        rows = (
+            self._db.query(GameSessionModel.initial_answer)
+            .filter(
+                GameSessionModel.user_id == user_id,
+                GameSessionModel.status == SessionStatus.COMPLETED.value,
+            )
+            .order_by(
+                GameSessionModel.ended_at.desc(),
+                GameSessionModel.started_at.desc(),
+            )
+            .limit(window)
+            .all()
+        )
+        if not rows:
+            return 0.0
+        correct = sum(1 for r in rows if bool(r[0]))
+        return correct / len(rows)
+
+    def has_correct_ia_session(self, user_id: str) -> bool:
+        # initial_answer is a Boolean column set once at creation; status is
+        # not part of the predicate (see protocol docstring for rationale).
+        return self._db.query(GameSessionModel.id).filter(
+            GameSessionModel.user_id == user_id,
+            GameSessionModel.initial_answer.is_(True),
+        ).first() is not None
+
+    def get_cumulative_stats(self, user_id: str) -> CumulativeStats:
+        completed = SessionStatus.COMPLETED.value
+        row = self._db.query(
+            func.coalesce(func.sum(GameSessionModel.kills), 0).label("total_kills"),
+            func.coalesce(func.sum(GameSessionModel.score), 0).label("total_score"),
+            func.coalesce(func.sum(GameSessionModel.waves_survived), 0).label("total_waves"),
+            func.count(GameSessionModel.id).label("total_sessions"),
+        ).filter(
+            GameSessionModel.user_id == user_id,
+            GameSessionModel.status == completed,
+        ).one()
+
+        stars_played = {
+            r[0] for r in
+            self._db.query(GameSessionModel.star_rating)
+            .filter(GameSessionModel.user_id == user_id, GameSessionModel.status == completed)
+            .distinct()
+            .all()
+        }
+
+        return CumulativeStats(
+            total_kills=row.total_kills,
+            total_score=row.total_score,
+            total_waves=row.total_waves,
+            total_sessions=row.total_sessions,
+            stars_played=stars_played,
+        )
+
     @staticmethod
     def _to_domain(row: GameSessionModel) -> GameSession:
-        return GameSession(
+        session = GameSession(
             id=row.id,
             user_id=row.user_id,
-            level=Level(row.level),
+            level=Level(row.star_rating),
             status=SessionStatus(row.status),
             current_wave=row.current_wave,
             gold=row.gold,
             hp=row.hp,
             score=row.score,
+            kills=row.kills,
+            waves_survived=row.waves_survived,
+            initial_answer=bool(row.initial_answer),
+            practice_mode=bool(row.practice_mode),
+            challenge_id=row.challenge_id,
+            rng_seed=row.rng_seed,
+            replay_version=row.replay_version if row.replay_version is not None else 1,
             started_at=_ensure_utc(row.started_at),
             ended_at=_ensure_utc(row.ended_at),
         )
+        session.path_config = row.path_config
+        session.kill_value = row.kill_value
+        session.cost_total = row.cost_total
+        session.time_total = row.time_total
+        session.health_origin = row.health_origin
+        session.health_final = row.health_final
+        session.time_exclude_prepare = row.time_exclude_prepare
+        session.total_score = row.total_score
+        session.reflection_text = row.reflection_text
+        return session
 
 
 class StartedAtMutationError(RuntimeError):

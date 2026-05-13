@@ -8,12 +8,13 @@ Each tower type corresponds to a real math topic:
 
 | Tower | Math Concept | How It Works |
 |---|---|---|
-| Function Cannon | Quadratic Functions | Projectile follows `y = ax² + bx + c`; hits enemy where trajectory intersects path |
-| Radar Sweep | Trigonometry & Sectors | Scans a sector area; damage applied to enemies inside via `pointInSector()` |
-| Matrix Link | 2×2 Matrix / Linear Transforms | Select two towers; input a matrix; applies rotation/scaling transformation |
-| Probability Shrine | Probability & Buffs | No direct attack; triggers buff-card selection phase after a wave clears |
-| Integral Cannon | Definite Integration | Damage computed as `∫[a,b] (ax² + bx + c) dx` via the trapezoid rule |
-| Fourier Shield | Fourier Series | Defensive mini-game; player matches a 3-sine composite target wave |
+| Magic | Function Curves (polynomial/trig/log) | Places a function curve as a zone that debuffs enemies or buffs nearby towers |
+| Radar A | Trigonometry & Sectors | Continuous AoE sweep; damage applied to all enemies inside the arc |
+| Radar B | Polar Coordinates | Fast single-target projectile launcher |
+| Radar C | Angular Momentum | Slow, powerful projectile shots with high per-hit damage |
+| Matrix | Linear Transforms / Dot Product | Paired tower system; dot-product damage; continuous laser beam between pair |
+| Limit | Limits (lim x→c) | Presents a multiple-choice limit question; outcome (±∞ / ±C / 0) sets effective range |
+| Calculus | Derivatives & Integrals | Player picks a function then derivative/integral; generates autonomous Pet projectiles |
 
 ---
 
@@ -29,7 +30,8 @@ Math Game/
 ├── emsdk/             Vendored Emscripten SDK for WASM builds
 ├── docker-compose.yml        Dev orchestration: Postgres + backend (hot reload) + frontend (Vite)
 ├── docker-compose.prod.yml   Prod orchestration: images are self-contained, nginx terminates /api
-├── nginx.conf                Production reverse-proxy config (SPA + /api)
+├── nginx.conf                Production reverse-proxy config (HTTP, SPA + /api)
+├── nginx-tls.conf            Production reverse-proxy config with TLS termination
 ├── .env.example              Template for required environment variables
 └── Math_Defense_Spec.md      Full game-design specification
 ```
@@ -41,13 +43,26 @@ Browser
   └─ Vue 3 SPA
        ├─ Pinia stores (reactivity bridge)
        ├─ Game Engine (ECS-style systems, Canvas rendering, fixed 60 FPS)
+       │    ├─ Audio AssetManager (HTMLAudioElement SFX, mute/volume)
+       │    ├─ EventRecorder / EventPlayer / SpectatorClient (replay + live spectate)
        │    └─ WasmBridge → math_engine.wasm (C, Emscripten) with JS fallback
        └─ Services → FastAPI Backend
-                          ├─ Routers (thin controllers)
+                          ├─ Routers (thin controllers — auth/sessions/leaderboard/
+                          │           achievements/seasons/talents/classes/admin/
+                          │           territory/assessment/recommendation/challenge/
+                          │           replay/study)
                           ├─ Global exception handlers → HTTP status from DomainError.status_code
-                          ├─ Application Services (Auth / Session / Leaderboard use cases)
-                          ├─ Domain Aggregates (User, GameSession, LeaderboardEntry)
+                          ├─ Application Services (Auth / Session / Leaderboard /
+                          │   Achievement / Season / Talent / Class / Admin /
+                          │   Territory / Assessment / Recommender / Challenge /
+                          │   Replay / Study)
+                          ├─ Domain Aggregates (User, GameSession, LeaderboardEntry,
+                          │   Achievement, Talent, Class, Territory, Season,
+                          │   Challenge) + Bayesian competency state
                           └─ SQLAlchemy Repositories → PostgreSQL
+                                  ↑
+                                  └─ scheduler (territory settlement)
+                                  └─ spectate hub (in-process WS fan-out)
 ```
 
 ---
@@ -57,10 +72,11 @@ Browser
 | Layer | Technology |
 |---|---|
 | Frontend | Vue 3 (Composition API, `<script setup>`), TypeScript 5.9 strict, Pinia, Vue Router, Vite 8, Vitest |
-| Backend | FastAPI 0.115, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
-| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`) |
+| Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
+| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 16 exported functions |
 | Database | PostgreSQL 16 (Alembic migrations) |
 | Container | Docker, Docker Compose |
+| Replay | Versioned (`replay_version` 1=mulberry32+JS Math, 2=PCG+WASM bit-exact); server-side score recompute via `wasmtime-py` |
 
 ---
 
@@ -68,16 +84,18 @@ Browser
 
 ```
 MENU
-  └─ LEVEL_SELECT (choose level 1–4)
-       └─ BUILD (place towers, configure math parameters)
-            └─ WAVE (enemies spawn; towers attack)
-                 ├─ BUFF_SELECT (wave cleared → pick a buff card → return to BUILD)
-                 ├─ BOSS_SHIELD (boss activates Fourier-match mini-game)
-                 ├─ LEVEL_END (all waves cleared → next level)
-                 └─ GAME_OVER (HP reaches 0)
+  └─ LEVEL_SELECT (choose star rating 1–5; shows difficulty, initial-answer screen)
+       └─ INITIAL_ANSWER (identify path endpoints before the wave; awards bonus)
+            └─ BUILD (place towers, configure math params; shop for time-based buffs / spells)
+                 └─ WAVE (enemies spawn; towers attack)
+                      ├─ BUILD (wave cleared → return to shop/build phase)
+                      ├─ MONTY_HALL (kill-value threshold crossed → Monty Hall event → BUILD)
+                      ├─ CHAIN_RULE (Boss Type-B triggers chain-rule challenge → WAVE)
+                      ├─ LEVEL_END (all waves cleared → score result screen)
+                      └─ GAME_OVER (HP reaches 0)
 ```
 
-Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend.
+Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend. The `BUFF_SELECT` phase remains valid in the FSM but is no longer part of the main flow — shop-based purchases during BUILD replaced the end-of-wave buff card draw.
 
 ---
 
@@ -86,7 +104,7 @@ Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirror
 ### Prerequisites
 
 - Node.js 18+
-- Python 3.11+
+- Python 3.12+
 - Docker & Docker Compose (optional)
 - Emscripten SDK (only if rebuilding WASM; `emsdk/` is vendored)
 
@@ -125,7 +143,7 @@ Vite proxies `/api/*` to `http://localhost:8000` in development so the browser s
 
 ```bash
 cd wasm
-make               # writes math_engine.js / .wasm into frontend/public/wasm/
+make               # writes math_engine.js / .wasm into frontend/src/math/wasm/
 ```
 
 `npm run build` in the frontend automatically triggers `make` via the `prebuild` script.
@@ -142,6 +160,9 @@ Create `.env` at the project root (see `.env.example`):
 | `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense` |
 | `POSTGRES_PASSWORD` | Yes | Password for the `postgres` service (matches the password embedded in `DATABASE_URL`) |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
+| `COOKIE_SECURE` | No | Default `true`; only `false` is honoured under CI/pytest (see `reject_insecure_cookie_outside_tests` in `backend/app/config.py`) |
+
+> The backend refuses to start when `DATABASE_URL` embeds the literal password `changeme` — replace it in `.env` before first boot.
 
 ---
 
@@ -151,12 +172,15 @@ Create `.env` at the project root (see `.env.example`):
 
 ```json
 {
-  "canvas":      { "width": 1280, "height": 720, "originX": 160, "originY": 600, "unitPx": 40 },
-  "grid":        { "minX": -3, "maxX": 25, "minY": -2, "maxY": 14 },
+  "canvas":      { "width": 1280, "height": 720, "originX": 640, "originY": 374, "unitPx": 20 },
+  "grid":        { "minX": -14, "maxX": 14, "minY": -14, "maxY": 14, "pointSpacing": 1 },
   "player":      { "initialHp": 20, "initialGold": 200 },
   "loop":        { "targetFps": 60 },
   "collision":   { "hitRadius": 0.5 },
-  "waveSystem":  { "pathValidationMinCoverage": 0.8 }
+  "waveSystem":  { "pathValidationMinCoverage": 0.8 },
+  "roles":       ["admin", "teacher", "student"],
+  "starRatings": { "min": 1, "max": 5 },
+  "economy":     { "startingGoldByStar": {...}, "waveCompletionBonus": {...}, "bossCorrectAnswerBonus": 100 }
 }
 ```
 
@@ -167,8 +191,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # 86 tests (DDD aggregates, routers, coverage gaps, shared-constants parity)
-cd frontend && npm test            # 13 test files, 117 tests (systems, engine, WASM bridge)
+cd backend  && pytest              # ~325 tests across 25 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute)
+cd frontend && npm test            # 50 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).

@@ -45,6 +45,7 @@ jobs:
           # the DB on first run against the postgres admin DB.
           DATABASE_URL: postgresql+psycopg://mathdefense:changeme@localhost:5432/math_defense
           CORS_ORIGINS: http://localhost:5173
+          FRONTEND_URL: http://localhost:5173
         run: pytest -q
 
   frontend:
@@ -62,10 +63,15 @@ jobs:
       - run: npm ci --no-fund
       - name: Audit npm dependencies
         run: npm audit --audit-level=high
-        continue-on-error: true
-      # Skip the `prebuild` WASM compile — emsdk isn't available on the runner
-      # and the build step is only used here to drive vue-tsc type-checking.
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+      - name: Build WASM
+        run: npm run prebuild
       - name: Type-check
         run: npx vue-tsc -b
+      - name: Arch check
+        run: npm run arch-check
+      - name: Lint non-ASCII comments
+        run: npm run lint-chinese-comments
       - name: Unit tests
-        run: npm test
+        run: npx vitest run

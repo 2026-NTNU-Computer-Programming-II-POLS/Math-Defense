@@ -1,5 +1,6 @@
-/* CSS 變數 — 主題色（中世紀奇幻 × 像素風） */
+/* CSS variables — medieval fantasy pixel art theme */
 :root {
+  --bg-base:       #0b0a12;
   --stone-dark:    #1a1520;
   --stone-light:   #252030;
   --grid-line:     #3a3028;
@@ -9,11 +10,6 @@
   --gold-dim:      #8b7342;
 
   --tower-cannon:  #4a82c8;
-  --tower-radar:   #4aab6e;
-  --tower-matrix:  #9068c8;
-  --tower-shrine:  #c89848;
-  --tower-integral:#4a82c8;
-  --tower-fourier: #c89848;
 
   --enemy-red:     #b84040;
   --hp-green:      #4aab6e;
@@ -24,6 +20,40 @@
   --panel-border:  #8b7342;
   --panel-shadow:  0 0 20px rgba(0, 0, 0, 0.8);
 
+  --text-primary:    #e0d0b0;
+  --text-secondary:  #e8dcc8;
+  --stone-selected:  #2a2535;
+  --option-selected: #2a2540;
+  --correct-bg:      #1a3020;
+  --wrong-bg:        #301a1a;
+  --error-red:       #e74c3c;
+
   --font-mono:     'Courier New', Courier, monospace;
   --font-main:     var(--font-mono);
+
+  /* Z-index ladder — single source of truth. Higher value = on top.
+     hints      : passive in-canvas helpers (FunctionPanel, BuildHint)
+     chrome     : persistent HUD surfaces (HUD bar, TowerBar)
+     action     : primary action buttons above chrome (Start Wave)
+     floating   : transient per-interaction panels (BuildPanel)
+     overlay    : full-screen dimmers for modal states (Buff, LevelSelect)
+     modal      : the dialog itself, always on top of its overlay (Modal) */
+  --z-hints:        15;
+  --z-chrome:       20;
+  --z-action:       25;
+  --z-floating:     30;
+  --z-overlay:      40;
+  --z-modal:        50;
+  --z-toast:       100;
+}
+
+/* §16: Tutorial-Level Palette Warming. On Star-1 the canvas backdrop and
+   gold accent shift toward warmer hues — emotional design cue per Plass et
+   al. (2014) to reduce the cognitive friction of a first encounter. The
+   override is static (no transition) so reduced-motion users get parity. */
+[data-star='1'] {
+  --bg-base:     #120a0e;
+  --stone-dark:  #251a18;
+  --gold:        #e0a838;
+  --panel-bg:    rgba(37, 26, 24, 0.95);
 }

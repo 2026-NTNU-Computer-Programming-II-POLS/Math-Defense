@@ -1,7 +1,5 @@
-/**
- * Entity interface definitions — pure data objects with no render or update methods
- */
 import type { TowerType, EnemyType } from '@/data/constants'
+import type { MagicMode } from '@/data/tower-defs'
 
 // ── Tower ──
 
@@ -21,22 +19,72 @@ export interface Tower {
   disabled: boolean
   level: number
 
-  // Effective values (after Buff modifiers)
   effectiveDamage: number
   effectiveRange: number
   cooldown: number
   cooldownTimer: number
 
-  // Buff multiplier modifiers
   damageBonus: number
   rangeBonus: number
 
-  // Raw base values (used for Buff calculations)
   baseDamage: number
   baseRange: number
 
-  // Color (used by Renderer)
+  talentMods: Record<string, number>
+  magicBuff: number
+
   color: string
+
+  // V2 fields
+  magicMode?: MagicMode
+  magicExpression?: string
+  arcStart?: number
+  arcEnd?: number
+  arcRestrict?: boolean
+  matrixPairId?: string | null
+  limitResult?: LimitResult | null
+  calculusState?: CalculusState | null
+  upgradeExtras?: Record<string, number>
+  upgradeSpend?: number
+  // Targeting preference for towers that pick a finite N targets per attack
+  // (currently RADAR_B / RADAR_C). Other types (sweep, zone, AoE) ignore it.
+  targetingMode?: TargetingMode
+}
+
+export type TargetingMode = 'first' | 'last' | 'closest' | 'strongest'
+
+export type LimitOutcome = '+inf' | '+c' | 'zero' | 'constant' | '-c' | '-inf'
+
+export interface LimitResult {
+  outcome: LimitOutcome
+  value: number
+}
+
+export interface CalculusState {
+  coefficient: number
+  exponent: number
+  currentExpr: string
+  opApplied: boolean
+}
+
+// ── Pet ──
+
+export type PetTrait = 'slow' | 'fast' | 'heavy' | 'basic'
+
+export interface Pet {
+  id: string
+  ownerId: string
+  x: number
+  y: number
+  damage: number
+  speed: number
+  attackSpeed: number
+  range: number
+  trait: PetTrait
+  abilityMod: number
+  cooldownTimer: number
+  targetId: string | null
+  active: boolean
 }
 
 // ── Enemy ──
@@ -50,22 +98,48 @@ export interface Enemy {
   maxHp: number
   speed: number
   speedMultiplier: number
-  size: number      // pixel size
+  size: number
   reward: number
-  damage: number    // HP cost to player when this enemy reaches the origin
+  damage: number
   color: string
   active: boolean
   alive: boolean
 
-  // Path following (internal state)
-  pathFn: (x: number) => number
   _pathX: number
   _targetX: number
   _direction: 1 | -1
 
-  // Stealth
-  stealthRanges: [number, number][]
-  isStealthed: boolean
+  killValue: number
+
+  shield: number
+  shieldMax: number
+
+  splitDepth: number
+  splitCount: number
+  splitChildType: EnemyType | null
+  splitChildScale: number
+
+  helperRadius: number
+  helperHealPerSec: number
+  helperSpeedBuff: number
+
+  minionTimer: number
+  minionInterval: number
+  minionType: EnemyType | null
+
+  chainRuleTriggered: boolean
+  chainRuleAnsweredCorrectly: boolean | null
+  // Backlog §25: per-spawn HP fraction at which the chain-rule ability fires.
+  // 0 means "no HP-gated ability"; populated for Boss-B from triggerHpRange.
+  chainRuleTriggerFraction: number
+
+  slowFactor: number
+  slowTimer: number
+  speedBoost: number
+  dotDamage: number
+  dotTimer: number
+
+  _emittedReachedOrigin?: boolean
 }
 
 // ── Projectile ──
@@ -80,21 +154,11 @@ export interface Projectile {
   color: string
   active: boolean
   ownerId: string
+  age: number
 }
 
 // ── Param accessor ──
 
-/**
- * Safely read a numeric param from a Tower with a fallback.
- *
- * TowerParams stores `number | string | boolean`; call sites in CombatSystem /
- * BuildPanel / TowerPlacementSystem routinely cast the bag to
- * `Record<string, number>` and rely on `?? fallback`. That works when the key
- * is absent but silently propagates `NaN` / strings if the value exists with
- * a non-number type. This helper validates at runtime: only a finite number
- * is returned; anything else (undefined, string, NaN, Infinity) yields the
- * fallback.
- */
 export function getParam(tower: Tower, key: string, fallback: number): number {
   const v = tower.params[key]
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
@@ -103,8 +167,7 @@ export function getParam(tower: Tower, key: string, fallback: number): number {
 // ── Preview ──
 
 export type TowerPreview =
-  | { type: 'line'; fn: (x: number) => number; xMin: number; xMax: number }
-  | { type: 'sector'; radius: number; startAngle: number; sweepAngle: number }
-  | { type: 'integral'; fn: (x: number) => number; a: number; b: number }
-  | { type: 'matrix'; radius: number }
+  | { type: 'curve'; fn: (x: number) => number; xMin: number; xMax: number }
+  | { type: 'circle'; radius: number; arcStart?: number; arcEnd?: number }
+  | { type: 'laser'; x1: number; y1: number; x2: number; y2: number }
   | { type: 'none' }

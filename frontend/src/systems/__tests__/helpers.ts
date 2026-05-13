@@ -5,9 +5,9 @@
 import { EventBus } from '@/engine/EventBus'
 import { type GameState, createInitialState } from '@/engine/GameState'
 import { PhaseStateMachine } from '@/engine/PhaseStateMachine'
-import { GamePhase } from '@/data/constants'
+import { Events, GamePhase } from '@/data/constants'
 import type { Game, GameEvents } from '@/engine/Game'
-import type { Tower, Enemy, Projectile } from '@/entities/types'
+import type { Tower, Enemy, Projectile, Pet } from '@/entities/types'
 import type { EnemyType, TowerType } from '@/data/constants'
 
 export function createMockGame(overrides?: Partial<GameState>): Game {
@@ -15,44 +15,74 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
   const phase = new PhaseStateMachine()
   const state = { ...createInitialState(), ...overrides }
 
-  // Methods reference `this` against the cast-to-Game return value; explicit `this: Game`
-  // annotations let TS resolve `this.state` etc. without the body itself seeing Game's shape.
-  return {
+  // F-ARCH-7: gold/hp/score/cost mutations live on EconomySystem (reached via
+  // `game.economy.*` on the real Game). The mock exposes the same surface
+  // inline so system tests don't have to register a real EconomySystem.
+  const game = {
     eventBus,
     phase,
     state,
     towers: [] as Tower[],
     enemies: [] as Enemy[],
     projectiles: [] as Projectile[],
-    pathFunction: (x: number) => x,
+    pets: [] as Pet[],
+    levelContext: null,
+    generatedLevel: null,
+    currentWaves: null,
     time: 0,
-    changeGold(this: Game, amount: number) {
-      this.state.gold = Math.max(0, this.state.gold + amount)
-      this.eventBus.emit('goldChanged', this.state.gold)
+    // Backlog §24: tests default to Math.random for the rng so existing
+    // suites pass unchanged. Determinism-specific tests overwrite this with
+    // a seeded mulberry32 stream.
+    rng: Math.random,
+    seed: null,
+    setSeed(this: Game, seed: number) {
+      this.seed = seed >>> 0
     },
-    changeHp(this: Game, amount: number) {
-      this.state.hp = Math.max(0, Math.min(this.state.maxHp, this.state.hp + amount))
-      this.eventBus.emit('hpChanged', this.state.hp)
-      if (this.state.hp <= 0) this.setPhase(GamePhase.GAME_OVER)
-    },
-    addScore(this: Game, points: number) {
-      this.state.score += points
-      this.eventBus.emit('scoreChanged', this.state.score)
+    addKillValue(this: Game, value: number) {
+      this.state.cumulativeKillValue += value
+      this.eventBus.emit(Events.KILL_VALUE_CHANGED, this.state.cumulativeKillValue)
     },
     setPhase(this: Game, to: GamePhase) {
       const from = this.state.phase
       if (!this.phase.transition(to)) return
       this.state.phase = to
-      this.eventBus.emit('phaseChanged', { from, to })
+      this.eventBus.emit(Events.PHASE_CHANGED, { from, to })
     },
+    assignEnemyPath() {},
     getSystem() { return undefined },
   } as unknown as Game
+
+  // Inline economy stub — same shape as EconomySystem's resource API.
+  Object.defineProperty(game, 'economy', {
+    value: {
+      changeGold(amount: number) {
+        game.state.gold = Math.max(0, game.state.gold + amount)
+        eventBus.emit(Events.GOLD_CHANGED, game.state.gold)
+      },
+      changeHp(amount: number) {
+        game.state.hp = Math.max(0, Math.min(game.state.maxHp, game.state.hp + amount))
+        eventBus.emit(Events.HP_CHANGED, game.state.hp)
+        if (game.state.hp <= 0) game.setPhase(GamePhase.GAME_OVER)
+      },
+      addScore(points: number) {
+        game.state.score += points
+        eventBus.emit(Events.SCORE_CHANGED, game.state.score)
+      },
+      addCost(amount: number) {
+        game.state.costTotal += amount
+        eventBus.emit(Events.COST_TOTAL_CHANGED, game.state.costTotal)
+      },
+    },
+    enumerable: true,
+  })
+
+  return game
 }
 
 export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
   return {
     id: `enemy_${Math.random().toString(36).slice(2)}`,
-    type: 'basicSlime' as EnemyType,
+    type: 'general' as EnemyType,
     x: 10,
     y: 5,
     hp: 100,
@@ -65,12 +95,30 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     color: '#b84040',
     active: true,
     alive: true,
-    pathFn: (x: number) => x,
     _pathX: 10,
     _targetX: 0,
     _direction: -1 as const,
-    stealthRanges: [],
-    isStealthed: false,
+    killValue: 10,
+    shield: 0,
+    shieldMax: 0,
+    splitDepth: 0,
+    splitCount: 0,
+    splitChildType: null,
+    splitChildScale: 1,
+    helperRadius: 0,
+    helperHealPerSec: 0,
+    helperSpeedBuff: 0,
+    minionTimer: 0,
+    minionInterval: 0,
+    minionType: null,
+    chainRuleTriggered: false,
+    chainRuleAnsweredCorrectly: null,
+    chainRuleTriggerFraction: 0,
+    slowFactor: 0,
+    slowTimer: 0,
+    speedBoost: 0,
+    dotDamage: 0,
+    dotTimer: 0,
     ...overrides,
   }
 }
@@ -78,7 +126,7 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
 export function createMockTower(overrides?: Partial<Tower>): Tower {
   return {
     id: `tower_${Math.random().toString(36).slice(2)}`,
-    type: 'functionCannon' as TowerType,
+    type: 'magic' as TowerType,
     x: 5,
     y: 5,
     params: { m: 1, b: 0 },
@@ -95,7 +143,9 @@ export function createMockTower(overrides?: Partial<Tower>): Tower {
     rangeBonus: 1,
     baseDamage: 20,
     baseRange: 5,
-    color: '#4a82c8',
+    talentMods: {},
+    magicBuff: 0,
+    color: '#a855f7',
     ...overrides,
   }
 }

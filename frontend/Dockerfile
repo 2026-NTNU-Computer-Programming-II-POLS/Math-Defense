@@ -26,7 +26,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules /app/node_modules
 COPY frontend/ .
 # Skip the `prebuild` lifecycle hook (= `cd ../wasm && make`) — emsdk is not
-# installed in this image and the compiled WASM artifacts under public/wasm/
+# installed in this image and the compiled WASM artifacts under src/math/wasm/
 # are committed to the repo. Invoke vue-tsc + vite directly to bypass it.
 RUN npx vue-tsc -b && npx vite build
 

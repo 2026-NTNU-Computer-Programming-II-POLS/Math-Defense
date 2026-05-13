@@ -1,18 +1,25 @@
 """Domain constraints — single source of truth for value bounds.
 
 Imported by Pydantic schemas (shape validation) and by value objects / the
-GameSession aggregate (invariant enforcement) so that "level must be 1..4"
+GameSession aggregate (invariant enforcement) so that "level must be 1..5"
 is encoded exactly once.
 """
 from __future__ import annotations
 
-LEVEL_MIN = 1
-LEVEL_MAX = 4
-LEVEL_RANGE = (LEVEL_MIN, LEVEL_MAX)
+STAR_MIN = 1
+STAR_MAX = 5
+STAR_RANGE = (STAR_MIN, STAR_MAX)
+
+LEVEL_MIN = STAR_MIN
+LEVEL_MAX = STAR_MAX
+LEVEL_RANGE = STAR_RANGE
 
 SCORE_MIN = 0
 SCORE_MAX = 9_999_999
 SCORE_RANGE = (SCORE_MIN, SCORE_MAX)
+
+# V2 floating-point score cap — matches the `le` bound in SessionEnd.total_score schema.
+TOTAL_SCORE_MAX = 1_000_000.0
 
 KILLS_MIN = 0
 KILLS_MAX = 9_999
@@ -45,6 +52,7 @@ LEVEL_MAX_SCORES: dict[int, int] = {
     2: 10_000,
     3: 15_000,
     4: 50_000,
+    5: 100_000,
 }
 
 LEVEL_MAX_KILLS: dict[int, int] = {
@@ -52,12 +60,13 @@ LEVEL_MAX_KILLS: dict[int, int] = {
     2: 100,
     3: 200,
     4: 300,
+    5: 500,
 }
 
-# Total waves per level (mirrors frontend level-defs.ts).
 LEVEL_MAX_WAVES: dict[int, int] = {
     1: 3,
     2: 4,
     3: 5,
     4: 5,
+    5: 6,
 }

@@ -4,8 +4,7 @@ import {
   sectorCoverage,
   pointInSector,
   numericalIntegrate,
-  fourierComposite,
-  fourierMatch,
+  powerF64,
 } from './WasmBridge'
 
 // These tests run against JS fallback (WASM not loaded in test env)
@@ -54,8 +53,8 @@ describe('WasmBridge (JS fallback)', () => {
 
     // ── JS-vs-WASM boundary parity (bug 2.12) ──
     // The JS fallback uses a 1e-6 epsilon on angle comparisons. WASM (point_in_sector
-    // in math_engine.c) must agree on these exact boundary conditions or stealth
-    // detection / radar sweeps will diverge between platforms.
+    // in math_engine.c) must agree on these exact boundary conditions or radar
+    // sweeps will diverge between platforms.
     describe('boundary parity (must match WASM behaviour)', () => {
       it('point exactly on the radius is inside (dist === radius, not >)', () => {
         // Sector at origin, radius 2, full first quadrant. (2, 0) sits on the arc.
@@ -149,39 +148,21 @@ describe('WasmBridge (JS fallback)', () => {
     })
   })
 
-  describe('fourierComposite', () => {
-    it('returns 0 when all amplitudes are 0', () => {
-      expect(fourierComposite(1, [1, 2, 3], [0, 0, 0])).toBe(0)
+  describe('powerF64', () => {
+    it('matches Math.pow on simple cases (fallback path)', () => {
+      expect(powerF64(2, 10)).toBe(1024)
+      expect(powerF64(9, 0.5)).toBe(3)
+      expect(powerF64(0, 0)).toBe(1)
     })
 
-    it('single component: A*sin(wt)', () => {
-      expect(fourierComposite(Math.PI / 2, [1, 0, 0], [2, 0, 0])).toBeCloseTo(2)
+    it('exact for 0^positive — score-calculator zero-kill path', () => {
+      expect(powerF64(0, 0.5)).toBe(0)
+      expect(powerF64(0, 1)).toBe(0)
     })
 
-    it('sum of sines', () => {
-      const t = 1.0
-      const freqs = [1, 2, 3]
-      const amps = [1, 0.5, 0.3]
-      const expected =
-        1 * Math.sin(1 * t) + 0.5 * Math.sin(2 * t) + 0.3 * Math.sin(3 * t)
-      expect(fourierComposite(t, freqs, amps)).toBeCloseTo(expected)
+    it('handles fractional exponent like 1/exponentDenom (score formula)', () => {
+      expect(powerF64(8, 1 / 3)).toBeCloseTo(2, 10)
     })
   })
 
-  describe('fourierMatch', () => {
-    it('identical waves → match = 1.0', () => {
-      const freqs = [1, 2, 3]
-      const amps = [1, 0.5, 0.3]
-      expect(fourierMatch(freqs, amps, freqs, amps)).toBeCloseTo(1.0, 1)
-    })
-
-    it('completely different waves → match < 0.5', () => {
-      const score = fourierMatch([1, 2, 3], [1, 1, 1], [7, 8, 9], [1, 1, 1])
-      expect(score).toBeLessThan(0.5)
-    })
-
-    it('zero energy → match = 1.0', () => {
-      expect(fourierMatch([1, 2, 3], [0, 0, 0], [4, 5, 6], [0, 0, 0])).toBe(1.0)
-    })
-  })
 })

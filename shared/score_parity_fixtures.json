@@ -1,0 +1,62 @@
+[
+  {
+    "input": {
+      "kill_value": 100,
+      "time_total": 120.0,
+      "time_exclude_prepare": [10.0],
+      "cost_total": 50,
+      "health_origin": 10,
+      "health_final": 10,
+      "initial_answer": true
+    },
+    "expected": 1.2060453783110545
+  },
+  {
+    "input": {
+      "kill_value": 200,
+      "time_total": 200.0,
+      "time_exclude_prepare": [20.0, 5.0],
+      "cost_total": 100,
+      "health_origin": 10,
+      "health_final": 8,
+      "initial_answer": false
+    },
+    "expected": 1.0946087842231575
+  },
+  {
+    "input": {
+      "kill_value": 50,
+      "time_total": 60.0,
+      "time_exclude_prepare": [],
+      "cost_total": 0,
+      "health_origin": 10,
+      "health_final": 10,
+      "initial_answer": true
+    },
+    "expected": 0.7637626158259734
+  },
+  {
+    "input": {
+      "kill_value": 0,
+      "time_total": 120.0,
+      "time_exclude_prepare": [10.0],
+      "cost_total": 50,
+      "health_origin": 10,
+      "health_final": 10,
+      "initial_answer": true
+    },
+    "expected": 0.0
+  },
+  {
+    "input": {
+      "kill_value": 300,
+      "time_total": 180.0,
+      "time_exclude_prepare": [15.0],
+      "cost_total": 200,
+      "health_origin": 10,
+      "health_final": 5,
+      "initial_answer": false
+    },
+    "expected": 1.0703530874827207
+  }
+]

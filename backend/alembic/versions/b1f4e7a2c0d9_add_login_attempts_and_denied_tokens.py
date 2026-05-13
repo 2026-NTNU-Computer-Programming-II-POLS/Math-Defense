@@ -39,6 +39,17 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Drop the persistent auth-security tables.
+
+    DESTRUCTIVE: deleting `login_attempts` discards every in-flight lockout —
+    any attacker mid-way through a brute-force burst has their counter reset
+    to zero. Deleting `denied_tokens` re-enables every logged-out JWT that
+    has not yet reached its natural expiry, reopening the window the deny-list
+    was introduced to close (see SECURITY_AUDIT_AUTH.md H2/H3).
+
+    Only run if you are reverting the feature in lockstep with an app version
+    that no longer depends on these tables.
+    """
     op.drop_index('ix_denied_tokens_expires_at', table_name='denied_tokens')
     op.drop_table('denied_tokens')
     op.drop_table('login_attempts')

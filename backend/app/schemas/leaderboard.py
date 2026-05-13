@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.constraints import (
     KILLS_MAX,
@@ -12,6 +12,8 @@ from app.domain.constraints import (
 
 
 class ScoreSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # level and score are intentionally absent — the backend reads them from
     # the authoritative GameSession record to prevent score/level forgery.
     kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
@@ -20,8 +22,11 @@ class ScoreSubmission(BaseModel):
 
 
 class LeaderboardEntryOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
     rank: int
-    username: str
+    player_name: str
     level: int
     score: int
     kills: int
@@ -29,6 +34,34 @@ class LeaderboardEntryOut(BaseModel):
     created_at: datetime
 
 
+class ScoreSubmissionResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    score: int
+
+
 class LeaderboardResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     entries: list[LeaderboardEntryOut]
+    total: int
+
+
+class PersonalHistoryEntryOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    level: int
+    score: int
+    kills: int
+    waves_survived: int
+    created_at: datetime
+    is_personal_best: bool
+
+
+class PersonalHistoryOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    entries: list[PersonalHistoryEntryOut]
     total: int

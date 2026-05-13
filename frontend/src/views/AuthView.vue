@@ -5,29 +5,22 @@ import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
-const { loading, error, login, register } = useAuth()
+const { loading, error, login, register, mfaRequired, verifyMfa, cancelMfa } = useAuth()
 
-// Default to register mode so first-time visitors land on the right form.
-// Switch to login when arriving from a protected-route redirect (?next=…)
-// or when the caller explicitly requests it (?mode=login).
 const isLogin = ref(
   route.query.mode === 'login' || (!route.query.mode && !!route.query.next),
 )
-const username = ref('')
+const email = ref('')
 const password = ref('')
+const playerName = ref('')
+const role = ref('student')
+const mfaCode = ref('')
 
 const title = computed(() => isLogin.value ? '登入' : '註冊')
 
-// Mirror backend constraints (backend/app/schemas/auth.py):
-//   username: 3-50 chars, [a-zA-Z0-9_-] only
-//   password: 8-128 chars, must contain at least one letter and one digit
-const USERNAME_MIN = 3
-const USERNAME_MAX = 50
-const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/
 const PASSWORD_MIN = 8
 const PASSWORD_MAX = 128
 
-// Real-time password rule checks shown during registration
 const passwordRules = reactive({
   length: false,
   hasLetter: false,
@@ -40,9 +33,14 @@ function updatePasswordRules(p: string): void {
   passwordRules.hasDigit = /[0-9]/.test(p)
 }
 
+function clearError(): void {
+  if (error.value) error.value = ''
+}
+
 function onPasswordInput(event: Event): void {
   const value = (event.target as HTMLInputElement).value
   password.value = value
+  clearError()
   if (!isLogin.value) updatePasswordRules(value)
 }
 
@@ -52,88 +50,173 @@ function toggleMode(): void {
   if (!isLogin.value) updatePasswordRules(password.value)
 }
 
-function validate(u: string, p: string): string {
-  if (!u) return '請輸入玩家名稱'
-  if (!p) return '請輸入密碼'
+function handleCancelMfa(): void {
+  mfaCode.value = ''
+  cancelMfa()
+}
+
+function validate(): string {
+  if (!email.value) return '請輸入電子信箱'
+  if (!password.value) return '請輸入密碼'
   if (isLogin.value) return ''
-  if (u.length < USERNAME_MIN || u.length > USERNAME_MAX) {
-    return `玩家名稱需 ${USERNAME_MIN}-${USERNAME_MAX} 字`
-  }
-  if (!USERNAME_PATTERN.test(u)) {
-    return '玩家名稱僅能包含英數、底線、連字號'
-  }
-  if (p.length < PASSWORD_MIN || p.length > PASSWORD_MAX) {
+  if (!playerName.value.trim()) return '請輸入玩家名稱'
+  if (playerName.value.trim().length > 50) return '玩家名稱不可超過 50 字'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) return '請輸入有效的電子信箱'
+  if (password.value.length < PASSWORD_MIN || password.value.length > PASSWORD_MAX) {
     return `密碼需 ${PASSWORD_MIN}-${PASSWORD_MAX} 字`
   }
-  if (!/[a-zA-Z]/.test(p) || !/[0-9]/.test(p)) {
+  if (!/[a-zA-Z]/.test(password.value) || !/[0-9]/.test(password.value)) {
     return '密碼需同時包含英文字母與數字'
   }
   return ''
 }
 
+function getNextPath(): string {
+  // F-BUG-10: the old check (`startsWith('/') && !startsWith('//')`) was
+  // fooled by backslash and unicode variants (`/\\evil.com`, `/%2fevil.com`)
+  // that browsers / vue-router still resolve as a foreign origin. Resolve
+  // through `URL` against the current origin and require an exact origin
+  // match before honouring the redirect target.
+  const raw = typeof route.query.next === 'string' ? route.query.next : ''
+  if (!raw) return '/'
+  // Reject backslashes outright — they are never a legitimate part of a
+  // same-origin in-app path and only show up in protocol-confusion attacks.
+  if (raw.includes('\\')) return '/'
+  try {
+    const resolved = new URL(raw, window.location.origin)
+    if (resolved.origin !== window.location.origin) return '/'
+    return resolved.pathname + resolved.search + resolved.hash
+  } catch {
+    return '/'
+  }
+}
+
 async function submit(): Promise<void> {
-  const u = username.value.trim()
+  if (mfaRequired.value) {
+    if (!mfaCode.value || !/^\d{6}$/.test(mfaCode.value)) {
+      error.value = '請輸入 6 位數驗證碼'
+      return
+    }
+    const ok = await verifyMfa(mfaCode.value)
+    if (ok) router.push(getNextPath())
+    return
+  }
+
+  const e = email.value.trim()
   const p = password.value
-  username.value = u
-  const msg = validate(u, p)
+  email.value = e
+  const msg = validate()
   if (msg) {
     error.value = msg
     return
   }
-  const ok = isLogin.value ? await login(u, p) : await register(u, p)
-  if (ok) {
-    const raw = typeof route.query.next === 'string' ? route.query.next : ''
-    // Only allow relative paths to prevent open-redirect attacks
-    const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
-    router.push(next)
-  }
+  const ok = isLogin.value
+    ? await login(e, p)
+    : await register(e, p, playerName.value.trim(), role.value)
+  if (ok) router.push(getNextPath())
 }
 </script>
 
 <template>
   <div class="auth-view">
     <div class="auth-panel rune-panel">
-      <h2 class="auth-title">{{ title }}</h2>
+      <h2 class="auth-title">{{ mfaRequired ? '雙重驗證' : title }}</h2>
 
       <form class="auth-form" @submit.prevent="submit">
-        <label class="auth-field">
-          <span>玩家名稱</span>
-          <input v-model="username" class="rune-input" type="text" autocomplete="username" required />
-        </label>
-        <label class="auth-field">
-          <span>密碼</span>
-          <input
-            :value="password"
-            class="rune-input"
-            type="password"
-            :autocomplete="isLogin ? 'current-password' : 'new-password'"
-            required
-            @input="onPasswordInput"
-          />
-        </label>
+        <template v-if="mfaRequired">
+          <p class="mfa-hint">請輸入驗證器 App 中的 6 位數驗證碼</p>
+          <label class="auth-field">
+            <span>驗證碼</span>
+            <input
+              v-model="mfaCode"
+              class="rune-input"
+              type="text"
+              inputmode="numeric"
+              pattern="\d{6}"
+              maxlength="6"
+              autocomplete="one-time-code"
+              placeholder="000000"
+              required
+              @input="clearError"
+            />
+          </label>
+        </template>
 
-        <ul v-if="!isLogin" class="password-rules">
-          <li :class="{ met: passwordRules.length }">至少 8 個字元</li>
-          <li :class="{ met: passwordRules.hasLetter }">包含英文字母</li>
-          <li :class="{ met: passwordRules.hasDigit }">包含數字</li>
-        </ul>
+        <template v-else>
+          <label class="auth-field">
+            <span>電子信箱</span>
+            <input
+              v-model="email"
+              class="rune-input"
+              type="email"
+              autocomplete="email"
+              required
+              @input="clearError"
+            />
+          </label>
+
+          <template v-if="!isLogin">
+            <label class="auth-field">
+              <span>玩家名稱</span>
+              <input
+                v-model="playerName"
+                class="rune-input"
+                type="text"
+                autocomplete="nickname"
+                required
+                @input="clearError"
+              />
+            </label>
+
+            <label class="auth-field">
+              <span>身份</span>
+              <select v-model="role" class="rune-input">
+                <option value="student">學生</option>
+                <option value="teacher">教師</option>
+              </select>
+            </label>
+          </template>
+
+          <label class="auth-field">
+            <span>密碼</span>
+            <input
+              :value="password"
+              class="rune-input"
+              type="password"
+              :autocomplete="isLogin ? 'current-password' : 'new-password'"
+              required
+              @input="onPasswordInput"
+            />
+          </label>
+
+          <ul v-if="!isLogin" class="password-rules">
+            <li :class="{ met: passwordRules.length }">至少 8 個字元</li>
+            <li :class="{ met: passwordRules.hasLetter }">包含英文字母</li>
+            <li :class="{ met: passwordRules.hasDigit }">包含數字</li>
+          </ul>
+        </template>
 
         <div v-if="error" class="auth-error">{{ error }}</div>
 
         <button class="btn" type="submit" :disabled="loading">
-          {{ loading ? '請稍候…' : title }}
+          {{ loading ? '請稍候…' : (mfaRequired ? '驗證' : title) }}
         </button>
       </form>
 
-      <button class="btn toggle-btn" @click="toggleMode">
-        {{ isLogin ? '沒有帳號？前往註冊' : '已有帳號？前往登入' }}
-      </button>
+      <template v-if="mfaRequired">
+        <button class="btn toggle-btn" @click="handleCancelMfa">← 返回登入</button>
+      </template>
+      <template v-else>
+        <button class="btn toggle-btn" @click="toggleMode">
+          {{ isLogin ? '沒有帳號？前往註冊' : '已有帳號？前往登入' }}
+        </button>
+      </template>
 
-      <p v-if="isLogin" class="demo-hint">
-        體驗帳號：<code>demo</code> / <code>Demo1234</code>
+      <p v-if="isLogin && !mfaRequired" class="demo-hint">
+        體驗帳號：<code>demo@mathdefense.local</code> / <code>Demo1234</code>
       </p>
 
-      <button class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
+      <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
     </div>
   </div>
 </template>
@@ -147,7 +230,8 @@ async function submit(): Promise<void> {
 }
 
 .auth-panel {
-  width: 320px;
+  width: 360px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -177,6 +261,14 @@ async function submit(): Promise<void> {
 .rune-input { width: 100%; }
 
 .auth-error { font-size: 11px; color: var(--enemy-red); }
+
+.mfa-hint {
+  font-size: 11px;
+  color: var(--axis);
+  opacity: 0.8;
+  margin: 0;
+  text-align: center;
+}
 
 .password-rules {
   list-style: none;

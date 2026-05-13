@@ -1,34 +1,84 @@
-import { api } from './api'
+import { api, readCookie, CSRF_COOKIE_NAME, CSRF_HEADER_NAME, REQUEST_TIMEOUT_MS } from './api'
 
 export interface TokenResponse {
-  access_token: string
   token_type: string
   id: string
-  username: string
+  email: string
+  player_name: string
+  role: string
+  avatar_url: string | null
+  mfa_required?: boolean
+  mfa_token?: string | null
+}
+
+export interface MeResponse {
+  id: string
+  email: string
+  player_name: string
+  role: string
+  avatar_url: string | null
+  is_email_verified?: boolean
+  mfa_enabled?: boolean
+  ia_unlock_earned?: boolean
+  ia_recent_accuracy?: number
 }
 
 export const authService = {
-  register(username: string, password: string) {
-    return api.post<TokenResponse>('/api/auth/register', { username, password })
+  register(email: string, password: string, playerName: string, role: string = 'student') {
+    return api.post<TokenResponse>('/api/auth/register', {
+      email,
+      password,
+      player_name: playerName,
+      role,
+    })
   },
-  login(username: string, password: string) {
-    return api.post<TokenResponse>('/api/auth/login', { username, password })
+  login(email: string, password: string) {
+    return api.post<TokenResponse>('/api/auth/login', { email, password })
+  },
+  mfaChallenge(mfaToken: string, code: string) {
+    return api.post<TokenResponse>('/api/auth/mfa/challenge', { mfa_token: mfaToken, code })
   },
   me() {
-    return api.get<{ id: string; username: string }>('/api/auth/me')
+    return api.get<MeResponse>('/api/auth/me')
   },
-  logout() {
-    // Bypass the api wrapper so the 401 interceptor (which itself calls
-    // logout()) can never re-enter this path and create an infinite loop.
-    // credentials: 'same-origin' sends the HTTP-only auth cookie so the
-    // backend can revoke the token and clear it.
+  updatePlayerName(playerName: string) {
+    return api.put<MeResponse>('/api/auth/profile/name', { player_name: playerName })
+  },
+  updateAvatar(avatarUrl: string | null) {
+    return api.put<MeResponse>('/api/auth/profile/avatar', { avatar_url: avatarUrl })
+  },
+  changePassword(currentPassword: string, newPassword: string) {
+    return api.post<void>('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+  },
+  logout(): Promise<void> {
+    // Uses raw fetch intentionally: avoids the api.ts 401 interceptor, which
+    // calls handleSessionExpiry() → no recursive logout loop if the server
+    // returns 401 on this request.
     const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
     const url = base ? `${base}/api/auth/logout` : '/api/auth/logout'
+    const headers: Record<string, string> = {}
+    const csrf = readCookie(CSRF_COOKIE_NAME)
+    if (csrf) headers[CSRF_HEADER_NAME] = csrf
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
     return fetch(url, {
       method: 'POST',
-      credentials: 'same-origin',
-    }).catch(() => {
-      // Best-effort: server unreachable is fine, cookie eventually expires.
+      credentials: 'include',
+      headers,
+      signal: controller.signal,
+    }).then((res) => {
+      clearTimeout(timeoutId)
+      // M14: surface 5xx so the caller can retry. 4xx (e.g. 401 on an already-
+      // expired cookie) is treated as success — the session is already gone.
+      if (res.status >= 500) throw new Error(`logout ${res.status}`)
+    }).catch((err) => {
+      clearTimeout(timeoutId)
+      // Abort (timeout) is swallowed — local state will still be cleared by the caller.
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      throw err
     })
   },
 }

@@ -12,20 +12,36 @@ export default defineConfig({
     },
   },
   server: {
+    fs: {
+      // Enumerate exactly the two directories the dev server needs to serve:
+      // frontend/ (auto-allowed by Vite but listed for explicitness) and
+      // shared/ (needed for the @shared alias; in Docker it lives outside the
+      // /app workspace so Vite's auto-allow would miss it).
+      allow: [__dirname, resolve(__dirname, '..', 'shared')],
+    },
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        // Override via VITE_API_TARGET when backend isn't on localhost — e.g.
+        // running `npm run dev` against a remote dev backend or inside a WSL
+        // setup where the backend container is reachable via its host name.
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:8000',
         changeOrigin: true,
       },
     },
   },
   assetsInclude: ['**/*.wasm'],
+  build: {
+    // Pin explicitly — a future Vite default flip to `true` would leak source
+    // paths (incl. file system layout) into prod bundles.
+    sourcemap: false,
+  },
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.test.ts'],
+    setupFiles: ['src/test-setup.ts'],
     // WasmBridge.test.ts runs under happy-dom and covers the pure-JS fallback.
     // WasmBridge.wasm.test.ts opts into the Node environment via its own
     // `// @vitest-environment node` pragma and loads the real math_engine.js from
-    // frontend/public/wasm/ to assert WASM/JS numeric parity.
+    // frontend/src/math/wasm/ to assert WASM/JS numeric parity.
   },
 })

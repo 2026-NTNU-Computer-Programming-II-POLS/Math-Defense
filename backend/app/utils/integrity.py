@@ -19,3 +19,10 @@ def is_constraint_violation(err: IntegrityError, *, constraint_name: str) -> boo
     if diag is None:
         return False
     return getattr(diag, "constraint_name", None) == constraint_name
+
+
+def extract_constraint_name(err: IntegrityError) -> str | None:
+    """Extract the DB constraint name from a SQLAlchemy IntegrityError, or None."""
+    orig = getattr(err, "orig", None)
+    diag = getattr(orig, "diag", None) if orig is not None else None
+    return getattr(diag, "constraint_name", None) if diag is not None else None

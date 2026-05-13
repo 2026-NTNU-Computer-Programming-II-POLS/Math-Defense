@@ -3,8 +3,56 @@
  * Manages panel visibility, selected tower, and other UI-only state.
  */
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { ref, watch } from 'vue'
+import { appBus } from '@/lib/app-bus'
 import type { TowerType } from '@/data/constants'
+
+const PRINCIPLE_OVERLAY_PREF_KEY = 'mdf.principleOverlayEnabled'
+const AUDIO_MUTED_PREF_KEY = 'mdf.audioMuted'
+const AUDIO_VOLUME_PREF_KEY = 'mdf.audioVolume'
+const SLIDER_FALLBACK_PREF_KEY = 'mdf.sliderFallbackEnabled'
+
+function loadPrincipleOverlayPref(): boolean {
+  if (typeof window === 'undefined') return true
+  try {
+    const raw = window.localStorage.getItem(PRINCIPLE_OVERLAY_PREF_KEY)
+    if (raw === null) return true
+    return raw === '1'
+  } catch {
+    return true
+  }
+}
+
+function loadAudioMutedPref(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(AUDIO_MUTED_PREF_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function loadSliderFallbackPref(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(SLIDER_FALLBACK_PREF_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function loadAudioVolumePref(): number {
+  if (typeof window === 'undefined') return 0.7
+  try {
+    const raw = window.localStorage.getItem(AUDIO_VOLUME_PREF_KEY)
+    if (raw === null) return 0.7
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return 0.7
+    return Math.max(0, Math.min(1, n))
+  } catch {
+    return 0.7
+  }
+}
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return (
@@ -16,6 +64,12 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 }
 
 export const useUiStore = defineStore('ui', () => {
+  // Subscribe once on init to dismiss any open modal on logout. Replaces the
+  // dynamic-import that authStore.logout used to do (F-ARCH-2).
+  appBus.on('auth:logout', () => {
+    if (modalVisible.value) dismissModal()
+  })
+
   // currently selected tower type (tower bar selection)
   const selectedTowerType = ref<TowerType | null>(null)
 
@@ -26,16 +80,22 @@ export const useUiStore = defineStore('ui', () => {
   // Buff Card Panel
   const buffPanelVisible = ref(false)
 
-  // Boss Shield Fourier target — visual cue only, driven by BOSS_SHIELD_START.
-  // shallowRef: replaced whole rather than mutated, so deep reactivity is waste.
-  const bossShieldTarget = shallowRef<{ freqs: number[]; amps: number[] } | null>(null)
-
-  // Modal (replaces alert)
+  // Modal (replaces alert/confirm)
   const modalVisible = ref(false)
   const modalTitle = ref('')
   const modalMessage = ref('')
   // Callback may return a Promise; we await it for rejection-reporting below.
   const modalCallback = ref<(() => unknown) | null>(null)
+  // Sticky modals survive re-entrant side-effects (e.g. a 401-triggered logout
+  // must not silently dismiss a "Sync Failed" modal the user hasn't read yet).
+  const modalSticky = ref(false)
+  // F-BUG-19: confirm-mode shows a Cancel button alongside OK. modalConfirmResolver
+  // is a single-shot promise resolver wired up by showConfirm() and consumed
+  // by closeModal()/cancelModal().
+  const modalConfirmMode = ref(false)
+  const modalConfirmLabel = ref('OK')
+  const modalCancelLabel = ref('Cancel')
+  let modalConfirmResolver: ((ok: boolean) => void) | null = null
 
   // Tutorial
   const tutorialVisible = ref(false)
@@ -44,26 +104,148 @@ export const useUiStore = defineStore('ui', () => {
   // HUD hint
   const buildHintStep = ref(0)   // 0=select tower  1=click cell  2=set params  3=Cast Spell
 
-  function showModal(title: string, message: string, onClose?: () => unknown): void {
+  // Pedagogy: post-wave principle-surfacing overlay (Backlog item #1).
+  // Persisted to localStorage so the player's choice survives reloads.
+  const principleOverlayEnabled = ref<boolean>(loadPrincipleOverlayPref())
+  if (typeof window !== 'undefined') {
+    watch(principleOverlayEnabled, (v) => {
+      try { window.localStorage.setItem(PRINCIPLE_OVERLAY_PREF_KEY, v ? '1' : '0') }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setPrincipleOverlayEnabled(v: boolean): void {
+    principleOverlayEnabled.value = v
+  }
+
+  // Pedagogical Backlog §15.3 — master volume + mute persisted across sessions.
+  // useGameLoop bridges these refs into AssetManager so the audio engine
+  // never imports Pinia (preserves engine/UI separation).
+  const audioMuted = ref<boolean>(loadAudioMutedPref())
+  const audioVolume = ref<number>(loadAudioVolumePref())
+  if (typeof window !== 'undefined') {
+    watch(audioMuted, (v) => {
+      try { window.localStorage.setItem(AUDIO_MUTED_PREF_KEY, v ? '1' : '0') }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+    watch(audioVolume, (v) => {
+      try { window.localStorage.setItem(AUDIO_VOLUME_PREF_KEY, String(v)) }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setAudioVolume(v: number): void {
+    audioVolume.value = Math.max(0, Math.min(1, v))
+  }
+
+  // Pedagogical Backlog §20 — opt-in slider-fallback / practice mode for
+  // dyscalculic / high-anxiety learners. When true, MagicModePanel and
+  // MatrixInputPanel render slider controls instead of typed expression /
+  // coefficient input, AND every new session is flagged practice_mode so it
+  // is excluded from the global leaderboard. Persisted across sessions.
+  const sliderFallbackEnabled = ref<boolean>(loadSliderFallbackPref())
+  if (typeof window !== 'undefined') {
+    watch(sliderFallbackEnabled, (v) => {
+      try { window.localStorage.setItem(SLIDER_FALLBACK_PREF_KEY, v ? '1' : '0') }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setSliderFallbackEnabled(v: boolean): void {
+    sliderFallbackEnabled.value = v
+  }
+
+  // Piecewise paths Phase 5: Function Panel ↔ Renderer hover sync.
+  // Panel writes via `setHoveredSegmentId`; `useGameLoop` mirrors the
+  // value onto `game.hoveredSegmentId` so the Renderer (engine layer)
+  // reads it without pulling in Pinia.
+  const hoveredSegmentId = ref<string | null>(null)
+
+  function showModal(
+    title: string,
+    message: string,
+    onClose?: () => unknown,
+    opts: { sticky?: boolean } = {},
+  ): void {
+    // If a confirm is already open, resolve its pending promise as cancelled
+    // before replacing the slot — otherwise the awaiting caller would hang.
+    if (modalConfirmResolver) {
+      const prev = modalConfirmResolver
+      modalConfirmResolver = null
+      prev(false)
+    }
+    modalConfirmMode.value = false
     modalTitle.value = title
     modalMessage.value = message
     modalCallback.value = onClose ?? null
+    modalSticky.value = opts.sticky ?? false
     modalVisible.value = true
   }
 
+  function dismissModal(opts: { force?: boolean } = {}): void {
+    // Callers that just want to clear side-effects (e.g. logout) respect the
+    // sticky flag; only explicit user action or force=true closes a sticky modal.
+    if (modalSticky.value && !opts.force) return
+    modalCallback.value = null
+    modalSticky.value = false
+    modalVisible.value = false
+    if (modalConfirmResolver) {
+      const resolve = modalConfirmResolver
+      modalConfirmResolver = null
+      modalConfirmMode.value = false
+      resolve(false)
+    }
+  }
+
+  // F-BUG-19: replaces native confirm(). Returns true on OK, false on Cancel
+  // / Esc / overlay click. Routing through the modal system gives us
+  // consistent styling, focus trapping, and avoids the synchronous-blocking
+  // behavior of window.confirm.
+  function showConfirm(
+    title: string,
+    message: string,
+    opts: { confirmLabel?: string; cancelLabel?: string } = {},
+  ): Promise<boolean> {
+    // If a previous confirm is still open, resolve it as cancelled so the
+    // pending caller doesn't hang forever.
+    if (modalConfirmResolver) {
+      const prev = modalConfirmResolver
+      modalConfirmResolver = null
+      prev(false)
+    }
+    modalTitle.value = title
+    modalMessage.value = message
+    modalCallback.value = null
+    modalSticky.value = false
+    modalConfirmMode.value = true
+    modalConfirmLabel.value = opts.confirmLabel ?? 'OK'
+    modalCancelLabel.value = opts.cancelLabel ?? 'Cancel'
+    modalVisible.value = true
+    return new Promise<boolean>((resolve) => {
+      modalConfirmResolver = resolve
+    })
+  }
+
   function _showErrorFallback(): void {
-    modalTitle.value = '發生錯誤'
-    modalMessage.value = '操作未能完成，請再試一次。'
+    modalTitle.value = 'Error'
+    modalMessage.value = 'The operation could not be completed. Please try again.'
     modalCallback.value = null
     modalVisible.value = true
   }
 
   function closeModal(): void {
     const cb = modalCallback.value
+    const resolver = modalConfirmResolver
+    const wasConfirm = modalConfirmMode.value
     // Clear state first so that if cb throws / rejects we open a fresh error
     // modal on top of a cleared slot instead of re-opening on top of itself.
     modalCallback.value = null
+    modalSticky.value = false
+    modalConfirmMode.value = false
+    modalConfirmResolver = null
     modalVisible.value = false
+    if (resolver) resolver(true)
+    if (wasConfirm) return
     if (!cb) return
     try {
       const result = cb()
@@ -87,14 +269,50 @@ export const useUiStore = defineStore('ui', () => {
     buildHintStep.value = type ? 1 : 0
   }
 
+  function clearSelectedTower(): void {
+    selectedTowerType.value = null
+  }
+
+  function openBuildPanel(towerId: string): void {
+    buildPanelTowerId.value = towerId
+    buildPanelVisible.value = true
+  }
+
+  function closeBuildPanel(): void {
+    buildPanelVisible.value = false
+    buildPanelTowerId.value = null
+  }
+
+  function hideBuildPanel(): void {
+    buildPanelVisible.value = false
+  }
+
+  function setBuildHintStep(step: number): void {
+    buildHintStep.value = step
+  }
+
+  function setHoveredSegmentId(id: string | null): void {
+    hoveredSegmentId.value = id
+  }
+
   return {
     selectedTowerType,
     buildPanelVisible, buildPanelTowerId,
     buffPanelVisible,
-    bossShieldTarget,
     modalVisible, modalTitle, modalMessage, modalCallback,
+    modalConfirmMode, modalConfirmLabel, modalCancelLabel,
     tutorialVisible, tutorialStep,
     buildHintStep,
-    showModal, closeModal, selectTower,
+    hoveredSegmentId,
+    principleOverlayEnabled,
+    audioMuted, audioVolume,
+    sliderFallbackEnabled,
+    showModal, showConfirm, closeModal, dismissModal, selectTower,
+    clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
+    setBuildHintStep,
+    setHoveredSegmentId,
+    setPrincipleOverlayEnabled,
+    setAudioVolume,
+    setSliderFallbackEnabled,
   }
 })

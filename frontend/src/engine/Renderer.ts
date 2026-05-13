@@ -5,13 +5,52 @@
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, UNIT_PX,
   GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y,
-  Colors,
 } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import type { LevelLayoutService, TileClass } from '@/domain/level/level-layout-service'
+import type { SegmentedPath } from '@/domain/path/segmented-path'
+import { tileStyleFor, type TileStyle } from './render-helpers/tile-style'
+
+/**
+ * Swappable neutral-tone palette (Backlog §16). Bright accents that encode
+ * meaning (path green, buildable blue, enemy red) intentionally stay on
+ * `Colors` — only the stone/grid/axis/forbidden tones, which carry no
+ * categorical signal, shift on Star-1.
+ */
+export interface RendererPalette {
+  readonly stoneDark: string
+  readonly stoneLight: string
+  readonly gridLine: string
+  readonly axis: string
+  readonly forbiddenFill: string
+}
+
+const NEUTRAL_PALETTE: RendererPalette = Object.freeze({
+  stoneDark: '#20323a',
+  stoneLight: '#2b4248',
+  gridLine: '#56737a',
+  axis: '#e1bd63',
+  forbiddenFill: '#26343f',
+})
+
+const WARM_PALETTE: RendererPalette = Object.freeze({
+  stoneDark: '#2e3330',
+  stoneLight: '#3a443b',
+  gridLine: '#746f4c',
+  axis: '#f0c65e',
+  forbiddenFill: '#343834',
+})
 
 export class Renderer {
   readonly canvas: HTMLCanvasElement
   readonly ctx: CanvasRenderingContext2D
+
+  /**
+   * Active neutral palette. Mutates only via `setStarPalette` so the engine
+   * has one well-defined seam for swapping Star-1 warming on/off, and the
+   * default state matches the legacy `Colors`-driven appearance.
+   */
+  palette: RendererPalette = NEUTRAL_PALETTE
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -19,35 +58,74 @@ export class Renderer {
     if (!ctx) throw new Error('Failed to get 2D context')
     this.ctx = ctx
 
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = CANVAS_WIDTH * dpr
-    canvas.height = CANVAS_HEIGHT * dpr
-    canvas.style.width = `${CANVAS_WIDTH}px`
-    canvas.style.height = `${CANVAS_HEIGHT}px`
-    ctx.scale(dpr, dpr)
-    ctx.imageSmoothingEnabled = false
+    this._applyDpr()
+  }
+
+  /**
+   * §16: select the neutral-tone palette for the current Star tier. Star-1
+   * warms the canvas backdrop and grid (emotional-design cue per Plass et
+   * al. 2014); Star-2+ uses the default neutrals. Idempotent — safe to call
+   * on every LEVEL_START even if the rating did not change.
+   */
+  setStarPalette(starRating: number): void {
+    this.palette = starRating === 1 ? WARM_PALETTE : NEUTRAL_PALETTE
+  }
+
+  /** Build the backing buffer at the current devicePixelRatio. */
+  private _applyDpr(): void {
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1
+    this.canvas.width = CANVAS_WIDTH * dpr
+    this.canvas.height = CANVAS_HEIGHT * dpr
+    this.canvas.style.width = `${CANVAS_WIDTH}px`
+    this.canvas.style.height = `${CANVAS_HEIGHT}px`
+    // `setTransform` (rather than a second `scale`) keeps the transform
+    // stack idempotent across repeated calls — consecutive resyncs would
+    // otherwise compound the scale on each monitor hop. Test doubles that
+    // omit `setTransform` fall through to `scale`, which is fine under
+    // construction but inaccurate after a subsequent resync (acceptable for
+    // unit tests — browsers always have setTransform).
+    if (typeof this.ctx.setTransform === 'function') {
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    } else {
+      this.ctx.scale(dpr, dpr)
+    }
+    this.ctx.imageSmoothingEnabled = false
+  }
+
+  /** K-1: rebuild the backing store when DPR changes (monitor switch).
+   * CSS size stays pinned to 1280×720; only the pixel buffer is resized. */
+  resyncDpr(): void {
+    this._applyDpr()
   }
 
   clear(): void {
-    this.ctx.fillStyle = Colors.STONE_DARK
+    this.ctx.fillStyle = this.palette.stoneDark
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   }
 
-  drawGrid(): void {
+  drawGrid(layout: LevelLayoutService | null = null): void {
     const { ctx } = this
 
-    // Checkerboard stone floor tiles
+    // Tile fills. When a LevelLayoutService is available we delegate every
+    // cell's category to `layout.classify` — the Renderer never re-derives
+    // path/buildable/forbidden inline (spec §8, plan §6.3 SoC Gate). Without
+    // a layout (pre-level-start, or flag-off legacy path) we fall back to
+    // the stone checkerboard so the grid never renders as an empty void.
     for (let gx = GRID_MIN_X; gx < GRID_MAX_X; gx++) {
       for (let gy = GRID_MIN_Y; gy < GRID_MAX_Y; gy++) {
         const px = gameToCanvasX(gx)
         const py = gameToCanvasY(gy + 1)
-        ctx.fillStyle = (gx + gy) % 2 === 0 ? Colors.STONE_DARK : Colors.STONE_LIGHT
-        ctx.fillRect(px, py, UNIT_PX, UNIT_PX)
+        if (layout) {
+          this._paintTile(px, py, layout.classify(gx, gy))
+        } else {
+          ctx.fillStyle = (gx + gy) % 2 === 0 ? this.palette.stoneDark : this.palette.stoneLight
+          ctx.fillRect(px, py, UNIT_PX, UNIT_PX)
+        }
       }
     }
 
     // Grid lines (dark gold rune lines)
-    ctx.strokeStyle = Colors.GRID_LINE
+    ctx.strokeStyle = this.palette.gridLine
     ctx.lineWidth = 0.5
     ctx.beginPath()
     for (let gx = GRID_MIN_X; gx <= GRID_MAX_X; gx++) {
@@ -63,7 +141,7 @@ export class Renderer {
     ctx.stroke()
 
     // Coordinate axes (bright gold)
-    ctx.strokeStyle = Colors.AXIS
+    ctx.strokeStyle = this.palette.axis
     ctx.lineWidth = 2
     ctx.beginPath()
     const xAxisY = gameToCanvasY(0)
@@ -75,7 +153,7 @@ export class Renderer {
     ctx.stroke()
 
     // Tick labels
-    ctx.fillStyle = Colors.AXIS
+    ctx.fillStyle = this.palette.axis
     ctx.font = '10px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
@@ -89,10 +167,164 @@ export class Renderer {
       if (gy === 0) continue
       ctx.fillText(String(gy), yAxisX - 6, gameToCanvasY(gy))
     }
-    ctx.fillStyle = Colors.AXIS
+    ctx.fillStyle = this.palette.axis
     ctx.textAlign = 'right'
     ctx.textBaseline = 'top'
     ctx.fillText('O', yAxisX - 6, xAxisY + 4)
+  }
+
+  /**
+   * Paint a single classified tile at canvas `(px, py)` (top-left corner,
+   * cell size = `UNIT_PX`). The style recipe comes from `tileStyleFor`;
+   * this method owns the canvas-specific translation (hatching → diagonal
+   * strokes, dotted borders → dashed `stroke`). Private so tests can stub
+   * `drawGrid` end-to-end without re-implementing the paint protocol.
+   */
+  private _paintTile(px: number, py: number, cls: TileClass): void {
+    const style = tileStyleFor(cls)
+    // §16 Star-1 warming: forbidden cells share their fill with the stone
+    // backdrop, so swap to the active palette's neutral. Path/buildable
+    // fills encode meaning and stay on the categorical palette.
+    const effective = cls === 'forbidden'
+      ? { ...style, fill: this.palette.forbiddenFill }
+      : style
+    this._applyTileStyle(px, py, effective)
+  }
+
+  private _applyTileStyle(px: number, py: number, style: TileStyle): void {
+    const { ctx } = this
+    ctx.fillStyle = style.fill
+    ctx.fillRect(px, py, UNIT_PX, UNIT_PX)
+
+    if (style.hatching) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(px, py, UNIT_PX, UNIT_PX)
+      ctx.clip()
+      ctx.strokeStyle = 'rgba(184, 64, 64, 0.35)'
+      ctx.lineWidth = 1
+      const step = 4
+      for (let off = -UNIT_PX; off < UNIT_PX; off += step) {
+        ctx.beginPath()
+        ctx.moveTo(px + off, py + UNIT_PX)
+        ctx.lineTo(px + off + UNIT_PX, py)
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+
+    if (style.border && style.borderStyle) {
+      ctx.save()
+      ctx.strokeStyle = style.border
+      ctx.lineWidth = 1
+      ctx.setLineDash(style.borderStyle === 'dotted' ? [2, 3] : [])
+      // Inset by 0.5 so the 1px stroke renders crisply on integer pixel rows.
+      ctx.strokeRect(px + 0.5, py + 0.5, UNIT_PX - 1, UNIT_PX - 1)
+      ctx.restore()
+    }
+  }
+
+  /**
+   * Draw an overlay highlight for the cell at game coordinate `(gx, gy)`
+   * using the `TileClass` legality cue. Called by `TowerPlacementSystem`
+   * while a tower type is selected so the classification shown under the
+   * cursor agrees with `drawGrid` — the single authority stays
+   * `LevelLayoutService.classify`. Intentionally NOT a rule check; the
+   * caller passes in the already-classified value.
+   */
+  /**
+   * Highlight the grid-line intersection at lattice point (gx, gy). Towers
+   * sit on intersections, not inside cells, so the cursor is a ring centered
+   * on the point — not a cell-sized rectangle.
+   */
+  drawPlacementCursor(gx: number, gy: number, cls: TileClass): void {
+    const { ctx } = this
+    const px = gameToCanvasX(gx)
+    const py = gameToCanvasY(gy)
+    const color = cls === 'buildable' ? '#6adf8a' : '#b84040'
+    const radius = UNIT_PX * 0.42
+
+    ctx.save()
+    // Soft fill to make legal/illegal status pop without obscuring the grid.
+    ctx.globalAlpha = 0.25
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(px, py, radius, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.arc(px, py, radius, 0, Math.PI * 2)
+    ctx.stroke()
+
+    // Crosshair at the exact lattice point — the bullseye where the tower
+    // will land.
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(px - radius * 0.4, py)
+    ctx.lineTo(px + radius * 0.4, py)
+    ctx.moveTo(px, py - radius * 0.4)
+    ctx.lineTo(px, py + radius * 0.4)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  /**
+   * Draw thin accent lines at each interior segment boundary of `path`, and
+   * (optionally) tint the `xRange` of the hovered segment. Interior means
+   * boundaries between consecutive segments — the path's outer `startX` /
+   * `targetX` are drawn as the axes, not as boundaries.
+   *
+   * Vertical segments have `xRange = [x, x]` and their "boundary" coincides
+   * with the adjacent segments' endpoints; we draw one accent per boundary
+   * between consecutive segments regardless of kind.
+   */
+  drawSegmentBoundaries(
+    path: SegmentedPath,
+    hoveredSegmentId: string | null = null,
+  ): void {
+    const { ctx } = this
+    const segments = path.segments
+
+    if (hoveredSegmentId) {
+      const seg = segments.find((s) => s.id === hoveredSegmentId)
+      if (seg) {
+        const [lo, hi] = seg.xRange
+        const pxLo = gameToCanvasX(lo)
+        const pxHi = gameToCanvasX(hi)
+        const pyTop = gameToCanvasY(GRID_MAX_Y)
+        const pyBot = gameToCanvasY(GRID_MIN_Y)
+        const width = Math.max(pxHi - pxLo, UNIT_PX * 0.25)
+        ctx.save()
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.12)'
+        ctx.fillRect(pxLo, pyTop, width, pyBot - pyTop)
+        ctx.restore()
+      }
+    }
+
+    if (segments.length < 2) return
+
+    ctx.save()
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 3])
+    const yTop = gameToCanvasY(GRID_MAX_Y)
+    const yBot = gameToCanvasY(GRID_MIN_Y)
+    // One accent per interior boundary = per consecutive-pair; authored in
+    // ascending x, so the boundary is segments[i].xRange[1] (equivalently
+    // segments[i+1].xRange[0]).
+    for (let i = 0; i < segments.length - 1; i++) {
+      const boundaryX = segments[i]!.xRange[1]
+      const px = gameToCanvasX(boundaryX)
+      ctx.beginPath()
+      ctx.moveTo(px, yTop)
+      ctx.lineTo(px, yBot)
+      ctx.stroke()
+    }
+    ctx.restore()
   }
 
   drawOrigin(time: number): void {
@@ -130,6 +362,41 @@ export class Renderer {
       ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r)
       ctx.stroke()
     }
+    ctx.restore()
+  }
+
+  /**
+   * Highlight the disclosure region — a rectangle that is guaranteed to
+   * contain exactly one common intersection of all level curves (= P*, the
+   * tower-defense goal). Player sees only the rectangle, not the precise
+   * point.
+   */
+  drawDisclosureRegion(region: {
+    readonly xMin: number
+    readonly xMax: number
+    readonly yMin: number
+    readonly yMax: number
+  }): void {
+    const { ctx } = this
+    const px = gameToCanvasX(region.xMin)
+    const py = gameToCanvasY(region.yMax)
+    const w = (region.xMax - region.xMin) * UNIT_PX
+    const h = (region.yMax - region.yMin) * UNIT_PX
+
+    ctx.save()
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.12)'
+    ctx.fillRect(px, py, w, h)
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([6, 4])
+    ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1)
+
+    ctx.setLineDash([])
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.95)'
+    ctx.font = 'bold 11px monospace'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    ctx.fillText('Goal here', px + 4, py + 4)
     ctx.restore()
   }
 

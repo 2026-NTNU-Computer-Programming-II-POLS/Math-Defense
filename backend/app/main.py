@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -5,6 +6,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -15,8 +17,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
 from app.db.database import engine, SessionLocal
-from app.domain.errors import DomainError
-from app.routers import auth, leaderboard, game_session
+from app.domain.errors import AccountLockedError, DomainError
+from app.http_status_map import http_status_for
+from app.domain.session.aggregate import set_stale_cutoff_hours
+from app.infrastructure.login_guard import purge_stale as purge_stale_login_attempts
+from app.infrastructure.scheduler import territory_settlement_task
+from app.infrastructure.token_denylist import purge_expired as purge_expired_denied_tokens
+from app.middleware.csrf import CsrfMiddleware
+from app.routers import achievement, admin, assessment, auth, challenge, class_, leaderboard, game_session, recommendation, replay, study, talent, territory
 from app.limiter import limiter
 from app.seed import ensure_demo_user
 
@@ -26,11 +34,42 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Forward the operator-configured stale cutoff into the domain layer. The
+# aggregate deliberately does not import app.config so the domain stays
+# test-isolated; this is the one place we bridge the two.
+set_stale_cutoff_hours(settings.session_stale_cutoff_hours)
+
 # backend/app/main.py -> backend/app -> backend -> backend/alembic.ini
 _ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
 # Arbitrary fixed key for the PostgreSQL advisory lock that serialises migrations.
 _MIGRATION_LOCK_ID = 483_921_746
+
+# How often the auth-store janitor runs. Frequent enough that rows don't
+# accumulate noticeably; infrequent enough that concurrent DELETEs don't
+# compete with the login path for row locks.
+_JANITOR_INTERVAL_SECONDS = 600
+
+
+async def _auth_store_janitor() -> None:
+    """Periodically purge expired deny-list and stale login-attempt rows.
+
+    Replaces the previous inline cleanup that `deny()` and `is_locked()` ran
+    on every write/read — a DoS amplifier under logout spam and a TOCTOU
+    source on the read path.
+    """
+    while True:
+        try:
+            await asyncio.sleep(_JANITOR_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            return
+        try:
+            with SessionLocal() as db:
+                purge_expired_denied_tokens(db)
+                purge_stale_login_attempts(db)
+                db.commit()
+        except Exception:
+            logger.exception("Auth-store janitor iteration failed")
 
 
 @asynccontextmanager
@@ -53,7 +92,23 @@ async def lifespan(_app: FastAPI):
         ensure_demo_user(db)
     finally:
         db.close()
-    yield
+    janitor = asyncio.create_task(_auth_store_janitor())
+    settlement = asyncio.create_task(territory_settlement_task())
+    try:
+        yield
+    finally:
+        janitor.cancel()
+        settlement.cancel()
+        try:
+            await janitor
+        except asyncio.CancelledError:
+            # Expected during shutdown
+            pass
+        try:
+            await settlement
+        except asyncio.CancelledError:
+            # Expected during shutdown
+            pass
 
 
 app = FastAPI(
@@ -61,6 +116,8 @@ app = FastAPI(
     description="Math Defense Game Backend API",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
 )
 
 app.state.limiter = limiter
@@ -69,9 +126,43 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(DomainError)
 async def _domain_error_handler(_request: Request, exc: DomainError) -> JSONResponse:
-    # DomainError subclasses carry their own status_code; pluck it and surface
-    # the message. Unhandled bugs still fall through to Starlette's default 500.
-    return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
+    # Domain layer is HTTP-free; the class → status mapping lives in
+    # app.http_status_map. Unhandled bugs still fall through to Starlette's
+    # default 500.
+    headers = {}
+    if isinstance(exc, AccountLockedError) and exc.retry_after_seconds is not None:
+        headers["Retry-After"] = str(exc.retry_after_seconds)
+    return JSONResponse(
+        status_code=http_status_for(exc),
+        content={"detail": str(exc)},
+        headers=headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _request_validation_handler(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    # Pydantic field-level errors must surface with field names so the
+    # frontend can map them back to inputs. Routing them through the generic
+    # ValueError handler below would erase that structure (E1).
+    # exc.errors() may include a raw exception object in ctx["error"] which
+    # is not JSON serializable — convert it to a string first.
+    # Surface field name + a generic message only. Pydantic's `ctx.error`
+    # frequently contains the original exception's repr (sometimes with
+    # filesystem paths or library internals); leaking that gives an
+    # attacker a free oracle for the validator implementation. Keep the
+    # `loc` and `type` fields so the SPA can still map errors to inputs.
+    errors = []
+    for err in exc.errors():
+        errors.append(
+            {
+                "loc": err.get("loc"),
+                "type": err.get("type"),
+                "msg": err.get("msg", "Invalid value"),
+            }
+        )
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(ValueError)
@@ -80,6 +171,15 @@ async def _value_error_handler(_request: Request, exc: ValueError) -> JSONRespon
     # and are handled above. Plain ValueErrors from libraries or Python internals
     # get a generic message to avoid leaking stack/internal details.
     return JSONResponse(status_code=422, content={"detail": "Unprocessable request"})
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    # Catch-all so Starlette's default 500 (which can include frame info under
+    # some configs) never escapes. Log with traceback server-side; return a
+    # fixed body client-side (E3).
+    logger.exception("Unhandled exception: %s", exc.__class__.__name__)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 # Security headers — defence-in-depth for direct backend access (dev docker-compose
@@ -97,19 +197,33 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# CSRF — double-submit cookie; on by default, opt-out only under pytest/CI.
+app.add_middleware(CsrfMiddleware)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 
 # Routes
 app.include_router(auth.router)
+app.include_router(class_.router)
+app.include_router(admin.router)
 app.include_router(leaderboard.router)
 app.include_router(game_session.router)
+app.include_router(achievement.router)
+app.include_router(achievement.seasons_router)
+app.include_router(talent.router)
+app.include_router(territory.router)
+app.include_router(assessment.router)
+app.include_router(recommendation.router)
+app.include_router(challenge.router)
+app.include_router(replay.router)
+app.include_router(study.router)
 
 
 @app.get("/")

@@ -5,21 +5,20 @@ import logging
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError
-
 from app.domain.errors import (
+    ConstraintViolationError,
     DuplicateSubmissionError,
     PermissionDeniedError,
     SessionValidationError,
 )
-from app.domain.value_objects import Level, Score, SessionStatus
+from app.domain.value_objects import Score, SessionStatus
 from app.domain.leaderboard.aggregate import LeaderboardEntry
-from app.utils.integrity import is_constraint_violation
+from app.domain.leaderboard.view import PersonalHistoryEntry, RankedLeaderboardEntry
 
 if TYPE_CHECKING:
+    from app.application.ports import UnitOfWork
     from app.domain.leaderboard.repository import LeaderboardRepository
     from app.domain.session.repository import GameSessionRepository
-    from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class LeaderboardApplicationService:
         self,
         leaderboard_repo: LeaderboardRepository,
         session_repo: GameSessionRepository,
-        uow: SqlAlchemyUnitOfWork,
+        uow: UnitOfWork,
     ) -> None:
         self._leaderboard_repo = leaderboard_repo
         self._session_repo = session_repo
@@ -41,8 +40,59 @@ class LeaderboardApplicationService:
         level: int | None,
         page: int,
         per_page: int,
-    ) -> tuple[list[dict], int]:
-        return self._leaderboard_repo.query_ranked(level, page, per_page)
+        class_id: str | None = None,
+        challenge_id: str | None = None,
+    ) -> tuple[list[RankedLeaderboardEntry], int]:
+        if challenge_id is not None:
+            return self._leaderboard_repo.query_ranked_by_challenge(
+                challenge_id, page, per_page
+            )
+        if class_id is not None:
+            return self._leaderboard_repo.query_ranked_by_class(class_id, page, per_page)
+        if level is None:
+            return self._leaderboard_repo.query_ranked_global(page, per_page)
+        return self._leaderboard_repo.query_ranked_by_level(level, page, per_page)
+
+    def get_user_history(
+        self,
+        user_id: str,
+        level: int | None = None,
+        page: int = 1,
+        per_page: int = 50,
+    ) -> tuple[list[PersonalHistoryEntry], int]:
+        """Personal-best timeline, paginated.
+
+        Returns (entries_for_page, total_count). PB flags are computed over
+        the full history first so the flag is stable regardless of page —
+        an entry that is a personal best is always marked as such, even if
+        it falls on page 3. The repo returns the full list (one user's
+        sessions); we paginate in Python after PB detection.
+        """
+        history = self._leaderboard_repo.get_user_history(user_id, level)
+        total = len(history)
+        # Walk chronologically (ASC) to compute the rolling-max PB set.
+        chronological = list(reversed(history))
+        running_best = -1
+        pb_ids: set[str] = set()
+        for entry in chronological:
+            if entry.score.value > running_best:
+                running_best = entry.score.value
+                pb_ids.add(entry.id)
+        # Build the full annotated list (DESC order), then slice for the page.
+        annotated = [
+            PersonalHistoryEntry(
+                id=entry.id,
+                level=int(entry.level),
+                score=entry.score.value,
+                kills=entry.kills,
+                waves_survived=entry.waves_survived,
+                created_at=entry.created_at,
+                is_personal_best=entry.id in pb_ids,
+            )
+            for entry in history
+        ]
+        start = (page - 1) * per_page
+        return annotated[start : start + per_page], total
 
     def submit_score(
         self,
@@ -64,38 +114,43 @@ class LeaderboardApplicationService:
                 raise PermissionDeniedError("Not authorized to access this session")
             if session.status != SessionStatus.COMPLETED:
                 raise SessionValidationError("Session is not completed")
-
-            # Cross-validate client-reported waves against server-tracked progress
-            if session.current_wave > 0 and waves_survived > session.current_wave:
+            # Backlog §20: practice-mode sessions are leaderboard-ineligible.
+            if getattr(session, "practice_mode", False):
                 raise SessionValidationError(
-                    "waves_survived exceeds server-tracked wave count"
+                    "Practice-mode sessions are not eligible for the leaderboard"
                 )
+
+            # The leaderboard entry below uses the session's authoritative
+            # kills / waves_survived (capped by GameSession.complete() at the
+            # aggregate boundary), so client-supplied values are ignored.
+            # No cap re-check is needed here — duplicating LEVEL_MAX_* would
+            # split the rule across two layers.
 
             # Domain rule: duplicate submission check
             existing = self._leaderboard_repo.find_by_session_id(session_id)
             if existing:
                 raise DuplicateSubmissionError("Score already submitted for this session")
 
-            # Use the session's authoritative level and score — NOT client-
-            # reported values — to prevent score/level forgery (C-01).
+            # Use the session's authoritative level, score, kills, and waves —
+            # NOT client-reported values — to prevent forgery (C-01, M-7).
             entry = LeaderboardEntry(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 level=session.level,
                 score=Score(session.score),
-                kills=kills,
-                waves_survived=waves_survived,
+                kills=session.kills,
+                waves_survived=session.waves_survived,
                 session_id=session_id,
             )
-            self._leaderboard_repo.save(entry)
             try:
+                self._leaderboard_repo.save(entry)
                 self._uow.commit()
-            except IntegrityError as e:
+            except ConstraintViolationError as e:
                 # Belt-and-braces behind the row-lock in find_by_id_for_update:
                 # a duplicate submission that slips past the lock still trips
                 # the unique constraint. Match the exact constraint so unrelated
                 # FK violations don't get silently mis-mapped to 409.
-                if is_constraint_violation(e, constraint_name="uq_leaderboard_session_id"):
+                if e.constraint_name == "uq_leaderboard_session_id":
                     raise DuplicateSubmissionError("Score already submitted for this session") from e
                 raise
 

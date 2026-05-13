@@ -1,29 +1,28 @@
-/**
- * EnemyFactory — enemy factory (pure TypeScript, no Vue dependency)
- * Builds Enemy objects from ENEMY_DEFS data; movement logic is handled by MovementSystem.
- */
 import { ENEMY_DEFS } from '@/data/enemy-defs'
 import type { EnemyType } from '@/data/constants'
+import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { Enemy } from './types'
 
 let _nextId = 0
 
 export function createEnemy(
   type: EnemyType,
-  pathFn: (x: number) => number,
-  overrides: Partial<{ startX: number; targetX: number }> = {},
+  path: SegmentedPath,
+  startX: number = path.startX,
+  targetX: number = path.targetX,
 ): Enemy {
   const def = ENEMY_DEFS[type]
   if (!def) throw new Error(`Unknown enemy type: ${type}`)
 
-  const startX = overrides.startX ?? 20
-  const targetX = overrides.targetX ?? 0
-  const startY = pathFn(startX)
+  const lo = Math.min(path.startX, path.targetX)
+  const hi = Math.max(path.startX, path.targetX)
+  const spawnX = Math.min(hi, Math.max(lo, startX))
+  const startY = path.evaluateAt(spawnX)
 
   return {
     id: `enemy_${++_nextId}`,
     type,
-    x: startX,
+    x: spawnX,
     y: startY,
     hp: def.maxHp,
     maxHp: def.maxHp,
@@ -36,12 +35,37 @@ export function createEnemy(
     active: true,
     alive: true,
 
-    pathFn,
-    _pathX: startX,
+    _pathX: spawnX,
     _targetX: targetX,
     _direction: targetX > startX ? 1 : -1,
 
-    stealthRanges: (def.stealthRanges as [number, number][]) ?? [],
-    isStealthed: false,
+    killValue: def.killValue,
+
+    shield: def.shieldHp ?? 0,
+    shieldMax: def.shieldHp ?? 0,
+
+    splitDepth: 0,
+    splitCount: def.split?.count ?? 0,
+    splitChildType: def.split?.childType ?? null,
+    splitChildScale: def.split?.childScale ?? 1,
+
+    helperRadius: def.helper?.radius ?? 0,
+    helperHealPerSec: def.helper?.healPerSec ?? 0,
+    helperSpeedBuff: def.helper?.speedBuff ?? 0,
+
+    minionTimer: 0,
+    minionInterval: def.minion?.interval ?? 0,
+    minionType: def.minion?.type ?? null,
+
+    chainRuleTriggered: false,
+    chainRuleAnsweredCorrectly: null,
+    // Sampled by EnemyAbilitySystem on ENEMY_SPAWNED if def.triggerHpRange exists.
+    chainRuleTriggerFraction: 0,
+
+    slowFactor: 0,
+    slowTimer: 0,
+    speedBoost: 0,
+    dotDamage: 0,
+    dotTimer: 0,
   }
 }

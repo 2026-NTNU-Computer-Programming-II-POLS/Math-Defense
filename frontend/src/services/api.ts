@@ -18,20 +18,149 @@ export class ApiError extends Error {
 // Requests over this wall-clock time are aborted. Keeps the UI from hanging
 // indefinitely if the backend disappears; tuned above the slowest expected
 // leaderboard page render and well below any human patience threshold.
-const REQUEST_TIMEOUT_MS = 10_000
+export const REQUEST_TIMEOUT_MS = 10_000
 
 // In dev, leave empty so Vite proxy handles "/api" → backend (vite.config.ts).
 // In prod, set VITE_API_BASE_URL to the backend origin (e.g. https://api.example.com)
 // so requests work without an external reverse proxy.
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
+export const CSRF_COOKIE_NAME = 'csrf_token'
+export const CSRF_HEADER_NAME = 'X-CSRF-Token'
+const UNSAFE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
+
+export function readCookie(name: string): string | null {
+  // document.cookie is "k=v; k2=v2"; pick by exact name.
+  if (typeof document === 'undefined') return null
+  const prefix = `${name}=`
+  for (const raw of document.cookie.split(';')) {
+    const c = raw.trim()
+    if (c.startsWith(prefix)) return decodeURIComponent(c.slice(prefix.length))
+  }
+  return null
+}
+
+// Transient errors worth retrying: network failures (ApiError.status === 0),
+// 502/503/504 from a reloading backend. We only retry idempotent GETs —
+// POST/PATCH/DELETE can't be retried safely without server-side idempotency
+// keys (a WAVE_END update might double-apply).
+const RETRY_STATUSES = new Set([0, 502, 503, 504])
+const MAX_RETRIES = 2
+const RETRY_BASE_DELAY_MS = 300
+
+function shouldRetry(method: string, err: unknown): boolean {
+  if (method !== 'GET') return false
+  if (!(err instanceof ApiError)) return false
+  return RETRY_STATUSES.has(err.status)
+}
+
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const id = setTimeout(resolve, ms)
+    signal?.addEventListener('abort', () => {
+      clearTimeout(id)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }, { once: true })
+  })
+}
+
+// F-BUG-16: a 403 with a CSRF-shaped detail means our cookie was missing or
+// stale (server cleared/rotated it). Refetch a safe GET to mint a fresh
+// csrf_token cookie, then retry the original request once.
+// Safe GET that runs through the same /api proxy + CsrfMiddleware path as
+// the original request, so the response will Set-Cookie the csrf_token if
+// it was missing client-side. /api/auth/me is cheap and always handled.
+const CSRF_REFRESH_PATH = '/api/auth/me'
+// FastAPI's RequestValidationError handler returns `detail` as an array of
+// {loc, type, msg} objects. Without normalization the Error constructor
+// coerces it via String() and the user sees "[object Object]".
+function formatErrorDetail(detail: unknown): string | null {
+  if (detail == null) return null
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    if (detail.length === 0) return null
+    const parts = detail.map((d) => {
+      if (d && typeof d === 'object') {
+        const o = d as { loc?: unknown; msg?: unknown }
+        const loc = Array.isArray(o.loc) ? o.loc.filter((x) => x !== 'body').join('.') : ''
+        const msg = typeof o.msg === 'string' ? o.msg : 'Invalid value'
+        return loc ? `${loc}: ${msg}` : msg
+      }
+      return String(d)
+    })
+    return parts.join('; ')
+  }
+  if (typeof detail === 'object') {
+    try { return JSON.stringify(detail) } catch { return String(detail) }
+  }
+  return String(detail)
+}
+
+function looksLikeCsrfReject(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return false
+  if (e.status !== 403) return false
+  const d = (e.detail ?? '').toLowerCase()
+  return d.includes('csrf')
+}
+
 async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  let lastErr: unknown
+  let csrfRefreshed = false
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await requestOnce<T>(path, options)
+    } catch (e) {
+      lastErr = e
+      const method = (options.method ?? 'GET').toUpperCase()
+      // Single-shot CSRF refresh-and-retry. Bypasses the GET-only retry guard
+      // because the original request was rejected pre-server-state-change, so
+      // re-issuing it is safe even for unsafe methods.
+      if (
+        !csrfRefreshed
+        && UNSAFE_METHODS.has(method)
+        && looksLikeCsrfReject(e)
+      ) {
+        csrfRefreshed = true
+        try { await requestOnce<unknown>(CSRF_REFRESH_PATH) } catch { /* best effort */ }
+        continue
+      }
+      if (attempt < MAX_RETRIES && shouldRetry(method, e)) {
+        // Exponential backoff with a small jitter to decorrelate concurrent
+        // retries from different tabs/components.
+        const delay = RETRY_BASE_DELAY_MS * 2 ** attempt + Math.random() * 100
+        try { await wait(delay, options.signal ?? undefined) } catch { throw e }
+        continue
+      }
+      throw e
+    }
+  }
+  throw lastErr
+}
+
+async function requestOnce<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
+  }
+
+  // Double-submit CSRF: echo the csrf_token cookie (set by the backend
+  // CsrfMiddleware) in the header on state-changing requests. If the
+  // cookie is absent (middleware disabled, or first-ever request), we
+  // skip the header — backend will mint one on this response.
+  const method = (options.method ?? 'GET').toUpperCase()
+  if (UNSAFE_METHODS.has(method)) {
+    const csrf = readCookie(CSRF_COOKIE_NAME)
+    if (csrf) headers[CSRF_HEADER_NAME] = csrf
   }
 
   // Compose a single AbortSignal from (a) the caller's signal, if any, and
@@ -54,7 +183,8 @@ async function request<T>(
       headers,
       signal: controller.signal,
       // Send cookies (HTTP-only auth cookie) with every request.
-      credentials: 'same-origin',
+      // 'include' is required for cross-origin deployments (VITE_API_BASE_URL).
+      credentials: 'include',
     })
   } catch (e) {
     // Caller-initiated abort: re-throw so consumers can detect & ignore it
@@ -72,22 +202,26 @@ async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
+    const detail = formatErrorDetail(body?.detail) ?? res.statusText
     // 401 interceptor: access token expired / rejected by server. Clear local
     // auth state and (if on a protected route) navigate to /auth so the user
     // isn't stranded on a blank panel with repeating errors.
     if (res.status === 401) {
       try {
         const { useAuthStore } = await import('@/stores/authStore')
-        await useAuthStore().logout()
+        // Call handleSessionExpiry (sync, no API call) to avoid recursive logout
+        // when authService.logout() itself uses the api wrapper.
+        useAuthStore().handleSessionExpiry()
       } catch {
         // Pinia not installed yet (very early bootstrap) — best-effort
       }
     }
-    throw new ApiError(res.status, body.detail ?? res.statusText)
+    throw new ApiError(res.status, detail)
   }
 
-  // 204 No Content
-  if (res.status === 204) return undefined as T
+  // 204 No Content — no body to parse; callers must type T as void/undefined.
+  // The double cast through unknown makes the intentional unsafety explicit.
+  if (res.status === 204) return undefined as unknown as T
   return res.json() as Promise<T>
 }
 
@@ -102,7 +236,13 @@ export const api = {
   post<T>(path: string, body: unknown, opts: ApiOptions = {}) {
     return request<T>(path, { method: 'POST', body: JSON.stringify(body), signal: opts.signal })
   },
+  put<T>(path: string, body: unknown, opts: ApiOptions = {}) {
+    return request<T>(path, { method: 'PUT', body: JSON.stringify(body), signal: opts.signal })
+  },
   patch<T>(path: string, body: unknown, opts: ApiOptions = {}) {
     return request<T>(path, { method: 'PATCH', body: JSON.stringify(body), signal: opts.signal })
+  },
+  delete(path: string, opts: ApiOptions = {}): Promise<void> {
+    return request<void>(path, { method: 'DELETE', signal: opts.signal })
   },
 }

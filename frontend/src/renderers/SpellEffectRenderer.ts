@@ -44,6 +44,7 @@ function seedFor(spellId: string, x: number, y: number): number {
 }
 
 function effectAge(spellId: string): number {
+  if (spellId === 'lightning') return 0.85
   return spellId === 'fireball' ? 1.35 : 0.65
 }
 
@@ -94,6 +95,8 @@ export class SpellEffectRenderer implements GameSystem {
     for (const vfx of this._effects) {
       if (vfx.spellId === 'fireball') {
         this._drawFireball(ctx, vfx)
+      } else if (vfx.spellId === 'lightning') {
+        this._drawLightning(ctx, vfx)
       } else {
         this._drawPulse(ctx, vfx)
       }
@@ -155,6 +158,186 @@ export class SpellEffectRenderer implements GameSystem {
     ctx.globalCompositeOperation = 'source-over'
     this._drawSmoke(ctx, px, py, waveR, out, alpha, vfx.seed)
     ctx.restore()
+  }
+
+  private _drawLightning(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
+    const p = clamp01(vfx.age / vfx.maxAge)
+    const out = easeOutQuart(p)
+    const flash = 1 - easeInOut(p)
+    const alpha = 1 - p
+    const px = gameToCanvasX(vfx.x)
+    const py = gameToCanvasY(vfx.y)
+    const span = Math.max(UNIT_PX * 2.1, vfx.radius * UNIT_PX * 1.2)
+    const topY = py - span * 1.45
+    const impactR = span * (0.12 + out * 0.32)
+    const path = this._buildLightningPath(px, topY, py, span, vfx.seed, 0)
+
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+
+    const column = ctx.createLinearGradient(px, topY, px, py + impactR)
+    column.addColorStop(0, `rgba(155, 218, 255, ${0.06 * alpha})`)
+    column.addColorStop(0.48, `rgba(248, 255, 220, ${0.18 * flash})`)
+    column.addColorStop(1, 'rgba(255, 240, 120, 0)')
+    ctx.fillStyle = column
+    ctx.beginPath()
+    ctx.ellipse(px, (topY + py) * 0.5, span * 0.16, span * 0.82, 0, 0, TAU)
+    ctx.fill()
+
+    this._drawLightningBolt(ctx, path, 9.5, `rgba(76, 204, 255, ${0.14 * alpha})`)
+    this._drawLightningBolt(ctx, path, 4.8, `rgba(128, 230, 255, ${0.46 * alpha})`)
+    this._drawLightningBolt(ctx, path, 1.6, `rgba(255, 255, 226, ${0.95 * alpha})`)
+
+    for (let i = 0; i < 7; i++) {
+      const anchor = path[2 + (i % (path.length - 3))]
+      const branch = this._buildLightningBranch(anchor.x, anchor.y, span, vfx.seed, i)
+      this._drawLightningBolt(ctx, branch, 3.2, `rgba(92, 206, 255, ${0.28 * alpha})`)
+      this._drawLightningBolt(ctx, branch, 1.1, `rgba(255, 255, 228, ${0.72 * alpha})`)
+    }
+
+    this._drawImpactFlash(ctx, px, py, impactR, alpha, flash)
+    this._drawLightningSparks(ctx, px, py, span, out, alpha, vfx.seed)
+
+    ctx.globalCompositeOperation = 'source-over'
+    this._drawLightningAfterimage(ctx, px, py, span, out, alpha, vfx.seed)
+    ctx.restore()
+  }
+
+  private _buildLightningPath(
+    px: number,
+    topY: number,
+    bottomY: number,
+    span: number,
+    seed: number,
+    salt: number,
+  ): Array<{ x: number; y: number }> {
+    const points: Array<{ x: number; y: number }> = []
+    const segments = 9
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments
+      const taper = Math.sin(t * Math.PI)
+      const jitter = (seededUnit(seed + salt, i + 400) - 0.5) * span * 0.34 * taper
+      const fork = Math.sin((t * 5.7 + seededUnit(seed, salt + 420)) * Math.PI) * span * 0.06 * taper
+      points.push({
+        x: px + jitter + fork,
+        y: topY + (bottomY - topY) * t,
+      })
+    }
+    return points
+  }
+
+  private _buildLightningBranch(
+    startX: number,
+    startY: number,
+    span: number,
+    seed: number,
+    branchIndex: number,
+  ): Array<{ x: number; y: number }> {
+    const side = seededUnit(seed, branchIndex + 520) > 0.5 ? 1 : -1
+    const length = span * (0.16 + seededUnit(seed, branchIndex + 540) * 0.18)
+    const drop = span * (0.08 + seededUnit(seed, branchIndex + 560) * 0.14)
+    const points: Array<{ x: number; y: number }> = []
+    for (let i = 0; i <= 3; i++) {
+      const t = i / 3
+      points.push({
+        x: startX + side * length * t + (seededUnit(seed, branchIndex * 10 + i + 580) - 0.5) * span * 0.08,
+        y: startY + drop * t + (seededUnit(seed, branchIndex * 10 + i + 600) - 0.5) * span * 0.05,
+      })
+    }
+    return points
+  }
+
+  private _drawLightningBolt(
+    ctx: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    width: number,
+    stroke: string,
+  ): void {
+    if (points.length < 2) return
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = width
+    ctx.strokeStyle = stroke
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, points[0].y)
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y)
+    }
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  private _drawImpactFlash(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    radius: number,
+    alpha: number,
+    flash: number,
+  ): void {
+    const glow = ctx.createRadialGradient(px, py, 0, px, py, radius * 2.6)
+    glow.addColorStop(0, `rgba(255, 255, 236, ${0.92 * alpha})`)
+    glow.addColorStop(0.24, `rgba(255, 239, 108, ${0.54 * alpha})`)
+    glow.addColorStop(0.62, `rgba(86, 203, 255, ${0.18 * alpha})`)
+    glow.addColorStop(1, 'rgba(16, 36, 70, 0)')
+    ctx.fillStyle = glow
+    ctx.beginPath()
+    ctx.arc(px, py, radius * 2.6, 0, TAU)
+    ctx.fill()
+
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeStyle = `rgba(255, 249, 176, ${(0.46 - i * 0.11) * alpha})`
+      ctx.lineWidth = 1.2 + flash * (2.4 - i * 0.4)
+      ctx.beginPath()
+      ctx.arc(px, py, radius * (0.8 + i * 0.52), i * 0.9, TAU - i * 0.42)
+      ctx.stroke()
+    }
+  }
+
+  private _drawLightningSparks(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    span: number,
+    out: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    for (let i = 0; i < 34; i++) {
+      const a = seededUnit(seed, i + 640) * TAU
+      const d = span * (0.05 + seededUnit(seed, i + 660) * 0.38) * out
+      const size = 0.9 + seededUnit(seed, i + 680) * 2.4
+      ctx.fillStyle = i % 3 === 0
+        ? `rgba(255, 248, 176, ${0.8 * alpha})`
+        : `rgba(100, 216, 255, ${0.62 * alpha})`
+      ctx.beginPath()
+      ctx.arc(px + Math.cos(a) * d, py + Math.sin(a) * d, size, 0, TAU)
+      ctx.fill()
+    }
+  }
+
+  private _drawLightningAfterimage(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    span: number,
+    out: number,
+    alpha: number,
+    seed: number,
+  ): void {
+    for (let i = 0; i < 6; i++) {
+      const sx = px + (seededUnit(seed, i + 700) - 0.5) * span * 0.46
+      const sy = py - span * (0.12 + seededUnit(seed, i + 720) * 0.52) * out
+      const r = span * (0.05 + seededUnit(seed, i + 740) * 0.1)
+      const haze = ctx.createRadialGradient(sx, sy, 0, sx, sy, r)
+      haze.addColorStop(0, `rgba(104, 178, 220, ${0.1 * alpha})`)
+      haze.addColorStop(1, 'rgba(12, 26, 42, 0)')
+      ctx.fillStyle = haze
+      ctx.beginPath()
+      ctx.arc(sx, sy, r, 0, TAU)
+      ctx.fill()
+    }
   }
 
   private _drawHeatBloom(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, alpha: number): void {

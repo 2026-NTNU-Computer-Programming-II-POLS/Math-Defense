@@ -31,20 +31,28 @@ import { useSessionSync } from './useSessionSync'
 import { Events, GamePhase } from '@/data/constants'
 import { EventBus } from '@/engine/EventBus'
 import { ApiError } from '@/services/api'
-import type { Game } from '@/engine/Game'
+import type { Game, GameEvents } from '@/engine/Game'
 
-// Minimal Game stub matching what useSessionSync.bind() actually touches
-function makeGameStub() {
-  const eventBus = new EventBus<Record<string, unknown>>()
-  const stub = {
+// Minimal Game stub matching what useSessionSync.bind() actually touches.
+// The object is typed as `Partial<Game>` so the shape is checked at the
+// boundary; the call site casts the same-shape value to the full Game once
+// (no per-test `as any`).
+type GameStub = Partial<Game> & {
+  eventBus: EventBus<GameEvents>
+  state: Partial<Game['state']>
+}
+function makeGameStub(): Game & { eventBus: EventBus<GameEvents> } {
+  const eventBus = new EventBus<GameEvents>()
+  const stub: GameStub = {
     eventBus,
     state: {
-      score: 1234,
-      kills: 7,
-      wave: 5,
-    },
+      kills: 7, wave: 5,
+      starRating: 1, initialAnswer: 0,
+      cumulativeKillValue: 100, costTotal: 50,
+      timeTotal: 60, hp: 15, healthOrigin: 20, timeExcludePrepare: [5, 3],
+    } as Game['state'],
   }
-  return stub as unknown as Game & { eventBus: EventBus<Record<string, unknown>> }
+  return stub as unknown as Game & { eventBus: EventBus<GameEvents> }
 }
 
 function flushPromises(): Promise<void> {
@@ -57,14 +65,15 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.clearAllMocks()
     // Pretend the user is logged in so the sync path actually runs
     const auth = useAuthStore()
-    auth.setUser({ id: 'u1', username: 'tester' })
+    auth.setUser({ id: 'u1', email: 'tester@test.local', player_name: 'tester', role: 'student', avatar_url: null, ia_unlock_earned: false, ia_recent_accuracy: 0 })
 
     // No orphan session at mount
     vi.mocked(sessionService.getActive).mockResolvedValue(null)
     // Successful create returns a session id
     vi.mocked(sessionService.create).mockResolvedValue({
+      schema_version: 1,
       id: 'sess-abc',
-      level: 1,
+      star_rating: 1,
       status: 'active',
       current_wave: 0,
       gold: 200,
@@ -79,8 +88,9 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.mocked(sessionService.end)
       .mockRejectedValueOnce(new Error('network blip'))
       .mockResolvedValueOnce({
+        schema_version: 1,
         id: 'sess-abc',
-        level: 1,
+        star_rating: 1,
         status: 'completed',
         current_wave: 5,
         gold: 200,
@@ -112,7 +122,11 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     expect(sessionService.end).toHaveBeenCalledTimes(2)
     const lastCallArgs = vi.mocked(sessionService.end).mock.calls[1]
     expect(lastCallArgs[0]).toBe('sess-abc')
-    expect(lastCallArgs[1]).toEqual({ score: 1234, kills: 7, waves_survived: 5 })
+    // F-BUG-6: client no longer sends a precomputed `score` field —
+    // backend recomputes from raw inputs (kill_value/time_total/etc.).
+    expect(lastCallArgs[1]).toMatchObject({ kills: 7, waves_survived: 5 })
+    expect(lastCallArgs[1]).not.toHaveProperty('score')
+    expect(lastCallArgs[1]).not.toHaveProperty('total_score')
     expect(sync.sessionId.value).toBeNull()
   })
 
@@ -168,8 +182,9 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.mocked(sessionService.end)
       .mockRejectedValueOnce(new Error('network blip'))
       .mockResolvedValueOnce({
+        schema_version: 1,
         id: 'sess-abc',
-        level: 1,
+        star_rating: 1,
         status: 'completed',
         current_wave: 5,
         gold: 200,
@@ -195,16 +210,19 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     game.eventBus.emit(Events.LEVEL_END, undefined)
     await flushPromises()
     expect(sessionService.end).toHaveBeenCalledTimes(2)
-    expect(vi.mocked(sessionService.end).mock.calls[1][1]).toEqual({
-      score: 1234, kills: 7, waves_survived: 5,
+    expect(vi.mocked(sessionService.end).mock.calls[1][1]).toMatchObject({
+      kills: 7, waves_survived: 5,
     })
+    expect(vi.mocked(sessionService.end).mock.calls[1][1]).not.toHaveProperty('score')
+    expect(vi.mocked(sessionService.end).mock.calls[1][1]).not.toHaveProperty('total_score')
     expect(sync.sessionId.value).toBeNull()
   })
 
   it('happy path: single end call succeeds first time and clears sessionId', async () => {
     vi.mocked(sessionService.end).mockResolvedValueOnce({
+      schema_version: 1,
       id: 'sess-abc',
-      level: 1,
+      star_rating: 1,
       status: 'completed',
       current_wave: 5,
       gold: 200,

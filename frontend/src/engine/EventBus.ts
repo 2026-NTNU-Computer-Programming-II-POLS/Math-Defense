@@ -3,6 +3,10 @@
  * TEvents is an event-map interface with specific keys; there is deliberately
  * no `[key: string]: unknown` index signature so a typo at the call site is a
  * compile error instead of a valid string emit.
+ *
+ * Every `eventBus.on(...)` subscription in the app is indexed in
+ * `event-handlers/registry.ts`. When you add, remove, or move a subscription,
+ * update that registry in the same change.
  */
 
 type ListenerFn<T> = (payload: T) => void

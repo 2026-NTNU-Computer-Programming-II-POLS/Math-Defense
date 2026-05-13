@@ -15,6 +15,10 @@ function close(): void {
   uiStore.closeModal()
 }
 
+function cancel(): void {
+  uiStore.dismissModal({ force: true })
+}
+
 function trapFocus(event: KeyboardEvent): void {
   // Keep keyboard focus inside the modal while it's open
   if (event.key !== 'Tab') return
@@ -43,16 +47,27 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  previousFocus?.focus?.()
+  // Only restore if the saved target is still in the DOM AND focusable. When
+  // one modal replaces another (e.g. an error modal opens on top of the
+  // original), the saved focus may be a now-detached button — focusing it
+  // dumps focus on <body> and breaks keyboard navigation. Fall back to
+  // letting the browser resolve focus naturally in that case.
+  const target = previousFocus
   previousFocus = null
+  if (!target) return
+  if (!document.contains(target)) return
+  // `focus` exists on HTMLElement; guard for the (rare) case of a non-element
+  // having slipped into document.activeElement.
+  if (typeof target.focus !== 'function') return
+  try { target.focus() } catch { /* detached/disabled — ignore */ }
 })
 </script>
 
 <template>
   <div
     class="modal-overlay"
-    @click.self="close"
-    @keydown.esc.prevent.stop="close"
+    @click.self="uiStore.modalConfirmMode ? cancel() : close()"
+    @keydown.esc.prevent.stop="uiStore.modalConfirmMode ? cancel() : close()"
     @keydown="trapFocus"
   >
     <div
@@ -65,7 +80,16 @@ onBeforeUnmount(() => {
     >
       <h3 :id="titleId" class="modal-title">{{ uiStore.modalTitle }}</h3>
       <p class="modal-message">{{ uiStore.modalMessage }}</p>
-      <button ref="okBtnRef" class="btn modal-ok" @click="close">確認</button>
+      <div class="modal-actions">
+        <button
+          v-if="uiStore.modalConfirmMode"
+          class="btn modal-cancel"
+          @click="cancel"
+        >{{ uiStore.modalCancelLabel }}</button>
+        <button ref="okBtnRef" class="btn modal-ok" @click="close">
+          {{ uiStore.modalConfirmMode ? uiStore.modalConfirmLabel : 'OK' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -78,11 +102,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-modal);
 }
 
 .modal-box {
   width: 360px;
+  max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -101,5 +126,12 @@ onBeforeUnmount(() => {
   line-height: 1.8;
 }
 
-.modal-ok { align-self: center; min-width: 120px; }
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.modal-ok { min-width: 120px; }
+.modal-cancel { min-width: 120px; border-color: var(--axis); color: var(--axis); }
+.modal-cancel:hover { background: var(--axis); color: var(--stone-dark); }
 </style>

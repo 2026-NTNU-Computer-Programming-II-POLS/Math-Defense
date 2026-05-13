@@ -9,7 +9,7 @@ export function useLeaderboard() {
   let fetchId = 0
   let inflight: AbortController | null = null
 
-  async function fetch(level?: number, page = 1): Promise<void> {
+  async function load(level?: number, page = 1): Promise<void> {
     // Cancel any inflight request so a rapid level-filter change doesn't let
     // the older (slower) response arrive last and overwrite the newer one.
     // Discarding by fetchId alone leaves the socket open; aborting frees it.
@@ -37,5 +37,5 @@ export function useLeaderboard() {
     }
   }
 
-  return { entries, total, loading, error, fetch }
+  return { entries, total, loading, error, load }
 }
