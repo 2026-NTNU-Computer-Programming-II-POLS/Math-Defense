@@ -12,8 +12,8 @@ import type { TowerSceneView, TowerView } from '@/engine/projections/views'
 import { drawOrbitRing, drawDiamondCrystal } from './primitives'
 
 const TOWER_RADIUS = 14
-const BASE_DARK = '#17131d'
-const BASE_MID = '#242031'
+const BASE_DARK = '#1a2a3a'
+const BASE_MID = '#2c3e50'
 const HIGHLIGHT = 'rgba(255,255,255,0.82)'
 
 export class TowerRenderer {

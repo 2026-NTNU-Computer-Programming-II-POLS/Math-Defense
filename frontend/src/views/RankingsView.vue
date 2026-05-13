@@ -506,7 +506,7 @@ onBeforeUnmount(cancelInflight)
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: radial-gradient(ellipse at center, #1e1828 0%, #0d0a12 70%);
+  background: var(--bg-base);
   min-height: 100vh;
   overflow-y: auto;
 }
@@ -517,7 +517,7 @@ onBeforeUnmount(cancelInflight)
 .rk-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .rk-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .filter-label { font-size: 11px; color: var(--axis); }
-.tab-btn.active { background: var(--gold); color: var(--stone-dark); }
+.tab-btn.active { background: var(--gold); color: #1a2a3a; font-weight: bold; }
 .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .rk-selector { max-width: 300px; }
@@ -527,7 +527,7 @@ onBeforeUnmount(cancelInflight)
 th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--grid-line); }
 th { color: var(--axis); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
 .rank { color: var(--gold); font-size: 14px; }
-.player-name { color: #e8dcc8; }
+.player-name { color: var(--text-primary); }
 .score { color: var(--gold-bright); font-weight: bold; }
 .rk-loading, .rk-error, .empty { text-align: center; color: var(--axis); padding: 32px; }
 .rk-error { color: var(--enemy-red); }

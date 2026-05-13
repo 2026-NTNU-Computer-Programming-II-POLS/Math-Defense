@@ -295,9 +295,9 @@ const showTargetingMode = computed(() => {
 .stats { display: flex; flex-direction: column; gap: 2px; }
 .stat-row {
   display: flex; justify-content: space-between;
-  font-size: 11px; color: #e8dcc8;
+  font-size: 11px; color: var(--text-primary);
 }
-.stat-row > span:last-child { color: var(--gold); }
+.stat-row > span:last-child { color: var(--gold); font-weight: bold; }
 
 /* Click-to-expand breakdown for Damage / Range / Cooldown rows. Using
    <details>/<summary> instead of an absolute-positioned tooltip avoids
@@ -307,7 +307,7 @@ details.stat-row--breakdown {
   display: flex;
   flex-direction: column;
   font-size: 11px;
-  color: #e8dcc8;
+  color: var(--text-primary);
 }
 details.stat-row--breakdown > summary {
   display: flex;
@@ -341,8 +341,8 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
 .breakdown-body {
   margin-top: 4px;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.25);
-  border-left: 2px solid rgba(139, 115, 66, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  border-left: 2px solid var(--gold);
   border-radius: 0 4px 4px 0;
   display: flex;
   flex-direction: column;
@@ -355,7 +355,7 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
   gap: 16px;
   letter-spacing: 0.5px;
 }
-.bd-row > span:first-child { color: #c8b894; }
+.bd-row > span:first-child { color: var(--text-secondary); }
 .bd-row > span:last-child { color: var(--gold); }
 /* Specificity must beat ".bd-row > span:last-child" (0,2,1); use a chained
    class on the same element so this wins by source order at (0,2,1). */
@@ -366,17 +366,17 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
   padding-top: 3px;
   border-top: 1px solid rgba(139, 115, 66, 0.3);
 }
-.bd-total > span:first-child { color: #e8dcc8; }
-.bd-total > span:last-child { color: var(--gold-bright); font-weight: bold; }
+.bd-total > span:first-child { color: var(--text-primary); }
+.bd-total > span:last-child { color: var(--gold); font-weight: bold; }
 
 .math-concept { font-size: 10px; color: var(--axis); letter-spacing: 1px; margin: 0; }
 .exam-relevance {
   font-size: 10px;
-  color: #c8b894;
+  color: var(--text-primary);
   line-height: 1.45;
   margin: 0;
-  padding: 6px 8px;
-  background: rgba(255, 215, 0, 0.06);
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.05);
   border-left: 2px solid var(--gold);
   border-radius: 0 4px 4px 0;
 }
@@ -395,7 +395,7 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
   flex: 0 0 auto; font-size: 11px; padding: 8px 12px;
   border-color: var(--hp-red); color: var(--hp-red);
 }
-.refund-btn:hover { background: var(--hp-red); color: var(--stone-dark); }
+.refund-btn:hover { background: var(--hp-red); color: #ffffff; }
 .refund-confirm {
   display: flex; align-items: center; gap: 6px; flex: 1;
 }

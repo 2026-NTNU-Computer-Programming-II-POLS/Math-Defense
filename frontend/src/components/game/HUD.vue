@@ -211,8 +211,8 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 48px;
-  background: linear-gradient(180deg, rgba(26,21,32,0.95), rgba(26,21,32,0.8));
-  border-bottom: 1px solid var(--panel-border);
+  background: rgba(80, 100, 130, 0.95);
+  border-bottom: 2px solid var(--gold);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -229,8 +229,8 @@ onBeforeUnmount(() => {
   position: absolute;
   top: var(--hud-height, 48px); left: 0; right: 0;
   height: 44px;
-  background: rgba(26,21,32,0.85);
-  border-bottom: 1px solid var(--panel-border);
+  background: rgba(100, 120, 150, 0.92);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.3);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -249,7 +249,8 @@ onBeforeUnmount(() => {
 
 .hud-label {
   font-size: 11px;
-  color: var(--axis);
+  color: #ffffff;
+  opacity: 0.8;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -258,9 +259,10 @@ onBeforeUnmount(() => {
   font-size: 14px;
   color: var(--gold);
   font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.phase    { color: #e8dcc8; font-size: 12px; }
+.phase    { color: var(--gold); font-size: 12px; }
 .gold     { color: var(--gold-bright); }
 .hp-low   { color: var(--hp-red); font-weight: 900; }
 .hp-warn-icon { margin: 0 2px; }
@@ -348,9 +350,9 @@ onBeforeUnmount(() => {
 /* Phase pulse */
 .phase-pulse { animation: phase-pulse 520ms ease-out; }
 @keyframes phase-pulse {
-  0%   { transform: scale(1);    color: var(--gold-bright); text-shadow: 0 0 8px var(--gold-bright); }
-  40%  { transform: scale(1.18); color: var(--gold-bright); text-shadow: 0 0 12px var(--gold-bright); }
-  100% { transform: scale(1);    color: #e8dcc8; text-shadow: none; }
+  0%   { transform: scale(1);    color: var(--gold-bright); text-shadow: 0 0 8px var(--gold); }
+  40%  { transform: scale(1.18); color: var(--gold); text-shadow: 0 0 12px var(--gold); }
+  100% { transform: scale(1);    color: #ffffff; text-shadow: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .phase-pulse { animation: none; }

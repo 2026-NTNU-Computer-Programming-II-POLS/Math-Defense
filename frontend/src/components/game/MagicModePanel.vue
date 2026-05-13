@@ -221,16 +221,16 @@ function toggleMode(mode: MagicMode) {
   font-size: 11px;
   padding: 6px 8px;
   background: var(--stone-dark);
-  color: var(--text);
-  border: 1px solid var(--axis);
+  color: #ffffff;
+  border: 1px solid var(--gold);
   border-radius: 4px;
   outline: none;
 }
-.fn-field:focus { border-color: var(--gold); }
+.fn-field:focus { border-color: #ffffff; box-shadow: 0 0 5px rgba(255, 215, 0, 0.4); }
 .apply-btn { font-size: 11px; padding: 6px 10px; }
-.hint { font-size: 10px; color: var(--axis); margin: 0; opacity: 0.7; }
+.hint { font-size: 10px; color: var(--text-primary); margin: 0; opacity: 0.7; }
 .fn-locked { color: var(--hp-red); opacity: 0.85; text-decoration: line-through; }
-.error-msg { font-size: 10px; color: #f87171; margin: 0; }
+.error-msg { font-size: 10px; color: #ff8888; margin: 0; }
 .mode-btns { display: flex; gap: 6px; }
 .mode-btns .btn { flex: 1; font-size: 10px; padding: 6px; }
 .mode-btns .btn.active { background: var(--gold); color: var(--stone-dark); }
@@ -239,7 +239,7 @@ function toggleMode(mode: MagicMode) {
 .slider-cell { display: grid; grid-template-columns: 14px 1fr 28px; align-items: center; gap: 6px; }
 .slider-name { font-size: 11px; color: var(--gold); font-style: italic; }
 .slider-ctrl { accent-color: var(--gold); cursor: pointer; }
-.slider-val { font-size: 11px; color: #e8dcc8; font-family: var(--font-mono); text-align: right; }
+.slider-val { font-size: 11px; color: #ffffff; font-family: var(--font-mono); text-align: right; }
 .formula-readout {
   font-family: var(--font-mono);
   font-size: 11px;

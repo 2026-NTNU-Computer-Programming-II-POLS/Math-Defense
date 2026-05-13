@@ -26,8 +26,8 @@ html, body {
 }
 
 body {
-  background: #0d0a12;
-  color: #e8dcc8;
+  background: #a4b9d4;
+  color: var(--text-primary);
   font-family: var(--font-main);
   margin: 0;
 }
@@ -41,17 +41,20 @@ body {
   min-height: 44px;
   border: 1px solid var(--gold);
   border-radius: 6px;
-  background: transparent;
-  color: var(--gold);
+  background: white;
+  color: var(--text-primary); /* Deep blue-gray for clear contrast on white */
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 2px;
-  transition: background 0.2s, color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn:hover {
   background: var(--gold);
-  color: var(--stone-dark);
+  color: #1a2a3a; /* Darker color for contrast on yellow */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Visible keyboard focus for all .btn instances */
@@ -76,14 +79,15 @@ body {
 
 /* ── Input Fields ── */
 .rune-input {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--gold-dim);
-  color: #e8dcc8;
+  background: var(--stone-dark);
+  border: 1px solid var(--gold);
+  color: #ffffff;
   font-family: var(--font-mono);
   font-size: 14px;
   padding: 4px 8px;
   width: 80px;
   text-align: center;
+  border-radius: 4px;
 }
 
 .rune-input:focus {
