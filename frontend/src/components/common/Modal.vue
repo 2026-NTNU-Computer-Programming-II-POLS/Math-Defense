@@ -117,6 +117,7 @@ onBeforeUnmount(() => {
 .modal-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
 }
 

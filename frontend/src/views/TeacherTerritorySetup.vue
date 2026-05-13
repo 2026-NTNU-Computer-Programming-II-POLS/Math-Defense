@@ -162,12 +162,13 @@ onMounted(async () => {
 .setup-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
   text-align: center;
 }
 
 .error-msg { font-size: 11px; color: var(--enemy-red); }
-.warn-msg { font-size: 10px; color: var(--gold); margin-top: 4px; }
+.warn-msg { font-size: 10px; color: var(--gold); text-shadow: var(--gold-shadow); margin-top: 4px; }
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
@@ -179,7 +180,7 @@ onMounted(async () => {
 }
 
 .field { display: flex; flex-direction: column; gap: 4px; }
-.field-label { font-size: 11px; color: var(--gold); }
+.field-label { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .slot-list { display: flex; flex-direction: column; gap: 6px; }
 
@@ -189,7 +190,7 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.slot-num { font-size: 10px; color: var(--axis); min-width: 24px; }
+.slot-num { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); min-width: 24px; }
 .star-select { flex: 1; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
@@ -203,6 +204,7 @@ onMounted(async () => {
   background: none;
   border: 1px solid var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   cursor: pointer;
 }
 
@@ -211,6 +213,6 @@ onMounted(async () => {
 .btn-sm.danger:hover { background: var(--enemy-red); color: var(--stone-dark); }
 .btn-sm:disabled { opacity: 0.3; cursor: default; }
 
-.back-btn { border-color: var(--axis); color: var(--axis); }
+.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 </style>

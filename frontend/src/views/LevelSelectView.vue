@@ -152,13 +152,14 @@ async function startLevel() {
   padding: 2rem;
   color: var(--text-primary);
   min-height: 100vh;
-  background: var(--stone-dark);
+  background: var(--bg-base);
 }
 
 h1 {
   font-size: 2rem;
   margin-bottom: 2rem;
-  color: var(--gold-bright);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 
 .star-grid {
@@ -171,8 +172,8 @@ h1 {
 }
 
 .star-card {
-  background: var(--stone-light);
-  border: 2px solid var(--grid-line);
+  background: var(--panel-bg);
+  border: 2px solid var(--card-border);
   border-radius: 8px;
   padding: 1.5rem 1rem;
   cursor: pointer;
@@ -189,7 +190,7 @@ h1 {
 .star-card.selected {
   border-color: var(--gold-bright);
   background: var(--stone-selected);
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+  box-shadow: 0 0 12px rgba(212, 160, 23, 0.3);
 }
 
 .star-card.locked,
@@ -200,13 +201,14 @@ h1 {
 }
 
 .star-card.locked:hover {
-  border-color: var(--grid-line);
+  border-color: var(--card-border);
 }
 
 .lock-badge {
   margin-top: 0.4rem;
   font-size: 1rem;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .star-icons {
@@ -243,7 +245,8 @@ h1 {
   padding: 0.5rem 1.5rem;
   background: transparent;
   color: var(--axis);
-  border: 1px solid var(--grid-line);
+  text-shadow: var(--gold-shadow);
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   cursor: pointer;
 }
@@ -257,9 +260,10 @@ h1 {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background: rgba(212, 168, 64, 0.12);
-  border: 1px solid var(--gold-bright, #d4a840);
-  color: var(--gold-bright, #d4a840);
+  background: var(--gold-tint-select);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
   border-radius: 999px;
   padding: 0.4rem 0.9rem;
   margin-bottom: 1rem;
@@ -267,7 +271,8 @@ h1 {
 }
 
 .suggestion-text strong {
-  color: var(--gold-bright, #d4a840);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 
 .suggestion-dismiss {

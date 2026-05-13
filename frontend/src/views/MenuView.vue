@@ -173,6 +173,7 @@ const mathGlyphs = [
 .title-sub {
   font-size: 24px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 16px;
   margin-bottom: 24px;
   font-weight: 300;
@@ -201,6 +202,7 @@ const mathGlyphs = [
 .title-motto {
   font-size: 12px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
 }
 
@@ -212,7 +214,7 @@ const mathGlyphs = [
   gap: 16px;
   width: 320px;
   padding: 32px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--card-surface);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 16px;
@@ -250,6 +252,7 @@ const mathGlyphs = [
 .menu-footer-link:hover,
 .menu-footer-link:focus-visible {
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -185,7 +185,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .score-panel {
-  background: rgba(50, 68, 95, 0.98);
+  background: var(--panel-bg);
   border: 2px solid var(--gold);
   border-radius: 8px;
   padding: 24px 40px;
@@ -222,18 +222,18 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .breakdown .label {
   text-align: left;
-  color: #ffffff;
-  opacity: 0.8;
+  color: var(--text-primary);
 }
 
 .breakdown .value {
   text-align: right;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-weight: bold;
 }
 
-.breakdown tr.formula .label { color: #60c0ff; }
-.breakdown tr.formula .value { color: #60c0ff; }
+.breakdown tr.formula .label { color: var(--formula-blue); }
+.breakdown tr.formula .value { color: var(--formula-blue); }
 
 .total-score {
   display: flex;
@@ -246,6 +246,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .total-label {
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-size: 14px;
   font-weight: bold;
 }
@@ -281,7 +282,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .btn-continue:hover {
-  background: #ffea00;
+  background: var(--gold-bright);
   transform: translateY(-1px);
 }
 
@@ -295,6 +296,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .reflection-label {
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   font-size: 11px;
 }
 
@@ -303,8 +305,8 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   resize: vertical;
   font-family: var(--font-mono);
   font-size: 12px;
-  background: rgba(0, 0, 0, 0.4);
-  color: #e8dcc8;
+  background: var(--stone-selected);
+  color: var(--text-primary);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   padding: 6px 8px;
@@ -325,6 +327,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 .reflection-meta {
   font-size: 10px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .reflection-meta.saved { color: var(--gold-bright); }
@@ -334,8 +337,9 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   margin-left: auto;
   padding: 4px 14px;
   border: 1px solid var(--gold);
-  background: rgba(212, 168, 64, 0.15);
+  background: rgba(212, 160, 23, 0.15);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-family: var(--font-mono);
   font-size: 11px;
   cursor: pointer;
@@ -347,6 +351,6 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .btn-submit:not(:disabled):hover {
-  background: rgba(212, 168, 64, 0.35);
+  background: rgba(212, 160, 23, 0.35);
 }
 </style>

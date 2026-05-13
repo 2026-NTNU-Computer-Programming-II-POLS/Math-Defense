@@ -216,24 +216,24 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.talent-title { font-size: 20px; color: var(--gold); letter-spacing: 4px; }
+.talent-title { font-size: 20px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 4px; }
 .talent-points { font-size: 12px; }
-.tp-available { color: var(--gold); font-weight: bold; }
-.tp-detail { color: var(--axis); margin-left: 8px; }
+.tp-available { color: var(--gold); text-shadow: var(--gold-shadow); font-weight: bold; }
+.tp-detail { color: var(--axis); text-shadow: var(--gold-shadow); margin-left: 8px; }
 .talent-actions { display: flex; gap: 8px; }
 
 .reset-btn { border-color: var(--enemy-red); color: var(--enemy-red); }
 .reset-btn:hover:not(:disabled) { background: var(--enemy-red); color: var(--stone-dark); }
 .reset-btn:disabled { opacity: 0.3; }
 
-.talent-loading, .talent-error { text-align: center; color: var(--axis); padding: 32px; }
+.talent-loading, .talent-error { text-align: center; color: var(--axis); text-shadow: var(--gold-shadow); padding: 32px; }
 .talent-error { color: var(--enemy-red); }
 .talent-alloc-error { font-size: 11px; color: var(--enemy-red); text-align: center; }
 
 .talent-towers { display: flex; flex-direction: column; gap: 24px; }
 
 .tower-section {
-  border: 1px solid var(--grid-line);
+  border: 1px solid var(--panel-border);
   border-radius: 4px;
   padding: 16px;
 }
@@ -249,7 +249,7 @@ onMounted(async () => {
 .talent-node {
   width: 140px;
   padding: 10px;
-  border: 1px solid var(--grid-line);
+  border: 1px solid var(--panel-border);
   border-radius: 4px;
   cursor: default;
   transition: border-color 0.2s, background 0.2s;
@@ -261,12 +261,12 @@ onMounted(async () => {
 }
 
 .talent-node.available:hover {
-  background: rgba(212, 168, 64, 0.1);
+  background: var(--gold-tint);
 }
 
 .talent-node.maxed {
   border-color: var(--gold);
-  background: rgba(212, 168, 64, 0.08);
+  background: var(--gold-tint-soft);
 }
 
 .talent-node.locked { opacity: 0.4; }
@@ -277,22 +277,23 @@ onMounted(async () => {
      when the user has no points to spend. */
   opacity: 1;
   border-color: var(--gold);
-  box-shadow: 0 0 0 1px var(--gold), 0 0 12px rgba(212, 168, 64, 0.45);
+  box-shadow: 0 0 0 1px var(--gold), 0 0 12px rgba(212, 160, 23, 0.45);
 }
 
 .talent-recommendation {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background: rgba(212, 168, 64, 0.12);
+  background: var(--gold-tint-select);
   border: 1px solid var(--gold);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   border-radius: 4px;
   padding: 0.5rem 0.8rem;
   font-size: 12px;
 }
 
-.rec-text strong { color: var(--gold); letter-spacing: 1px; }
+.rec-text strong { color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
 
 .rec-dismiss {
   background: transparent;
@@ -306,9 +307,9 @@ onMounted(async () => {
 
 .rec-dismiss:hover { opacity: 0.7; }
 
-.node-name { font-size: 11px; color: #e8dcc8; margin-bottom: 4px; }
-.node-level { font-size: 13px; color: var(--gold); margin-bottom: 4px; }
-.node-desc { font-size: 9px; color: var(--axis); margin-bottom: 4px; }
-.node-effect { font-size: 9px; color: var(--gold); opacity: 0.8; }
-.node-cost { font-size: 9px; color: var(--axis); opacity: 0.7; margin-top: 2px; }
+.node-name { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.node-level { font-size: 13px; color: var(--gold); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
+.node-desc { font-size: 9px; color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
+.node-effect { font-size: 9px; color: var(--gold); text-shadow: var(--gold-shadow); opacity: 0.8; }
+.node-cost { font-size: 9px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 2px; }
 </style>

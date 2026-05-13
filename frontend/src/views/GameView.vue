@@ -459,7 +459,7 @@ onBeforeUnmount(() => {
   z-index: var(--z-modal);
 }
 .boot-state.error { color: var(--hp-red); }
-.boot-title { font-size: 16px; letter-spacing: 2px; color: var(--gold); }
+.boot-title { font-size: 16px; letter-spacing: 2px; color: var(--gold); text-shadow: var(--gold-shadow); }
 .boot-msg   { font-size: 12px; text-align: center; max-width: 480px; padding: 0 16px; }
 .boot-spinner {
   width: 32px; height: 32px;
@@ -496,7 +496,7 @@ onBeforeUnmount(() => {
   color: var(--gold-bright);
   letter-spacing: 6px;
 }
-.pause-hint { font-size: 12px; color: var(--axis); letter-spacing: 1px; }
+.pause-hint { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
 .pause-hint kbd {
   display: inline-block;
   padding: 2px 6px;
@@ -506,6 +506,7 @@ onBeforeUnmount(() => {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 
 /* §12: Star-5 checkpoint retry dialog */
@@ -546,6 +547,7 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 12px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   line-height: 1.5;
 }
 .checkpoint-practice {
@@ -564,7 +566,7 @@ onBeforeUnmount(() => {
   padding: 8px 20px;
   border: 1px solid var(--gold-dim);
   border-radius: 4px;
-  background: rgba(255, 215, 0, 0.1);
+  background: rgba(212, 160, 23, 0.1);
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -572,16 +574,16 @@ onBeforeUnmount(() => {
   transition: background 120ms;
 }
 .btn-checkpoint:hover {
-  background: rgba(255, 215, 0, 0.25);
+  background: rgba(212, 160, 23, 0.25);
 }
 .btn-checkpoint.primary {
   border-color: var(--gold);
   color: var(--text-on-accent);
-  background: rgba(255, 215, 0, 0.3);
+  background: rgba(212, 160, 23, 0.3);
   font-weight: bold;
 }
 .btn-checkpoint.primary:hover {
-  background: rgba(255, 215, 0, 0.5);
+  background: rgba(212, 160, 23, 0.5);
 }
 
 /* Backlog §20 — practice-mode badge */

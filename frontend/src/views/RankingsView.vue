@@ -512,11 +512,11 @@ onBeforeUnmount(cancelInflight)
 }
 
 .rk-header { display: flex; justify-content: space-between; align-items: center; }
-.rk-title { font-size: 20px; color: var(--gold); letter-spacing: 4px; }
+.rk-title { font-size: 20px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 4px; }
 
 .rk-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .rk-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.filter-label { font-size: 11px; color: var(--axis); }
+.filter-label { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); }
 .tab-btn.active { background: var(--gold); color: var(--text-on-accent); font-weight: bold; }
 .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -525,28 +525,28 @@ onBeforeUnmount(cancelInflight)
 .rk-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .rk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--grid-line); }
-th { color: var(--axis); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
-.rank { color: var(--gold); font-size: 14px; }
+th { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+.rank { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 14px; }
 .player-name { color: var(--text-primary); }
 .score { color: var(--gold-bright); font-weight: bold; }
-.rk-loading, .rk-error, .empty { text-align: center; color: var(--axis); padding: 32px; }
+.rk-loading, .rk-error, .empty { text-align: center; color: var(--axis); text-shadow: var(--gold-shadow); padding: 32px; }
 .rk-error { color: var(--enemy-red); }
 
 .rk-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.page-info { font-size: 12px; color: var(--axis); }
+.page-info { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); }
 .page-btn:disabled { opacity: 0.3; cursor: default; }
 
 .rk-internal { display: flex; flex-direction: column; gap: 10px; }
 .rk-internal-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .rk-control-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .rk-scope-class { font-size: 11px; padding: 2px 6px; }
-.user-rank-pill { margin-left: auto; padding: 4px 10px; border: 1px solid var(--gold); color: var(--gold); font-size: 11px; }
+.user-rank-pill { margin-left: auto; padding: 4px 10px; border: 1px solid var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); font-size: 11px; }
 .user-rank-pill strong { color: var(--gold-bright); }
-.rk-hint { font-size: 10px; color: var(--axis); opacity: 0.8; }
+.rk-hint { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.8; }
 
-.rk-table tr.is-user { background: rgba(255, 215, 0, 0.06); }
-.delta { font-size: 12px; color: var(--axis); }
+.rk-table tr.is-user { background: rgba(212, 160, 23, 0.06); }
+.delta { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); }
 .delta.up { color: #6abf85; }
 .delta.down { color: #d05050; }
-.composition, .last-occ { font-size: 10px; color: var(--axis); }
+.composition, .last-occ { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); }
 </style>

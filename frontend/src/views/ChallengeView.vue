@@ -135,17 +135,18 @@ function goToLeaderboard(): void {
 .setup-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
   text-align: center;
 }
 
-.loading { color: var(--axis); font-size: 12px; text-align: center; }
+.loading { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 12px; text-align: center; }
 .error-msg { font-size: 11px; color: var(--enemy-red); }
 
 .challenge-detail { display: flex; flex-direction: column; gap: 12px; }
 .title-row { display: flex; align-items: baseline; justify-content: space-between; }
-.ch-title { font-size: 14px; color: var(--gold); margin: 0; }
-.ch-desc { font-size: 11px; color: var(--axis); margin: 0; line-height: 1.4; }
+.ch-title { font-size: 14px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.ch-desc { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); margin: 0; line-height: 1.4; }
 
 .constraints {
   display: grid;
@@ -154,8 +155,8 @@ function goToLeaderboard(): void {
   font-size: 11px;
   margin: 0;
 }
-.constraints dt { color: var(--gold); }
-.constraints dd { color: var(--axis); margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.constraints dt { color: var(--gold); text-shadow: var(--gold-shadow); }
+.constraints dd { color: var(--axis); text-shadow: var(--gold-shadow); margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 
 .chip {
   display: inline-block;
@@ -163,10 +164,11 @@ function goToLeaderboard(): void {
   border: 1px solid var(--axis);
   font-size: 10px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 .chip.danger { border-color: var(--enemy-red); color: var(--enemy-red); }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.back-btn { border-color: var(--axis); color: var(--axis); }
+.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 </style>

@@ -50,7 +50,7 @@ const display = computed(() => {
 
 <style scoped>
 .deadline-progress { display: flex; flex-direction: column; gap: 6px; }
-.timer-line { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--axis); }
+.timer-line { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); }
 .icon { font-size: 12px; }
 .bar-track {
   height: 6px;
@@ -62,7 +62,7 @@ const display = computed(() => {
 [data-tier="safe"] .text { color: #6abf85; }
 [data-tier="warning"] .text { color: #d8a848; }
 [data-tier="urgent"] .text { color: #d05050; }
-[data-tier="expired"] .text { color: var(--axis); opacity: 0.7; }
+[data-tier="expired"] .text { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; }
 [data-tier="safe"]    .bar-fill { background: linear-gradient(90deg, #4aab6e, #3a9b5e); }
 [data-tier="warning"] .bar-fill { background: linear-gradient(90deg, #c89848, #b88838); }
 [data-tier="urgent"]  .bar-fill { background: linear-gradient(90deg, #b84040, #a83030); animation: pulse 1s infinite; }

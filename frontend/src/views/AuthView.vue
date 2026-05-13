@@ -240,6 +240,7 @@ async function submit(): Promise<void> {
 .auth-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
   text-align: center;
 }
@@ -256,6 +257,7 @@ async function submit(): Promise<void> {
   gap: 4px;
   font-size: 11px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .rune-input { width: 100%; }
@@ -265,6 +267,7 @@ async function submit(): Promise<void> {
 .mfa-hint {
   font-size: 11px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   opacity: 0.8;
   margin: 0;
   text-align: center;
@@ -279,6 +282,7 @@ async function submit(): Promise<void> {
   gap: 2px;
   font-size: 10px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   opacity: 0.7;
 }
 
@@ -290,6 +294,7 @@ async function submit(): Promise<void> {
 .password-rules li.met::before {
   content: '✓ ';
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 
 .password-rules li.met {
@@ -300,12 +305,14 @@ async function submit(): Promise<void> {
   text-align: center;
   font-size: 10px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   opacity: 0.6;
   margin: 0;
 }
 
 .demo-hint code {
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-family: inherit;
 }
 
@@ -314,6 +321,7 @@ async function submit(): Promise<void> {
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .toggle-btn:hover, .back-btn:hover {

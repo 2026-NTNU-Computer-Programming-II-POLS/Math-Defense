@@ -134,7 +134,7 @@ function backToMenu() {
   max-width: 760px;
   margin: 2rem auto;
   padding: 0 1.25rem 3rem;
-  color: var(--color-text, #ddd);
+  color: var(--text-primary);
 }
 .affect-header h1 {
   margin: 0 0 0.25rem;
@@ -142,19 +142,19 @@ function backToMenu() {
 }
 .affect-meta {
   margin: 0;
-  color: var(--color-text-muted, #aaa);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 .affect-warning {
-  background: rgba(255, 165, 0, 0.12);
-  border: 1px solid rgba(255, 165, 0, 0.4);
+  background: var(--gold-tint);
+  border: 1px solid var(--gold-dim);
   padding: 0.6rem 0.8rem;
   border-radius: 6px;
   margin-top: 0.75rem;
 }
 .affect-instructions {
   margin: 1rem 0 0;
-  color: var(--color-text-muted, #aaa);
+  color: var(--text-secondary);
 }
 .affect-list {
   list-style: none;
@@ -164,8 +164,8 @@ function backToMenu() {
 .affect-item {
   margin-bottom: 1.4rem;
   padding: 1rem 1.1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--card-surface);
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
 }
 .affect-stem {
@@ -174,7 +174,8 @@ function backToMenu() {
 }
 .affect-num {
   margin-right: 0.4rem;
-  color: var(--color-accent, #6db);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-weight: 600;
 }
 .likert {
@@ -188,18 +189,18 @@ function backToMenu() {
   align-items: center;
   gap: 0.15rem;
   padding: 0.5rem 0.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   cursor: pointer;
   text-align: center;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 .likert-cell:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--gold-tint-hover);
 }
 .likert-cell.selected {
-  border-color: var(--color-accent, #6db);
-  background: rgba(110, 220, 187, 0.08);
+  border-color: var(--gold);
+  background: var(--gold-tint-select);
 }
 .likert-cell input[type="radio"] {
   position: absolute;
@@ -209,19 +210,20 @@ function backToMenu() {
 }
 .likert-num {
   font-weight: 700;
-  color: var(--color-accent, #6db);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 .likert-text {
   font-size: 0.78rem;
-  color: var(--color-text-muted, #aaa);
+  color: var(--text-secondary);
 }
 .affect-actions {
   margin-top: 1.5rem;
   text-align: right;
 }
 .affect-submit {
-  background: var(--color-accent, #6db);
-  color: #0a1118;
+  background: var(--gold);
+  color: var(--text-on-accent);
   border: none;
   padding: 0.6rem 1.4rem;
   border-radius: 6px;
@@ -233,7 +235,7 @@ function backToMenu() {
   cursor: not-allowed;
 }
 .affect-error {
-  color: #ff8a8a;
+  color: var(--error-red);
   margin-top: 1rem;
 }
 .affect-result {

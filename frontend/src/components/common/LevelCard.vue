@@ -98,6 +98,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   background: none;
   border: none;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   cursor: pointer;
   font-size: 14px;
   min-width: 44px;
@@ -107,7 +108,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   justify-content: center;
 }
 
-.close-btn:hover { color: var(--gold); }
+.close-btn:hover { color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .level-overlay {
   position: absolute;
@@ -130,6 +131,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 .select-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 6px;
   text-align: center;
 }
@@ -157,8 +159,8 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   background: rgba(212,168,64,0.08);
 }
 
-.lv-num  { font-size: 10px; color: var(--axis); letter-spacing: 2px; }
+.lv-num  { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
 .lv-name { font-size: 18px; color: var(--gold-bright); }
-.lv-name-en { font-size: 11px; color: var(--gold); letter-spacing: 2px; }
+.lv-name-en { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
 .lv-desc { font-size: 10px; color: #9a8a70; margin-top: 4px; }
 </style>

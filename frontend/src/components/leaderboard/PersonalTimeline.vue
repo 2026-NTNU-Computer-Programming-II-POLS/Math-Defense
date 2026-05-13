@@ -125,14 +125,14 @@ const personalBestPoints = computed(() => points.value.filter(p => p.entry.is_pe
 
 <style scoped>
 .pt-wrap { display: flex; flex-direction: column; gap: 16px; }
-.pt-empty { text-align: center; color: var(--axis); padding: 48px 16px; }
+.pt-empty { text-align: center; color: var(--axis); text-shadow: var(--gold-shadow); padding: 48px 16px; }
 
 .pt-svg { width: 100%; max-width: 640px; height: auto; }
 .pt-axis { stroke: var(--grid-line); stroke-width: 1; }
 .pt-axis-label { fill: var(--axis); font-size: 10px; }
 .pt-line { stroke: var(--gold); stroke-width: 1.5; }
 .pt-dot { fill: var(--gold-bright); }
-.pt-pb-marker { fill: var(--gold); color: var(--gold); font-size: 14px; font-weight: bold; }
+.pt-pb-marker { fill: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); font-size: 14px; font-weight: bold; }
 
 .pt-list { list-style: none; padding: 0; margin: 0; }
 .pt-row {
@@ -145,7 +145,7 @@ const personalBestPoints = computed(() => points.value.filter(p => p.entry.is_pe
   font-size: 12px;
 }
 .pt-row-pb { width: 24px; text-align: center; }
-.pt-row-level { color: var(--axis); }
+.pt-row-level { color: var(--axis); text-shadow: var(--gold-shadow); }
 .pt-row-score { color: var(--gold-bright); font-weight: bold; }
-.pt-row-date { color: var(--axis); font-size: 11px; }
+.pt-row-date { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 11px; }
 </style>

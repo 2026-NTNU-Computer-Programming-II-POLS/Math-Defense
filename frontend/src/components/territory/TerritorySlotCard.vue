@@ -68,14 +68,14 @@ const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat
   padding: 2px 8px; font-size: 9px; letter-spacing: 1px; white-space: nowrap;
 }
 
-.slot-stars { color: var(--gold); font-size: 14px; letter-spacing: 2px; }
-.slot-index { font-size: 10px; color: var(--axis); }
+.slot-stars { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 14px; letter-spacing: 2px; }
+.slot-index { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .slot-occupant { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.occupant-id { font-size: 10px; color: var(--axis); }
+.occupant-id { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); }
 .occupant-score { font-size: 14px; color: var(--gold-bright); font-weight: bold; }
 
-.slot-empty { font-size: 11px; color: var(--axis); opacity: 0.5; }
+.slot-empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
 
 .slot-play-btn { font-size: 10px; padding: 4px 10px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 </style>

@@ -113,13 +113,14 @@ onMounted(() => store.loadActivities())
 .panel-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
 }
 
 .header-actions { display: flex; gap: 8px; }
 
 .error-msg { font-size: 11px; color: var(--enemy-red); }
-.loading, .empty { font-size: 11px; color: var(--axis); opacity: 0.5; text-align: center; padding: 20px; }
+.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; text-align: center; padding: 20px; }
 
 .activity-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 
@@ -134,7 +135,7 @@ onMounted(() => store.loadActivities())
 
 .activity-item:hover { border-color: var(--gold); }
 
-.activity-title { color: var(--gold); font-size: 13px; }
+.activity-title { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 13px; }
 
 .activity-meta {
   display: flex;
@@ -142,23 +143,25 @@ onMounted(() => store.loadActivities())
   align-items: center;
   font-size: 10px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .status-badge {
   padding: 2px 6px;
   border: 1px solid var(--gold);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-size: 9px;
   letter-spacing: 1px;
 }
 
-.status-badge.settled { border-color: var(--axis); color: var(--axis); }
+.status-badge.settled { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .status-badge.expired { border-color: var(--enemy-red); color: var(--enemy-red); }
 
 .scope-badge {
   padding: 2px 6px;
-  border: 1px solid #7a6fa0;
-  color: #a08fc0;
+  border: 1px solid var(--scope-border);
+  color: var(--scope-text);
   font-size: 9px;
   letter-spacing: 1px;
 }
@@ -169,11 +172,12 @@ onMounted(() => store.loadActivities())
   font-size: 11px;
   border-color: var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.page-info { font-size: 12px; color: var(--axis); }
+.page-info { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); }
 .page-btn:disabled { opacity: 0.3; cursor: default; }
 </style>

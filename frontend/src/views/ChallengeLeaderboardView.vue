@@ -103,10 +103,10 @@ onMounted(load)
 }
 
 .header { text-align: center; }
-.setup-title { font-size: 16px; color: var(--gold); letter-spacing: 3px; margin: 0; }
-.ch-name { font-size: 12px; color: var(--axis); margin-top: 4px; }
+.setup-title { font-size: 16px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 3px; margin: 0; }
+.ch-name { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); margin-top: 4px; }
 
-.loading, .empty-msg { color: var(--axis); font-size: 12px; text-align: center; padding: 16px 0; }
+.loading, .empty-msg { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 12px; text-align: center; padding: 16px 0; }
 .error-msg { color: var(--enemy-red); font-size: 11px; }
 
 .ranking-table {
@@ -119,13 +119,13 @@ onMounted(load)
   border-bottom: 1px solid var(--axis);
   text-align: left;
 }
-.ranking-table th { color: var(--gold); font-weight: normal; letter-spacing: 1px; }
-.ranking-table td { color: var(--axis); }
+.ranking-table th { color: var(--gold); text-shadow: var(--gold-shadow); font-weight: normal; letter-spacing: 1px; }
+.ranking-table td { color: var(--axis); text-shadow: var(--gold-shadow); }
 .rank-col { width: 36px; text-align: center; }
-.score-col { width: 80px; text-align: right; color: var(--gold); }
+.score-col { width: 80px; text-align: right; color: var(--gold); text-shadow: var(--gold-shadow); }
 .meta-col { width: 70px; text-align: right; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-start; margin-top: 12px; }
-.back-btn { border-color: var(--axis); color: var(--axis); }
+.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 </style>

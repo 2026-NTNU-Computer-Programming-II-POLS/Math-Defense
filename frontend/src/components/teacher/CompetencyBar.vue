@@ -74,6 +74,7 @@ const bars = computed<BarRow[]>(() =>
   align-items: center;
   gap: 2px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .bar-track {
@@ -96,6 +97,7 @@ const bars = computed<BarRow[]>(() =>
   font-family: monospace;
   font-size: 9px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 
 .bar-label {

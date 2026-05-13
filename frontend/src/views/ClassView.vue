@@ -372,6 +372,7 @@ onMounted(async () => {
 .class-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
   text-align: center;
 }
@@ -379,7 +380,7 @@ onMounted(async () => {
 .class-error { font-size: 11px; color: var(--enemy-red); }
 
 .section { display: flex; flex-direction: column; gap: 8px; }
-.section-title { font-size: 12px; color: var(--gold); margin: 0; }
+.section-title { font-size: 12px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
 
 .inline-form { display: flex; gap: 8px; }
 .inline-form .rune-input { flex: 1; }
@@ -405,25 +406,27 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.class-name { color: var(--gold); flex: 1; }
+.class-name { color: var(--gold); text-shadow: var(--gold-shadow); flex: 1; }
 
 .teacher-name {
   font-size: 10px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   opacity: 0.6;
 }
 
 .join-code {
   font-family: monospace;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   cursor: pointer;
   font-size: 10px;
   transition: color 0.15s;
   white-space: nowrap;
 }
 
-.join-code:hover { color: var(--gold); }
-.join-code.copied { color: var(--gold); }
+.join-code:hover { color: var(--gold); text-shadow: var(--gold-shadow); }
+.join-code.copied { color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .rename-input { flex: 1; font-size: 11px; }
 .rename-btns { display: flex; gap: 4px; }
@@ -438,8 +441,8 @@ onMounted(async () => {
 }
 
 .student-info { display: flex; flex-direction: column; gap: 2px; }
-.student-name { color: var(--gold); }
-.student-email { font-size: 9px; color: var(--axis); opacity: 0.6; }
+.student-name { color: var(--gold); text-shadow: var(--gold-shadow); }
+.student-email { font-size: 9px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
 
 .btn-sm {
   font-size: 9px;
@@ -450,6 +453,7 @@ onMounted(async () => {
   background: none;
   border: 1px solid var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   cursor: pointer;
 }
 
@@ -458,13 +462,14 @@ onMounted(async () => {
 .btn-sm.danger:hover { background: var(--enemy-red); color: var(--stone-dark); }
 .btn-sm:disabled { opacity: 0.4; cursor: default; }
 
-.loading, .empty { font-size: 11px; color: var(--axis); opacity: 0.5; }
+.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
 
 .back-btn {
   font-size: 11px;
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }

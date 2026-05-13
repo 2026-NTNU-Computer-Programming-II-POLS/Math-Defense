@@ -324,6 +324,7 @@ async function selectAvatar(url: string): Promise<void> {
 .profile-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
   text-align: center;
 }
@@ -356,7 +357,7 @@ async function selectAvatar(url: string): Promise<void> {
   width: 44px;
   height: 44px;
   padding: 3px;
-  border: 1px solid var(--grid-line);
+  border: 1px solid var(--panel-border);
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
@@ -387,8 +388,8 @@ async function selectAvatar(url: string): Promise<void> {
   font-size: 12px;
 }
 
-.profile-label { color: var(--axis); opacity: 0.7; }
-.profile-value { color: var(--gold); }
+.profile-label { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; }
+.profile-value { color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .name-value { display: flex; align-items: center; gap: 6px; }
 
@@ -396,6 +397,7 @@ async function selectAvatar(url: string): Promise<void> {
   background: none;
   border: none;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   opacity: 0.5;
   cursor: pointer;
   font-size: 11px;
@@ -403,7 +405,7 @@ async function selectAvatar(url: string): Promise<void> {
   line-height: 1;
 }
 
-.name-edit-btn:hover { opacity: 1; color: var(--gold); }
+.name-edit-btn:hover { opacity: 1; color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .name-edit-inline {
   display: flex;
@@ -427,14 +429,14 @@ async function selectAvatar(url: string): Promise<void> {
   letter-spacing: 0;
 }
 
-.name-save-btn { border-color: var(--gold); color: var(--gold); }
+.name-save-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
 .name-save-btn:hover { background: var(--gold); color: var(--stone-dark); }
-.name-cancel-btn { border-color: var(--axis); color: var(--axis); }
+.name-cancel-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .name-cancel-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
 .name-error { font-size: 10px; color: var(--error-red); }
 
-.progression-loading { font-size: 11px; color: var(--axis); opacity: 0.6; text-align: center; }
+.progression-loading { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; text-align: center; }
 .progression-error { font-size: 11px; color: var(--enemy-red); text-align: center; }
 
 .progression-summary {
@@ -445,16 +447,16 @@ async function selectAvatar(url: string): Promise<void> {
 .summary-card {
   flex: 1;
   padding: 12px;
-  border: 1px solid var(--grid-line);
+  border: 1px solid var(--panel-border);
   border-radius: 4px;
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .summary-card:hover { border-color: var(--gold); }
-.summary-title { font-size: 10px; color: var(--axis); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
-.summary-stat { font-size: 16px; color: var(--gold); }
-.summary-sub { font-size: 10px; color: var(--axis); opacity: 0.7; margin-top: 4px; }
+.summary-title { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+.summary-stat { font-size: 16px; color: var(--gold); text-shadow: var(--gold-shadow); }
+.summary-sub { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 4px; }
 
 .profile-links {
   display: flex;
@@ -467,6 +469,7 @@ async function selectAvatar(url: string): Promise<void> {
   letter-spacing: 1px;
   border-color: var(--gold);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 
 .link-btn:hover { background: var(--gold); color: var(--stone-dark); }
@@ -478,6 +481,7 @@ async function selectAvatar(url: string): Promise<void> {
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   align-self: flex-start;
 }
 
@@ -489,7 +493,7 @@ async function selectAvatar(url: string): Promise<void> {
   gap: 8px;
 }
 
-.section-title { font-size: 12px; color: var(--gold); margin: 0; }
+.section-title { font-size: 12px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
 
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
 .settings-row {
@@ -497,17 +501,18 @@ async function selectAvatar(url: string): Promise<void> {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #e8dcc8;
+  color: var(--text-primary);
   cursor: pointer;
 }
 .settings-checkbox { accent-color: var(--gold); cursor: pointer; }
-.settings-label { color: #e8dcc8; }
+.settings-label { color: var(--text-primary); }
 .settings-row--with-hint { align-items: flex-start; }
 .settings-row--with-hint .settings-checkbox { margin-top: 2px; }
 .settings-label--block { display: flex; flex-direction: column; gap: 2px; }
 .settings-hint {
   font-size: 10px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   opacity: 0.75;
   line-height: 1.4;
   font-style: italic;
@@ -524,18 +529,19 @@ async function selectAvatar(url: string): Promise<void> {
 .volume-pct {
   font-size: 11px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   min-width: 36px;
   text-align: right;
 }
 
 .pw-error { font-size: 10px; color: var(--error-red); }
-.pw-success { font-size: 10px; color: var(--gold); }
+.pw-success { font-size: 10px; color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .pw-actions { display: flex; gap: 8px; }
 
-.pw-save-btn { font-size: 11px; border-color: var(--gold); color: var(--gold); }
+.pw-save-btn { font-size: 11px; border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
 .pw-save-btn:hover:not(:disabled) { background: var(--gold); color: var(--stone-dark); }
-.pw-cancel-btn { font-size: 11px; border-color: var(--axis); color: var(--axis); }
+.pw-cancel-btn { font-size: 11px; border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .pw-cancel-btn:hover:not(:disabled) { background: var(--axis); color: var(--stone-dark); }
 
 .back-btn {
@@ -543,6 +549,7 @@ async function selectAvatar(url: string): Promise<void> {
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }

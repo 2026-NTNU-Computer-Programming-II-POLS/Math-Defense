@@ -122,7 +122,7 @@ function exit(): void {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--stone-dark);
+  background: var(--bg-base);
   color: var(--text-primary);
   padding: 1rem;
 }
@@ -136,16 +136,17 @@ function exit(): void {
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
   font-size: 0.8rem;
-  background: var(--stone-light);
+  background: var(--panel-bg);
 }
-.status[data-status="live"] { color: #6cc44a; }
+.status[data-status="live"] { color: var(--live-green); }
 .status[data-status="error"] { color: var(--hp-red); }
 .btn-ghost {
   margin-left: auto;
   padding: 0.4rem 0.9rem;
   background: transparent;
   color: var(--axis);
-  border: 1px solid var(--grid-line);
+  text-shadow: var(--gold-shadow);
+  border: 1px solid var(--panel-border);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -163,7 +164,7 @@ function exit(): void {
 }
 .last-event {
   padding: 0.5rem;
-  background: var(--stone-light);
+  background: var(--panel-bg);
   border-radius: 4px;
 }
 .err { color: var(--hp-red); }

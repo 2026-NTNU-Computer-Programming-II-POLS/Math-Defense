@@ -222,6 +222,7 @@ onMounted(loadData)
 .admin-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
   text-align: center;
 }
@@ -236,10 +237,11 @@ onMounted(loadData)
   background: none;
   border: 1px solid var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   cursor: pointer;
 }
 
-.tab-btn.active { border-color: var(--gold); color: var(--gold); }
+.tab-btn.active { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
 .tab-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
 .item-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -252,18 +254,19 @@ onMounted(loadData)
   border: 1px solid var(--axis);
 }
 
-.item-name { color: var(--gold); }
-.item-detail { color: var(--axis); opacity: 0.7; font-size: 10px; }
+.item-name { color: var(--gold); text-shadow: var(--gold-shadow); }
+.item-detail { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; font-size: 10px; }
 
 .search-input { font-size: 11px; }
 .error-msg { font-size: 11px; color: var(--enemy-red); }
-.loading, .empty { font-size: 11px; color: var(--axis); opacity: 0.5; }
+.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
 
 .back-btn {
   font-size: 11px;
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
@@ -278,11 +281,11 @@ onMounted(loadData)
   border: 1px solid var(--axis);
 }
 
-.season-form-title { font-size: 11px; color: var(--gold); letter-spacing: 2px; margin: 0 0 4px; }
-.season-label { font-size: 10px; color: var(--axis); display: flex; flex-direction: column; gap: 2px; }
+.season-form-title { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; margin: 0 0 4px; }
+.season-label { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); display: flex; flex-direction: column; gap: 2px; }
 .season-row { flex-direction: column; gap: 4px; align-items: flex-start; }
 
-.season-id-hint { font-size: 10px; color: var(--axis); opacity: 0.6; }
+.season-id-hint { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
 
 .season-pill {
   margin-left: 6px;
@@ -291,9 +294,10 @@ onMounted(loadData)
   letter-spacing: 1px;
   border: 1px solid var(--gold);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   border-radius: 2px;
 }
 
-.season-pill.archived { border-color: var(--axis); color: var(--axis); }
-.season-pill.upcoming { border-color: var(--axis); color: var(--axis); opacity: 0.7; }
+.season-pill.archived { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
+.season-pill.upcoming { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; }
 </style>

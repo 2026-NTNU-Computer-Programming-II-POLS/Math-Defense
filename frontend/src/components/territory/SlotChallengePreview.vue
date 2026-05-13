@@ -96,19 +96,19 @@ const stars = computed(() =>
 }
 .preview-panel { width: 420px; max-width: 100%; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .preview-header { display: flex; justify-content: space-between; align-items: center; }
-.preview-title { font-size: 14px; color: var(--gold); letter-spacing: 3px; }
-.preview-stars { color: var(--gold); font-size: 14px; letter-spacing: 2px; }
+.preview-title { font-size: 14px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 3px; }
+.preview-stars { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 14px; letter-spacing: 2px; }
 
 .preview-stats { display: grid; grid-template-columns: max-content 1fr; column-gap: 14px; row-gap: 6px; font-size: 11px; margin: 0; }
-.preview-stats dt { color: var(--axis); }
+.preview-stats dt { color: var(--axis); text-shadow: var(--gold-shadow); }
 .preview-stats dd { margin: 0; color: #e8dcc8; }
 .preview-stats dd.score { color: var(--gold-bright); font-weight: bold; }
 .preview-stats dd.negative { color: #d05050; }
 
-.skip-pref { font-size: 10px; color: var(--axis); display: flex; gap: 6px; align-items: center; }
+.skip-pref { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); display: flex; gap: 6px; align-items: center; }
 
 .preview-actions { display: flex; gap: 10px; justify-content: flex-end; }
-.cancel-btn { border-color: var(--axis); color: var(--axis); }
-.confirm-btn { border-color: var(--gold); color: var(--gold); }
+.cancel-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
+.confirm-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
 .confirm-btn:hover { background: var(--gold); color: var(--stone-dark); }
 </style>

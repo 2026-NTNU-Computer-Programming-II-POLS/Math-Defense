@@ -274,6 +274,7 @@ watch(activityId, (id) => {
 .detail-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
 }
 
@@ -281,13 +282,14 @@ watch(activityId, (id) => {
   padding: 2px 8px;
   border: 1px solid var(--gold);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-size: 10px;
 }
 
-.status-badge.settled { border-color: var(--axis); color: var(--axis); }
+.status-badge.settled { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 
-.detail-meta { font-size: 11px; color: var(--axis); display: flex; gap: 12px; align-items: center; }
-.scope-tag { padding: 2px 6px; border: 1px solid #7a6fa0; color: #a08fc0; font-size: 9px; letter-spacing: 1px; }
+.detail-meta { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); display: flex; gap: 12px; align-items: center; }
+.scope-tag { padding: 2px 6px; border: 1px solid var(--scope-border); color: var(--scope-text); font-size: 9px; letter-spacing: 1px; }
 
 .slot-grid {
   display: grid;
@@ -304,24 +306,24 @@ watch(activityId, (id) => {
 .settle-btn { border-color: var(--enemy-red); color: var(--enemy-red); }
 .settle-btn:hover { background: var(--enemy-red); color: var(--stone-dark); }
 
-.back-btn { border-color: var(--axis); color: var(--axis); }
+.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
 .loading, .error-msg { text-align: center; padding: 20px; font-size: 11px; }
-.loading { color: var(--axis); }
+.loading { color: var(--axis); text-shadow: var(--gold-shadow); }
 .error-msg { color: var(--enemy-red); }
 
 .recommendation-bar {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 12px;
   border: 1px dashed var(--gold);
-  background: rgba(255, 215, 0, 0.05);
+  background: var(--gold-tint-faint);
   font-size: 11px;
-  color: #e8dcc8;
+  color: var(--text-secondary);
 }
-.rec-icon { color: var(--gold); font-size: 14px; }
+.rec-icon { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 14px; }
 .rec-text { flex: 1; }
-.rec-text strong { color: var(--gold); }
-.rec-btn { border-color: var(--gold); color: var(--gold); padding: 4px 10px; font-size: 10px; }
+.rec-text strong { color: var(--gold); text-shadow: var(--gold-shadow); }
+.rec-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); padding: 4px 10px; font-size: 10px; }
 .rec-btn:hover { background: var(--gold); color: var(--stone-dark); }
 </style>

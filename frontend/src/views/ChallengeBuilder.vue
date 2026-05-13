@@ -253,6 +253,7 @@ onMounted(async () => {
 .setup-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
   text-align: center;
 }
@@ -260,6 +261,7 @@ onMounted(async () => {
 .subtitle {
   font-size: 13px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 2px;
   margin-top: 16px;
 }
@@ -271,7 +273,7 @@ onMounted(async () => {
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field.row { flex-direction: row; gap: 12px; }
 .half { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.field-label { font-size: 11px; color: var(--gold); }
+.field-label { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .checkbox-grid {
   display: grid;
@@ -285,6 +287,7 @@ onMounted(async () => {
   gap: 6px;
   font-size: 11px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   cursor: pointer;
 }
 
@@ -299,14 +302,15 @@ onMounted(async () => {
   font-family: var(--font-mono, monospace);
   font-size: 12px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   min-width: 12px;
 }
 .num-input { width: 70px; }
-.dash { color: var(--axis); }
-.hint { color: var(--axis); font-size: 9px; opacity: 0.7; }
+.dash { color: var(--axis); text-shadow: var(--gold-shadow); }
+.hint { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 9px; opacity: 0.7; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.back-btn { border-color: var(--axis); color: var(--axis); }
+.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
 .my-challenges { display: flex; flex-direction: column; gap: 6px; }
@@ -318,7 +322,7 @@ onMounted(async () => {
   padding: 4px 6px;
   border: 1px solid var(--axis);
 }
-.ch-title { color: var(--gold); text-decoration: none; }
+.ch-title { color: var(--gold); text-shadow: var(--gold-shadow); text-decoration: none; }
 .ch-title:hover { text-decoration: underline; }
-.ch-meta { color: var(--axis); font-size: 10px; }
+.ch-meta { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 10px; }
 </style>

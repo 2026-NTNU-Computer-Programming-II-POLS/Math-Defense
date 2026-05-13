@@ -4,10 +4,10 @@
   --stone-dark: #5b718f;
   --stone-light: #7a8da8;
   --grid-line: rgba(255, 255, 255, 0.2);
-  --axis: #ffd700;
-  --gold: #ffd700;
+  --axis: #d4a017;
+  --gold: #d4a017;
   --gold-bright: #ffffff;
-  --gold-dim: #cca300;
+  --gold-dim: #9a7005;
   --tower-cannon: #4a82c8;
 
   --enemy-red: #b84040;
@@ -47,5 +47,20 @@
   --z-overlay: 40;
   --z-modal: 50;
   --z-toast: 100;
+
+  --live-green:   #6cc44a;
+  --formula-blue: #60c0ff;
+  --scope-border: #7a6fa0;
+  --scope-text:   #a08fc0;
+
+  --card-border:      rgba(164, 185, 212, 0.5);
+  --divider:          rgba(164, 185, 212, 0.4);
+  --card-surface:     rgba(255, 255, 255, 0.72);
+  --gold-tint:        rgba(212, 160, 23, 0.10);
+  --gold-tint-hover:  rgba(212, 160, 23, 0.06);
+  --gold-tint-select: rgba(212, 160, 23, 0.12);
+  --gold-tint-faint:  rgba(212, 160, 23, 0.05);
+  --gold-tint-soft:   rgba(212, 160, 23, 0.08);
+  --gold-shadow:      0 1px 4px rgba(0, 0, 0, 0.45);
 }
 

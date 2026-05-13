@@ -210,15 +210,16 @@ onMounted(async () => {
 .dashboard-title {
   font-size: 16px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
   text-align: center;
 }
 
 .error-msg { font-size: 11px; color: var(--enemy-red); }
-.loading, .empty { font-size: 11px; color: var(--axis); opacity: 0.5; }
+.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
 
 .section { display: flex; flex-direction: column; gap: 6px; }
-.section-title { font-size: 12px; color: var(--gold); margin: 0; }
+.section-title { font-size: 12px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
 
 .item-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 
@@ -234,21 +235,22 @@ onMounted(async () => {
 
 .item:hover { border-color: var(--gold); }
 
-.item-name { color: var(--gold); }
-.item-meta { font-family: monospace; color: var(--axis); font-size: 10px; }
+.item-name { color: var(--gold); text-shadow: var(--gold-shadow); }
+.item-meta { font-family: monospace; color: var(--axis); text-shadow: var(--gold-shadow); font-size: 10px; }
 
 .item-badge {
   padding: 1px 5px;
   border: 1px solid var(--gold);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-size: 9px;
 }
 
-.item-badge.settled { border-color: var(--axis); color: var(--axis); }
+.item-badge.settled { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .dashboard-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.back-btn { border-color: var(--axis); color: var(--axis); }
+.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
 .reflection-row {
@@ -270,7 +272,7 @@ onMounted(async () => {
 .reflection-text {
   margin: 0;
   white-space: pre-wrap;
-  color: #e8dcc8;
+  color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -293,7 +295,7 @@ onMounted(async () => {
 
 .competency-suggestion {
   margin: 0;
-  color: #e8dcc8;
+  color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.3;
   font-style: italic;
@@ -303,7 +305,7 @@ onMounted(async () => {
   border: 1px solid var(--axis);
   padding: 8px 10px;
   font-size: 11px;
-  color: #e8dcc8;
+  color: var(--text-secondary);
 }
 
 .explainer[open] {
@@ -313,6 +315,7 @@ onMounted(async () => {
 .explainer-summary {
   cursor: pointer;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-size: 12px;
   list-style: none;
 }

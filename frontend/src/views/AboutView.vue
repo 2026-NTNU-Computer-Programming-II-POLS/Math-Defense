@@ -73,7 +73,7 @@ const router = useRouter()
   padding: 2.5rem 1.5rem 3rem;
   color: var(--text-primary);
   min-height: 100vh;
-  background: var(--stone-dark);
+  background: var(--bg-base);
   line-height: 1.6;
 }
 
@@ -83,13 +83,15 @@ const router = useRouter()
 
 h1 {
   font-size: 1.8rem;
-  color: var(--gold-bright);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
   letter-spacing: 2px;
 }
 
 .about-lead {
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   font-size: 1rem;
 }
 
@@ -100,6 +102,7 @@ h1 {
 .about-section h2 {
   font-size: 1.1rem;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   margin-bottom: 0.6rem;
   letter-spacing: 1px;
 }
@@ -127,8 +130,8 @@ kbd {
   padding: 1px 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
-  background: var(--stone-light);
-  border: 1px solid var(--grid-line);
+  background: var(--stone-selected);
+  border: 1px solid var(--panel-border);
   border-radius: 3px;
 }
 
@@ -136,13 +139,15 @@ code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .back-btn {
   padding: 0.5rem 1.5rem;
   background: transparent;
   color: var(--axis);
-  border: 1px solid var(--grid-line);
+  text-shadow: var(--gold-shadow);
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   cursor: pointer;
 }

@@ -240,7 +240,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--stone-dark);
+  background: var(--bg-base);
   color: var(--text-primary);
 }
 .replay-header {
@@ -248,12 +248,13 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--divider);
 }
 .replay-header h1 {
   font-size: 1.1rem;
   margin: 0;
-  color: var(--gold-bright);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 .replay-stage {
   flex: 1;
@@ -272,12 +273,12 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid var(--grid-line);
+  border-top: 1px solid var(--divider);
 }
 .scrub {
   flex: 1;
   height: 8px;
-  background: var(--stone-light);
+  background: var(--divider);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -291,6 +292,7 @@ onBeforeUnmount(() => {
   gap: 0.5rem;
   font-size: 0.85rem;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 .warn { color: var(--hp-red); }
 .btn {
@@ -305,7 +307,8 @@ onBeforeUnmount(() => {
   padding: 0.4rem 0.9rem;
   background: transparent;
   color: var(--axis);
-  border: 1px solid var(--grid-line);
+  text-shadow: var(--gold-shadow);
+  border: 1px solid var(--panel-border);
   border-radius: 4px;
   cursor: pointer;
 }

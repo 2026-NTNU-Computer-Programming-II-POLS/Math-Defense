@@ -147,23 +147,25 @@ function startGame() {
   padding: 2rem;
   color: var(--text-primary);
   min-height: 100vh;
-  background: var(--stone-dark);
+  background: var(--bg-base);
 }
 
 h1 {
   font-size: 1.8rem;
-  color: var(--gold-bright);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
 }
 
 .subtitle {
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
   margin-bottom: 1.5rem;
 }
 
 .equations {
-  background: var(--stone-light);
-  border: 1px solid var(--grid-line);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -185,6 +187,7 @@ h1 {
   font-weight: bold;
   min-width: 60px;
   color: var(--axis);
+  text-shadow: var(--gold-shadow);
 }
 
 .options-grid {
@@ -198,8 +201,8 @@ h1 {
 
 .option-btn {
   padding: 0.8rem;
-  background: var(--stone-light);
-  border: 2px solid var(--grid-line);
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid var(--card-border);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 1rem;
@@ -250,7 +253,7 @@ h1 {
 .pay-btn {
   padding: 0.7rem 1.5rem;
   background: var(--hp-yellow);
-  color: var(--stone-dark);
+  color: var(--text-on-accent);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -260,7 +263,8 @@ h1 {
   padding: 0.7rem 1.5rem;
   background: transparent;
   color: var(--axis);
-  border: 1px solid var(--grid-line);
+  text-shadow: var(--gold-shadow);
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   cursor: pointer;
 }
@@ -272,7 +276,7 @@ h1 {
 .result-correct { color: var(--hp-green); font-size: 1.1rem; }
 .result-wrong { color: var(--hp-red); font-size: 1.1rem; }
 .result-paid { color: var(--hp-yellow); font-size: 1.1rem; }
-.result-ignored { color: var(--axis); font-size: 1.1rem; }
+.result-ignored { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 1.1rem; }
 
 .start-btn {
   margin-top: 1rem;

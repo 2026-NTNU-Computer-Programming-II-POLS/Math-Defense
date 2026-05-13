@@ -147,7 +147,7 @@ function backToMenu() {
   max-width: 760px;
   margin: 2rem auto;
   padding: 0 1.25rem 3rem;
-  color: var(--color-text, #ddd);
+  color: var(--text-primary);
 }
 .probe-header h1 {
   margin: 0 0 0.25rem;
@@ -155,12 +155,12 @@ function backToMenu() {
 }
 .probe-meta {
   margin: 0;
-  color: var(--color-text-muted, #aaa);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 .probe-warning {
-  background: rgba(255, 165, 0, 0.12);
-  border: 1px solid rgba(255, 165, 0, 0.4);
+  background: var(--gold-tint);
+  border: 1px solid var(--gold-dim);
   padding: 0.6rem 0.8rem;
   border-radius: 6px;
   margin-top: 0.75rem;
@@ -173,8 +173,8 @@ function backToMenu() {
 .probe-item {
   margin-bottom: 1.5rem;
   padding: 1rem 1.1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--card-surface);
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
 }
 .probe-stem {
@@ -185,7 +185,8 @@ function backToMenu() {
 .probe-num {
   display: inline-block;
   margin-right: 0.4rem;
-  color: var(--color-accent, #6db);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
   font-weight: 600;
 }
 .probe-options {
@@ -200,17 +201,17 @@ function backToMenu() {
   gap: 0.6rem;
   align-items: flex-start;
   padding: 0.55rem 0.7rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 .probe-option:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--gold-tint-hover);
 }
 .probe-option.selected {
-  border-color: var(--color-accent, #6db);
-  background: rgba(110, 220, 187, 0.08);
+  border-color: var(--gold);
+  background: var(--gold-tint-select);
 }
 .probe-option input[type="radio"] {
   margin-top: 0.2rem;
@@ -218,15 +219,16 @@ function backToMenu() {
 .probe-option-label {
   font-weight: 600;
   margin-right: 0.25rem;
-  color: var(--color-accent, #6db);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
 }
 .probe-actions {
   margin-top: 1.5rem;
   text-align: right;
 }
 .probe-submit {
-  background: var(--color-accent, #6db);
-  color: #0a1118;
+  background: var(--gold);
+  color: var(--text-on-accent);
   border: none;
   padding: 0.6rem 1.4rem;
   border-radius: 6px;
@@ -238,7 +240,7 @@ function backToMenu() {
   cursor: not-allowed;
 }
 .probe-error {
-  color: #ff8a8a;
+  color: var(--error-red);
   margin-top: 1rem;
 }
 .probe-result {

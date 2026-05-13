@@ -162,6 +162,7 @@ onMounted(async () => {
 .ach-title {
   font-size: 20px;
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
 }
 
@@ -171,13 +172,13 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-.ach-count { color: var(--gold); }
-.ach-points { color: var(--axis); }
+.ach-count { color: var(--gold); text-shadow: var(--gold-shadow); }
+.ach-points { color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .ach-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 .filter-btn.active { background: var(--gold); color: var(--stone-dark); }
 
-.ach-loading, .ach-error { text-align: center; color: var(--axis); padding: 32px; }
+.ach-loading, .ach-error { text-align: center; color: var(--axis); text-shadow: var(--gold-shadow); padding: 32px; }
 .ach-error { color: var(--enemy-red); }
 
 .ach-grid {
@@ -190,14 +191,14 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   padding: 12px;
-  border: 1px solid var(--grid-line);
+  border: 1px solid var(--panel-border);
   border-radius: 4px;
   transition: border-color 0.2s;
 }
 
 .ach-card.unlocked {
   border-color: var(--gold);
-  background: rgba(212, 168, 64, 0.05);
+  background: var(--gold-tint-faint);
 }
 
 .ach-card.locked { opacity: 0.5; }
@@ -212,12 +213,12 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.ach-card.unlocked .ach-icon { color: var(--gold); }
-.ach-card.locked .ach-icon { color: var(--axis); }
+.ach-card.unlocked .ach-icon { color: var(--gold); text-shadow: var(--gold-shadow); }
+.ach-card.locked .ach-icon { color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .ach-info { flex: 1; min-width: 0; }
-.ach-name { font-size: 12px; color: #e8dcc8; margin-bottom: 4px; }
-.ach-desc { font-size: 10px; color: var(--axis); margin-bottom: 6px; }
+.ach-name { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.ach-desc { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 6px; }
 
 .ach-meta {
   display: flex;
@@ -225,8 +226,8 @@ onMounted(async () => {
   font-size: 10px;
 }
 
-.ach-tp { color: var(--gold); }
-.ach-date { color: var(--axis); opacity: 0.7; }
+.ach-tp { color: var(--gold); text-shadow: var(--gold-shadow); }
+.ach-date { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; }
 
 .ach-pagination {
   display: flex;
@@ -235,7 +236,7 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.page-info { font-size: 11px; color: var(--axis); }
+.page-info { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .season-banner {
   display: flex;
@@ -244,17 +245,17 @@ onMounted(async () => {
   gap: 12px;
   padding: 10px 14px;
   border: 1px solid var(--gold);
-  background: rgba(212, 168, 64, 0.1);
+  background: var(--gold-tint);
   border-radius: 4px;
   font-size: 11px;
 }
 
-.season-banner-title { color: var(--gold); letter-spacing: 1px; }
-.season-banner-end { color: var(--axis); }
+.season-banner-title { color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
+.season-banner-end { color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .seasonal-btn { letter-spacing: 1px; }
 
-.ach-card.season-active { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(212, 168, 64, 0.4) inset; }
+.ach-card.season-active { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.4) inset; }
 .ach-card.season-archived { border-style: dashed; opacity: 0.7; }
 
 .season-pill {
@@ -264,8 +265,9 @@ onMounted(async () => {
   letter-spacing: 1px;
   border: 1px solid var(--gold);
   color: var(--gold);
+  text-shadow: var(--gold-shadow);
   border-radius: 2px;
 }
 
-.season-pill.archived { border-color: var(--axis); color: var(--axis); }
+.season-pill.archived { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 </style>
