@@ -98,7 +98,7 @@ export class SpellSystem implements GameSystem {
       if (!enemy.alive) continue
       if (dist(x, y, enemy.x, enemy.y) > radius) continue  // S-6: > means boundary is inclusive
       hits++
-      applyDamage(enemy, damage, game)
+      applyDamage(enemy, damage, game, 'spell')
     }
     return hits
   }
@@ -126,7 +126,7 @@ export class SpellSystem implements GameSystem {
       ? game.enemies.find((e) => e.id === targetId && e.alive)
       : this._findNearestEnemy(x, y, game.enemies)
     if (!target) return null
-    applyDamage(target, damage, game)
+    applyDamage(target, damage, game, 'spell')
     return target
   }
 

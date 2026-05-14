@@ -121,6 +121,6 @@ export class PetCombatSystem {
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
     if (!enemy.alive) return
-    applyDamage(enemy, amount, game)
+    applyDamage(enemy, amount, game, 'pet')
   }
 }

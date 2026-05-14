@@ -21,7 +21,9 @@ import type { GamePhase } from '@/data/constants'
 // ── Appearance discriminants ─────────────────────────────────────────────────
 
 export type TowerAppearance = 'magic' | 'radarA' | 'radarB' | 'radarC' | 'matrix' | 'limit' | 'calculus'
-export type EnemyAppearance = 'general' | 'fast' | 'strong' | 'split' | 'helper' | 'bossA' | 'bossB'
+export type EnemyAppearance =
+  | 'general' | 'fast' | 'strong' | 'split' | 'helper' | 'bossA' | 'bossB'
+  | 'regenerator' | 'bulwark' | 'swarmling'
 export type PetTrait        = 'slow' | 'fast' | 'heavy' | 'basic'
 
 // ── Tower views ──────────────────────────────────────────────────────────────
@@ -53,6 +55,8 @@ export interface EnemyView {
   readonly shieldRatio: number | null
   /** Helper-aura radius in game units; 0 means no aura. */
   readonly helperRadius: number
+  /** True while a Regenerator is below max HP and actively healing. */
+  readonly regenerating: boolean
 }
 
 // ── Pet views ────────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { useUiStore } from '@/stores/uiStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useGameLoop } from '@/composables/useGameLoop'
 import { useKeyboardPlacement } from '@/composables/useKeyboardPlacement'
+import { useFirstEncounterCards } from '@/composables/useFirstEncounterCards'
 import { GamePhase, CANVAS_WIDTH, CANVAS_HEIGHT } from '@/data/constants'
 import { formatScore } from '@/utils/formatters'
 import { parseLevelJson, parseTerritoryContext } from '@/utils/parseHistoryState'
@@ -15,6 +16,8 @@ import HUD from '@/components/game/HUD.vue'
 import TowerBar from '@/components/game/TowerBar.vue'
 import BuildPanel from '@/components/game/BuildPanel.vue'
 import BuildHint from '@/components/game/BuildHint.vue'
+import WaveForecast from '@/components/game/WaveForecast.vue'
+import FirstEncounterCard from '@/components/game/FirstEncounterCard.vue'
 import BuffCardPanel from '@/components/game/BuffCardPanel.vue'
 import ShopPanel from '@/components/game/ShopPanel.vue'
 import GameSpeedPanel from '@/components/game/GameSpeedPanel.vue'
@@ -74,6 +77,11 @@ const {
 // listener lifecycle; gating by BUILD phase happens inside the handler so
 // a single registration covers the whole view.
 useKeyboardPlacement(game)
+
+// V3 Phase 6 §6.2 — first-encounter telegraph cards. The composable owns the
+// queue and soft-pauses via Game.stop/start (no new GamePhase); this view
+// just renders the active card and routes its dismiss back.
+const { activeCard: firstEncounterCard, dismiss: dismissFirstEncounter } = useFirstEncounterCards(game)
 
 function navigateHome(): void {
   router.push({ name: 'menu' }).catch((err) => {
@@ -235,6 +243,12 @@ function onKeydown(e: KeyboardEvent): void {
   // in the Build Panel isn't hijacked by Space.
   const tag = (e.target as HTMLElement | null)?.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA') return
+  // While a first-encounter card is open the game is already soft-paused by
+  // useFirstEncounterCards (a separate Game.stop/start owner). Letting Space /
+  // Esc also drive the manual `paused` flag here would desync the two: the
+  // game could resume behind a stale pause overlay, or the card's pause could
+  // be lifted out from under it. Defer to the card while it is showing.
+  if (firstEncounterCard.value) return
   if (e.code === 'Space' || e.code === 'Escape') {
     e.preventDefault()
     togglePause()
@@ -363,6 +377,7 @@ onBeforeUnmount(() => {
         aria-live="polite"
       >Practice mode — leaderboard ineligible</div>
       <BuildHint />
+      <WaveForecast />
       <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
         <ShopPanel v-if="gameStore.isBuilding" />
         <GameSpeedPanel />
@@ -422,6 +437,9 @@ onBeforeUnmount(() => {
 
       <!-- Modal -->
       <Modal v-if="uiStore.modalVisible" />
+
+      <!-- V3 Phase 6 §6.2: first-encounter card (soft-pauses via the composable) -->
+      <FirstEncounterCard :type="firstEncounterCard" @dismiss="dismissFirstEncounter" />
 
       <!-- U-1: paused overlay -->
       <div

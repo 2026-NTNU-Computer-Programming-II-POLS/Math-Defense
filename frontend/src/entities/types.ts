@@ -32,6 +32,10 @@ export interface Tower {
 
   talentMods: Record<string, number>
   magicBuff: number
+  // Same-type tower interference factor (Phase 7). 1 = no interference;
+  // drops toward INTERFERENCE_FLOOR as same-type towers cluster nearby.
+  // Owned per-frame by TowerInterferenceSystem.
+  interferenceFactor: number
 
   color: string
 
@@ -126,6 +130,12 @@ export interface Enemy {
   helperRadius: number
   helperHealPerSec: number
   helperSpeedBuff: number
+
+  // V3 counter-enemy defensive traits. Inert defaults (0 / 0 / 1) leave the
+  // pre-V3 enemies byte-identical.
+  regenPerSec: number
+  damageCapPerHit: number
+  towerDamageMult: number
 
   minionTimer: number
   minionInterval: number

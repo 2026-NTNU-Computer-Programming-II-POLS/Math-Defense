@@ -35,6 +35,14 @@ export interface EnemyDef {
   // Sampled uniformly per spawn so timing varies but the ability never gets
   // skipped. Bounds must be inside (0, 1). Currently only Boss-B uses this.
   triggerHpRange?: [number, number]
+  // V3 counter-enemy defensive traits. Optional so the existing seven defs
+  // need no change; EnemyFactory fills inert defaults (0 / 0 / 1).
+  /** Constant HP regenerated per second. Never interrupted by taking damage. */
+  regenPerSec?: number
+  /** Max damage a single discrete hit can deal. 0 / undefined = no cap. */
+  damageCapPerHit?: number
+  /** Multiplier applied to non-pet damage. 1 / undefined = no reduction. */
+  towerDamageMult?: number
 }
 
 export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
@@ -135,5 +143,41 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
       type: EnemyType.FAST,
     },
     triggerHpRange: [0.45, 0.55],
+  },
+  [EnemyType.REGENERATOR]: {
+    type: EnemyType.REGENERATOR,
+    name: 'Regenerator',
+    color: Colors.REGENERATOR,
+    maxHp: 80,
+    speed: 1.5,
+    size: 20,
+    reward: 35,
+    damage: 2,
+    killValue: 20,
+    regenPerSec: 18,
+  },
+  [EnemyType.BULWARK]: {
+    type: EnemyType.BULWARK,
+    name: 'Bulwark',
+    color: Colors.BULWARK,
+    maxHp: 220,
+    speed: 0.9,
+    size: 26,
+    reward: 50,
+    damage: 3,
+    killValue: 30,
+    damageCapPerHit: 14,
+  },
+  [EnemyType.SWARMLING]: {
+    type: EnemyType.SWARMLING,
+    name: 'Swarmling',
+    color: Colors.SWARMLING,
+    maxHp: 12,
+    speed: 3.2,
+    size: 9,
+    reward: 6,
+    damage: 1,
+    killValue: 4,
+    towerDamageMult: 0.35,
   },
 }

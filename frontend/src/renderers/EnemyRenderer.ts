@@ -14,6 +14,7 @@ export class EnemyRenderer {
   // Semantically meaningful game-art colors — centralized so theme adjustments
   // don't require hunting through individual draw methods.
   private static readonly HELPER_AURA = '#48c878'
+  private static readonly REGEN_AURA  = '#7ee68a'
   private static readonly SHIELD_BG   = '#333333'
   private static readonly SHIELD_FILL = '#4488ee'
 
@@ -49,6 +50,10 @@ export class EnemyRenderer {
       ctx.lineWidth = 1
       ctx.stroke()
       ctx.restore()
+    }
+
+    if (enemy.regenerating) {
+      this._drawRegenAura(ctx, px, py, enemy.size)
     }
 
     ctx.save()
@@ -108,6 +113,15 @@ export class EnemyRenderer {
       case 'bossB':
         this._drawBossBDetails(ctx, 0, 0, size)
         break
+      case 'regenerator':
+        this._drawRegeneratorDetails(ctx, 0, 0, size)
+        break
+      case 'bulwark':
+        this._drawBulwarkDetails(ctx, 0, 0, size)
+        break
+      case 'swarmling':
+        this._drawSwarmlingDetails(ctx, 0, 0, size)
+        break
       default:
         this._drawGeneralDetails(ctx, 0, 0, size)
         break
@@ -164,7 +178,7 @@ export class EnemyRenderer {
     this._drawEye(ctx, px - eyeGap, eyeY, eyeR, pupilX)
     this._drawEye(ctx, px + eyeGap, eyeY, eyeR, pupilX)
 
-    ctx.strokeStyle = type === 'strong' || type === 'bossA' ? '#1b0b0b' : 'rgba(20,12,22,0.75)'
+    ctx.strokeStyle = type === 'strong' || type === 'bossA' || type === 'bulwark' ? '#1b0b0b' : 'rgba(20,12,22,0.75)'
     ctx.lineWidth = Math.max(1, size / 18)
     ctx.beginPath()
     if (type === 'bossB') {
@@ -514,6 +528,147 @@ export class EnemyRenderer {
     ctx.beginPath()
     ctx.arc(px, py, size * 0.34, 0, Math.PI * 2)
     ctx.stroke()
+  }
+
+  /**
+   * Regenerator aura — deliberately a different visual language from the
+   * Helper's flat translucent disc: a rotating dashed ring plus rising "+"
+   * particles, so the two green enemies are never confused.
+   */
+  private _drawRegenAura(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
+    const pulse = Math.sin(this._time * 3.4) * 0.5 + 0.5
+    const radius = size * (0.78 + pulse * 0.12)
+
+    ctx.save()
+    ctx.translate(px, py)
+    ctx.rotate(this._time * 0.9)
+    ctx.globalAlpha = 0.32 + pulse * 0.24
+    ctx.strokeStyle = EnemyRenderer.REGEN_AURA
+    ctx.lineWidth = Math.max(1.4, size / 12)
+    ctx.setLineDash([size * 0.2, size * 0.16])
+    ctx.beginPath()
+    ctx.arc(0, 0, radius, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.restore()
+
+    ctx.save()
+    ctx.strokeStyle = EnemyRenderer.REGEN_AURA
+    ctx.lineWidth = Math.max(1.2, size / 14)
+    ctx.lineCap = 'round'
+    for (let i = 0; i < 3; i++) {
+      const phase = (this._time * 0.6 + i / 3) % 1
+      const cx = px + Math.sin(i * 2.1 + this._time) * size * 0.32
+      const cy = py - size * 0.2 - phase * size * 0.9
+      const s = size * 0.13
+      ctx.globalAlpha = (1 - phase) * 0.7
+      ctx.beginPath()
+      ctx.moveTo(cx - s, cy)
+      ctx.lineTo(cx + s, cy)
+      ctx.moveTo(cx, cy - s)
+      ctx.lineTo(cx, cy + s)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  private _drawRegeneratorDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
+    // Faint regenerating sheen — a soft inner glow that pulses.
+    const pulse = Math.sin(this._time * 4 + py * 0.05) * 0.5 + 0.5
+    ctx.save()
+    ctx.globalAlpha = 0.18 + pulse * 0.16
+    const g = ctx.createRadialGradient(px, py, size * 0.06, px, py, size * 0.5)
+    g.addColorStop(0, '#e8ffe8')
+    g.addColorStop(1, 'rgba(232,255,232,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(px, py, size * 0.5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+
+    // Medical cross — the "heal" motif, drawn as a single plus polygon.
+    const a = size * 0.2
+    const t = size * 0.075
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.strokeStyle = 'rgba(40,120,60,0.6)'
+    ctx.lineWidth = Math.max(1, size / 26)
+    ctx.beginPath()
+    ctx.moveTo(px - t, py - a)
+    ctx.lineTo(px + t, py - a)
+    ctx.lineTo(px + t, py - t)
+    ctx.lineTo(px + a, py - t)
+    ctx.lineTo(px + a, py + t)
+    ctx.lineTo(px + t, py + t)
+    ctx.lineTo(px + t, py + a)
+    ctx.lineTo(px - t, py + a)
+    ctx.lineTo(px - t, py + t)
+    ctx.lineTo(px - a, py + t)
+    ctx.lineTo(px - a, py - t)
+    ctx.lineTo(px - t, py - t)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+  }
+
+  private _drawBulwarkDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
+    const half = size / 2
+    ctx.strokeStyle = '#33383f'
+    ctx.lineWidth = Math.max(1.2, size / 16)
+    ctx.lineJoin = 'miter'
+
+    // Side pauldrons — heavy angular plates flanking the body, kept clear of
+    // the face so the eyes still read.
+    const pauldron = (dir: number): void => {
+      ctx.beginPath()
+      ctx.moveTo(px + dir * half * 0.46, py - half * 0.52)
+      ctx.lineTo(px + dir * half * 1.02, py - half * 0.28)
+      ctx.lineTo(px + dir * half * 0.98, py + half * 0.28)
+      ctx.lineTo(px + dir * half * 0.44, py + half * 0.16)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    }
+    ctx.fillStyle = '#9aa3b0'
+    pauldron(-1)
+    pauldron(1)
+
+    // Jaw plate — angular chin guard below the mouth.
+    ctx.fillStyle = '#828b98'
+    ctx.beginPath()
+    ctx.moveTo(px - half * 0.4, py + half * 0.26)
+    ctx.lineTo(px + half * 0.4, py + half * 0.26)
+    ctx.lineTo(px + half * 0.24, py + half * 0.6)
+    ctx.lineTo(px - half * 0.24, py + half * 0.6)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    // Rivets on the pauldrons.
+    ctx.fillStyle = '#d6dbe2'
+    for (const dir of [-1, 1]) {
+      ctx.beginPath()
+      ctx.arc(px + dir * half * 0.74, py - half * 0.04, Math.max(1, size * 0.045), 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  private _drawSwarmlingDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
+    // Tiny jittery satellite segments — a cluster reads as a swarm even though
+    // each Swarmling is one entity.
+    ctx.fillStyle = '#c8b85a'
+    ctx.strokeStyle = 'rgba(40,34,12,0.6)'
+    ctx.lineWidth = Math.max(1, size / 14)
+    for (let i = 0; i < 4; i++) {
+      const ang = (i / 4) * Math.PI * 2 + this._time * 2.2
+      const jitter = Math.sin(this._time * 18 + i * 5) * size * 0.08
+      const orbit = size * 0.46 + jitter
+      const bx = px + Math.cos(ang) * orbit
+      const by = py + Math.sin(ang) * orbit
+      ctx.beginPath()
+      ctx.arc(bx, by, size * 0.16, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
   }
 
   private _drawBossADetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {

@@ -108,6 +108,9 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     helperRadius: 0,
     helperHealPerSec: 0,
     helperSpeedBuff: 0,
+    regenPerSec: 0,
+    damageCapPerHit: 0,
+    towerDamageMult: 1,
     minionTimer: 0,
     minionInterval: 0,
     minionType: null,
@@ -144,7 +147,10 @@ export function createMockTower(overrides?: Partial<Tower>): Tower {
     baseDamage: 20,
     baseRange: 5,
     talentMods: {},
-    magicBuff: 0,
+    // Matches createTower's default — recomputeEffectiveDamage multiplies by
+    // magicBuff, so the neutral value is 1, not 0.
+    magicBuff: 1,
+    interferenceFactor: 1,
     color: '#a855f7',
     ...overrides,
   }

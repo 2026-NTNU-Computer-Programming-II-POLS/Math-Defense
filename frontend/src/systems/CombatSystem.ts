@@ -35,7 +35,7 @@ export class CombatSystem {
       if (!enemy.alive) continue
       if (enemy.dotTimer > 0) {
         enemy.dotTimer -= dt
-        applyDamage(enemy, enemy.dotDamage * dt, game)
+        applyDamage(enemy, enemy.dotDamage * dt, game, 'dot')
         if (enemy.dotTimer <= 0) {
           enemy.dotDamage = 0
         }
@@ -92,7 +92,8 @@ export class CombatSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    applyDamage(enemy, amount, game)
+    // Projectiles (Radar B/C) are discrete tower hits.
+    applyDamage(enemy, amount, game, 'towerHit')
   }
 
 }

@@ -23,6 +23,7 @@ import { CombatSystem } from '@/systems/CombatSystem'
 import { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
 import { EconomySystem } from '@/systems/EconomySystem'
 import { MagicTowerSystem } from '@/systems/MagicTowerSystem'
+import { TowerInterferenceSystem } from '@/systems/TowerInterferenceSystem'
 import { RadarTowerSystem } from '@/systems/RadarTowerSystem'
 import { MatrixTowerSystem } from '@/systems/MatrixTowerSystem'
 import { LimitTowerSystem } from '@/systems/LimitTowerSystem'
@@ -40,6 +41,7 @@ import { RadarRangeRenderer } from '@/renderers/RadarRangeRenderer'
 import { MatrixLaserRenderer } from '@/renderers/MatrixLaserRenderer'
 import { PetRenderer } from '@/renderers/PetRenderer'
 import { SpellEffectRenderer } from '@/renderers/SpellEffectRenderer'
+import { CombatFeedbackRenderer } from '@/renderers/CombatFeedbackRenderer'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { TowerType } from '@/data/constants'
 
@@ -68,6 +70,10 @@ export function registerSystems(game: Game, opts: RegisterSystemsOptions): void 
     ['wave', new WaveSystem()],
     ['buff', new BuffSystem()],
     ['economy', new EconomySystem()],
+    // TowerInterferenceSystem MUST precede magicTower: it sets each tower's
+    // interferenceFactor for the frame before MagicTowerSystem folds in the
+    // magic buff (Phase 7 §7.3 ordering dependency).
+    ['towerInterference', new TowerInterferenceSystem()],
     ['magicTower', new MagicTowerSystem()],
     ['radarTower', new RadarTowerSystem()],
     ['matrixTower', new MatrixTowerSystem()],
@@ -85,6 +91,7 @@ export function registerSystems(game: Game, opts: RegisterSystemsOptions): void 
     ['matrixLaserRenderer', new MatrixLaserRenderer()],
     ['petRenderer', new PetRenderer()],
     ['spellEffectRenderer', new SpellEffectRenderer()],
+    ['combatFeedbackRenderer', new CombatFeedbackRenderer()],
   ]
   for (const [name, sys] of systems) game.addSystem(name, sys)
 }

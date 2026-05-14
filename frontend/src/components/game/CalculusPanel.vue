@@ -70,17 +70,15 @@ const presetPreviews = computed(() =>
     const count = petCount(p.coefficient)
     const newC = p.coefficient * p.exponent
     const newN = p.exponent - 1
-    const removes = newC === 0 || p.exponent === 0
-    const disables = !removes && newN === 0
-    const breaks = removes || disables
-    const derivExpr = removes ? '0' : fmtMono(newC, newN)
-    return { trait, count, derivExpr, derivBreaks: breaks }
+    const collapses = newC === 0 || p.exponent === 0 || newN === 0
+    const derivExpr = newC === 0 ? '0' : fmtMono(newC, newN)
+    return { trait, count, derivExpr, derivBreaks: collapses }
   }),
 )
 
 interface OpPreview {
   expr: string
-  outcome: 'ok' | 'disable' | 'remove'
+  outcome: 'ok' | 'collapse'
 }
 
 function previewOp(op: 'derivative' | 'derivative2' | 'integral'): OpPreview | null {
@@ -92,15 +90,22 @@ function previewOp(op: 'derivative' | 'derivative2' | 'integral'): OpPreview | n
   else { nc = roundUi(s.coefficient / (s.exponent + 1)); nn = s.exponent + 1 }
 
   if (nc === 0 || (op === 'derivative' && s.exponent === 0)) {
-    return { expr: '0', outcome: 'remove' }
+    return { expr: '0', outcome: 'collapse' }
   }
-  if (nn === 0) return { expr: `${nc}`, outcome: 'disable' }
+  if (nn === 0) return { expr: `${nc}`, outcome: 'collapse' }
   return { expr: fmtMono(nc, nn), outcome: 'ok' }
 }
 
 const opDeriv = computed(() => previewOp('derivative'))
 const opDeriv2 = computed(() => previewOp('derivative2'))
 const opInteg = computed(() => previewOp('integral'))
+
+// The minimal f(x) = x fallback — a fresh tower or the state a collapsed
+// operation lands in. Surfaced so the student knows to grow it again.
+const isMinimalState = computed(() => {
+  const s = calcState.value
+  return !!s && s.coefficient === 1 && s.exponent === 1 && s.currentExpr === 'x'
+})
 
 const currentTrait = computed<TraitKey | null>(() => {
   const s = calcState.value
@@ -114,8 +119,8 @@ function selectPreset(index: number) {
 }
 
 // Two-step confirm flow for irreversible ops. f', f'', and ∫f mutate the
-// tower's polynomial in-place and can remove or disable it; once committed,
-// there is no rollback. The first click stages an op; the second commits.
+// tower's polynomial in-place; once committed, there is no rollback (a chain op
+// also costs gold). The first click stages an op; the second commits.
 const pendingOp = ref<CalcOp | null>(null)
 
 // Reset confirmation if the calculus state changes (op committed elsewhere,
@@ -210,6 +215,9 @@ function pendingLabel(op: CalcOp): string {
       <p v-else class="chain-cost chain-cost--free">
         Next op: free (first operation)
       </p>
+      <p v-if="isMinimalState" class="minimal-hint" data-testid="calc-minimal-hint">
+        Function is at the minimal <code>f(x) = x</code> — pick an operation to grow it again.
+      </p>
       <div class="op-btns">
         <button
           :class="['btn', 'op-btn', { 'op-btn--pending': pendingOp === 'derivative' }]"
@@ -220,8 +228,7 @@ function pendingLabel(op: CalcOp): string {
           <span class="op-label">f'</span>
           <span v-if="opDeriv" class="op-preview" :class="`op-preview--${opDeriv.outcome}`">
             → {{ opDeriv.expr }}
-            <span v-if="opDeriv.outcome === 'remove'" class="op-tag">removes</span>
-            <span v-else-if="opDeriv.outcome === 'disable'" class="op-tag">disables</span>
+            <span v-if="opDeriv.outcome === 'collapse'" class="op-tag">collapses</span>
           </span>
         </button>
         <button
@@ -233,8 +240,7 @@ function pendingLabel(op: CalcOp): string {
           <span class="op-label">f''</span>
           <span v-if="opDeriv2" class="op-preview" :class="`op-preview--${opDeriv2.outcome}`">
             → {{ opDeriv2.expr }}
-            <span v-if="opDeriv2.outcome === 'remove'" class="op-tag">removes</span>
-            <span v-else-if="opDeriv2.outcome === 'disable'" class="op-tag">disables</span>
+            <span v-if="opDeriv2.outcome === 'collapse'" class="op-tag">collapses</span>
           </span>
         </button>
         <button
@@ -252,19 +258,16 @@ function pendingLabel(op: CalcOp): string {
 
       <!-- Two-step confirm prevents costly mis-clicks. The pending op is
            highlighted above; this banner makes the consequences explicit
-           (especially "removes/disables") and offers a one-click cancel. -->
+           (especially a collapse) and offers a one-click cancel. -->
       <div v-if="pendingOp" class="confirm-banner" :class="{
-        'confirm-banner--remove': pendingPreview()?.outcome === 'remove',
-        'confirm-banner--disable': pendingPreview()?.outcome === 'disable',
+        'confirm-banner--collapse': pendingPreview()?.outcome === 'collapse',
       }">
         <p class="confirm-text">
           Apply <strong>{{ pendingLabel(pendingOp) }}</strong>
           <span v-if="pendingPreview()"> → <code>{{ pendingPreview()?.expr }}</code></span>
-          <span v-if="pendingPreview()?.outcome === 'remove'" class="confirm-warn">
-            — this will <strong>remove the tower</strong>.
-          </span>
-          <span v-else-if="pendingPreview()?.outcome === 'disable'" class="confirm-warn">
-            — this will <strong>disable the tower</strong>.
+          <span v-if="pendingPreview()?.outcome === 'collapse'" class="confirm-warn">
+            — the function collapses; the tower resets to <code>f(x) = x</code>
+            (free — pick another operation after).
           </span>
           <span v-else class="confirm-info">— irreversible.</span>
         </p>
@@ -404,8 +407,7 @@ function pendingLabel(op: CalcOp): string {
   align-items: center;
   gap: 1px;
 }
-.op-preview--disable { color: var(--gold); }
-.op-preview--remove { color: var(--hp-red); }
+.op-preview--collapse { color: var(--gold); }
 .op-tag {
   font-family: var(--font-sans, inherit);
   font-size: 8px;
@@ -423,13 +425,9 @@ function pendingLabel(op: CalcOp): string {
   flex-direction: column;
   gap: 6px;
 }
-.confirm-banner--disable {
+.confirm-banner--collapse {
   background: rgba(212, 168, 64, 0.15);
   border-color: var(--gold-bright);
-}
-.confirm-banner--remove {
-  background: rgba(204, 68, 68, 0.12);
-  border-color: var(--hp-red);
 }
 .confirm-text {
   font-size: 11px;
@@ -444,7 +442,7 @@ function pendingLabel(op: CalcOp): string {
   color: var(--gold-bright);
   font-family: var(--font-mono);
 }
-.confirm-warn { color: var(--hp-red); }
+.confirm-warn { color: var(--gold); }
 .confirm-info { color: var(--gold); }
 .confirm-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .confirm-yes,
@@ -453,12 +451,19 @@ function pendingLabel(op: CalcOp): string {
   padding: 6px 12px;
   min-height: 32px;
 }
-.confirm-banner--remove .confirm-yes {
-  border-color: var(--hp-red);
-  color: var(--hp-red);
+
+.minimal-hint {
+  font-size: 10px;
+  margin: 0;
+  color: var(--text-primary);
+  opacity: 0.7;
+  line-height: 1.4;
 }
-.confirm-banner--remove .confirm-yes:hover {
-  background: var(--hp-red);
-  color: var(--stone-dark);
+.minimal-hint code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--gold-bright);
+  font-family: var(--font-mono);
 }
 </style>

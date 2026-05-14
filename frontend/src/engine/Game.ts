@@ -32,6 +32,7 @@ import type { WaveSystem } from '@/systems/WaveSystem'
 import type { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
 import type { EconomySystem } from '@/systems/EconomySystem'
 import type { MagicTowerSystem } from '@/systems/MagicTowerSystem'
+import type { TowerInterferenceSystem } from '@/systems/TowerInterferenceSystem'
 import type { RadarTowerSystem } from '@/systems/RadarTowerSystem'
 import type { MatrixTowerSystem } from '@/systems/MatrixTowerSystem'
 import type { LimitTowerSystem } from '@/systems/LimitTowerSystem'
@@ -45,6 +46,7 @@ import type { EnemyRenderer } from '@/renderers/EnemyRenderer'
 import type { SpellEffectRenderer } from '@/renderers/SpellEffectRenderer'
 import type { TowerRenderer } from '@/renderers/TowerRenderer'
 import type { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
+import type { CombatFeedbackRenderer } from '@/renderers/CombatFeedbackRenderer'
 
 // ── Type-safe event map ──
 
@@ -68,6 +70,19 @@ export interface WaveEndSnapshot {
   readonly costTotal: number
 }
 
+/**
+ * Payload of DAMAGE_RESOLVED — emitted by `applyDamage` only when a defensive
+ * trait changed a discrete hit's number. `raw` is the post-vulnerability
+ * incoming amount; `applied` is what landed after evasion / per-hit cap.
+ */
+export interface DamageResolvedPayload {
+  readonly x: number
+  readonly y: number
+  readonly raw: number
+  readonly applied: number
+  readonly kind: 'capped' | 'reduced'
+}
+
 export interface GameEvents {
   [Events.PHASE_CHANGED]:        { from: GamePhase; to: GamePhase }
   [Events.LEVEL_START]:          number
@@ -85,6 +100,7 @@ export interface GameEvents {
   [Events.ENEMY_KILLED]:         Enemy
   [Events.ENEMY_REACHED_ORIGIN]: Enemy
   [Events.TOWER_ATTACK]:         { tower: Tower; target: Enemy }
+  [Events.DAMAGE_RESOLVED]:      DamageResolvedPayload
   [Events.BUFF_PHASE_START]:     void
   [Events.BUFF_CARDS_UPDATED]:   ReadonlyArray<BuffCard>
   [Events.BUFF_CARD_SELECTED]:   string
@@ -184,6 +200,7 @@ export interface SystemMap {
   buff: BuffSystem
   economy: EconomySystem
   magicTower: MagicTowerSystem
+  towerInterference: TowerInterferenceSystem
   radarTower: RadarTowerSystem
   matrixTower: MatrixTowerSystem
   limitTower: LimitTowerSystem
@@ -197,6 +214,7 @@ export interface SystemMap {
   towerRenderer: TowerRenderer
   projectileRenderer: ProjectileRenderer
   spellEffectRenderer: SpellEffectRenderer
+  combatFeedbackRenderer: CombatFeedbackRenderer
 }
 
 // ── Game ──

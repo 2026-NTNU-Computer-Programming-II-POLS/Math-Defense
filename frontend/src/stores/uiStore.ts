@@ -5,12 +5,13 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { appBus } from '@/lib/app-bus'
-import type { TowerType } from '@/data/constants'
+import type { TowerType, EnemyType } from '@/data/constants'
 
 const PRINCIPLE_OVERLAY_PREF_KEY = 'mdf.principleOverlayEnabled'
 const AUDIO_MUTED_PREF_KEY = 'mdf.audioMuted'
 const AUDIO_VOLUME_PREF_KEY = 'mdf.audioVolume'
 const SLIDER_FALLBACK_PREF_KEY = 'mdf.sliderFallbackEnabled'
+const SEEN_COUNTER_ENEMIES_PREF_KEY = 'mdf.seenCounterEnemies'
 
 function loadPrincipleOverlayPref(): boolean {
   if (typeof window === 'undefined') return true
@@ -51,6 +52,19 @@ function loadAudioVolumePref(): number {
     return Math.max(0, Math.min(1, n))
   } catch {
     return 0.7
+  }
+}
+
+function loadSeenCounterEnemies(): Set<EnemyType> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.localStorage.getItem(SEEN_COUNTER_ENEMIES_PREF_KEY)
+    if (raw === null) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((v): v is EnemyType => typeof v === 'string'))
+  } catch {
+    return new Set()
   }
 }
 
@@ -153,6 +167,30 @@ export const useUiStore = defineStore('ui', () => {
 
   function setSliderFallbackEnabled(v: boolean): void {
     sliderFallbackEnabled.value = v
+  }
+
+  // V3 Phase 6 — first-encounter telegraph. Persisted to localStorage so
+  // "first encounter" means the first time ever, across sessions, not just
+  // the first time this run.
+  const seenCounterEnemies = ref<Set<EnemyType>>(loadSeenCounterEnemies())
+  if (typeof window !== 'undefined') {
+    watch(seenCounterEnemies, (v) => {
+      try { window.localStorage.setItem(SEEN_COUNTER_ENEMIES_PREF_KEY, JSON.stringify([...v])) }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function markCounterEnemySeen(type: EnemyType): void {
+    if (seenCounterEnemies.value.has(type)) return
+    // Reassign rather than mutate so the persistence watcher fires and any
+    // computed consumers re-evaluate.
+    const next = new Set(seenCounterEnemies.value)
+    next.add(type)
+    seenCounterEnemies.value = next
+  }
+
+  function hasSeenCounterEnemy(type: EnemyType): boolean {
+    return seenCounterEnemies.value.has(type)
   }
 
   // Piecewise paths Phase 5: Function Panel ↔ Renderer hover sync.
@@ -307,6 +345,7 @@ export const useUiStore = defineStore('ui', () => {
     principleOverlayEnabled,
     audioMuted, audioVolume,
     sliderFallbackEnabled,
+    seenCounterEnemies,
     showModal, showConfirm, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
     setBuildHintStep,
@@ -314,5 +353,6 @@ export const useUiStore = defineStore('ui', () => {
     setPrincipleOverlayEnabled,
     setAudioVolume,
     setSliderFallbackEnabled,
+    markCounterEnemySeen, hasSeenCounterEnemy,
   }
 })

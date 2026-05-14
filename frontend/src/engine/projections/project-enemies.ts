@@ -22,6 +22,7 @@ export function projectEnemyScene(game: Game): EnemySceneView {
       hpRatio: e.hp < e.maxHp ? e.hp / e.maxHp : null,
       shieldRatio: e.shieldMax > 0 ? e.shield / e.shieldMax : null,
       helperRadius: e.helperRadius,
+      regenerating: e.regenPerSec > 0 && e.hp < e.maxHp,
     })
   }
   return { enemies }
