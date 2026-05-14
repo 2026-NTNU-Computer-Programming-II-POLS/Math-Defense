@@ -76,6 +76,10 @@ export interface Pet {
   ownerId: string
   x: number
   y: number
+  // Orbit anchor (spawn position). The pet leashes its targeting to this point
+  // and drifts back to it when idle, so it stays a tower-guarding satellite.
+  homeX: number
+  homeY: number
   damage: number
   speed: number
   attackSpeed: number
