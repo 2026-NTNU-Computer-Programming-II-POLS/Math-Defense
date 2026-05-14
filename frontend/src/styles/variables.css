@@ -4,10 +4,10 @@
   --stone-dark: #5b718f;
   --stone-light: #7a8da8;
   --grid-line: rgba(255, 255, 255, 0.2);
-  --axis: #d4a017;
-  --gold: #d4a017;
+  --axis: #c47206;
+  --gold: #c47206;
   --gold-bright: #ffffff;
-  --gold-dim: #9a7005;
+  --gold-dim: #9a5705;
   --tower-cannon: #4a82c8;
 
   --enemy-red: #b84040;
@@ -61,6 +61,6 @@
   --gold-tint-select: rgba(212, 160, 23, 0.12);
   --gold-tint-faint:  rgba(212, 160, 23, 0.05);
   --gold-tint-soft:   rgba(212, 160, 23, 0.08);
-  --gold-shadow:      0 1px 4px rgba(0, 0, 0, 0.45);
+  --gold-shadow:      0 1px 4px rgba(231, 210, 139, 0.709);
 }
 
