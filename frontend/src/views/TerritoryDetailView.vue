@@ -110,7 +110,7 @@ async function handlePlay(slotId: string): Promise<void> {
       const ok = await ui.showConfirm(
         'Active session in progress',
         'You have an active game session in progress. Starting a territory game will abandon it. Continue?',
-        { confirmLabel: 'Continue', cancelLabel: 'Cancel' },
+        { confirmLabel: 'Continue', cancelLabel: '取消' },
       )
       if (!ok) return
     }

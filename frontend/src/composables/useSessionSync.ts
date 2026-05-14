@@ -8,6 +8,7 @@ import {
   createSessionWithRetry,
   pushWaveSnapshot,
   endSession as endSessionRequest,
+  abandonSession as abandonSessionRequest,
 } from '@/services/sessionLifecycleService'
 import { Events, GamePhase } from '@/data/constants'
 import type { Game, WaveEndSnapshot } from '@/engine/Game'
@@ -232,6 +233,28 @@ export function useSessionSync() {
     }
   }
 
+  async function abandonRun(): Promise<void> {
+    createGeneration++
+    sessionGeneration++
+    pending.value = null
+    pendingLevel = null
+    consecutiveUpdateFailures = 0
+    alertedForFailures = false
+    lastSyncedWave = -1
+
+    const id = sessionId.value
+    sessionId.value = null
+    isPracticeMode.value = false
+    activeChallengeId.value = null
+
+    if (!id) return
+    try {
+      await abandonSessionRequest(id)
+    } catch (e) {
+      console.warn('[SessionSync] Failed to abandon session:', e)
+    }
+  }
+
   return {
     sessionId,
     lastCompletedSessionId,
@@ -239,6 +262,7 @@ export function useSessionSync() {
     isPracticeMode,
     activeChallengeId,
     bind,
+    abandonRun,
   }
 }
 
