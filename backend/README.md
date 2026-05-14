@@ -50,7 +50,6 @@ backend/
 │   │   ├── talent/                Talent tree aggregate (21 nodes, 7 tower types, prereq chains)
 │   │   ├── class_/                Class aggregate + ClassMembership + join_code
 │   │   ├── auth/                  Auth-specific domain helpers
-│   │   ├── identity/              Identity value objects
 │   │   ├── scoring/               score_calculator.py — server-side S1/S2/K/TotalScore formula
 │   │   ├── territory/             Grabbing Territory aggregate + optimistic locking
 │   │   ├── season/                Season aggregate — time-bounded achievement multipliers
@@ -79,7 +78,6 @@ backend/
 │   │   ├── unit_of_work.py        SqlAlchemyUnitOfWork — explicit commit; auto-rollback on exit
 │   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers exponential-backoff lockout (5m → 15m → 1h → 24h)
 │   │   ├── token_denylist.py      DB-backed JWT deny-list for server-side logout (jti → expiry); bounded by natural JWT TTL
-│   │   ├── refresh_token_store.py DB-backed rotating refresh-token store (SHA-256 hashed; used + revoked flags)
 │   │   ├── audit_logger.py        record_audit_event() — writes to its own SQLAlchemy session so audit rows commit independently of the surrounding business txn
 │   │   ├── email_service.py       Thin SMTP wrapper for verification/2FA mail; no-op when SMTP env is unset
 │   │   ├── scheduler.py           Background asyncio task runner (territory settlement loop)
@@ -91,11 +89,17 @@ backend/
 │   │       ├── leaderboard_repository.py      SQLAlchemy impl with per-level DENSE_RANK ranking + per-challenge query
 │   │       ├── achievement_repository.py      SQLAlchemy impl of AchievementRepository
 │   │       ├── talent_repository.py           SQLAlchemy impl of TalentRepository
+│   │       ├── class_repository.py            SQLAlchemy impl of ClassRepository (members, join-code lookup)
+│   │       ├── territory_repository.py        SQLAlchemy impl of TerritoryRepository (activity + slot + occupation)
 │   │       ├── season_repository.py           SQLAlchemy impl of SeasonRepository
 │   │       ├── challenge_repository.py        SQLAlchemy impl of ChallengeRepository (soft-delete aware)
 │   │       ├── competency_state_repository.py SQLAlchemy impl backing the Beta-posterior store
 │   │       ├── session_event_repository.py    Append-only event log (replay/spectate)
-│   │       └── study_repository.py            Enrollment + probe + affect persistence for the validity probe
+│   │       ├── study_repository.py            Enrollment + probe + affect persistence for the validity probe
+│   │       ├── login_attempt_repository.py    Per-account failure-count + lockout-deadline store (backing login_guard)
+│   │       ├── token_denylist_repository.py   Persist revoked JWT JTIs until natural expiry (backing token_denylist)
+│   │       ├── refresh_token_repository.py    Rotating refresh-token store (SHA-256 hashed; used + revoked flags)
+│   │       └── email_verification_repository.py  One-use email verification token store
 │   │
 │   ├── models/                    SQLAlchemy ORM models
 │   │   ├── user.py                User (email, player_name, avatar_url, role, totp_*, ia_recent_accuracy)

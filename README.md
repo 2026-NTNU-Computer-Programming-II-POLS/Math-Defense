@@ -33,7 +33,11 @@ Math Game/
 ├── nginx.conf                Production reverse-proxy config (HTTP, SPA + /api)
 ├── nginx-tls.conf            Production reverse-proxy config with TLS termination
 ├── .env.example              Template for required environment variables
-└── Math_Defense_Spec.md      Full game-design specification
+├── ARCHITECTURE.md           Comprehensive system architecture documentation
+├── DATABASE_SCHEMA.md        Full ERD, column constraints, indexes, and migration history
+├── SECURITY.md               Security model, threat surface, and hardening notes
+├── Math_Defense_Spec.md      Full game-design specification
+└── docs/                     Additional design documents and analysis (Audit, V3 planning, educational theory)
 ```
 
 The three runtime layers communicate as follows:

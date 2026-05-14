@@ -397,6 +397,7 @@ flowchart TB
         MTS[MatrixTowerSystem]
         LTS[LimitTowerSystem]
         CTS[CalculusTowerSystem]
+        PCS[PetCombatSystem]
         MS[MovementSystem]
         WS[WaveSystem]
         BS[BuffSystem]
@@ -689,8 +690,7 @@ erDiagram
 stateDiagram-v2
     [*] --> MENU
     MENU --> LEVEL_SELECT
-    LEVEL_SELECT --> INITIAL_ANSWER : pick 1–5★
-    INITIAL_ANSWER --> BUILD : submit IA (+20 if correct)
+    LEVEL_SELECT --> BUILD : pick 1–5★ (through InitialAnswerView — not a PhaseStateMachine state)
     BUILD --> WAVE : Start Wave
     WAVE --> BUILD : wave cleared
     WAVE --> MONTY_HALL : kill_value ≥ threshold
@@ -893,14 +893,14 @@ backend/
     factories.py                 # ServiceContainer DI wiring
     domain/                      # aggregates, value objects, errors, policies
       session/   user/   leaderboard/   achievement/   talent/   class_/
-      territory/   challenge/   season/   assessment/   study/   scoring/
+      territory/   challenge/   season/   assessment/   study/   scoring/   auth/
       value_objects.py   constraints.py   errors.py
     application/                 # use-case services + mappers.py
     infrastructure/
       persistence/               # SqlAlchemy*Repository
       unit_of_work.py
-      login_guard.py   token_denylist.py   refresh_token_store.py
-      audit_logger.py   email_service.py   scheduler.py   spectate_hub.py
+      login_guard.py   token_denylist.py   audit_logger.py
+      email_service.py   scheduler.py   spectate_hub.py
       wasm_runtime.py            # wasmtime-py singleton, hosts math_engine.wasm
     models/                      # SQLAlchemy ORM models (20)
     routers/                     # FastAPI routers (thin adapters)
