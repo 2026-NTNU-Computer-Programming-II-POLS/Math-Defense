@@ -76,7 +76,7 @@ export class TowerRenderer {
     ctx.restore()
 
     if (view.showCoords) {
-      ctx.fillStyle = 'rgba(212,168,64,0.7)'
+      ctx.fillStyle = 'rgb(255, 215, 0)'
       ctx.font = '9px monospace'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'bottom'
