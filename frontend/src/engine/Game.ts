@@ -511,6 +511,12 @@ export class Game {
       for (let step = 0; step < speedSteps; step++) {
         this._update(FIXED_DT)
         this.time += FIXED_DT
+        // A sub-step can end the wave (e.g. the last enemy is cleared). Stop
+        // the remaining perceived-speed sub-steps so a non-WAVE phase never
+        // receives a doubled tick: the extra _update would advance `time` —
+        // and so the scored `timeTotal` — by a FIXED_DT that belongs to no
+        // wave and that timeExcludePrepare never subtracts back out.
+        if (this.state.phase !== GamePhase.WAVE) break
       }
       this._accumulator -= FIXED_DT
     }

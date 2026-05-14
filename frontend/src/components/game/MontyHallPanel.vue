@@ -155,7 +155,7 @@ function close(): void {
 }
 
 .mh-prompt {
-  color: #e8dcc8;
+  color: var(--overlay-text);
   font-size: 14px;
   margin: 0 0 16px;
 }
@@ -178,7 +178,7 @@ function close(): void {
   border: 2px solid var(--panel-border);
   border-radius: 6px;
   background: rgba(139, 115, 66, 0.2);
-  color: #e8dcc8;
+  color: var(--overlay-text);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 20px;

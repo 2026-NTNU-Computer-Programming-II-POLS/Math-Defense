@@ -175,7 +175,7 @@ function purchase(itemId: string, cost: number): void {
 .shop-panel {
   position: relative;
   width: 200px;
-  background: rgba(26, 21, 32, 0.95);
+  background: var(--overlay-panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   padding: 8px;
@@ -190,7 +190,7 @@ function purchase(itemId: string, cost: number): void {
 .shop-panel.collapsed {
   width: auto;
   padding: 4px;
-  background: rgba(26, 21, 32, 0.9);
+  background: var(--overlay-panel-bg);
 }
 
 .shop-icon-btn {
@@ -267,7 +267,7 @@ function purchase(itemId: string, cost: number): void {
   margin-bottom: 8px;
 }
 .chip {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay-cell-bg);
   border: 1px solid var(--grid-line);
   border-radius: 12px;
   padding: 3px 8px;
@@ -287,7 +287,7 @@ function purchase(itemId: string, cost: number): void {
 }
 .chip:hover {
   border-color: var(--gold);
-  color: #e8dcc8;
+  color: var(--overlay-text);
 }
 .chip:focus-visible {
   outline: 2px solid var(--gold-bright);
@@ -295,7 +295,7 @@ function purchase(itemId: string, cost: number): void {
 }
 .chip--active {
   border-color: var(--gold-bright);
-  background: rgba(255, 215, 0, 0.15);
+  background: var(--overlay-cell-active);
   color: var(--gold-bright);
 }
 .chip-count {
@@ -325,8 +325,8 @@ function purchase(itemId: string, cost: number): void {
   padding: 6px 8px;
   border: 1px solid var(--panel-border);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #e8dcc8;
+  background: var(--overlay-cell-bg);
+  color: var(--overlay-text);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -336,7 +336,7 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .shop-item:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--overlay-cell-hover);
 }
 
 .shop-item.unaffordable {

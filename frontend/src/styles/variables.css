@@ -22,6 +22,15 @@
   --overlay-bg: rgba(91, 113, 143, 0.92);
   --text-on-accent: #1a2a3a;
 
+  /* In-game dark overlay surfaces — HUD/Shop/Spell/etc. panels that sit over
+     the game canvas. Kept dark on purpose (see V3 UI plan); these tokens are
+     the single source of truth so the alpha values stop fragmenting. */
+  --overlay-panel-bg:    rgba(26, 21, 32, 0.95);
+  --overlay-text:        #e8dcc8;
+  --overlay-cell-bg:     rgba(255, 255, 255, 0.04);
+  --overlay-cell-hover:  rgba(255, 255, 255, 0.1);
+  --overlay-cell-active: rgba(255, 215, 0, 0.15);
+
   --text-primary: #2c3e50;
   --text-secondary: #5d6d7e;
   --stone-selected: #d1dbe8;
