@@ -173,15 +173,12 @@ function purchase(itemId: string, cost: number): void {
 
 <style scoped>
 .shop-panel {
-  position: absolute;
-  left: 8px;
-  top: 100px;
+  position: relative;
   width: 200px;
   background: rgba(26, 21, 32, 0.95);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   padding: 8px;
-  z-index: var(--z-chrome);
   max-height: 400px;
   overflow-y: auto;
   transition:

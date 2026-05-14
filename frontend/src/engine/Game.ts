@@ -130,6 +130,7 @@ export interface GameEvents {
   [Events.MONTY_HALL_RESULT]:         { won: boolean; reward: MontyHallReward | null }
 
   [Events.SHOP_PURCHASE]:        { itemId: string; cost: number }
+  [Events.PERCEIVED_SPEED_CHANGED]: number
 
   [Events.KILL_VALUE_CHANGED]:   number
   [Events.COST_TOTAL_CHANGED]:   number
@@ -437,6 +438,13 @@ export class Game {
     this.eventBus.emit(Events.WAVE_START, this.state.wave)
   }
 
+  setPerceivedSpeedMultiplier(multiplier: number): void {
+    const next = multiplier >= 2 ? 2 : 1
+    if (this.state.perceivedSpeedMultiplier === next) return
+    this.state.perceivedSpeedMultiplier = next
+    this.eventBus.emit(Events.PERCEIVED_SPEED_CHANGED, next)
+  }
+
   // ── Game loop ──
 
   start(): void {
@@ -497,9 +505,14 @@ export class Game {
     this._accumulator += frameTime
 
     while (this._accumulator >= FIXED_DT) {
-      this._update(FIXED_DT)
+      const speedSteps = this.state.phase === GamePhase.WAVE
+        ? Math.max(1, Math.round(this.state.perceivedSpeedMultiplier))
+        : 1
+      for (let step = 0; step < speedSteps; step++) {
+        this._update(FIXED_DT)
+        this.time += FIXED_DT
+      }
       this._accumulator -= FIXED_DT
-      this.time += FIXED_DT
     }
 
     this._render()

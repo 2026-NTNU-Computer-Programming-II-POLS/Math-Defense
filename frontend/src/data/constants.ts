@@ -136,6 +136,7 @@ export const Events = Object.freeze({
   MONTY_HALL_RESULT:         'montyHallResult',
 
   SHOP_PURCHASE:        'shopPurchase',
+  PERCEIVED_SPEED_CHANGED: 'perceivedSpeedChanged',
 
   KILL_VALUE_CHANGED:   'killValueChanged',
   COST_TOTAL_CHANGED:   'costTotalChanged',

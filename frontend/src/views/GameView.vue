@@ -17,6 +17,7 @@ import BuildPanel from '@/components/game/BuildPanel.vue'
 import BuildHint from '@/components/game/BuildHint.vue'
 import BuffCardPanel from '@/components/game/BuffCardPanel.vue'
 import ShopPanel from '@/components/game/ShopPanel.vue'
+import GameSpeedPanel from '@/components/game/GameSpeedPanel.vue'
 import MontyHallPanel from '@/components/game/MontyHallPanel.vue'
 import ScoreResultView from '@/views/ScoreResultView.vue'
 import ChainRulePanel from '@/components/game/ChainRulePanel.vue'
@@ -362,12 +363,15 @@ onBeforeUnmount(() => {
         aria-live="polite"
       >Practice mode — leaderboard ineligible</div>
       <BuildHint />
+      <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
+        <ShopPanel v-if="gameStore.isBuilding" />
+        <GameSpeedPanel />
+      </div>
 
       <!-- Build Phase -->
       <template v-if="gameStore.isBuilding">
         <TowerBar />
         <BuildPanel v-if="uiStore.buildPanelVisible" />
-        <ShopPanel />
         <StartWaveButton />
       </template>
 
@@ -470,6 +474,17 @@ onBeforeUnmount(() => {
 
 .game-overlay > * {
   pointer-events: auto;
+}
+
+.left-utility-stack {
+  position: absolute;
+  left: 8px;
+  top: 100px;
+  z-index: var(--z-chrome);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .return-level-btn {

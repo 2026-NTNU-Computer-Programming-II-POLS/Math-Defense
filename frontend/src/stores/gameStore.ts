@@ -58,6 +58,7 @@ export const useGameStore = defineStore('game', () => {
   // V2 Timing
   const timeTotal = ref(0)
   const timeExcludePrepare = ref<number[]>([])
+  const perceivedSpeedMultiplier = ref(1)
 
   // V2 Initial Answer
   const initialAnswer = ref<0 | 1>(0)
@@ -157,6 +158,7 @@ export const useGameStore = defineStore('game', () => {
       game.eventBus.on(Events.GOLD_CHANGED, (v) => { gold.value = v }),
       game.eventBus.on(Events.HP_CHANGED, (v) => { hp.value = v }),
       game.eventBus.on(Events.SCORE_CHANGED, (v) => { score.value = v }),
+      game.eventBus.on(Events.PERCEIVED_SPEED_CHANGED, (v) => { perceivedSpeedMultiplier.value = v }),
       game.eventBus.on(Events.KILL_VALUE_CHANGED, (v) => {
         cumulativeKillValue.value = v
         montyHallProgress.value = v
@@ -201,6 +203,7 @@ export const useGameStore = defineStore('game', () => {
         healthOrigin.value = game.state.healthOrigin
         timeTotal.value = 0
         timeExcludePrepare.value = []
+        perceivedSpeedMultiplier.value = game.state.perceivedSpeedMultiplier
         initialAnswer.value = game.state.initialAnswer
         pathsVisible.value = game.state.pathsVisible
         montyHallProgress.value = 0
@@ -269,6 +272,7 @@ export const useGameStore = defineStore('game', () => {
     healthOrigin.value = s.healthOrigin
     timeTotal.value = s.timeTotal
     timeExcludePrepare.value = [...s.timeExcludePrepare]
+    perceivedSpeedMultiplier.value = s.perceivedSpeedMultiplier
     initialAnswer.value = s.initialAnswer
     pathsVisible.value = s.pathsVisible
     activeBuffs.value = [...s.activeBuffs]
@@ -315,6 +319,7 @@ export const useGameStore = defineStore('game', () => {
     healthOrigin.value = 20
     timeTotal.value = 0
     timeExcludePrepare.value = []
+    perceivedSpeedMultiplier.value = 1
     initialAnswer.value = 0
     pathsVisible.value = false
     buffCards.value = []
@@ -333,7 +338,7 @@ export const useGameStore = defineStore('game', () => {
   return {
     phase, level, starRating, wave, totalWaves,
     gold, hp, maxHp, score, kills, cumulativeKillValue, enemiesAlive, buffCards,
-    costTotal, healthOrigin, timeTotal, timeExcludePrepare,
+    costTotal, healthOrigin, timeTotal, timeExcludePrepare, perceivedSpeedMultiplier,
     initialAnswer, pathsVisible, montyHallProgress, montyHallState,
     activeBuffs, activeBuffsSnapshotTime, spellCooldowns, calculusStates, towerUpgradeTick,
     pathLabelOpacity,
