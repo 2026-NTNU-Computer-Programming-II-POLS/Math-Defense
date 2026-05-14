@@ -67,7 +67,13 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
   const gameStore = useGameStore()
   const uiStore = useUiStore()
   const sessionSync = useSessionSync()
-  const { bind: bindSession, newlyUnlockedAchievements, lastCompletedSessionId, isPracticeMode } = sessionSync
+  const {
+    bind: bindSession,
+    newlyUnlockedAchievements,
+    lastCompletedSessionId,
+    isPracticeMode,
+    abandonRun,
+  } = sessionSync
   const principleOverlay = createPrincipleOverlay()
 
   const unsubs: (() => void)[] = []
@@ -291,5 +297,6 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
     clearPrinciple: principleOverlay.clearPrinciple,
     restoreFromCheckpoint,
     isPracticeMode,
+    abandonRun,
   }
 }

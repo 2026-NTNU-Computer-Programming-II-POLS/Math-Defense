@@ -79,7 +79,7 @@ const stars = computed(() =>
       </label>
 
       <div class="preview-actions">
-        <button class="btn cancel-btn" @click="emit('cancel')">Cancel</button>
+        <button class="btn cancel-btn" @click="emit('cancel')">取消</button>
         <button class="btn confirm-btn" @click="emit('confirm', slot.id)">{{ ctaLabel }}</button>
       </div>
     </div>

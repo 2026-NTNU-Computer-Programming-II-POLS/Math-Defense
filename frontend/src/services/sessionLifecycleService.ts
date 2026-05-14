@@ -131,3 +131,8 @@ export function endSession(
 ): Promise<SessionOut> {
   return sessionService.end(sessionId, buildEndPayload(state))
 }
+
+/** POST /api/sessions/:id/abandon without scoring or leaderboard submission. */
+export function abandonSession(sessionId: string): Promise<SessionOut> {
+  return sessionService.abandon(sessionId)
+}
