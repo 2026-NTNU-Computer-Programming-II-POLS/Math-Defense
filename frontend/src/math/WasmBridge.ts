@@ -9,6 +9,7 @@
 // rename is caught by vue-tsc here instead of at runtime.
 import type { WasmExport } from './wasm-exports'
 import type { CurveDefinition } from './curve-types'
+import type { MultisetEntry } from '@/data/difficulty-defs'
 import { mulberry32 } from './MathUtils'
 // Static imports of the co-located glue + binary. Vite treats the .wasm as an
 // asset (?url emits a hashed, serveable URL in prod and a dev-server URL in dev),
@@ -861,18 +862,6 @@ function jsComputeSpawnPoints(
 //   = 556 bytes
 const GENERATED_LEVEL_BYTES = 556
 
-const MULTISET_TRIG_SIN = 100
-const MULTISET_TRIG_COS = 101
-const MULTISET_LOG = 200
-
-function multisetEntryToCode(entry: number | string): number {
-  if (typeof entry === 'number') return entry
-  if (entry === 'sin') return MULTISET_TRIG_SIN
-  if (entry === 'cos') return MULTISET_TRIG_COS
-  if (entry === 'log') return MULTISET_LOG
-  return 0
-}
-
 export interface BridgeGeneratedLevel {
   success: boolean
   curves: CurveDefinition[]
@@ -883,33 +872,30 @@ export interface BridgeGeneratedLevel {
 }
 
 function readCurveAt(m: WasmModule, base: number): CurveDefinition {
-  const family = m.getValue(base + 0, 'i32')
+  // The reworked level generator emits polynomials only, so a generated
+  // curve_t is always FAMILY_POLY. The trig/log families remain in the ABI
+  // (and in writeCurveTo) for Magic-tower curves but are never produced here.
   const variant = m.getValue(base + 4, 'i32')
   const a = m.getValue(base + 8, 'float')
   const b = m.getValue(base + 12, 'float')
   const c = m.getValue(base + 16, 'float')
   const d = m.getValue(base + 20, 'float')
-  if (family === FAMILY_POLY) {
-    const degree = (variant === 1 || variant === 2 || variant === 3 ? variant : 1) as 1 | 2 | 3
-    const coeffs = degree === 1 ? [a, b] : degree === 2 ? [a, b, c] : [a, b, c, d]
-    return { family: 'polynomial', degree, coefficients: coeffs }
-  }
-  if (family === FAMILY_TRIG) {
-    return { family: 'trigonometric', fn: variant === 0 ? 'sin' : 'cos', a, b, c, d }
-  }
-  return { family: 'logarithmic', a, b, c, d }
+  const degree = (variant === 1 || variant === 2 || variant === 3 ? variant : 1) as 1 | 2 | 3
+  const coeffs = degree === 1 ? [a, b] : degree === 2 ? [a, b, c] : [a, b, c, d]
+  return { family: 'polynomial', degree, coefficients: coeffs }
 }
 
 export function generateLevelDeterministic(
   starRating: number,
   rng: PrngHandle,
-  multisetEntries: ReadonlyArray<number | string>,
+  multisetEntries: ReadonlyArray<MultisetEntry>,
 ): BridgeGeneratedLevel | null {
   const m = _module
   if (!(_useWasm && m && rng instanceof WasmPrngHandle)) return null
   if (multisetEntries.length < 1 || multisetEntries.length > MAX_CURVES) return null
 
-  const codes = multisetEntries.map(multisetEntryToCode)
+  // A polynomial multiset entry is its own wire code — the degree (1|2|3).
+  const codes = multisetEntries
   const codesPtr = m._malloc(codes.length * 4)
   const outPtr = m._malloc(GENERATED_LEVEL_BYTES)
   try {

@@ -43,10 +43,9 @@ const PRE_EXISTING_ALLOWLIST: ReadonlyArray<{
   importPath: string
 }> = [
   // Audit F-ARCH-6 fix relocated only the level-generator branching to a
-  // service. The two remaining views→domain imports below predate that fix
-  // and will be migrated in follow-up work; ratcheted here so the new
+  // service. The remaining views→domain import below predates that fix and
+  // will be migrated in follow-up work; ratcheted here so the new
   // views/-vs-domain rule still catches *new* violations.
-  { fileSuffix: 'src/views/InitialAnswerView.vue', importPath: '@/domain/level/distractor-generator' },
   { fileSuffix: 'src/views/ScoreResultView.vue', importPath: '@/domain/scoring/score-calculator' },
 ]
 

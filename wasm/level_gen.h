@@ -14,9 +14,11 @@
  *
  * Multiset wire encoding (TS-side helper produces this; C-side decodes):
  *   1, 2, 3   → polynomial degree
- *   100       → trig sin
- *   101       → trig cos
- *   200       → log
+ *
+ * The level generator is polynomial-only (V3 fraction fill-in rework), so the
+ * trig/log wire codes were removed. The trig/log curve *families* still exist
+ * in curve.h for Magic-tower function curves; the generator just never emits
+ * them.
  */
 
 #ifndef MD_LEVEL_GEN_H
@@ -32,9 +34,6 @@
 #define MULTISET_POLY_DEG_1  1
 #define MULTISET_POLY_DEG_2  2
 #define MULTISET_POLY_DEG_3  3
-#define MULTISET_TRIG_SIN    100
-#define MULTISET_TRIG_COS    101
-#define MULTISET_LOG         200
 
 /* spawn_t — 20 bytes; 4-byte aligned, no padding required. */
 typedef struct {

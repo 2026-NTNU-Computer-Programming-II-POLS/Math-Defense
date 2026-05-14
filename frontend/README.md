@@ -152,10 +152,8 @@ frontend/
 │   │   │   └── SplitPolicy.ts          Single source for Split enemy split rules
 │   │   ├── level/
 │   │   │   ├── level-generator.ts      Reverse-endpoint curve generation algorithm
-│   │   │   ├── distractor-generator.ts Plausible wrong answers for Initial Answer
 │   │   │   ├── decoy-generator.ts      Decoy curve generation for Initial Answer screen
 │   │   │   ├── level-layout-service.ts Builds SegmentedPath + placement rules for a level definition
-│   │   │   ├── path-group-defs.ts      7 runtime path group definitions
 │   │   │   ├── placement-policy.ts     Grid-cell → can-place decision shared by preview and click handler
 │   │   │   └── checkpoint.ts           Star-5 retry-from-checkpoint serialization (gold/HP/costTotal/killValue)
 │   │   ├── movement/               Curve-path and piecewise-path movement strategies
