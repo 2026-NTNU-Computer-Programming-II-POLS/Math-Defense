@@ -120,10 +120,7 @@ async function returnToLevelSelect(): Promise<void> {
     if (!ok) return
   }
 
-  if (paused.value) {
-    game.value?.start()
-    paused.value = false
-  }
+  paused.value = false
 
   await abandonRun()
   bypassLeaveConfirm.value = true
@@ -480,10 +477,10 @@ onBeforeUnmount(() => {
   gap: 6px;
   height: 34px;
   padding: 0 12px;
-  border: 1px solid rgba(255, 215, 0, 0.65);
+  border: 1px solid var(--gold-border);
   border-radius: 4px;
   background: rgba(44, 62, 80, 0.82);
-  color: #ffffff;
+  color: var(--gold-bright);
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
@@ -497,7 +494,7 @@ onBeforeUnmount(() => {
 }
 
 .return-level-btn:focus-visible {
-  outline: 2px solid #ffffff;
+  outline: 2px solid var(--gold-bright);
   outline-offset: 2px;
 }
 
