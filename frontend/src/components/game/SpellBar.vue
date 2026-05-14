@@ -110,7 +110,7 @@ defineExpose({ castingSpell, castAtPosition })
   height: 44px;
   border: 2px solid var(--spell-color, #888);
   border-radius: 6px;
-  background: rgba(26, 21, 32, 0.9);
+  background: var(--overlay-panel-bg);
   color: var(--spell-color, #888);
   cursor: pointer;
   font-family: var(--font-mono);
@@ -121,7 +121,7 @@ defineExpose({ castingSpell, castAtPosition })
 }
 
 .spell-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--overlay-cell-hover);
   transform: scale(1.05);
 }
 

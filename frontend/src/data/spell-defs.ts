@@ -55,7 +55,7 @@ export const SPELL_DEFS: SpellDef[] = [
     vfxDuration: 0.85,
   },
   {
-    id: 'heal',
+    id: 'haste',
     name: 'Haste',
     description: 'Accelerate all towers briefly',
     cost: 120,

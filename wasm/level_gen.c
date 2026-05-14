@@ -6,11 +6,14 @@
  *   - frontend/src/domain/path/spawn-calculator.ts      (Phase 3)
  *   - frontend/src/domain/level/level-generator.ts      (Phase 4)
  *
- * All transcendentals (sinf/cosf/logf/asinf/acosf) compile through musl libc
- * into the WASM bytecode, so cross-engine ULP drift cannot enter the result.
- * With -fno-fast-math / -ffp-contract=off (set in wasm/Makefile) the compiler
- * also cannot fuse FMAs or rewrite the expression tree, giving us byte-exact
- * outputs for the same inputs across every host that runs the .wasm.
+ * The level generator is polynomial-only, so it draws no transcendentals
+ * itself; the libc transcendentals still reachable from this file (logf/ceilf
+ * in the intersection bisector, and the curve evaluator's sinf/cosf/logf for
+ * Magic-tower curves) compile through musl libc into the WASM bytecode, so
+ * cross-engine ULP drift cannot enter the result. With -fno-fast-math /
+ * -ffp-contract=off (set in wasm/Makefile) the compiler also cannot fuse FMAs
+ * or rewrite the expression tree, giving us byte-exact outputs for the same
+ * inputs across every host that runs the .wasm.
  *
  * Floating-point precision: every coefficient lives in `float` (32-bit IEEE)
  * end-to-end. The JS path uses doubles, so the WASM side will produce its
@@ -45,7 +48,12 @@
 #define SLOPE_SEPARATION_THRESHOLD   0.3f
 #define ATTEMPTS_PER_BATCH           50
 #define MAX_BATCHES                  8
-#define LOG_DOMAIN_BUFFER            0.5f
+/* P* and every free coefficient are integer multiples of this dyadic quantum
+ * (mirrors RATIONAL_QUANTUM in frontend/src/math/rational.ts). */
+#define RATIONAL_QUANTUM             0.25f
+/* When a multiset has a degree-3 entry, P* is drawn from [-4, 4] so a*x0^3
+ * stays on-grid (mirrors DEGREE3_ENDPOINT_BOUND in level-generator.ts). */
+#define DEGREE3_ENDPOINT_BOUND       4.0f
 
 /* Grid bounds (must match shared/game-constants.json). The C side hardcodes
  * them rather than receiving them as args because they are part of the
@@ -66,27 +74,29 @@ static const float DISCLOSURE_HALF_EXTENTS[DISCLOSURE_LADDER_LEN] = {
     3.0f, 2.5f, 2.0f, 1.5f, 1.0f, 0.5f
 };
 
-/* M_PI not guaranteed in C99; pin our own to keep emcc/host-clang in step.
- * Truncated to float at use sites — Math.PI in JS is a double, so the JS path
- * gets a slightly different bound than the C path. This is one of the float-
- * vs-double divergence points the v2 protocol embraces by design. */
-#define MD_PI 3.14159265358979323846f
+/* Dyadic coefficient candidate lists — mirrors COEFFICIENT_BOUNDS in
+ * frontend/src/math/curve-types.ts. Every free coefficient the generator
+ * picks is an index into one of these lists, so all generated polynomials
+ * have exact dyadic coefficients. The solved term of each polynomial
+ * (degree-1 intercept, degree-2 c, degree-3 d) is derived from the
+ * through-point equation, not sampled, so it is not listed here. */
+static const float POLY1_SLOPE[] = {
+    -3.0f, -2.5f, -2.0f, -1.5f, -1.0f, -0.5f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f
+};
+static const float POLY2_A[] = { -0.5f, -0.25f, 0.25f, 0.5f };
+static const float POLY2_B[] = {
+    -3.0f, -2.5f, -2.0f, -1.5f, -1.0f, -0.5f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f
+};
+static const float POLY3_A[] = { -0.5f, -0.25f, 0.25f, 0.5f };
+static const float POLY3_B[] = { -1.0f, -0.75f, -0.5f, -0.25f, 0.25f, 0.5f, 0.75f, 1.0f };
+static const float POLY3_C[] = { -2.0f, -1.5f, -1.0f, -0.5f, 0.5f, 1.0f, 1.5f, 2.0f };
 
-/* Coefficient bounds — mirrors COEFFICIENT_BOUNDS in curve-types.ts. */
-static const float POLY1_SLOPE_LO     = -3.0f, POLY1_SLOPE_HI     =  3.0f;
-static const float POLY1_INTERCEPT_LO = -10.0f, POLY1_INTERCEPT_HI = 14.0f;
-static const float POLY2_A_LO = -0.5f,  POLY2_A_HI = 0.5f;
-static const float POLY2_B_LO = -3.0f,  POLY2_B_HI = 3.0f;
-/* poly2 c is solved from the through-point equation, not sampled. */
-static const float POLY3_A_LO = -0.02f, POLY3_A_HI = 0.02f;
-static const float POLY3_B_LO = -0.3f,  POLY3_B_HI = 0.3f;
-static const float POLY3_C_LO = -2.0f,  POLY3_C_HI = 2.0f;
-static const float TRIG_A_LO = 0.5f, TRIG_A_HI = 3.0f;
-static const float TRIG_B_LO = 0.3f, TRIG_B_HI = 2.0f;
-static const float TRIG_D_LO = 2.0f, TRIG_D_HI = 12.0f;
-static const float LOG_A_LO = 0.5f, LOG_A_HI = 4.0f;
-static const float LOG_B_LO = 0.2f, LOG_B_HI = 2.0f;
-static const float LOG_C_LO = 1.0f, LOG_C_HI = 10.0f;
+#define POLY1_SLOPE_LEN ((int32_t)(sizeof(POLY1_SLOPE) / sizeof(POLY1_SLOPE[0])))
+#define POLY2_A_LEN     ((int32_t)(sizeof(POLY2_A)     / sizeof(POLY2_A[0])))
+#define POLY2_B_LEN     ((int32_t)(sizeof(POLY2_B)     / sizeof(POLY2_B[0])))
+#define POLY3_A_LEN     ((int32_t)(sizeof(POLY3_A)     / sizeof(POLY3_A[0])))
+#define POLY3_B_LEN     ((int32_t)(sizeof(POLY3_B)     / sizeof(POLY3_B[0])))
+#define POLY3_C_LEN     ((int32_t)(sizeof(POLY3_C)     / sizeof(POLY3_C[0])))
 
 /* ─── Scalar helpers. */
 
@@ -397,21 +407,39 @@ int32_t compute_spawn_points(
 
 /* ─── Phase 4 — full level generator. */
 
-static inline float rand_range(prng_t *rng, float lo, float hi) {
-    return lo + (float)prng_next_f64(rng) * (hi - lo);
+/* Pick a dyadic value in [lo, hi] by integer index — consumes exactly one
+ * rng draw. Mirrors pickDyadic in level-generator.ts. */
+static float pick_dyadic(float lo, float hi, prng_t *rng) {
+    int32_t steps = (int32_t)((hi - lo) / RATIONAL_QUANTUM + 0.5f);
+    int32_t idx   = (int32_t)(prng_next_f64(rng) * (double)(steps + 1));
+    return lo + (float)idx * RATIONAL_QUANTUM;
+}
+
+/* Pick one element from a dyadic candidate list — consumes exactly one rng
+ * draw. Mirrors pickFrom in level-generator.ts. prng_next_f64 returns a
+ * double in [0, 1), so the index stays in [0, len). */
+static float pick_from(const float *list, int32_t len, prng_t *rng) {
+    return list[(int32_t)(prng_next_f64(rng) * (double)len)];
 }
 
 /* Generate a polynomial of given degree (1|2|3) passing through (x0, y0).
- * Returns 1 on success, 0 on bad inputs. Mirrors the TS generator's
- * coefficient sampling order, which determines the rng draw schedule. */
+ * Returns 1 on success, 0 on bad inputs.
+ *
+ * Free coefficients are picked by index into the dyadic candidate lists; the
+ * constant term is solved from the through-point equation. x0, y0, and every
+ * picked coefficient are dyadic with small denominators, so the solved term is
+ * exact — the curve passes through P* exactly. The solved term is NOT snapped
+ * back to the RATIONAL_QUANTUM grid: a product like slope*x0 legitimately
+ * lands on a finer grid (e.g. 1/8, 1/64), and snapping it would move the curve
+ * off P*. Mirrors generatePolynomialThrough in level-generator.ts, including
+ * the coefficient sampling order that fixes the rng draw schedule. */
 static int generate_polynomial_through(
     int32_t degree, float x0, float y0, prng_t *rng, curve_t *out
 ) {
     out->family = CURVE_FAMILY_POLY;
     switch (degree) {
     case 1: {
-        float slope = rand_range(rng, POLY1_SLOPE_LO, POLY1_SLOPE_HI);
-        (void)POLY1_INTERCEPT_LO; (void)POLY1_INTERCEPT_HI;  /* solved, not sampled */
+        float slope = pick_from(POLY1_SLOPE, POLY1_SLOPE_LEN, rng);
         float intercept = y0 - slope * x0;
         out->variant = 1;
         out->a = slope;
@@ -421,8 +449,8 @@ static int generate_polynomial_through(
         return 1;
     }
     case 2: {
-        float a = rand_range(rng, POLY2_A_LO, POLY2_A_HI);
-        float b = rand_range(rng, POLY2_B_LO, POLY2_B_HI);
+        float a = pick_from(POLY2_A, POLY2_A_LEN, rng);
+        float b = pick_from(POLY2_B, POLY2_B_LEN, rng);
         float c = y0 - a * x0 * x0 - b * x0;
         out->variant = 2;
         out->a = a;
@@ -432,9 +460,9 @@ static int generate_polynomial_through(
         return 1;
     }
     case 3: {
-        float a = rand_range(rng, POLY3_A_LO, POLY3_A_HI);
-        float b = rand_range(rng, POLY3_B_LO, POLY3_B_HI);
-        float c = rand_range(rng, POLY3_C_LO, POLY3_C_HI);
+        float a = pick_from(POLY3_A, POLY3_A_LEN, rng);
+        float b = pick_from(POLY3_B, POLY3_B_LEN, rng);
+        float c = pick_from(POLY3_C, POLY3_C_LEN, rng);
         float d = y0 - a * x0 * x0 * x0 - b * x0 * x0 - c * x0;
         out->variant = 3;
         out->a = a;
@@ -443,71 +471,6 @@ static int generate_polynomial_through(
         out->d = d;
         return 1;
     }
-    default: return 0;
-    }
-}
-
-/* Generate a trig curve passing through (x0, y0). Returns 1 on success,
- * 0 if no real solution exists for the chosen (a, d) — caller retries. */
-static int generate_trig_through(
-    int variant /* 0=sin, 1=cos */, float x0, float y0, prng_t *rng, curve_t *out
-) {
-    float a = rand_range(rng, TRIG_A_LO, TRIG_A_HI);
-    float b = rand_range(rng, TRIG_B_LO, TRIG_B_HI);
-    /* c is sampled from [-π, π] but immediately rejected — the inverse-fn
-     * solve below recomputes c from y0/a/d, so the sampled c only burns one
-     * rng draw to keep the schedule aligned with the JS path. */
-    (void)rand_range(rng, -MD_PI, MD_PI);
-    float d = rand_range(rng, TRIG_D_LO, TRIG_D_HI);
-
-    float ratio = (y0 - d) / a;
-    if (fabsf_local(ratio) > 1.0f) return 0;
-    float base = (variant == 0) ? asinf(ratio) : acosf(ratio);
-    if (!isfinite_f(base)) return 0;
-    float c = base - b * x0;
-
-    out->family = CURVE_FAMILY_TRIG;
-    out->variant = (uint32_t)variant;
-    out->a = a;
-    out->b = b;
-    out->c = c;
-    out->d = d;
-    return 1;
-}
-
-/* Generate a log curve a·ln(b·x + c) + d passing through (x0, y0).
- * Domain start (-c/b) must lie left of the playable grid. */
-static int generate_log_through(float x0, float y0, prng_t *rng, curve_t *out) {
-    float a = rand_range(rng, LOG_A_LO, LOG_A_HI);
-    float b = rand_range(rng, LOG_B_LO, LOG_B_HI);
-    float c = rand_range(rng, LOG_C_LO, LOG_C_HI);
-
-    float arg = b * x0 + c;
-    if (arg <= 0.0f) return 0;
-    float d = y0 - a * logf(arg);
-    float domain_start = -c / b;
-    if (domain_start > GRID_MIN_X - LOG_DOMAIN_BUFFER) return 0;
-
-    out->family = CURVE_FAMILY_LOG;
-    out->variant = 0;
-    out->a = a;
-    out->b = b;
-    out->c = c;
-    out->d = d;
-    return 1;
-}
-
-static int generate_curve_through(
-    int32_t entry_code, float x0, float y0, prng_t *rng, curve_t *out
-) {
-    switch (entry_code) {
-    case MULTISET_POLY_DEG_1:
-    case MULTISET_POLY_DEG_2:
-    case MULTISET_POLY_DEG_3:
-        return generate_polynomial_through(entry_code, x0, y0, rng, out);
-    case MULTISET_TRIG_SIN: return generate_trig_through(0, x0, y0, rng, out);
-    case MULTISET_TRIG_COS: return generate_trig_through(1, x0, y0, rng, out);
-    case MULTISET_LOG:      return generate_log_through(x0, y0, rng, out);
     default: return 0;
     }
 }
@@ -599,12 +562,23 @@ static int try_generate_level(
 ) {
     if (n_entries < 1 || n_entries > MAX_CURVES) return 0;
 
-    float x0 = PLAYABLE_X_MIN + (float)prng_next_f64(rng) * (PLAYABLE_X_MAX - PLAYABLE_X_MIN);
-    float y0 = PLAYABLE_Y_MIN + (float)prng_next_f64(rng) * (PLAYABLE_Y_MAX - PLAYABLE_Y_MIN);
+    /* P* is a dyadic rational so the displayed equations are exact and the
+     * common point is genuinely a fraction the student can derive. A degree-3
+     * multiset biases P* toward the origin to keep the cubic on-grid. */
+    int has_degree3 = 0;
+    for (int32_t i = 0; i < n_entries; i++) {
+        if (entries[i] == MULTISET_POLY_DEG_3) { has_degree3 = 1; break; }
+    }
+    float x_lo = has_degree3 ? fmaxf2(PLAYABLE_X_MIN, -DEGREE3_ENDPOINT_BOUND) : PLAYABLE_X_MIN;
+    float x_hi = has_degree3 ? fminf2(PLAYABLE_X_MAX,  DEGREE3_ENDPOINT_BOUND) : PLAYABLE_X_MAX;
+    float y_lo = has_degree3 ? fmaxf2(PLAYABLE_Y_MIN, -DEGREE3_ENDPOINT_BOUND) : PLAYABLE_Y_MIN;
+    float y_hi = has_degree3 ? fminf2(PLAYABLE_Y_MAX,  DEGREE3_ENDPOINT_BOUND) : PLAYABLE_Y_MAX;
+    float x0 = pick_dyadic(x_lo, x_hi, rng);
+    float y0 = pick_dyadic(y_lo, y_hi, rng);
 
     curve_t curves[MAX_CURVES];
     for (int32_t i = 0; i < n_entries; i++) {
-        if (!generate_curve_through(entries[i], x0, y0, rng, &curves[i])) return 0;
+        if (!generate_polynomial_through(entries[i], x0, y0, rng, &curves[i])) return 0;
     }
     if (!verify_slope_separation(curves, n_entries, x0)) return 0;
 

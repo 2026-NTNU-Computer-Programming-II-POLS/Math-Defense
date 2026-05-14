@@ -1,5 +1,6 @@
 import type { CurveDefinition, PolynomialCurve, TrigonometricCurve, LogarithmicCurve } from './curve-types'
 import { evaluateCurve, evaluateCurveDerivative, isCurveInDomain } from './WasmBridge'
+import { fractionToLatex } from './rational'
 
 // Phase 2 (construction plan): evaluate/evaluateDerivative/isInDomain delegate to
 // the WASM bridge so cross-engine ULP drift on Math.sin/cos/log no longer
@@ -37,19 +38,19 @@ function polynomialToLatex(curve: PolynomialCurve): string {
   const terms: string[] = []
   switch (curve.degree) {
     case 1:
-      if (c[0] !== 0) terms.push(c[0] === 1 ? 'x' : c[0] === -1 ? '-x' : `${fmt(c[0])}x`)
-      if (c[1] !== 0 || terms.length === 0) terms.push(fmt(c[1]))
+      if (c[0] !== 0) terms.push(c[0] === 1 ? 'x' : c[0] === -1 ? '-x' : `${fractionToLatex(c[0])}x`)
+      if (c[1] !== 0 || terms.length === 0) terms.push(fractionToLatex(c[1]))
       break
     case 2:
-      if (c[0] !== 0) terms.push(c[0] === 1 ? 'x^2' : c[0] === -1 ? '-x^2' : `${fmt(c[0])}x^2`)
-      if (c[1] !== 0) terms.push(c[1] === 1 ? 'x' : c[1] === -1 ? '-x' : `${fmt(c[1])}x`)
-      if (c[2] !== 0 || terms.length === 0) terms.push(fmt(c[2]))
+      if (c[0] !== 0) terms.push(c[0] === 1 ? 'x^2' : c[0] === -1 ? '-x^2' : `${fractionToLatex(c[0])}x^2`)
+      if (c[1] !== 0) terms.push(c[1] === 1 ? 'x' : c[1] === -1 ? '-x' : `${fractionToLatex(c[1])}x`)
+      if (c[2] !== 0 || terms.length === 0) terms.push(fractionToLatex(c[2]))
       break
     case 3:
-      if (c[0] !== 0) terms.push(c[0] === 1 ? 'x^3' : c[0] === -1 ? '-x^3' : `${fmt(c[0])}x^3`)
-      if (c[1] !== 0) terms.push(c[1] === 1 ? 'x^2' : c[1] === -1 ? '-x^2' : `${fmt(c[1])}x^2`)
-      if (c[2] !== 0) terms.push(c[2] === 1 ? 'x' : c[2] === -1 ? '-x' : `${fmt(c[2])}x`)
-      if (c[3] !== 0 || terms.length === 0) terms.push(fmt(c[3]))
+      if (c[0] !== 0) terms.push(c[0] === 1 ? 'x^3' : c[0] === -1 ? '-x^3' : `${fractionToLatex(c[0])}x^3`)
+      if (c[1] !== 0) terms.push(c[1] === 1 ? 'x^2' : c[1] === -1 ? '-x^2' : `${fractionToLatex(c[1])}x^2`)
+      if (c[2] !== 0) terms.push(c[2] === 1 ? 'x' : c[2] === -1 ? '-x' : `${fractionToLatex(c[2])}x`)
+      if (c[3] !== 0 || terms.length === 0) terms.push(fractionToLatex(c[3]))
       break
   }
   let result = terms[0]

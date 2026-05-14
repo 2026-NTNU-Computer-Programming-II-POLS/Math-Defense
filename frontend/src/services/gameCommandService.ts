@@ -48,6 +48,10 @@ export const gameCommands = {
     _engine?.eventBus.emit(Events.BUFF_CARD_SELECTED, cardId)
   },
 
+  setPerceivedSpeedMultiplier(multiplier: number): void {
+    _engine?.setPerceivedSpeedMultiplier(multiplier)
+  },
+
   selectMontyHallDoor(index: number): void {
     _engine?.eventBus.emit(Events.MONTY_HALL_DOOR_SELECTED, index)
   },

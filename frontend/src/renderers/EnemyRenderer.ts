@@ -11,6 +11,12 @@ import { projectEnemyScene } from '@/engine/projections/project-enemies'
 import type { EnemyAppearance, EnemyView } from '@/engine/projections/views'
 
 export class EnemyRenderer {
+  // Semantically meaningful game-art colors — centralized so theme adjustments
+  // don't require hunting through individual draw methods.
+  private static readonly HELPER_AURA = '#48c878'
+  private static readonly SHIELD_BG   = '#333333'
+  private static readonly SHIELD_FILL = '#4488ee'
+
   private _time = 0
 
   update(dt: number, _game: Game): void {
@@ -34,12 +40,12 @@ export class EnemyRenderer {
       ctx.save()
       const auraRadius = enemy.helperRadius * UNIT_PX
       ctx.globalAlpha = 0.12
-      ctx.fillStyle = '#48c878'
+      ctx.fillStyle = EnemyRenderer.HELPER_AURA
       ctx.beginPath()
       ctx.arc(px, py, auraRadius, 0, Math.PI * 2)
       ctx.fill()
       ctx.globalAlpha = 0.4
-      ctx.strokeStyle = '#48c878'
+      ctx.strokeStyle = EnemyRenderer.HELPER_AURA
       ctx.lineWidth = 1
       ctx.stroke()
       ctx.restore()
@@ -57,9 +63,9 @@ export class EnemyRenderer {
     if (enemy.shieldRatio !== null) {
       const barPx = px - half
       const barPy = py + barY
-      ctx.fillStyle = '#333'
+      ctx.fillStyle = EnemyRenderer.SHIELD_BG
       ctx.fillRect(barPx, barPy, enemy.size, 4)
-      ctx.fillStyle = '#4488ee'
+      ctx.fillStyle = EnemyRenderer.SHIELD_FILL
       ctx.fillRect(barPx, barPy, enemy.size * enemy.shieldRatio, 4)
       barY -= 6
     }

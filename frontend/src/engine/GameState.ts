@@ -36,6 +36,7 @@ export interface GameState {
   timeExcludePrepare: number[]      // duration of each prep or UI-pause phase (subtracted from timeTotal for scoring)
   prepPhaseStart: number            // timestamp when current BUILD phase started (0 if not in BUILD)
   pausePhaseStart: number           // timestamp when current MONTY_HALL or CHAIN_RULE phase started (0 if not paused)
+  perceivedSpeedMultiplier: number  // wall-clock pacing only; score time advances with simulation time
 
   // V2 Initial Answer
   initialAnswer: 0 | 1
@@ -85,6 +86,7 @@ export function createInitialState(): GameState {
     timeExcludePrepare: [],
     prepPhaseStart: 0,
     pausePhaseStart: 0,
+    perceivedSpeedMultiplier: 1,
     initialAnswer: 0,
     pathsVisible: false,
     montyHallNextIndex: 0,

@@ -17,6 +17,7 @@ import BuildPanel from '@/components/game/BuildPanel.vue'
 import BuildHint from '@/components/game/BuildHint.vue'
 import BuffCardPanel from '@/components/game/BuffCardPanel.vue'
 import ShopPanel from '@/components/game/ShopPanel.vue'
+import GameSpeedPanel from '@/components/game/GameSpeedPanel.vue'
 import MontyHallPanel from '@/components/game/MontyHallPanel.vue'
 import ScoreResultView from '@/views/ScoreResultView.vue'
 import ChainRulePanel from '@/components/game/ChainRulePanel.vue'
@@ -62,7 +63,7 @@ const _seed = (typeof history.state?.seed === 'number') ? history.state.seed : D
 
 const {
   game, ready, loadError, retry, newlyUnlockedAchievements, lastCompletedSessionId,
-  currentPrincipleId, clearPrinciple, restoreFromCheckpoint, isPracticeMode,
+  currentPrincipleId, clearPrinciple, restoreFromCheckpoint, isPracticeMode, abandonRun,
 } = useGameLoop(canvasRef, {
   generatedLevel: _generatedLevel,
   iaResult: _iaResult,
@@ -107,11 +108,34 @@ function navigateAfterLoss(): void {
   }
 }
 
+const activePhases: GamePhase[] = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
+const bypassLeaveConfirm = ref(false)
+
+async function returnToLevelSelect(): Promise<void> {
+  if (activePhases.includes(gameStore.phase)) {
+    const ok = await uiStore.showConfirm(
+      '放棄本局',
+      '返回關卡選擇？本局不會被記錄，已取得的分數與進度都會放棄。',
+      { confirmLabel: '返回' },
+    )
+    if (!ok) return
+  }
+
+  paused.value = false
+
+  await abandonRun()
+  bypassLeaveConfirm.value = true
+  router.push({ name: 'level-select' }).catch((err) => {
+    bypassLeaveConfirm.value = false
+    console.warn('[GameView] Level-select navigation failed:', err)
+  })
+}
+
 // Warn before navigating away mid-game (progress would be lost).
 // beforeEnter on the game route already blocks entry without level data,
 // so _generatedLevel is always non-null here.
 onBeforeRouteLeave(async () => {
-  const activePhases: GamePhase[] = [GamePhase.WAVE, GamePhase.BUILD, GamePhase.BUFF_SELECT, GamePhase.CHAIN_RULE]
+  if (bypassLeaveConfirm.value) return true
   if (activePhases.includes(gameStore.phase)) {
     return await uiStore.showConfirm(
       'Leave game',
@@ -233,9 +257,14 @@ watch(() => gameStore.phase, (phase) => {
 // handling in `Renderer` all stay untouched.
 const shellRef = ref<HTMLDivElement | null>(null)
 
+// MAX_SCALE caps upscaling so the pixel-art canvas stays legible without
+// becoming excessively blocky on very large / 4K displays. Screens smaller
+// than the world still scale down freely.
+const MAX_SCALE = 2
+
 function calcScale(W: number, H: number) {
   const pad = 2
-  const s = Math.min(1, (W - pad * 2) / CANVAS_WIDTH, (H - pad * 2) / CANVAS_HEIGHT)
+  const s = Math.min(MAX_SCALE, (W - pad * 2) / CANVAS_WIDTH, (H - pad * 2) / CANVAS_HEIGHT)
   return { s, ox: Math.floor((W - CANVAS_WIDTH * s) / 2), oy: Math.floor((H - CANVAS_HEIGHT * s) / 2) }
 }
 
@@ -314,6 +343,17 @@ onBeforeUnmount(() => {
       <AchievementToast :achievements="newlyUnlockedAchievements" />
       <PrincipleOverlay :principle-id="currentPrincipleId" @dismiss="clearPrinciple" />
       <HUD />
+      <button
+        v-if="activePhases.includes(gameStore.phase)"
+        type="button"
+        class="return-level-btn"
+        aria-label="中途退出，本局不會被記錄"
+        title="中途退出，本局不會被記錄"
+        @click="returnToLevelSelect"
+      >
+        <span aria-hidden="true">←</span>
+        中途退出
+      </button>
       <!-- Backlog §20 — practice-mode badge persists for the entire WAVE/BUILD
            session so the player never forgets the run is leaderboard-ineligible. -->
       <div
@@ -323,12 +363,15 @@ onBeforeUnmount(() => {
         aria-live="polite"
       >Practice mode — leaderboard ineligible</div>
       <BuildHint />
+      <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
+        <ShopPanel v-if="gameStore.isBuilding" />
+        <GameSpeedPanel />
+      </div>
 
       <!-- Build Phase -->
       <template v-if="gameStore.isBuilding">
         <TowerBar />
         <BuildPanel v-if="uiStore.buildPanelVisible" />
-        <ShopPanel />
         <StartWaveButton />
       </template>
 
@@ -431,6 +474,48 @@ onBeforeUnmount(() => {
 
 .game-overlay > * {
   pointer-events: auto;
+}
+
+.left-utility-stack {
+  position: absolute;
+  left: 8px;
+  top: 100px;
+  z-index: var(--z-chrome);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.return-level-btn {
+  position: absolute;
+  top: calc(var(--hud-height, 48px) + 56px);
+  right: 12px;
+  z-index: var(--z-action);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--gold-border);
+  border-radius: 4px;
+  background: rgba(44, 62, 80, 0.82);
+  color: var(--gold-bright);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.return-level-btn:hover {
+  background: rgba(44, 62, 80, 0.96);
+  border-color: var(--gold);
+}
+
+.return-level-btn:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
 }
 
 .sr-only {
@@ -589,7 +674,7 @@ onBeforeUnmount(() => {
 /* Backlog §20 — practice-mode badge */
 .practice-badge {
   position: absolute;
-  top: 12px;
+  top: calc(var(--hud-height, 48px) + 98px);
   right: 12px;
   padding: 4px 10px;
   background: rgba(144, 104, 200, 0.18);

@@ -13,14 +13,13 @@
 import type {
   CurveDefinition,
   PolynomialCurve,
-  TrigonometricCurve,
-  LogarithmicCurve,
   PolynomialDegree,
   GeneratedLevel,
   DisclosureRegion,
 } from '@/math/curve-types'
 import { COEFFICIENT_BOUNDS } from '@/math/curve-types'
 import { evaluate, evaluateDerivative, isInDomain } from '@/math/curve-evaluator'
+import { RATIONAL_QUANTUM } from '@/math/rational'
 import { countCommonIntersectionsInInterval } from '@/math/intersection-solver'
 import { computeSpawnPoints, type SpawnPoint } from '@/domain/path/spawn-calculator'
 import { pickRandomMultiset, type MultisetEntry } from '@/data/difficulty-defs'
@@ -43,7 +42,9 @@ const PLAYABLE_Y_MAX = GRID_MAX_Y - ENDPOINT_MARGIN
 const SLOPE_SEPARATION_THRESHOLD = 0.3
 const ATTEMPTS_PER_BATCH = 50
 const MAX_BATCHES = 8
-const LOG_DOMAIN_BUFFER = 0.5
+
+/** When a multiset has a degree-3 entry, P* is drawn from [-4, 4] so a*x0^3 stays on-grid. */
+const DEGREE3_ENDPOINT_BOUND = 4
 
 /** Candidate disclosure half-extents to try (largest first). */
 const DISCLOSURE_HALF_EXTENTS = [3, 2.5, 2, 1.5, 1, 0.5]
@@ -152,14 +153,20 @@ function tryGenerate(
   entries: readonly MultisetEntry[],
   rng: () => number,
 ): TryGenerateResult | null {
-  const x0 = PLAYABLE_X_MIN + rng() * (PLAYABLE_X_MAX - PLAYABLE_X_MIN)
-  const y0 = PLAYABLE_Y_MIN + rng() * (PLAYABLE_Y_MAX - PLAYABLE_Y_MIN)
+  // P* is a dyadic rational so the displayed equations are exact and the common
+  // point is genuinely a fraction the student can derive. A degree-3 multiset
+  // biases P* toward the origin to keep the cubic on-grid.
+  const hasDegree3 = entries.includes(3)
+  const xLo = hasDegree3 ? Math.max(PLAYABLE_X_MIN, -DEGREE3_ENDPOINT_BOUND) : PLAYABLE_X_MIN
+  const xHi = hasDegree3 ? Math.min(PLAYABLE_X_MAX, DEGREE3_ENDPOINT_BOUND) : PLAYABLE_X_MAX
+  const yLo = hasDegree3 ? Math.max(PLAYABLE_Y_MIN, -DEGREE3_ENDPOINT_BOUND) : PLAYABLE_Y_MIN
+  const yHi = hasDegree3 ? Math.min(PLAYABLE_Y_MAX, DEGREE3_ENDPOINT_BOUND) : PLAYABLE_Y_MAX
+  const x0 = pickDyadic(xLo, xHi, rng)
+  const y0 = pickDyadic(yLo, yHi, rng)
 
   const curves: CurveDefinition[] = []
   for (const entry of entries) {
-    const curve = generateCurveThrough(entry, x0, y0, rng)
-    if (!curve) return null
-    curves.push(curve)
+    curves.push(generatePolynomialThrough(entry, x0, y0, rng))
   }
 
   if (!verifySlopeSeparation(curves, x0)) return null
@@ -185,101 +192,56 @@ function tryGenerate(
   return { curves, endpoint, interval, region, spawns }
 }
 
-function generateCurveThrough(
-  entry: MultisetEntry,
-  x0: number,
-  y0: number,
-  rng: () => number,
-): CurveDefinition | null {
-  if (typeof entry === 'number') {
-    if (entry !== 1 && entry !== 2 && entry !== 3) return null
-    return generatePolynomialThrough(entry, x0, y0, rng)
-  }
-  if (entry === 'sin') return generateTrigThrough('sin', x0, y0, rng)
-  if (entry === 'cos') return generateTrigThrough('cos', x0, y0, rng)
-  if (entry === 'log') return generateLogThrough(x0, y0, rng)
-  return null
+/** Pick a dyadic value in [lo, hi] by integer index — consumes exactly one rng draw. */
+function pickDyadic(lo: number, hi: number, rng: () => number): number {
+  const steps = Math.round((hi - lo) / RATIONAL_QUANTUM)
+  return lo + Math.floor(rng() * (steps + 1)) * RATIONAL_QUANTUM
 }
 
-function randRange(min: number, max: number, rng: () => number): number {
-  return min + rng() * (max - min)
+/** Pick one element from a candidate list — consumes exactly one rng draw. */
+function pickFrom<T>(list: readonly T[], rng: () => number): T {
+  return list[Math.floor(rng() * list.length)]!
 }
 
+/**
+ * Build a polynomial of the given degree through P*. Free coefficients are
+ * picked by index into the dyadic candidate lists; the constant term is solved
+ * from the through-point equation.
+ *
+ * x0, y0, and every picked coefficient are dyadic with small denominators, so
+ * the solved term is computed *exactly* in f64 (no rounding) — the curve passes
+ * through P* exactly. The term is NOT snapped to the RATIONAL_QUANTUM grid: a
+ * product like slope*x0 legitimately lands on a finer grid (e.g. 1/8, 1/64),
+ * and snapping it would move the curve off P*.
+ */
 function generatePolynomialThrough(
   degree: PolynomialDegree,
   x0: number,
   y0: number,
   rng: () => number,
-): PolynomialCurve | null {
+): PolynomialCurve {
   switch (degree) {
     case 1: {
-      const b1 = COEFFICIENT_BOUNDS.polynomial[1]
-      const slope = randRange(b1.slope[0], b1.slope[1], rng)
+      const slope = pickFrom(COEFFICIENT_BOUNDS.polynomial[1].slope, rng)
       const intercept = y0 - slope * x0
       return { family: 'polynomial', degree: 1, coefficients: [slope, intercept] }
     }
     case 2: {
       const b2 = COEFFICIENT_BOUNDS.polynomial[2]
-      const a = randRange(b2.a[0], b2.a[1], rng)
-      const b = randRange(b2.b[0], b2.b[1], rng)
+      const a = pickFrom(b2.a, rng)
+      const b = pickFrom(b2.b, rng)
       const c = y0 - a * x0 * x0 - b * x0
       return { family: 'polynomial', degree: 2, coefficients: [a, b, c] }
     }
     case 3: {
       const b3 = COEFFICIENT_BOUNDS.polynomial[3]
-      const a = randRange(b3.a[0], b3.a[1], rng)
-      const b = randRange(b3.b[0], b3.b[1], rng)
-      const c = randRange(b3.c[0], b3.c[1], rng)
-      const d = y0 - a * x0 ** 3 - b * x0 ** 2 - c * x0
+      const a = pickFrom(b3.a, rng)
+      const b = pickFrom(b3.b, rng)
+      const c = pickFrom(b3.c, rng)
+      const d = y0 - a * x0 * x0 * x0 - b * x0 * x0 - c * x0
       return { family: 'polynomial', degree: 3, coefficients: [a, b, c, d] }
     }
   }
-}
-
-function generateTrigThrough(
-  fn: 'sin' | 'cos',
-  x0: number,
-  y0: number,
-  rng: () => number,
-): TrigonometricCurve | null {
-  const tb = COEFFICIENT_BOUNDS.trigonometric
-  const a = randRange(tb.a[0], tb.a[1], rng)
-  const b = randRange(tb.b[0], tb.b[1], rng)
-  const d = randRange(tb.d[0], tb.d[1], rng)
-
-  const ratio = (y0 - d) / a
-  if (Math.abs(ratio) > 1) return null
-
-  // allow-non-deterministic-math: v1 fallback path. v2 (WASM) uses asinf/acosf via generateLevelDeterministicFromSeed (construction plan §3.5).
-  const base = fn === 'sin' ? Math.asin(ratio) : Math.acos(ratio)
-  if (!isFinite(base)) return null
-  const c = base - b * x0
-
-  return { family: 'trigonometric', fn, a, b, c, d }
-}
-
-function generateLogThrough(
-  x0: number,
-  y0: number,
-  rng: () => number,
-): LogarithmicCurve | null {
-  const lb = COEFFICIENT_BOUNDS.logarithmic
-  const a = randRange(lb.a[0], lb.a[1], rng)
-  const b = randRange(lb.b[0], lb.b[1], rng)
-  const cCoeff = randRange(lb.c[0], lb.c[1], rng)
-
-  const arg = b * x0 + cCoeff
-  if (arg <= 0) return null
-
-  // allow-non-deterministic-math: v1 fallback path. v2 (WASM) uses logf via generateLevelDeterministicFromSeed (construction plan §3.5).
-  const d = y0 - a * Math.log(arg)
-
-  // Logarithmic domain ends at x = -c/b (b>0). Require buffer between domain
-  // start and the playable grid so the left-side spawn can exist on the curve.
-  const domainStart = -cCoeff / b
-  if (domainStart > GRID_MIN_X - LOG_DOMAIN_BUFFER) return null
-
-  return { family: 'logarithmic', a, b, c: cCoeff, d }
 }
 
 function verifySlopeSeparation(curves: CurveDefinition[], x0: number): boolean {

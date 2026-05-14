@@ -245,4 +245,35 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     expect(sessionService.end).toHaveBeenCalledTimes(1)
     expect(sync.sessionId.value).toBeNull()
   })
+
+  it('abandons the active run without submitting an end payload', async () => {
+    vi.mocked(sessionService.abandon).mockResolvedValueOnce({
+      schema_version: 1,
+      id: 'sess-abc',
+      star_rating: 1,
+      status: 'abandoned',
+      current_wave: 0,
+      gold: 200,
+      hp: 20,
+      score: 0,
+      started_at: new Date().toISOString(),
+    })
+
+    const sync = useSessionSync()
+    const game = makeGameStub()
+    sync.bind(game)
+
+    game.eventBus.emit(Events.LEVEL_START, 1)
+    await flushPromises()
+
+    await sync.abandonRun()
+
+    expect(sessionService.abandon).toHaveBeenCalledWith('sess-abc')
+    expect(sync.sessionId.value).toBeNull()
+
+    game.eventBus.emit(Events.LEVEL_END, undefined)
+    await flushPromises()
+
+    expect(sessionService.end).not.toHaveBeenCalled()
+  })
 })

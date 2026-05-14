@@ -34,19 +34,19 @@ const SRC_ROOT = resolve(process.cwd(), 'src')
 
 /**
  * Pre-existing SoC violations. Each entry is a known cross-layer import
- * the ratchet permits but should eventually be removed. Currently empty
- * because the formerly-allowlisted `domain/formatters → components` was
- * fixed by relocating the module to `src/utils/formatters.ts`.
+ * the ratchet permits but should eventually be removed. One entry remains
+ * (`ScoreResultView → domain/scoring`); the formerly-allowlisted
+ * `domain/formatters → components` and `InitialAnswerView → domain/level`
+ * imports were both fixed and removed from this list.
  */
 const PRE_EXISTING_ALLOWLIST: ReadonlyArray<{
   fileSuffix: string
   importPath: string
 }> = [
   // Audit F-ARCH-6 fix relocated only the level-generator branching to a
-  // service. The two remaining views→domain imports below predate that fix
-  // and will be migrated in follow-up work; ratcheted here so the new
+  // service. The remaining views→domain import below predates that fix and
+  // will be migrated in follow-up work; ratcheted here so the new
   // views/-vs-domain rule still catches *new* violations.
-  { fileSuffix: 'src/views/InitialAnswerView.vue', importPath: '@/domain/level/distractor-generator' },
   { fileSuffix: 'src/views/ScoreResultView.vue', importPath: '@/domain/scoring/score-calculator' },
 ]
 

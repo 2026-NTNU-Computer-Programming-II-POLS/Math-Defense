@@ -99,7 +99,7 @@ function setMode(mode: TargetingMode) {
   align-items: center;
   gap: 2px;
   padding: 6px 2px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay-cell-bg);
   border: 1px solid var(--grid-line);
   border-radius: 4px;
   color: #c8b894;
@@ -112,7 +112,7 @@ function setMode(mode: TargetingMode) {
 .mode-btn:hover {
   border-color: var(--gold);
   background: rgba(212, 168, 64, 0.08);
-  color: #e8dcc8;
+  color: var(--overlay-text);
 }
 
 .mode-btn:focus-visible {
@@ -122,7 +122,7 @@ function setMode(mode: TargetingMode) {
 
 .mode-btn.active {
   border-color: var(--gold-bright);
-  background: rgba(255, 215, 0, 0.15);
+  background: var(--overlay-cell-active);
   color: var(--gold-bright);
   box-shadow: inset 0 0 0 1px var(--gold-bright);
 }

@@ -64,22 +64,30 @@ export interface GeneratedLevel {
   readonly multisetLabel: string
 }
 
+/**
+ * Dyadic coefficient candidate lists — every free coefficient the level
+ * generator picks is an index into one of these lists, so all generated
+ * polynomials have exact (dyadic) coefficients. The solved term of each
+ * polynomial (degree-1 intercept, degree-2 `c`, degree-3 `d`) is not listed
+ * here: it is derived from the through-point equation.
+ */
 export const COEFFICIENT_BOUNDS = {
   polynomial: {
-    1: { slope: [-3, 3], intercept: [-10, 14] },
-    2: { a: [-0.5, 0.5], b: [-3, 3], c: [-5, 20] },
-    3: { a: [-0.02, 0.02], b: [-0.3, 0.3], c: [-2, 2], d: [-5, 15] },
-  },
-  trigonometric: {
-    a: [0.5, 3],
-    b: [0.3, 2],
-    c: [-Math.PI, Math.PI],
-    d: [2, 12],
-  },
-  logarithmic: {
-    a: [0.5, 4],
-    b: [0.2, 2],
-    c: [1, 10],
-    d: [2, 12],
+    1: {
+      // slope: ±1/2 … ±3, step 1/2 (excludes 0)
+      slope: [-3, -2.5, -2, -1.5, -1, -0.5, 0.5, 1, 1.5, 2, 2.5, 3],
+    },
+    2: {
+      a: [-0.5, -0.25, 0.25, 0.5],
+      // b: ±1/2 … ±3, step 1/2
+      b: [-3, -2.5, -2, -1.5, -1, -0.5, 0.5, 1, 1.5, 2, 2.5, 3],
+    },
+    3: {
+      a: [-0.5, -0.25, 0.25, 0.5],
+      // b: ±1/4 … ±1, step 1/4
+      b: [-1, -0.75, -0.5, -0.25, 0.25, 0.5, 0.75, 1],
+      // c: ±1/2 … ±2, step 1/2
+      c: [-2, -1.5, -1, -0.5, 0.5, 1, 1.5, 2],
+    },
   },
 } as const

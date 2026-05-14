@@ -227,6 +227,7 @@ async function submit(): Promise<void> {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .auth-panel {

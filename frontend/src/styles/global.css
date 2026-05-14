@@ -81,7 +81,7 @@ body {
 .rune-input {
   background: var(--stone-dark);
   border: 1px solid var(--gold);
-  color: #ffffff;
+  color: var(--input-text);
   font-family: var(--font-mono);
   font-size: 14px;
   padding: 4px 8px;

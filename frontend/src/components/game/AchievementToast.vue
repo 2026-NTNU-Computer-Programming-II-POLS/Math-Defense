@@ -61,7 +61,7 @@ watch(() => props.achievements, (newVal) => {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(26, 21, 32, 0.95);
+  background: var(--overlay-panel-bg);
   border: 1px solid var(--gold);
   border-radius: 4px;
   font-size: 12px;
@@ -70,7 +70,7 @@ watch(() => props.achievements, (newVal) => {
 
 .toast-icon { color: var(--gold); font-size: 14px; }
 .toast-body { display: flex; flex-direction: column; gap: 2px; }
-.toast-name { color: #e8dcc8; font-weight: 600; }
+.toast-name { color: var(--overlay-text); font-weight: 600; }
 .toast-desc { color: #b8a98c; font-size: 11px; }
 .toast-tp { color: var(--gold); font-size: 10px; margin-left: auto; }
 

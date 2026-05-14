@@ -93,6 +93,7 @@ onMounted(() => store.loadActivities())
   align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding-top: 40px;
 }
 

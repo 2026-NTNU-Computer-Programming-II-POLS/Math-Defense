@@ -3,16 +3,16 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MathDisplay from '@/components/common/MathDisplay.vue'
 import { curveToLatex } from '@/math/curve-evaluator'
-import { generateDistractors, type AnswerOption } from '@/domain/level/distractor-generator'
-import { mulberry32 } from '@/math/MathUtils'
+import { parseFraction, rationalEquals, numberToRational, fractionToLatex } from '@/math/rational'
 import type { GeneratedLevel } from '@/math/curve-types'
 import { parseLevelJson } from '@/utils/parseHistoryState'
 
 const router = useRouter()
 
 const level = ref<GeneratedLevel | null>(null)
-const options = ref<AnswerOption[]>([])
-const selectedIndex = ref<number | null>(null)
+const inputX = ref('')
+const inputY = ref('')
+const validationMsg = ref('')
 const answered = ref(false)
 const iaResult = ref<'correct' | 'wrong' | 'paid' | 'ignored' | null>(null)
 const territoryContext = ref<string | undefined>(undefined)
@@ -31,14 +31,6 @@ onMounted(() => {
   }
   territoryContext.value = history.state?.territoryContext as string | undefined
   level.value = parsed
-  const seed = history.state?.seed ?? Date.now()
-  const rng = mulberry32(seed + 1)
-  options.value = generateDistractors(
-    level.value.curves,
-    level.value.endpoint,
-    level.value.interval,
-    rng,
-  )
 })
 
 const equations = computed(() => {
@@ -46,22 +38,38 @@ const equations = computed(() => {
   return level.value.curves.map((c) => curveToLatex(c))
 })
 
-const intervalStr = computed(() => {
+// The disclosure region is a dyadic rectangle covering P*; render its bounds as
+// exact fractions so the player solves against the same numbers they see.
+const regionLatex = computed(() => {
   if (!level.value) return ''
-  const [a, b] = level.value.interval
-  return `[${a.toFixed(1)}, ${b.toFixed(1)}]`
+  const r = level.value.region
+  const xs = `${fractionToLatex(r.xMin)} \\le x \\le ${fractionToLatex(r.xMax)}`
+  const ys = `${fractionToLatex(r.yMin)} \\le y \\le ${fractionToLatex(r.yMax)}`
+  return `${xs}, \\quad ${ys}`
 })
 
-function selectOption(index: number) {
-  if (answered.value) return
-  selectedIndex.value = index
-}
+const endpointLatex = computed(() => {
+  if (!level.value) return ''
+  return `\\left(${fractionToLatex(level.value.endpoint.x)},\\ ${fractionToLatex(level.value.endpoint.y)}\\right)`
+})
+
+const parsedX = computed(() => parseFraction(inputX.value))
+const parsedY = computed(() => parseFraction(inputY.value))
 
 function submitAnswer() {
-  if (selectedIndex.value === null || !level.value) return
+  if (!level.value) return
+  const px = parsedX.value
+  const py = parsedY.value
+  if (!px || !py) {
+    validationMsg.value = 'Enter both coordinates as fractions (e.g. 3/2), integers, or exact decimals.'
+    return
+  }
+  validationMsg.value = ''
   answered.value = true
-  const chosen = options.value[selectedIndex.value]
-  iaResult.value = chosen.isCorrect ? 'correct' : 'wrong'
+  const correct =
+    rationalEquals(px, numberToRational(level.value.endpoint.x)) &&
+    rationalEquals(py, numberToRational(level.value.endpoint.y))
+  iaResult.value = correct ? 'correct' : 'wrong'
 }
 
 function payToSkip() {
@@ -93,7 +101,8 @@ function startGame() {
 <template>
   <div v-if="level" class="ia-view">
     <h1>Find the Intersection Point</h1>
-    <p class="subtitle">All paths share exactly one common point in {{ intervalStr }}. Where is it?</p>
+    <p class="subtitle">All paths share exactly one common point. It lies in the region:</p>
+    <div class="region"><MathDisplay :latex="regionLatex" /></div>
 
     <div class="equations">
       <div v-for="(eq, i) in equations" :key="i" class="equation-row">
@@ -102,35 +111,44 @@ function startGame() {
       </div>
     </div>
 
-    <div class="options-grid">
-      <button
-        v-for="(opt, i) in options"
-        :key="i"
-        class="option-btn"
-        :class="{
-          selected: selectedIndex === i,
-          correct: answered && opt.isCorrect,
-          wrong: answered && selectedIndex === i && !opt.isCorrect,
-        }"
-        :disabled="answered"
-        @click="selectOption(i)"
-      >
-        ({{ opt.x.toFixed(2) }}, {{ opt.y.toFixed(2) }})
-      </button>
+    <div class="answer-inputs">
+      <div class="input-row">
+        <label for="ia-input-x">x =</label>
+        <input
+          id="ia-input-x"
+          v-model="inputX"
+          type="text"
+          placeholder="e.g. 3/2"
+          :disabled="answered"
+          @keyup.enter="submitAnswer"
+        />
+        <span v-if="inputX.trim() && !parsedX" class="parse-error">invalid</span>
+      </div>
+      <div class="input-row">
+        <label for="ia-input-y">y =</label>
+        <input
+          id="ia-input-y"
+          v-model="inputY"
+          type="text"
+          placeholder="e.g. -5/4"
+          :disabled="answered"
+          @keyup.enter="submitAnswer"
+        />
+        <span v-if="inputY.trim() && !parsedY" class="parse-error">invalid</span>
+      </div>
     </div>
 
     <div v-if="!answered" class="actions">
-      <button class="submit-btn" :disabled="selectedIndex === null" @click="submitAnswer">
-        Submit Answer
-      </button>
+      <button class="submit-btn" @click="submitAnswer">Submit Answer</button>
       <button class="pay-btn" @click="payToSkip">Pay 50 Gold to Skip</button>
       <button class="ignore-btn" @click="ignoreAndProceed">Proceed (Paths Hidden)</button>
     </div>
+    <p v-if="!answered && validationMsg" class="validation-msg">{{ validationMsg }}</p>
 
     <div v-else class="result">
       <p v-if="iaResult === 'correct'" class="result-correct">Correct! Paths will be visible.</p>
       <p v-else-if="iaResult === 'wrong'" class="result-wrong">
-        Wrong! The correct point was ({{ level.endpoint.x.toFixed(2) }}, {{ level.endpoint.y.toFixed(2) }}). Paths will still be visible.
+        Wrong! The correct point was <MathDisplay :latex="endpointLatex" />. Paths will still be visible.
       </p>
       <p v-else-if="iaResult === 'paid'" class="result-paid">Paid 50 gold. Paths will be visible.</p>
       <p v-else class="result-ignored">Paths will be hidden during gameplay.</p>
@@ -147,6 +165,7 @@ function startGame() {
   padding: 2rem;
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-base);
 }
 
@@ -190,43 +209,59 @@ h1 {
   text-shadow: var(--gold-shadow);
 }
 
-.options-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.8rem;
+.region {
   margin-bottom: 1.5rem;
-  max-width: 500px;
-  width: 100%;
+  font-size: 1.1rem;
 }
 
-.option-btn {
-  padding: 0.8rem;
-  background: rgba(255, 255, 255, 0.7);
+.answer-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.input-row label {
+  font-weight: bold;
+  min-width: 36px;
+  color: var(--axis);
+  text-shadow: var(--gold-shadow);
+}
+
+.input-row input {
+  padding: 0.5rem 0.7rem;
+  background: rgba(255, 255, 255, 0.85);
   border: 2px solid var(--card-border);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.2s;
+  width: 160px;
 }
 
-.option-btn:hover:not(:disabled) {
-  border-color: var(--axis);
-}
-
-.option-btn.selected {
+.input-row input:focus {
+  outline: none;
   border-color: var(--tower-cannon);
-  background: var(--option-selected);
 }
 
-.option-btn.correct {
-  border-color: var(--hp-green);
-  background: var(--correct-bg);
+.input-row input:disabled {
+  opacity: 0.6;
 }
 
-.option-btn.wrong {
-  border-color: var(--hp-red);
-  background: var(--wrong-bg);
+.parse-error {
+  color: var(--hp-red);
+  font-size: 0.85rem;
+}
+
+.validation-msg {
+  margin-top: 0.8rem;
+  color: var(--hp-red);
+  font-size: 0.9rem;
 }
 
 .actions {
@@ -243,11 +278,6 @@ h1 {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-}
-
-.submit-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .pay-btn {

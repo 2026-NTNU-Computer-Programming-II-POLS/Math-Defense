@@ -216,7 +216,7 @@ onMounted(async () => {
           <button class="btn" type="submit" :disabled="!canSubmit">
             {{ submitting ? 'Creating…' : 'Create Challenge' }}
           </button>
-          <button class="btn back-btn" type="button" @click="router.push('/teacher')">Cancel</button>
+          <button class="btn back-btn" type="button" @click="router.push('/teacher')">取消</button>
         </div>
       </form>
 
@@ -239,6 +239,7 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding-top: 40px;
 }
 

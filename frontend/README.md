@@ -152,10 +152,8 @@ frontend/
 │   │   │   └── SplitPolicy.ts          Single source for Split enemy split rules
 │   │   ├── level/
 │   │   │   ├── level-generator.ts      Reverse-endpoint curve generation algorithm
-│   │   │   ├── distractor-generator.ts Plausible wrong answers for Initial Answer
 │   │   │   ├── decoy-generator.ts      Decoy curve generation for Initial Answer screen
 │   │   │   ├── level-layout-service.ts Builds SegmentedPath + placement rules for a level definition
-│   │   │   ├── path-group-defs.ts      7 runtime path group definitions
 │   │   │   ├── placement-policy.ts     Grid-cell → can-place decision shared by preview and click handler
 │   │   │   └── checkpoint.ts           Star-5 retry-from-checkpoint serialization (gold/HP/costTotal/killValue)
 │   │   ├── movement/               Curve-path and piecewise-path movement strategies
@@ -193,6 +191,7 @@ frontend/
 │   │   ├── MatrixTowerSystem.ts    Paired towers + dot-product damage + laser lock-on
 │   │   ├── LimitTowerSystem.ts     Multiple-choice limit question + range-based attack
 │   │   ├── CalculusTowerSystem.ts  Derivative/integral picker + pet spawning
+│   │   ├── PetCombatSystem.ts      Pet projectile homing movement, collision damage, expiry pruning
 │   │   ├── MovementSystem.ts       Path movement with arc-length correction
 │   │   ├── WaveSystem.ts           Enemy spawn queue driven by domain/wave/wave-generator
 │   │   ├── BuffSystem.ts           Time-based buff/curse strategy map; applyExternalBuff() public API
@@ -382,6 +381,7 @@ Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_ST
 | `MatrixTowerSystem` | Paired towers via `matrixPairId`; continuous laser with dot-product damage |
 | `LimitTowerSystem` | Presents lim question; resolves ±∞/±C/0 outcome; applies range effect |
 | `CalculusTowerSystem` | Derivative/integral picker; spawns Pet entities managed by `PetCombatSystem` |
+| `PetCombatSystem` | Homing movement for Pet projectiles toward nearest enemy; applies damage on contact; prunes expired or out-of-range pets |
 | `SpellSystem` | Fireball (AoE), Frost Nova (slow), Lightning (single), Rejuvenate (tower buff); cooldown per spell |
 | `MontyHallSystem` | Kill-value thresholds per star rating; door reveal logic; injects rewards via `BuffSystem.applyExternalBuff()` |
 | `MovementSystem` | Advances enemies along CurvePath/SegmentedPath via matching strategy; reads `speedBoost` + `enemySpeedMultiplier` |

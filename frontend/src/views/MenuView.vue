@@ -98,6 +98,7 @@ const mathGlyphs = [
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 32px 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -163,7 +164,7 @@ const mathGlyphs = [
 
 .title-main {
   font-size: 56px;
-  color: #0f2a4a;
+  color: var(--menu-navy);
   text-shadow: 0 2px 20px rgba(255,255,255,0.8), 0 4px 12px rgba(164,185,212,0.4);
   letter-spacing: 12px;
   margin-bottom: 4px;
@@ -228,7 +229,7 @@ const mathGlyphs = [
   letter-spacing: 4px;
   width: 100%;
   background: rgba(255, 255, 255, 0.55);
-  color: #1a3a6a;
+  color: var(--menu-btn-color);
 }
 
 .menu-footer {

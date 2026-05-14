@@ -31,7 +31,7 @@ const show = computed(() => gameStore.phase === GamePhase.BUILD)
   top: calc(var(--hud-height, 48px) + 44px + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(26,21,32,0.9);
+  background: var(--overlay-panel-bg);
   border: 1px solid var(--gold-dim);
   padding: 6px 16px;
   font-size: 11px;

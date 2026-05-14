@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { GamePhase, Events } from '@/data/constants'
+import { GamePhase, Events, FIXED_DT } from '@/data/constants'
 
 // Mock Renderer/InputManager so we don't need a real canvas2d context
 vi.mock('./Renderer', () => ({
@@ -80,5 +80,77 @@ describe('Game.startLevel', () => {
 
     game.startLevel(1)
     expect(game.phase.current).toBe(GamePhase.BUILD)
+  })
+})
+
+describe('Game perceived speed', () => {
+  let game: Game
+  let nowSpy: ReturnType<typeof vi.spyOn>
+  let rafSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    const canvas = document.createElement('canvas')
+    game = new Game(canvas)
+    nowSpy = vi.spyOn(performance, 'now')
+    rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+  })
+
+  it('runs extra fixed simulation steps during waves while advancing scoring time by the same simulated amount', () => {
+    const update = vi.fn()
+    game.addSystem('probe', { update })
+    game.phase.forceTransition(GamePhase.WAVE)
+    game.state.phase = GamePhase.WAVE
+    game.setPerceivedSpeedMultiplier(2)
+
+    const internals = game as unknown as { _running: boolean; _lastTime: number; _loop(): void }
+    internals._running = true
+    internals._lastTime = 0
+    nowSpy.mockReturnValue(FIXED_DT * 1000)
+
+    internals._loop()
+
+    expect(update).toHaveBeenCalledTimes(2)
+    expect(update).toHaveBeenNthCalledWith(1, FIXED_DT, game)
+    expect(update).toHaveBeenNthCalledWith(2, FIXED_DT, game)
+    expect(game.time).toBeCloseTo(FIXED_DT * 2)
+    expect(rafSpy).toHaveBeenCalled()
+  })
+
+  it('does not speed up build phase timing', () => {
+    const update = vi.fn()
+    game.addSystem('probe', { update })
+    game.phase.forceTransition(GamePhase.BUILD)
+    game.state.phase = GamePhase.BUILD
+    game.setPerceivedSpeedMultiplier(2)
+
+    const internals = game as unknown as { _running: boolean; _lastTime: number; _loop(): void }
+    internals._running = true
+    internals._lastTime = 0
+    nowSpy.mockReturnValue(FIXED_DT * 1000)
+
+    internals._loop()
+
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(game.time).toBeCloseTo(FIXED_DT)
+  })
+
+  it('stops perceived-speed sub-steps the moment a sub-step ends the wave', () => {
+    // The wave-ending sub-step is legitimate WAVE time; the *extra* sub-step
+    // must not run, or it would advance scored time into a non-WAVE phase.
+    const update = vi.fn(() => { game.state.phase = GamePhase.BUILD })
+    game.addSystem('probe', { update })
+    game.phase.forceTransition(GamePhase.WAVE)
+    game.state.phase = GamePhase.WAVE
+    game.setPerceivedSpeedMultiplier(2)
+
+    const internals = game as unknown as { _running: boolean; _lastTime: number; _loop(): void }
+    internals._running = true
+    internals._lastTime = 0
+    nowSpy.mockReturnValue(FIXED_DT * 1000)
+
+    internals._loop()
+
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(game.time).toBeCloseTo(FIXED_DT)
   })
 })

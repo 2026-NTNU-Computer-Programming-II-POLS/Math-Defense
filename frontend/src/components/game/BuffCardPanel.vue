@@ -210,7 +210,7 @@ function skipBuff(): void {
   flex-direction: column;
   gap: 8px;
   padding: 16px;
-  background: rgba(255,255,255,0.04);
+  background: var(--overlay-cell-bg);
   border: 1px solid var(--grid-line);
   border-radius: 6px;
   cursor: pointer;

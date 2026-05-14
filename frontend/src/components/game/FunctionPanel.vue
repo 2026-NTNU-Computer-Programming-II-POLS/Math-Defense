@@ -215,12 +215,12 @@ function onUnhover(): void {
   right: 16px;
   top: 100px;
   width: 232px;
-  background: rgba(26, 21, 32, 0.92);
+  background: var(--overlay-panel-bg);
   border: 1px solid var(--panel-border, #3a3028);
   border-radius: 6px;
   padding: 10px 12px;
   font-family: var(--font-mono, monospace);
-  color: #e8dcc8;
+  color: var(--overlay-text);
   z-index: var(--z-hints);
   display: flex;
   flex-direction: column;
@@ -320,7 +320,7 @@ function onUnhover(): void {
 }
 
 .fn-seg-active {
-  background: rgba(255, 215, 0, 0.15);
+  background: var(--overlay-cell-active);
   color: var(--gold-bright, #d4a840);
 }
 

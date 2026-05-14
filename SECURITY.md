@@ -79,7 +79,7 @@ The application uses SQLAlchemy's ORM for all database interactions. No raw SQL 
 
 ## CSRF Protection
 
-The application implements the double-submit cookie pattern for CSRF protection. A random token is set in a `csrf-token` cookie and must also appear in the `X-CSRF-Token` request header on all state-mutating requests. The token is refreshed on every response.
+The application implements the double-submit cookie pattern for CSRF protection. A random token is set in a `csrf_token` cookie and must also appear in the `X-CSRF-Token` request header on all state-mutating requests. The token is refreshed on every response.
 
 CSRF protection is enabled by default. Attempting to disable it outside of the CI/test harness causes the application to refuse to start. `SameSite=Lax` cookies provide a second layer of defence for modern browsers, but the explicit CSRF check is retained because `SameSite` alone does not cover all older browsers or all cross-origin navigation patterns.
 
