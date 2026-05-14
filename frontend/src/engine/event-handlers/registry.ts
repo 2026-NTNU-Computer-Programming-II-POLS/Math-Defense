@@ -229,6 +229,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   SHOP_PURCHASE: [
     { module: 'systems/BuffSystem', handler: 'anonymous', purpose: 'Apply purchased buff from shop' },
   ],
+  PERCEIVED_SPEED_CHANGED: [
+    { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror score-neutral pacing control to reactive store' },
+  ],
   KILL_VALUE_CHANGED: [
     { module: 'stores/gameStore',        handler: 'anonymous', purpose: 'Mirror kill-value snapshot for UI' },
     { module: 'systems/MontyHallSystem', handler: 'anonymous', purpose: 'Track accumulated kill value for Monty Hall trigger' },
