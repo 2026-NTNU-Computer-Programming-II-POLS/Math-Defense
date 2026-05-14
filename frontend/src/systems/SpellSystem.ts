@@ -73,7 +73,7 @@ export class SpellSystem implements GameSystem {
           hitCount = 1
         }
         break
-      case 'heal':
+      case 'haste':
         this._applyTowerBoost(def.duration!, game)
         hitCount = 1
         break

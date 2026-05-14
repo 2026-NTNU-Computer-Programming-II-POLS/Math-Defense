@@ -43,12 +43,6 @@ function seedFor(spellId: string, x: number, y: number): number {
   return seed
 }
 
-function effectAge(spellId: string): number {
-  if (spellId === 'lightning') return 0.85
-  if (spellId === 'slow') return 1.15
-  if (spellId === 'heal') return 1.05
-  return spellId === 'fireball' ? 1.35 : 0.65
-}
 
 export class SpellEffectRenderer implements GameSystem {
   private _effects: SpellVfx[] = []
@@ -65,7 +59,7 @@ export class SpellEffectRenderer implements GameSystem {
           y,
           radius: radius ?? 2,
           age: 0,
-          maxAge: def?.vfxDuration ?? effectAge(spellId),
+          maxAge: def?.vfxDuration ?? 0.65,
           color: def?.color ?? '#ffffff',
           seed: seedFor(spellId, x, y),
         })
@@ -101,7 +95,7 @@ export class SpellEffectRenderer implements GameSystem {
         this._drawLightning(ctx, vfx)
       } else if (vfx.spellId === 'slow') {
         this._drawFrostNova(ctx, vfx)
-      } else if (vfx.spellId === 'heal') {
+      } else if (vfx.spellId === 'haste') {
         this._drawHaste(ctx, vfx)
       } else {
         this._drawPulse(ctx, vfx)

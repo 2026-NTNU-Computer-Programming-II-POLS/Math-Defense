@@ -20,7 +20,7 @@ defineProps<{ spellId: string }>()
       <path class="icon-fill" d="M18.2 4.8 9.6 16.2h7.1l-2.4 10.9 8.2-11.9h-7.1l2.8-10.4Z" />
       <path class="icon-accent" d="M17.1 8.4 12 15.2h5.1l-1.2 6.2 4.1-6.8h-4.7l1.8-6.2Z" />
     </g>
-    <g v-else-if="spellId === 'heal'">
+    <g v-else-if="spellId === 'haste'">
       <circle class="icon-glow" cx="16" cy="16" r="11.2" />
       <path class="icon-line" d="M16 7.2v17.6M7.2 16h17.6" />
       <path class="icon-fill" d="M11.3 7.4c-2.9 1-5.1 3.6-5.7 7 3.4.2 6.1-1 8-3.6-1.1-.7-1.9-1.8-2.3-3.4ZM20.7 24.6c2.9-1 5.1-3.6 5.7-7-3.4-.2-6.1 1-8 3.6 1.1.7 1.9 1.8 2.3 3.4Z" />

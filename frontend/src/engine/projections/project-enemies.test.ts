@@ -9,7 +9,7 @@ describe('projectEnemyScene', () => {
 
     const scene = projectEnemyScene(game)
 
-    expect(scene.enemies[0]?.frostRatio).toBeCloseTo(0.4)
+    expect(scene.enemies[0]?.frostRatio).toBeCloseTo(0.6) // 1 - slowFactor: heavier freeze = higher visual intensity
   })
 
   it('does not show frost after the slow timer expires', () => {
