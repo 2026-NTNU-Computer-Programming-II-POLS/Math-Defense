@@ -107,7 +107,7 @@ Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirror
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - Python 3.12+
 - Docker & Docker Compose (optional)
 - Emscripten SDK (only if rebuilding WASM; `emsdk/` is vendored)
@@ -115,7 +115,7 @@ Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirror
 ### Option A — Docker (recommended)
 
 ```bash
-cp .env.example .env          # fill in SECRET_KEY (≥16 chars)
+cp .env.example .env          # fill in SECRET_KEY (≥32 chars)
 docker-compose up
 ```
 
@@ -160,10 +160,11 @@ Create `.env` at the project root (see `.env.example`):
 
 | Variable | Required | Description |
 |---|---|---|
-| `SECRET_KEY` | Yes | JWT signing secret — minimum 16 characters |
+| `SECRET_KEY` | Yes | JWT signing secret — minimum 32 characters; generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense` |
 | `POSTGRES_PASSWORD` | Yes | Password for the `postgres` service (matches the password embedded in `DATABASE_URL`) |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
+| `FRONTEND_URL` | Yes | Base URL used in outbound emails (verification links), e.g. `http://localhost:5173` |
 | `COOKIE_SECURE` | No | Default `true`; only `false` is honoured under CI/pytest (see `reject_insecure_cookie_outside_tests` in `backend/app/config.py`) |
 
 > The backend refuses to start when `DATABASE_URL` embeds the literal password `changeme` — replace it in `.env` before first boot.
