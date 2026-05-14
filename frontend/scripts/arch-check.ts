@@ -34,9 +34,10 @@ const SRC_ROOT = resolve(process.cwd(), 'src')
 
 /**
  * Pre-existing SoC violations. Each entry is a known cross-layer import
- * the ratchet permits but should eventually be removed. Currently empty
- * because the formerly-allowlisted `domain/formatters → components` was
- * fixed by relocating the module to `src/utils/formatters.ts`.
+ * the ratchet permits but should eventually be removed. One entry remains
+ * (`ScoreResultView → domain/scoring`); the formerly-allowlisted
+ * `domain/formatters → components` and `InitialAnswerView → domain/level`
+ * imports were both fixed and removed from this list.
  */
 const PRE_EXISTING_ALLOWLIST: ReadonlyArray<{
   fileSuffix: string
