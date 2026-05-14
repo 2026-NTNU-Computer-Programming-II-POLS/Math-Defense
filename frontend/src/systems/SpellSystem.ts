@@ -152,7 +152,7 @@ export class SpellSystem implements GameSystem {
   private _applyTowerBoost(duration: number, game: Game): void {
     const buffSys = game.getSystem('buff')
     if (import.meta.env.DEV && !buffSys) {
-      console.warn('[SpellSystem] heal no-op: BuffSystem not registered')
+      console.warn('[SpellSystem] haste no-op: BuffSystem not registered')
     }
     buffSys?.applyExternalBuff(
       'ALL_TOWERS_DAMAGE_MULTIPLY_1_5',

@@ -9,9 +9,8 @@ export function projectEnemyScene(game: Game): EnemySceneView {
   const enemies: EnemyView[] = []
   for (const e of game.enemies) {
     if (!e.alive) continue
-    // frostRatio is visual intensity: lower slowFactor (heavier freeze) → higher intensity
-    const frostRatio = e.slowTimer > 0 && e.slowFactor < 1
-      ? Math.max(0, Math.min(1, 1 - e.slowFactor))
+    const frostRatio = e.slowTimer > 0 && e.slowFactor > 0
+      ? Math.max(0, Math.min(1, e.slowFactor))
       : 0
     enemies.push({
       x: e.x,
