@@ -27,8 +27,8 @@ function onClick(): void {
 <style scoped>
 .start-wave-btn {
   position: absolute;
-  bottom: calc(var(--tower-bar-height, 64px) + 12px);
-  left: 16px;
+  top: calc(var(--tower-bar-height, 64px) + 12px);
+  right: 16px;
   font-size: 12px;
   letter-spacing: 3px;
   padding: 10px 20px;

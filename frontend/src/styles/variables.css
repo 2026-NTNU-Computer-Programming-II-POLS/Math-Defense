@@ -4,16 +4,16 @@
   --stone-dark: #5b718f;
   --stone-light: #7a8da8;
   --grid-line: rgba(255, 255, 255, 0.2);
-  --axis: #d4a017;
-  --gold: #d4a017;
+  --axis: #c47206;
+  --gold: #c47206;
   --gold-bright: #ffffff;
-  --gold-dim: #9a7005;
+  --gold-dim: #9a5705;
   --tower-cannon: #4a82c8;
 
   --enemy-red: #b84040;
-  --hp-green: #4aab6e;
+  --hp-green: #048634;
   --hp-yellow: #c89848;
-  --hp-red: #cc4444;
+  --hp-red: #a31f1f;
 
   --panel-bg: rgba(235, 242, 250, 0.96);
   --panel-border: var(--gold);
