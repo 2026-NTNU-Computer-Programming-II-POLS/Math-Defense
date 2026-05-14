@@ -182,7 +182,7 @@ function purchase(itemId: string, cost: number): void {
   border-radius: 6px;
   padding: 8px;
   z-index: var(--z-chrome);
-  max-height: 400px;
+  max-height: 500px;
   overflow-y: auto;
   transition:
     width 200ms ease-out,
