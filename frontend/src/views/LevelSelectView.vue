@@ -152,6 +152,7 @@ async function startLevel() {
   padding: 2rem;
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-base);
 }
 

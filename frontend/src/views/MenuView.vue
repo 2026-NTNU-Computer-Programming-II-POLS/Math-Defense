@@ -98,6 +98,7 @@ const mathGlyphs = [
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 32px 0;
   overflow-x: hidden;
   overflow-y: auto;

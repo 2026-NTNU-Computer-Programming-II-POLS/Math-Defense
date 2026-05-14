@@ -205,6 +205,11 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+  // Restore scroll on browser back/forward; otherwise start fresh routes at
+  // the top so a previously-scrolled page doesn't leave the next one offset.
+  scrollBehavior(_to, _from, savedPosition) {
+    return savedPosition ?? { top: 0 }
+  },
 })
 
 router.beforeEach(() => {

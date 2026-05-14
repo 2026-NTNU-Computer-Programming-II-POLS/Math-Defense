@@ -194,6 +194,7 @@ onBeforeUnmount(() => {
   gap: 24px;
   background: var(--bg-base);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-y: auto;
 }
 

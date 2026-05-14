@@ -256,9 +256,14 @@ watch(() => gameStore.phase, (phase) => {
 // handling in `Renderer` all stay untouched.
 const shellRef = ref<HTMLDivElement | null>(null)
 
+// MAX_SCALE caps upscaling so the pixel-art canvas stays legible without
+// becoming excessively blocky on very large / 4K displays. Screens smaller
+// than the world still scale down freely.
+const MAX_SCALE = 2
+
 function calcScale(W: number, H: number) {
   const pad = 2
-  const s = Math.min(1, (W - pad * 2) / CANVAS_WIDTH, (H - pad * 2) / CANVAS_HEIGHT)
+  const s = Math.min(MAX_SCALE, (W - pad * 2) / CANVAS_WIDTH, (H - pad * 2) / CANVAS_HEIGHT)
   return { s, ox: Math.floor((W - CANVAS_WIDTH * s) / 2), oy: Math.floor((H - CANVAS_HEIGHT * s) / 2) }
 }
 
