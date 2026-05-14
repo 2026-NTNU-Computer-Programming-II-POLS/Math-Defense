@@ -11,7 +11,7 @@ import { Events, GamePhase } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { getStrategy } from '@/domain/movement/movement-strategy-registry'
 import type { MovementState } from '@/domain/movement/movement-strategy'
-import type { SegmentedPath } from '@/domain/path/segmented-path'
+import type { SegmentedPath, PathSegmentRuntime } from '@/domain/path/segmented-path'
 import type { Game, MovementLevelContext } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
 
@@ -20,6 +20,7 @@ const ORIGIN = Object.freeze({ x: 0, y: 0 })
 export class MovementSystem {
   private _states = new Map<string, MovementState>()
   private _assignedPaths = new Map<string, SegmentedPath>()
+  private _activeSegmentIds = new Map<string, string>()
 
   /**
    * Optional sink for the lead-enemy x value. The composable injects
@@ -45,8 +46,18 @@ export class MovementSystem {
       if (!enemy.alive) {
         this._states.delete(enemy.id)
         this._assignedPaths.delete(enemy.id)
+        this._activeSegmentIds.delete(enemy.id)
         game.enemies.splice(i, 1)
         continue
+      }
+
+      // Compute speedMultiplier from live fields; consume speedBoost; clear slowFactor
+      // once consumed if the timer has run out (preserving the original consume-then-clear order).
+      const baseMul = 1 + enemy.speedBoost
+      enemy.speedMultiplier = enemy.slowFactor > 0 ? baseMul * (1 - enemy.slowFactor) : baseMul
+      enemy.speedBoost = 0
+      if (enemy.slowFactor > 0 && enemy.slowTimer <= 0) {
+        enemy.slowFactor = 0
       }
 
       if (ctx) {
@@ -58,6 +69,7 @@ export class MovementSystem {
       if (!enemy.alive) {
         this._states.delete(enemy.id)
         this._assignedPaths.delete(enemy.id)
+        this._activeSegmentIds.delete(enemy.id)
         game.enemies.splice(i, 1)
       }
     }
@@ -82,7 +94,47 @@ export class MovementSystem {
     game: Game,
     path: SegmentedPath,
   ): void {
-    const segment = path.findSegmentAt(enemy.x)
+    const prev = this._states.get(enemy.id) ?? { x: enemy.x, y: enemy.y, t: 0 }
+    const lockedId = this._activeSegmentIds.get(enemy.id)
+
+    // State-machine segment resolution.
+    //
+    // findSegmentAt uses a right-hand boundary convention (spec §14.1): at x=v
+    // shared by three segments [_, v] | [v, v] (vertical) | [v, _], it always
+    // returns the rightmost one.  This means vertical segments are invisible to
+    // findSegmentAt — we must advance by index instead.
+    //
+    // Strategy:
+    //   - If locked to a segment, decide whether to stay or advance to the
+    //     adjacent segment in the direction of travel (lockedIdx ± 1).
+    //   - Vertical: stay while t < 1; advance when t >= 1.
+    //   - X-driven: stay while enemy.x is still in xRange; advance when it exits.
+    //   - First tick (no lockedId): bootstrap via findSegmentAt.
+    let segment: PathSegmentRuntime | null = null
+
+    if (lockedId !== undefined) {
+      const lockedIdx = path.segments.findIndex(s => s.id === lockedId)
+      const locked = lockedIdx >= 0 ? (path.segments[lockedIdx] ?? null) : null
+
+      if (locked !== null) {
+        const travelStep = enemy._direction < 0 ? -1 : 1
+
+        if (locked.kind === 'vertical') {
+          segment = prev.t < 1
+            ? locked
+            : (path.segments[lockedIdx + travelStep] ?? null)
+        } else {
+          const [lo, hi] = locked.xRange
+          segment = (enemy.x >= lo && enemy.x <= hi)
+            ? locked
+            : (path.segments[lockedIdx + travelStep] ?? null)
+        }
+      }
+    }
+
+    // First tick or locked segment not found in this path.
+    if (segment === null) segment = path.findSegmentAt(enemy.x)
+
     if (!segment) {
       // Out-of-path enemy: without this the enemy would freeze on the map
       // forever (no damage, no kill credit). Mark dead so it is cleaned up.
@@ -94,11 +146,14 @@ export class MovementSystem {
       game.eventBus.emit(Events.ENEMY_KILLED, enemy)
       return
     }
+
+    this._activeSegmentIds.set(enemy.id, segment.id)
     const strategy = getStrategy(segment.kind)
-    const prev = this._states.get(enemy.id) ?? { x: enemy.x, y: enemy.y, t: 0 }
+    // Reset t when entering a new segment so time-driven strategies start fresh.
+    const prevState = segment.id !== lockedId ? { ...prev, t: 0 } : prev
     const effectiveSpeed =
       enemy.speed * enemy.speedMultiplier * game.state.enemySpeedMultiplier
-    const next = strategy.advance(prev, segment, dt, {
+    const next = strategy.advance(prevState, segment, dt, {
       speed: effectiveSpeed,
       direction: enemy._direction,
     })

@@ -63,6 +63,8 @@ class TerritorySlot:
         slot_index: int,
         path_config: dict[str, Any] | None = None,
     ) -> TerritorySlot:
+        if not (1 <= star_rating <= 5):
+            raise ValueError(f"star_rating must be 1-5, got {star_rating}")
         return cls(
             id=str(uuid.uuid4()),
             activity_id=activity_id,

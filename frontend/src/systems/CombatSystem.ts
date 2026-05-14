@@ -46,16 +46,6 @@ export class CombatSystem {
           enemy.slowTimer = 0
         }
       }
-      const baseMul = 1 + enemy.speedBoost
-      if (enemy.slowFactor > 0) {
-        enemy.speedMultiplier = baseMul * (1 - enemy.slowFactor)
-        if (enemy.slowTimer <= 0) {
-          enemy.slowFactor = 0
-        }
-      } else {
-        enemy.speedMultiplier = baseMul
-      }
-      enemy.speedBoost = 0
     }
   }
 

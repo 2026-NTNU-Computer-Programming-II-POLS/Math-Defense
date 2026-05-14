@@ -71,7 +71,11 @@ jobs:
         run: npx vue-tsc -b
       - name: Arch check
         run: npm run arch-check
+      - name: Event registry check
+        run: npm run event-registry-check
       - name: Lint non-ASCII comments
         run: npm run lint-chinese-comments
+      - name: Lint determinism
+        run: npm run lint-determinism
       - name: Unit tests
         run: npx vitest run

@@ -192,18 +192,6 @@ class TestAssessmentService:
         # Untouched competencies remain at the uniform prior.
         assert fresh.get_posteriors(user.id)[Competency.MAGIC].mean == 0.5
 
-    def test_record_events_batches_into_one_uow(self, db_session):
-        user = _make_user(db_session, "assess_batch")
-        svc = self._service(db_session)
-        svc.record_events(
-            user.id,
-            [("chain_rule_correct", True)] * 5,
-        )
-        post = svc.get_posteriors(user.id)[Competency.CHAIN_RULE]
-        assert post.mean > 0.85
-        # CHAIN_RULE rows: weight 1.0 × 5 → α = 1 + 5 = 6.0
-        assert post.alpha == pytest.approx(6.0)
-
     def test_unknown_event_is_swallowed(self, db_session):
         user = _make_user(db_session, "assess_unk")
         svc = self._service(db_session)
@@ -218,14 +206,8 @@ class TestAssessmentService:
         user = _make_user(db_session, "assess_n1")
         svc = self._service(db_session)
         # Seed multiple competencies so a per-key fetch would issue 7 SELECTs.
-        svc.record_events(
-            user.id,
-            [
-                ("limit_correct", True),
-                ("chain_rule_correct", True),
-                ("monty_hall_switch_won", True),
-            ],
-        )
+        for ev in ("limit_correct", "chain_rule_correct", "monty_hall_switch_won"):
+            svc.record_event(user.id, ev, success=True)
         statements: list[str] = []
 
         from sqlalchemy import event as sa_event

@@ -291,6 +291,59 @@ def test_end_session_creates_leaderboard_entry(client):
     assert 3000 in scores
 
 
+# ── BD-1: score bounded by replay-verified wave count ──
+
+def _post_wave_end_events(client, token, session_id, count):
+    """Post `count` waveEnd events so end_session derives that many waves."""
+    client.post(
+        f"/api/sessions/{session_id}/events",
+        json={"events": [
+            {"seq": i + 1, "ts": float(i + 1), "event_type": "waveEnd", "payload": None}
+            for i in range(count)
+        ]},
+        headers=_auth_headers(token),
+    )
+
+
+def test_end_session_rejects_score_implausible_for_replayed_waves(client):
+    """BD-1: a maxed score with a replay log proving only one cleared wave
+    must 422 — the leaderboard can no longer be reached with a forged score."""
+    token = _register_and_token(client, "bd1_reject")
+    session_id = _create_session(client, token).json()["id"]
+    # Replay log proves 1 wave cleared. Level 1's cap is 5000 over 3 waves,
+    # so the plausible ceiling is ceil(5000 * (1 + 1) / 3) = 3334.
+    _post_wave_end_events(client, token, session_id, 1)
+
+    res = client.post(
+        f"/api/sessions/{session_id}/end",
+        json={"score": 5000, "kills": 10, "waves_survived": 1},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 422
+    # Rejected before completion — the session stays active for a retry.
+    active = client.get(
+        "/api/sessions/active", headers=_auth_headers(token)
+    ).json()
+    assert active is not None and active["id"] == session_id
+    assert active["status"] == "active"
+
+
+def test_end_session_accepts_score_plausible_for_replayed_waves(client):
+    """BD-1: a maxed score is still accepted when the replay log proves the
+    wave count that justifies it."""
+    token = _register_and_token(client, "bd1_accept")
+    session_id = _create_session(client, token).json()["id"]
+    _post_wave_end_events(client, token, session_id, 3)
+
+    res = client.post(
+        f"/api/sessions/{session_id}/end",
+        json={"score": 5000, "kills": 10, "waves_survived": 3},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 200
+    assert res.json()["score"] == 5000
+
+
 # ── Backlog §20: practice-mode (slider-fallback) ──
 
 

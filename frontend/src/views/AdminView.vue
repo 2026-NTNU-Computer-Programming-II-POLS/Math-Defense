@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { adminService, type UserSummary, type ClassSummary } from '@/services/adminService'
 import { seasonService, type SeasonOut } from '@/services/seasonService'
@@ -98,7 +98,10 @@ function switchTab(tab: Tab): void {
   router.push({ name: `admin-${tab}` })
 }
 
-onMounted(loadData)
+// Load whenever the active tab changes (and once on mount). activeTab is a
+// computed off route.name, so this fires only after the route push settles —
+// avoids loading the previous tab's data.
+watch(activeTab, loadData, { immediate: true })
 </script>
 
 <template>
@@ -113,7 +116,7 @@ onMounted(loadData)
           class="tab-btn"
           :class="{ active: activeTab === tab }"
           :disabled="loading"
-          @click="switchTab(tab); loadData()"
+          @click="switchTab(tab)"
         >
           {{ { teachers: '教師', classes: '班級', students: '學生', seasons: '賽季' }[tab] }}
         </button>

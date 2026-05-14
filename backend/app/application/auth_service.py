@@ -21,6 +21,7 @@ from app.domain.errors import (
     MFANotSetupError,
     UserNotFoundError,
 )
+from app.domain.auth.repository import RefreshTokenConsumeStatus
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Email, Role
 from app.utils import totp as totp_utils
@@ -255,9 +256,18 @@ class AuthApplicationService:
                     self._token_denylist.deny(jti, float(exp))
             if refresh_token is not None and self._refresh_token_repo is not None:
                 token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-                user_id = self._refresh_token_repo.consume(token_hash)
-                if user_id is not None:
-                    self._refresh_token_repo.revoke_all_for_user(user_id)
+                result = self._refresh_token_repo.consume(token_hash)
+                # A successful consume rotates this token; a reuse-detected one
+                # is a stolen-cookie replay. Either way logout kills the user's
+                # whole refresh-token family. consume() no longer revokes
+                # internally (BA-S1 / BA-U1) — the revocation is explicit here
+                # and made durable by the unconditional commit below.
+                if result.status in (
+                    RefreshTokenConsumeStatus.OK,
+                    RefreshTokenConsumeStatus.REUSE_DETECTED,
+                ):
+                    assert result.user_id is not None
+                    self._refresh_token_repo.revoke_all_for_user(result.user_id)
             self._uow.commit()
 
     def refresh_access_token(self, refresh_token: str) -> tuple[User, str, str]:
@@ -266,16 +276,23 @@ class AuthApplicationService:
             raise InvalidTokenError("Refresh tokens are not enabled")
         token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
         with self._uow:
-            user_id = self._refresh_token_repo.consume(token_hash)
-            if user_id is None:
-                # consume() may have detected reuse and called
-                # revoke_all_for_user(). That mutation must persist even on
-                # the error path — without this commit the UoW exits via
-                # the exception and rolls back the family-revocation,
-                # defeating B-SEC-1. Empty commits are no-ops, so it's
-                # safe to commit when no reuse was detected either.
+            result = self._refresh_token_repo.consume(token_hash)
+            if result.status is RefreshTokenConsumeStatus.REUSE_DETECTED:
+                # Stolen-cookie replay (B-SEC-1): revoke every refresh token
+                # for this user so neither the attacker's nor the victim's
+                # lineage survives. The commit MUST run before the raise —
+                # otherwise the UoW exits via the exception and rolls the
+                # family-revocation back. consume() no longer does this
+                # itself, so the responsibility is explicit here (BA-S1).
+                assert result.user_id is not None
+                self._refresh_token_repo.revoke_all_for_user(result.user_id)
                 self._uow.commit()
                 raise InvalidTokenError("Refresh token is invalid or expired")
+            if result.status is RefreshTokenConsumeStatus.INVALID:
+                # Nothing was mutated — let the UoW roll back cleanly.
+                raise InvalidTokenError("Refresh token is invalid or expired")
+            user_id = result.user_id
+            assert user_id is not None  # OK status always carries a user_id
             user = self._user_repo.find_by_id(user_id)
             if user is None:
                 raise UserNotFoundError("User not found")

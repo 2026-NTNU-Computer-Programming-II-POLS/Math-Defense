@@ -16,14 +16,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.db.database import SessionLocal, get_db
 from app.domain.session.events_log import ReplayEvent
 from app.domain.user.aggregate import User
 from app.factories import build_auth_service, build_replay_service
 from app.infrastructure.spectate_hub import hub as spectate_hub
 from app.limiter import limiter
-from app.middleware.auth import AUTH_COOKIE_NAME, get_current_user
+from app.middleware.auth import AUTH_COOKIE_NAME, authenticate_ws, get_current_user
 from app.schemas.replay import (
     ReplayBatchIn,
     ReplayBatchOut,
@@ -113,25 +112,6 @@ def get_replay(
 # monotonic and gaps are visible client-side.
 @router.websocket("/{session_id}/spectate")
 async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
-    # Authenticate via the access-token cookie (browser sends it on the WS
-    # handshake automatically). Raw cookie parsing because Starlette's
-    # Request is not available here.
-    # CSWSH defence: cookies attach to WS handshakes automatically and the
-    # CSRF middleware does not run on WS, so without an Origin check a
-    # malicious page could open a same-cookie WS to the victim's session.
-    # Reject any handshake whose Origin is not in the configured CORS
-    # allow-list. Browsers always send Origin on WS upgrades; a missing
-    # header indicates a non-browser client and is treated as untrusted.
-    origin = websocket.headers.get("origin")
-    if not origin or origin not in settings.cors_origins:
-        await websocket.close(code=4403, reason="forbidden origin")
-        return
-
-    token = websocket.cookies.get(AUTH_COOKIE_NAME)
-    if not token:
-        await websocket.close(code=4401, reason="unauthenticated")
-        return
-
     # B-BUG-5: open the DB session only for auth + history bootstrap, then
     # close it before entering the streaming loop. Holding a SessionLocal
     # for the WS lifetime starves the connection pool — 11 spectators on a
@@ -140,10 +120,8 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
     # Periodic auth re-validation reopens its own short-lived session.
     db = SessionLocal()
     try:
-        try:
-            user = build_auth_service(db).authenticate_token(token)
-        except Exception:
-            await websocket.close(code=4401, reason="unauthenticated")
+        user = await authenticate_ws(websocket, db)
+        if user is None:
             return
 
         # Spectator authorization v1: owner-only via the application
@@ -216,11 +194,13 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
                 revalidate_db = SessionLocal()
                 try:
                     try:
-                        re_user = build_auth_service(revalidate_db).authenticate_token(token)
+                        reauth_token = websocket.cookies.get(AUTH_COOKIE_NAME)
+                        build_auth_service(revalidate_db).authenticate_token(reauth_token)
                     except DomainError:
-                        await websocket.close(code=4401, reason="auth revoked")
-                        return
-                    if re_user.id != user.id or not re_user.is_active:
+                        # Covers all revocation cases: AccountDisabledError (banned),
+                        # InvalidTokenError (JTI denied / password-rotated / expired),
+                        # UserNotFoundError (deleted). A successfully returned user is
+                        # always active — no redundant is_active check needed.
                         await websocket.close(code=4401, reason="auth revoked")
                         return
                 finally:
