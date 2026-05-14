@@ -47,7 +47,7 @@ export class TowerRenderer {
     ctx.stroke()
 
     ctx.lineWidth = 2
-    ctx.strokeStyle = '#ffd700'
+    ctx.strokeStyle = this._palette.axis
     ctx.setLineDash([])
     ctx.beginPath()
     ctx.arc(px, py, radius, 0, Math.PI * 2)
@@ -76,7 +76,7 @@ export class TowerRenderer {
     ctx.restore()
 
     if (view.showCoords) {
-      ctx.fillStyle = 'rgb(255, 215, 0)'
+      ctx.fillStyle = this._palette.axis
       ctx.font = '9px monospace'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'bottom'
