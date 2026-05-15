@@ -51,8 +51,12 @@ export function useStartRun() {
 
     // F-BUG-14: cap serialized size so a malformed level can't bloat the history entry.
     const levelJson = JSON.stringify(level)
-    if (levelJson.length > MAX_LEVEL_JSON_BYTES) {
-      console.error('[startRun] Generated level JSON exceeds size cap', { bytes: levelJson.length })
+    const levelJsonBytes = new TextEncoder().encode(levelJson).length
+    if (levelJsonBytes > MAX_LEVEL_JSON_BYTES) {
+      console.error('[startRun] Generated level JSON exceeds size cap', {
+        bytes: levelJsonBytes,
+        charLength: levelJson.length,
+      })
       ui.showModal('Level too large', 'Generated level payload is unexpectedly large; please try again.')
       return
     }
