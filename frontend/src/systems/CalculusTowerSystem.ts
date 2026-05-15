@@ -58,7 +58,14 @@ export class CalculusTowerSystem {
           // a free retry, so capture whether we charged and refund on collapse.
           const wasApplied = tower.calculusState.opApplied
           if (wasApplied) {
-            if (game.state.gold < CALCULUS_OP_COST) return
+            if (game.state.gold < CALCULUS_OP_COST) {
+              // Emit so the UI knows the op was rejected and can signal the player.
+              game.eventBus.emit(Events.CALCULUS_STATE_CHANGED, {
+                towerId: tower.id,
+                state: { ...tower.calculusState },
+              })
+              return
+            }
             game.economy.changeGold(-CALCULUS_OP_COST)
             game.economy.addCost(CALCULUS_OP_COST)
           }

@@ -266,7 +266,8 @@ class AuthApplicationService:
                     RefreshTokenConsumeStatus.OK,
                     RefreshTokenConsumeStatus.REUSE_DETECTED,
                 ):
-                    assert result.user_id is not None
+                    if result.user_id is None:
+                        raise ValueError("consume() returned OK/REUSE_DETECTED without a user_id")
                     self._refresh_token_repo.revoke_all_for_user(result.user_id)
             self._uow.commit()
 

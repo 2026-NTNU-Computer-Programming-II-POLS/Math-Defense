@@ -195,7 +195,12 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
                 try:
                     try:
                         reauth_token = websocket.cookies.get(AUTH_COOKIE_NAME)
-                        build_auth_service(revalidate_db).authenticate_token(reauth_token)
+                        re_user = build_auth_service(revalidate_db).authenticate_token(reauth_token)
+                        # Guard against a cookie swap: if the token now belongs to a
+                        # different user the original spectator's session must close.
+                        if re_user.id != user.id:
+                            await websocket.close(code=4401, reason="auth revoked")
+                            return
                     except DomainError:
                         # Covers all revocation cases: AccountDisabledError (banned),
                         # InvalidTokenError (JTI denied / password-rotated / expired),

@@ -136,14 +136,26 @@ export class MovementSystem {
     if (segment === null) segment = path.findSegmentAt(enemy.x)
 
     if (!segment) {
-      // Out-of-path enemy: without this the enemy would freeze on the map
-      // forever (no damage, no kill credit). Mark dead so it is cleaned up.
-      console.warn(
-        `[MovementSystem] Enemy ${enemy.id} at x=${enemy.x} outside path [${path.targetX}, ${path.startX}]; marking dead.`,
-      )
-      enemy.alive = false
-      enemy.active = false
-      game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+      // Distinguish "reached goal" from "genuinely off-path" so the EconomySystem
+      // receives ENEMY_REACHED_ORIGIN (deals HP damage) rather than ENEMY_KILLED
+      // (awards kill credit) when the enemy exits the last segment naturally.
+      const reachedTarget =
+        enemy._direction < 0
+          ? enemy._pathX <= enemy._targetX
+          : enemy._pathX >= enemy._targetX
+      if (reachedTarget && !enemy._emittedReachedOrigin) {
+        enemy._emittedReachedOrigin = true
+        enemy.alive = false
+        enemy.active = false
+        game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, enemy)
+      } else if (enemy.alive) {
+        console.warn(
+          `[MovementSystem] Enemy ${enemy.id} at x=${enemy.x} outside path [${path.targetX}, ${path.startX}]; marking dead.`,
+        )
+        enemy.alive = false
+        enemy.active = false
+        game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+      }
       return
     }
 

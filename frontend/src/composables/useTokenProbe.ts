@@ -3,7 +3,7 @@ import { authService } from '@/services/authService'
 
 const TOKEN_PROBE_INTERVAL_MS = 15_000
 
-export function useTokenProbe(user: Ref<unknown | null>) {
+export function useTokenProbe(user: Ref<object | null>) {
   let probeTimer: ReturnType<typeof setInterval> | null = null
   let pageHideListener: (() => void) | null = null
   let pageShowListener: (() => void) | null = null

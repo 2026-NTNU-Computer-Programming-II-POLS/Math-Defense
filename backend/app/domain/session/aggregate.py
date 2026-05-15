@@ -1,6 +1,7 @@
 """GameSession Aggregate Root — encapsulates all session invariants and state transitions"""
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import datetime, timedelta, UTC
 
@@ -227,6 +228,7 @@ class GameSession:
         self,
         result: GameResult,
         wave_cap_override: int | None = None,
+        authoritative_waves: int | None = None,
     ) -> None:
         """End session — transition to COMPLETED and emit domain event.
 
@@ -234,6 +236,11 @@ class GameSession:
         substitute a tighter wave ceiling for the per-level default. The
         kill/score caps still derive from the session's star_rating because
         challenges run inside an existing star-rated waveset, just shorter.
+
+        ``authoritative_waves`` is the replay-log-derived wave count. When
+        present (non-empty event log), the score is additionally bounded to
+        what is plausible for that many waves (BD-1). See session_service
+        for why this is gated on a non-empty log.
         """
         self._assert_active("Session already ended, cannot resubmit")
         # Reject end-payload scores that wildly exceed the most recent in-flight score
@@ -254,6 +261,21 @@ class GameSession:
             wave_cap = min(wave_cap, wave_cap_override)
         if result.waves_survived > wave_cap:
             raise DomainValueError("waves_survived exceeds level wave count")
+
+        # BD-1: when replay evidence is available, tighten the score ceiling to
+        # what is plausible for the proven wave count. The +1 margin absorbs the
+        # in-progress wave whose waveEnd event may not have flushed yet.
+        if authoritative_waves is not None:
+            level_wave_count = LEVEL_MAX_WAVES.get(int(self.level))
+            if level_wave_count:
+                max_plausible = min(
+                    level_cap,
+                    math.ceil(level_cap * (authoritative_waves + 1) / level_wave_count),
+                )
+                if result.score.value > max_plausible:
+                    raise DomainValueError(
+                        "final score is implausible for the number of waves survived"
+                    )
 
         self._transition_to(SessionStatus.COMPLETED)
         self.score = result.score.value

@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import OperationalError
 
-from app.domain.constraints import LEVEL_MAX_SCORES, LEVEL_MAX_WAVES, SCORE_MAX
 from app.domain.errors import (
     ConstraintViolationError,
     DomainValueError,
@@ -302,10 +300,6 @@ class SessionApplicationService:
                     #     client that posts zero events stays bounded only by
                     #     the per-level cap — but it also lands on the board with
                     #     waves_survived=0, so such a forgery is at least visible.
-                    if replay_events:
-                        self._assert_score_plausible_for_waves(
-                            session.level, score, waves_survived
-                        )
                 result = GameResult(
                     score=Score(score),
                     kills=kills,
@@ -316,7 +310,15 @@ class SessionApplicationService:
                 # enforcement: a tampered client cannot bypass the per-challenge
                 # ceiling.
                 wave_cap_override = self._challenge_wave_cap(session.challenge_id)
-                session.complete(result, wave_cap_override=wave_cap_override)
+                # BD-1: pass the replay-verified wave count to the aggregate so
+                # the per-wave score ceiling is a domain invariant, not an app
+                # concern. None when the event log is empty (falls back to the
+                # flat per-level cap — see inline comment above).
+                session.complete(
+                    result,
+                    wave_cap_override=wave_cap_override,
+                    authoritative_waves=waves_survived if replay_events else None,
+                )
                 session.record_scoring_context(
                     kill_value=kill_value,
                     cost_total=cost_total,
@@ -540,46 +542,6 @@ class SessionApplicationService:
         if challenge is None or challenge.is_deleted:
             return None
         return challenge.constraints.wave_count
-
-    def _assert_score_plausible_for_waves(
-        self, level: Level, score: int, waves_survived: int
-    ) -> None:
-        """BD-1: bound the client-submitted ``score`` by the replay-verified
-        wave count.
-
-        The leaderboard ranks on ``score`` and its only other forgery defense
-        is the coarse per-level ceiling enforced in ``GameSession.complete``.
-        A scripted client making in-range ``update_session`` calls can
-        otherwise climb to that per-level maximum no matter how far it
-        actually got. Tying the ceiling to the number of waves the replay log
-        proves were cleared closes that gap.
-
-        Caller restricts this to sessions with a non-empty event log, so a
-        missing/empty log falls back to the flat per-level cap rather than
-        collapsing the bound to ~0. The ``+ 1`` margin absorbs the single
-        wave the replay count can legitimately under-report: the in-progress
-        wave the player died on emits no ``waveEnd`` event, and the
-        recorder's terminal flush is best-effort and not awaited by
-        ``end_session`` so the final ``waveEnd`` can land just after the
-        score is submitted. The wide safety margin already baked into
-        ``LEVEL_MAX_SCORES`` keeps this from false-rejecting real runs.
-        """
-        level_cap = LEVEL_MAX_SCORES.get(int(level), SCORE_MAX)
-        level_wave_count = LEVEL_MAX_WAVES.get(int(level))
-        if not level_wave_count:
-            return
-        max_plausible = min(
-            level_cap,
-            math.ceil(level_cap * (waves_survived + 1) / level_wave_count),
-        )
-        if score > max_plausible:
-            logger.warning(
-                "score implausible for waves level=%d score=%d waves=%d max_plausible=%d",
-                int(level), score, waves_survived, max_plausible,
-            )
-            raise DomainValueError(
-                "final score is implausible for the number of waves survived"
-            )
 
     def _get_session(self, session_id: str, user_id: str) -> GameSession:
         session = self._session_repo.find_by_id(session_id, user_id)

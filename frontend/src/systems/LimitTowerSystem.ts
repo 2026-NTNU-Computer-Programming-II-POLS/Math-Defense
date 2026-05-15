@@ -2,7 +2,7 @@ import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { hashStr } from '@/math/RandomUtils'
 import { generateLimitQuestion } from '@/math/limit-evaluator'
-import { applyDamage } from '@/domain/combat/SplitPolicy'
+import { applyDamage, killEnemy } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, LimitResult } from '@/entities/types'
 
@@ -58,9 +58,15 @@ export class LimitTowerSystem {
         if (!enemy.alive) continue
         if (distance(tower.x, tower.y, enemy.x, enemy.y) > range) continue
 
+        if (result.outcome === '+inf') {
+          // Infinity kills outright: bypass all defensive modifiers (Bulwark
+          // cap, evasion) so a correct +inf answer always removes the enemy.
+          killEnemy(enemy, game)
+          continue
+        }
+
         let dmg: number
         switch (result.outcome) {
-          case '+inf': dmg = enemy.hp + enemy.shield; break
           case '+c': dmg = tower.effectiveDamage * Math.abs(result.value); break
           case 'zero':
           case 'constant':

@@ -43,14 +43,18 @@ export const INTERFERING_TOWER_TYPES: ReadonlySet<TowerType> = new Set<TowerType
  */
 export class TowerInterferenceSystem implements GameSystem {
   private _unsubs: (() => void)[] = []
+  // Towers never change during WAVE, so a recompute is only needed once after
+  // the tower layout is finalised (WAVE_START) or changed (TOWER_* events).
+  private _dirty = true
 
   init(game: Game): void {
     this.destroy()
-    const recompute = () => this._recomputeAll(game)
+    const setDirty = () => { this._dirty = true }
     this._unsubs.push(
-      game.eventBus.on(Events.TOWER_PLACED, recompute),
-      game.eventBus.on(Events.TOWER_REMOVED, recompute),
-      game.eventBus.on(Events.TOWER_REFUND_RESULT, recompute),
+      game.eventBus.on(Events.TOWER_PLACED, () => { this._dirty = true; this._recomputeAll(game) }),
+      game.eventBus.on(Events.TOWER_REMOVED, () => { this._dirty = true; this._recomputeAll(game) }),
+      game.eventBus.on(Events.TOWER_REFUND_RESULT, () => { this._dirty = true; this._recomputeAll(game) }),
+      game.eventBus.on(Events.WAVE_START, setDirty),
     )
   }
 
@@ -61,6 +65,8 @@ export class TowerInterferenceSystem implements GameSystem {
 
   update(_dt: number, game: Game): void {
     if (game.state.phase !== GamePhase.WAVE) return
+    if (!this._dirty) return
+    this._dirty = false
     this._recomputeAll(game)
   }
 
