@@ -197,7 +197,6 @@ h1 {
 .star-card[disabled] {
   opacity: 0.45;
   cursor: not-allowed;
-  filter: grayscale(0.6);
 }
 
 .star-card.locked:hover {
@@ -213,7 +212,8 @@ h1 {
 
 .star-icons {
   font-size: 1.5rem;
-  color: var(--gold-bright);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
 }
 
