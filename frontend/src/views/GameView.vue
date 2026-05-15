@@ -114,9 +114,9 @@ const bypassLeaveConfirm = ref(false)
 async function returnToLevelSelect(): Promise<void> {
   if (activePhases.includes(gameStore.phase)) {
     const ok = await uiStore.showConfirm(
-      '放棄本局',
-      '返回關卡選擇？本局不會被記錄，已取得的分數與進度都會放棄。',
-      { confirmLabel: '返回' },
+      'Abandon Run',
+      'Return to level select? This run will not be recorded, and your current score and progress will be lost.',
+      { confirmLabel: 'Return', cancelLabel: 'Cancel' },
     )
     if (!ok) return
   }
@@ -342,12 +342,12 @@ onBeforeUnmount(() => {
         v-if="activePhases.includes(gameStore.phase)"
         type="button"
         class="return-level-btn"
-        aria-label="中途退出，本局不會被記錄"
-        title="中途退出，本局不會被記錄"
+        aria-label="Exit run early. This run will not be recorded."
+        title="Exit run early. This run will not be recorded."
         @click="returnToLevelSelect"
       >
         <span aria-hidden="true">←</span>
-        中途退出
+        Exit Run
       </button>
       <!-- Backlog §20 — practice-mode badge persists for the entire WAVE/BUILD
            session so the player never forgets the run is leaderboard-ineligible. -->
