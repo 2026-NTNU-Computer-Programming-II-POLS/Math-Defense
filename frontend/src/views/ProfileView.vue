@@ -6,6 +6,15 @@ import { useUiStore } from '@/stores/uiStore'
 import { authService } from '@/services/authService'
 import { achievementService, type AchievementSummary } from '@/services/achievementService'
 import { talentService, type TalentTreeOut } from '@/services/talentService'
+import { useUiAudio } from '@/composables/useUiAudio'
+
+const uiAudio = useUiAudio()
+
+// Audio settings test-sound — plays a short ui-confirm so the player can
+// audition the current mix without leaving the settings panel.
+function playTestSound(): void {
+  uiAudio.confirm()
+}
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -282,6 +291,53 @@ async function selectAvatar(url: string): Promise<void> {
           />
           <span class="volume-pct">{{ Math.round(ui.audioVolume * 100) }}%</span>
         </label>
+        <label class="settings-row volume-row">
+          <span class="settings-label volume-label">Music</span>
+          <input
+            :value="ui.audioVolumeMusic"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            class="settings-range"
+            :disabled="ui.audioMuted"
+            @input="ui.setAudioVolumeMusic(Number(($event.target as HTMLInputElement).value))"
+          />
+          <span class="volume-pct">{{ Math.round(ui.audioVolumeMusic * 100) }}%</span>
+        </label>
+        <label class="settings-row volume-row">
+          <span class="settings-label volume-label">Sound effects</span>
+          <input
+            :value="ui.audioVolumeSfx"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            class="settings-range"
+            :disabled="ui.audioMuted"
+            @input="ui.setAudioVolumeSfx(Number(($event.target as HTMLInputElement).value))"
+          />
+          <span class="volume-pct">{{ Math.round(ui.audioVolumeSfx * 100) }}%</span>
+        </label>
+        <label class="settings-row volume-row">
+          <span class="settings-label volume-label">UI clicks</span>
+          <input
+            :value="ui.audioVolumeUi"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            class="settings-range"
+            :disabled="ui.audioMuted"
+            @input="ui.setAudioVolumeUi(Number(($event.target as HTMLInputElement).value))"
+          />
+          <span class="volume-pct">{{ Math.round(ui.audioVolumeUi * 100) }}%</span>
+        </label>
+        <div class="settings-row">
+          <button class="btn test-sound-btn" type="button" :disabled="ui.audioMuted" @click="playTestSound">
+            Test sound
+          </button>
+        </div>
       </div>
 
       <div class="pw-section">

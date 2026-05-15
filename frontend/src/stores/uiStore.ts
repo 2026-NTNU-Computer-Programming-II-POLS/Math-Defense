@@ -10,6 +10,9 @@ import type { TowerType, EnemyType } from '@/data/constants'
 const PRINCIPLE_OVERLAY_PREF_KEY = 'mdf.principleOverlayEnabled'
 const AUDIO_MUTED_PREF_KEY = 'mdf.audioMuted'
 const AUDIO_VOLUME_PREF_KEY = 'mdf.audioVolume'
+const AUDIO_VOLUME_MUSIC_KEY = 'mdf.audioVolume.music'
+const AUDIO_VOLUME_SFX_KEY = 'mdf.audioVolume.sfx'
+const AUDIO_VOLUME_UI_KEY = 'mdf.audioVolume.ui'
 const SLIDER_FALLBACK_PREF_KEY = 'mdf.sliderFallbackEnabled'
 const SEEN_COUNTER_ENEMIES_PREF_KEY = 'mdf.seenCounterEnemies'
 
@@ -52,6 +55,19 @@ function loadAudioVolumePref(): number {
     return Math.max(0, Math.min(1, n))
   } catch {
     return 0.7
+  }
+}
+
+function loadBusVolumePref(key: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (raw === null) return fallback
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return fallback
+    return Math.max(0, Math.min(1, n))
+  } catch {
+    return fallback
   }
 }
 
@@ -135,6 +151,12 @@ export const useUiStore = defineStore('ui', () => {
   // never imports Pinia (preserves engine/UI separation).
   const audioMuted = ref<boolean>(loadAudioMutedPref())
   const audioVolume = ref<number>(loadAudioVolumePref())
+  // Per-bus volumes (music / sfx / ui). Master `audioVolume` still gates all
+  // playback for legacy uses; bus knobs let the player rebalance music vs.
+  // gameplay vs. UI clicks. Defaults: music 0.7, sfx 1.0, ui 0.8.
+  const audioVolumeMusic = ref<number>(loadBusVolumePref(AUDIO_VOLUME_MUSIC_KEY, 0.7))
+  const audioVolumeSfx = ref<number>(loadBusVolumePref(AUDIO_VOLUME_SFX_KEY, 1.0))
+  const audioVolumeUi = ref<number>(loadBusVolumePref(AUDIO_VOLUME_UI_KEY, 0.8))
   if (typeof window !== 'undefined') {
     watch(audioMuted, (v) => {
       try { window.localStorage.setItem(AUDIO_MUTED_PREF_KEY, v ? '1' : '0') }
@@ -144,10 +166,31 @@ export const useUiStore = defineStore('ui', () => {
       try { window.localStorage.setItem(AUDIO_VOLUME_PREF_KEY, String(v)) }
       catch { /* storage may be disabled (private mode); silently ignore */ }
     })
+    watch(audioVolumeMusic, (v) => {
+      try { window.localStorage.setItem(AUDIO_VOLUME_MUSIC_KEY, String(v)) }
+      catch { /* ignore */ }
+    })
+    watch(audioVolumeSfx, (v) => {
+      try { window.localStorage.setItem(AUDIO_VOLUME_SFX_KEY, String(v)) }
+      catch { /* ignore */ }
+    })
+    watch(audioVolumeUi, (v) => {
+      try { window.localStorage.setItem(AUDIO_VOLUME_UI_KEY, String(v)) }
+      catch { /* ignore */ }
+    })
   }
 
   function setAudioVolume(v: number): void {
     audioVolume.value = Math.max(0, Math.min(1, v))
+  }
+  function setAudioVolumeMusic(v: number): void {
+    audioVolumeMusic.value = Math.max(0, Math.min(1, v))
+  }
+  function setAudioVolumeSfx(v: number): void {
+    audioVolumeSfx.value = Math.max(0, Math.min(1, v))
+  }
+  function setAudioVolumeUi(v: number): void {
+    audioVolumeUi.value = Math.max(0, Math.min(1, v))
   }
 
   // Pedagogical Backlog §20 — opt-in slider-fallback / practice mode for
@@ -345,6 +388,7 @@ export const useUiStore = defineStore('ui', () => {
     hoveredSegmentId,
     principleOverlayEnabled,
     audioMuted, audioVolume,
+    audioVolumeMusic, audioVolumeSfx, audioVolumeUi,
     sliderFallbackEnabled,
     seenCounterEnemies,
     showModal, showConfirm, closeModal, dismissModal, selectTower,
@@ -353,6 +397,7 @@ export const useUiStore = defineStore('ui', () => {
     setHoveredSegmentId,
     setPrincipleOverlayEnabled,
     setAudioVolume,
+    setAudioVolumeMusic, setAudioVolumeSfx, setAudioVolumeUi,
     setSliderFallbackEnabled,
     markCounterEnemySeen, hasSeenCounterEnemy,
   }

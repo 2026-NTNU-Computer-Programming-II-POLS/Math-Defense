@@ -6,9 +6,30 @@
  * teardown bag — the audio bridge intentionally does not run its own
  * onUnmounted hook so retry() can rebind cleanly without a fresh component
  * mount.
+ *
+ * Event coverage map (extended audio pass):
+ *   SPELL_CAST            → cast-spell        (player spell trigger)
+ *   ENEMY_KILLED          → kill              (jittered)
+ *   WAVE_END              → wave-end
+ *   MONTY_HALL_RESULT     → mh-reveal
+ *   PHASE_CHANGED         → ambient-build / ambient-wave crossfade
+ *   TOWER_PLACED          → tower-place
+ *   TOWER_UPGRADED        → tower-upgrade
+ *   TOWER_REFUND_RESULT*  → tower-refund (success only)
+ *   TOWER_SELECTED        → tower-select (throttled, ignore null deselect)
+ *   TOWER_ATTACK          → tower-attack-light (heavy-throttled + jittered)
+ *   ENEMY_SPAWNED         → enemy-spawn / boss-spawn (boss override)
+ *   ENEMY_REACHED_ORIGIN  → enemy-reached (HP warning)
+ *   WAVE_START            → wave-start
+ *   LEVEL_END             → level-victory
+ *   GAME_OVER             → game-over
+ *   PLACEMENT_REJECTED    → ui-cancel
+ *
+ * Heavy-tower distinction is per-tower-type — STRONG and bosses' chain-rule
+ * towers fire the heavy variant. Pet attacks reuse the light variant.
  */
 import { watch, type Ref } from 'vue'
-import { Events, GamePhase } from '@/data/constants'
+import { Events, GamePhase, TowerType, EnemyType } from '@/data/constants'
 import type { Game } from '@/engine/Game'
 import { assetManager } from '@/engine/audio/AssetManager'
 import { useUiStore } from '@/stores/uiStore'
@@ -18,29 +39,70 @@ export interface AchievementAudioRef {
   newlyUnlockedAchievements: Ref<ReadonlyArray<{ id: string }>>
 }
 
+// MATRIX and CALCULUS are the heavy hitters — large AOE / slow fire-rate
+// archetypes get the deeper attack sample. The fast-firing arc-radars and
+// MAGIC pulses use the lighter, jittered pew so a row of three radars
+// doesn't sound like artillery.
+const HEAVY_TOWERS: ReadonlySet<string> = new Set<string>([TowerType.MATRIX, TowerType.CALCULUS])
+const BOSS_TYPES: ReadonlySet<string> = new Set<string>([EnemyType.BOSS_A, EnemyType.BOSS_B])
+
 export function bindEngineAudio(g: Game, audio: AchievementAudioRef): (() => void)[] {
   const uiStore = useUiStore()
   const offs: (() => void)[] = []
 
   // §15.4 — kick off the asset preload. Lazy so the first wireEngine pass
-  // triggers /audio/*.mp3 fetches; subsequent retries reuse the cached pool.
+  // triggers /audio/* fetches; subsequent retries reuse the cached pool.
   void assetManager.load()
 
-  // Player-facing spell trigger lives on SPELL_CAST (emitted from SpellBar).
-  // CAST_SPELL is an internal tower-cast event with much higher fire rate.
+  // ─── Spell / kill / wave-end ───────────────────────────────────────────
   offs.push(g.eventBus.on(Events.SPELL_CAST, () => assetManager.play('cast-spell')))
   offs.push(g.eventBus.on(Events.ENEMY_KILLED, () => assetManager.play('kill')))
   offs.push(g.eventBus.on(Events.WAVE_END, () => assetManager.play('wave-end')))
   offs.push(g.eventBus.on(Events.MONTY_HALL_RESULT, () => assetManager.play('mh-reveal')))
-  offs.push(g.eventBus.on(Events.PHASE_CHANGED, ({ from, to }) => {
+
+  // ─── Phase music: BUILD vs. WAVE crossfade ────────────────────────────
+  offs.push(g.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
     if (to === GamePhase.BUILD) assetManager.play('ambient-build')
-    else if (from === GamePhase.BUILD) assetManager.stop('ambient-build')
+    else if (to === GamePhase.WAVE) assetManager.play('ambient-wave')
+    else assetManager.stopAllMusic()
   }))
-  // Singleton ambient survives engine teardown — without this cleanup the
-  // BUILD-phase loop keeps playing after the player leaves GameView, and
-  // also persists across retry() between teardown and the next phase
-  // transition that would have stopped it organically.
-  offs.push(() => assetManager.stop('ambient-build'))
+  // Singleton music survives engine teardown — without this cleanup the bed
+  // keeps playing after the player leaves GameView, and also persists across
+  // retry() between teardown and the next phase transition.
+  offs.push(() => assetManager.stopAllMusic())
+
+  // ─── Build / economy feedback ─────────────────────────────────────────
+  offs.push(g.eventBus.on(Events.TOWER_PLACED, () => assetManager.play('tower-place')))
+  offs.push(g.eventBus.on(Events.TOWER_UPGRADED, () => assetManager.play('tower-upgrade')))
+  offs.push(g.eventBus.on(Events.TOWER_REFUND_RESULT, ({ success }) => {
+    if (success) assetManager.play('tower-refund')
+  }))
+  // Selection: ignore the deselect (null) edge — only the human's pick-up
+  // gesture should click. Throttle is enforced inside AssetManager.
+  offs.push(g.eventBus.on(Events.TOWER_SELECTED, (t) => {
+    if (t) assetManager.play('tower-select')
+  }))
+  offs.push(g.eventBus.on(Events.PLACEMENT_REJECTED, () => assetManager.play('ui-cancel')))
+
+  // ─── Combat attacks ──────────────────────────────────────────────────
+  // TOWER_ATTACK fires every projectile launch. AssetManager throttles &
+  // jitters; we just pick the heavy/light variant based on tower type.
+  offs.push(g.eventBus.on(Events.TOWER_ATTACK, ({ tower }) => {
+    const slug = HEAVY_TOWERS.has(tower.type) ? 'tower-attack-heavy' : 'tower-attack-light'
+    assetManager.play(slug)
+  }))
+
+  // ─── Enemy lifecycle ─────────────────────────────────────────────────
+  offs.push(g.eventBus.on(Events.ENEMY_SPAWNED, (enemy) => {
+    if (BOSS_TYPES.has(enemy.type)) assetManager.play('boss-spawn')
+    else assetManager.play('enemy-spawn')
+  }))
+  offs.push(g.eventBus.on(Events.ENEMY_REACHED_ORIGIN, () => assetManager.play('enemy-reached')))
+
+  // ─── Flow ────────────────────────────────────────────────────────────
+  offs.push(g.eventBus.on(Events.WAVE_START, () => assetManager.play('wave-start')))
+  offs.push(g.eventBus.on(Events.LEVEL_END, () => assetManager.play('level-victory')))
+  offs.push(g.eventBus.on(Events.GAME_OVER, () => assetManager.play('game-over')))
 
   // Achievement-unlock SFX: piggy-back on the ref AchievementToast already
   // watches so we don't need a parallel event channel.
@@ -53,6 +115,9 @@ export function bindEngineAudio(g: Game, audio: AchievementAudioRef): (() => voi
   // session is honoured before any SFX fires.
   offs.push(watch(() => uiStore.audioVolume, (v) => assetManager.setVolume(v), { immediate: true }))
   offs.push(watch(() => uiStore.audioMuted, (m) => assetManager.mute(m), { immediate: true }))
+  offs.push(watch(() => uiStore.audioVolumeMusic, (v) => assetManager.setBusVolume('music', v), { immediate: true }))
+  offs.push(watch(() => uiStore.audioVolumeSfx, (v) => assetManager.setBusVolume('sfx', v), { immediate: true }))
+  offs.push(watch(() => uiStore.audioVolumeUi, (v) => assetManager.setBusVolume('ui', v), { immediate: true }))
 
   return offs
 }

@@ -16,6 +16,7 @@ interface FakeAudio {
   preload: string
   paused: boolean
   currentTime: number
+  playbackRate: number
   play: ReturnType<typeof vi.fn>
   pause: ReturnType<typeof vi.fn>
   cloneNode: (deep?: boolean) => FakeAudio
@@ -34,12 +35,14 @@ function makeFakeAudio(src = ''): FakeAudio {
     preload: '',
     paused: true,
     currentTime: 0,
+    playbackRate: 1,
     play: vi.fn(() => Promise.resolve()),
     pause: vi.fn(),
     cloneNode: (_deep?: boolean) => {
       const clone = makeFakeAudio(inst.src)
       clone.volume = inst.volume
       clone.loop = inst.loop
+      clone.playbackRate = inst.playbackRate
       return clone
     },
     addEventListener: (ev, fn) => {
@@ -183,10 +186,159 @@ describe('AssetManager', () => {
     await p
     unlock()
     am.setVolume(1.0)
+    am.setBusVolume('music', 1.0)
     am.play('ambient-build')
     const ambient = allInstances.find((a) => a.src === SFX_DEFS['ambient-build'].url)!
     const fullVol = ambient.volume
     am.setVolume(0.5)
     expect(ambient.volume).toBeCloseTo(fullVol * 0.5, 5)
+  })
+
+  it('setBusVolume() scales SFX on the matching bus only', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    am.setVolume(1.0)
+    am.setBusVolume('sfx', 1.0)
+    am.setBusVolume('ui', 1.0)
+
+    // Use tower-place (no jitter) for deterministic ratio assertions.
+    am.play('tower-place')
+    const sfxFull = allInstances[allInstances.length - 1].volume
+
+    am.setBusVolume('sfx', 0.5)
+    am.play('tower-place')
+    const sfxHalved = allInstances[allInstances.length - 1].volume
+    expect(sfxHalved).toBeCloseTo(sfxFull * 0.5, 5)
+
+    // UI bus is independent — ui-confirm (no jitter, no throttle) still full.
+    am.play('ui-confirm')
+    const uiClone = allInstances[allInstances.length - 1]
+    expect(uiClone.volume).toBeGreaterThan(0)
+  })
+
+  it('polyphonyCap evicts the oldest active clone', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    // kill has polyphonyCap: 6 — fire 8 in quick succession, expect the
+    // earliest 2 to have been pause()d by eviction.
+    const evicted: FakeAudio[] = []
+    for (let i = 0; i < 8; i++) {
+      am.play('kill')
+      const clone = allInstances[allInstances.length - 1]
+      if (i < 2) evicted.push(clone as unknown as FakeAudio)
+    }
+    for (const c of evicted) {
+      expect(c.pause).toHaveBeenCalled()
+    }
+  })
+
+  it('minIntervalMs drops triggers fired too soon after the previous one', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    // ui-click has minIntervalMs: 40 — back-to-back calls drop the second.
+    const countBefore = allInstances.length
+    am.play('ui-click')
+    am.play('ui-click')  // dropped — same frame
+    am.play('ui-click')  // dropped
+    const created = allInstances.length - countBefore
+    expect(created).toBe(1)
+  })
+
+  it('pitchJitter randomises playbackRate around 1.0 within bounds', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    // kill has pitchJitter: 0.1 — playbackRate must land in [0.9, 1.1].
+    const rates: number[] = []
+    for (let i = 0; i < 8; i++) {
+      am.play('kill')
+      rates.push(allInstances[allInstances.length - 1].playbackRate)
+    }
+    for (const r of rates) {
+      expect(r).toBeGreaterThanOrEqual(0.9 - 1e-6)
+      expect(r).toBeLessThanOrEqual(1.1 + 1e-6)
+    }
+    // With 8 samples and ±10% jitter, at least one should differ from 1.0.
+    expect(rates.some((r) => Math.abs(r - 1) > 1e-9)).toBe(true)
+  })
+
+  it('switching music slugs starts the new bed and fades out the previous one', async () => {
+    vi.useFakeTimers()
+    try {
+      const am = new AssetManager()
+      const p = am.load()
+      fireLoaded()
+      await p
+      unlock()
+      am.play('ambient-build')
+      const build = allInstances.find((a) => a.src === SFX_DEFS['ambient-build'].url)!
+      expect(build.play).toHaveBeenCalledTimes(1)
+      am.play('ambient-wave')
+      const wave = allInstances.find((a) => a.src === SFX_DEFS['ambient-wave'].url)!
+      expect(wave.play).toHaveBeenCalledTimes(1)
+      // Crossfade is driven by setInterval — advance past FADE_MS to land
+      // the onDone callback that pauses the outgoing bed.
+      vi.advanceTimersByTime(400)
+      expect(build.pause).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stopAllMusic() pauses every active music bed', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    am.play('ambient-build')
+    am.stopAllMusic()
+    const build = allInstances.find((a) => a.src === SFX_DEFS['ambient-build'].url)!
+    expect(build.pause).toHaveBeenCalled()
+  })
+
+  it('switching back to a fading-out bed cancels the pending stopMusic', async () => {
+    vi.useFakeTimers()
+    try {
+      const am = new AssetManager()
+      const p = am.load()
+      fireLoaded()
+      await p
+      unlock()
+      am.play('ambient-build')
+      const build = allInstances.find((a) => a.src === SFX_DEFS['ambient-build'].url)!
+      // Switch away: build starts fading out toward 0 with onDone = stop.
+      am.play('ambient-wave')
+      // Advance partway through the fade — not enough to complete.
+      vi.advanceTimersByTime(100)
+      // Switch back before fade completes. The fade-out's onDone must NOT
+      // fire after this point, or build's element gets pause()d behind us.
+      am.play('ambient-build')
+      vi.advanceTimersByTime(500)  // well past FADE_MS
+      expect(build.pause).not.toHaveBeenCalled()
+      // Volume should be at the rescaled target, not 0.
+      expect(build.volume).toBeGreaterThan(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stopAllMusic() is a no-op when nothing is playing', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    expect(() => am.stopAllMusic()).not.toThrow()
   })
 })

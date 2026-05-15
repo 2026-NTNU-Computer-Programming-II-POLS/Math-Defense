@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useUiStore } from '@/stores/uiStore'
+import { useUiAudio } from '@/composables/useUiAudio'
 
 const uiStore = useUiStore()
+const uiAudio = useUiAudio()
 
 const titleId = `modal-title-${Math.random().toString(36).slice(2, 10)}`
 const boxRef = ref<HTMLElement | null>(null)
@@ -12,10 +14,12 @@ const okBtnRef = ref<HTMLButtonElement | null>(null)
 let previousFocus: HTMLElement | null = null
 
 function close(): void {
+  uiAudio.confirm()
   uiStore.closeModal()
 }
 
 function cancel(): void {
+  uiAudio.cancel()
   uiStore.dismissModal({ force: true })
 }
 
