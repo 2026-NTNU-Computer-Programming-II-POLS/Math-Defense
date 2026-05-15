@@ -28,7 +28,7 @@ export function useStartRun() {
         const ok = await ui.showConfirm(
           'Active session in progress',
           'You have an active game session in progress. Starting a new game will abandon it. Continue?',
-          { confirmLabel: 'Continue', cancelLabel: '取消' },
+          { confirmLabel: 'Continue', cancelLabel: 'Cancel' },
         )
         if (!ok) return
       }
