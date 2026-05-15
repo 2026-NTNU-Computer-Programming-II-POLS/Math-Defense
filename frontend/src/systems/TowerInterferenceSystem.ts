@@ -49,12 +49,12 @@ export class TowerInterferenceSystem implements GameSystem {
 
   init(game: Game): void {
     this.destroy()
-    const setDirty = () => { this._dirty = true }
+    const recomputeAndDirty = () => { this._dirty = true; this._recomputeAll(game) }
     this._unsubs.push(
-      game.eventBus.on(Events.TOWER_PLACED, () => { this._dirty = true; this._recomputeAll(game) }),
-      game.eventBus.on(Events.TOWER_REMOVED, () => { this._dirty = true; this._recomputeAll(game) }),
-      game.eventBus.on(Events.TOWER_REFUND_RESULT, () => { this._dirty = true; this._recomputeAll(game) }),
-      game.eventBus.on(Events.WAVE_START, setDirty),
+      game.eventBus.on(Events.TOWER_PLACED, recomputeAndDirty),
+      game.eventBus.on(Events.TOWER_REMOVED, recomputeAndDirty),
+      game.eventBus.on(Events.TOWER_REFUND_RESULT, recomputeAndDirty),
+      game.eventBus.on(Events.WAVE_START, () => { this._dirty = true }),
     )
   }
 

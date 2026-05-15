@@ -3,7 +3,7 @@ import { authService } from '@/services/authService'
 
 const TOKEN_PROBE_INTERVAL_MS = 15_000
 
-export function useTokenProbe(user: Ref<object | null>) {
+export function useTokenProbe(user: Ref<unknown | null>) {
   let probeTimer: ReturnType<typeof setInterval> | null = null
   let pageHideListener: (() => void) | null = null
   let pageShowListener: (() => void) | null = null
@@ -17,7 +17,7 @@ export function useTokenProbe(user: Ref<object | null>) {
       probeTimer = null
     }
     probeTimer = setInterval(async () => {
-      if (user.value === null) { stop(); return }
+      if (user.value == null) { stop(); return }
       if (typeof document !== 'undefined' && document.hidden) return
       try {
         await authService.me()
@@ -39,7 +39,7 @@ export function useTokenProbe(user: Ref<object | null>) {
     }
     if (typeof window !== 'undefined' && pageShowListener === null) {
       pageShowListener = () => {
-        if (user.value !== null) start()
+        if (user.value != null) start()
       }
       window.addEventListener('pageshow', pageShowListener)
     }
