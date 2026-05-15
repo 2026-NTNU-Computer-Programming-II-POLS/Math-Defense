@@ -3,7 +3,7 @@
  * Manages panel visibility, selected tower, and other UI-only state.
  */
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, onScopeDispose } from 'vue'
 import { appBus } from '@/lib/app-bus'
 import type { TowerType, EnemyType } from '@/data/constants'
 
@@ -78,11 +78,9 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 }
 
 export const useUiStore = defineStore('ui', () => {
-  // Subscribe once on init to dismiss any open modal on logout. Replaces the
-  // dynamic-import that authStore.logout used to do (F-ARCH-2).
-  appBus.on('auth:logout', () => {
+  onScopeDispose(appBus.on('auth:logout', () => {
     if (modalVisible.value) dismissModal()
-  })
+  }))
 
   // currently selected tower type (tower bar selection)
   const selectedTowerType = ref<TowerType | null>(null)
@@ -194,8 +192,8 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   // Piecewise paths Phase 5: Function Panel ↔ Renderer hover sync.
-  // Panel writes via `setHoveredSegmentId`; `useGameLoop` mirrors the
-  // value onto `game.hoveredSegmentId` so the Renderer (engine layer)
+  // Panel writes via `setHoveredSegmentId`; `useEngineUiBridges` mirrors the
+  // value onto `game.hud.hoveredSegmentId` so the Renderer (engine layer)
   // reads it without pulling in Pinia.
   const hoveredSegmentId = ref<string | null>(null)
 
@@ -268,6 +266,9 @@ export const useUiStore = defineStore('ui', () => {
     modalTitle.value = 'Error'
     modalMessage.value = 'The operation could not be completed. Please try again.'
     modalCallback.value = null
+    modalSticky.value = false
+    modalConfirmMode.value = false
+    modalConfirmResolver = null
     modalVisible.value = true
   }
 

@@ -1,4 +1,4 @@
-import { api } from './api'
+import { api, type ApiOptions } from './api'
 
 export interface SessionOut {
   schema_version: 1
@@ -96,10 +96,12 @@ export const sessionService = {
   appendReplayEvents(
     sessionId: string,
     events: ReplayEventIn[],
+    opts: ApiOptions = {},
   ) {
     return api.post<{ written: number }>(
       `/api/sessions/${sessionId}/events`,
       { events },
+      opts,
     )
   },
   getReplay(sessionId: string) {

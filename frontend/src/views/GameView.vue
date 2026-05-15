@@ -302,7 +302,7 @@ onMounted(() => {
   recomputeScale()
   const shell = shellRef.value
   if (shell) {
-    ro = new ResizeObserver(recomputeScale)
+    ro = new ResizeObserver(() => recomputeScale())
     ro.observe(shell)
   }
   window.addEventListener('resize', recomputeScale)

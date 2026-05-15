@@ -129,8 +129,10 @@ export class EnemyAbilitySystem implements GameSystem {
     if (payload.correct) {
       boss.alive = false
       boss.active = false
-      game.eventBus.emit(Events.ENEMY_KILLED, boss)
+      // Children must be in game.enemies before ENEMY_KILLED fires so that
+      // any observer (including a future wave-end check) sees them already.
       this._splitBoss(boss, question, game)
+      game.eventBus.emit(Events.ENEMY_KILLED, boss)
     }
 
     game.setPhase(GamePhase.WAVE)

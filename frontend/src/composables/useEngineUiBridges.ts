@@ -1,7 +1,7 @@
 /**
  * useEngineUiBridges — engine ↔ uiStore plumbing (F-ARCH-5).
  *
- * - hovered segment id (uiStore → game.hoveredSegmentId) for the FunctionPanel hover
+ * - hovered segment id (uiStore → game.hud.hoveredSegmentId) for the FunctionPanel hover
  * - tower-selected event → open/close BuildPanel
  * - tower-placed event   → open BuildPanel + advance build-hint
  * - tower-removed event  → close BuildPanel if it's showing the removed one
@@ -22,7 +22,7 @@ export function bindEngineUiBridges(g: Game): (() => void)[] {
 
   offs.push(watch(
     () => uiStore.hoveredSegmentId,
-    (id) => { g.hoveredSegmentId = id },
+    (id) => { g.hud.hoveredSegmentId = id },
     { immediate: true },
   ))
 

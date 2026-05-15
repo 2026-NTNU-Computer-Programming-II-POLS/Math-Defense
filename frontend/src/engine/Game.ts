@@ -217,6 +217,20 @@ export interface SystemMap {
   combatFeedbackRenderer: CombatFeedbackRenderer
 }
 
+// ── HUD / Input state ──
+
+/**
+ * Groups the UI-bridge fields that the engine owns but that are read/written
+ * by the presentation layer (composables, renderers). Keeping them in one
+ * named object makes the cross-layer surface explicit and easy to locate.
+ */
+export interface HudState {
+  /** Path-segment the Function Panel is hovering over; null when none. */
+  hoveredSegmentId: string | null
+  /** Keyboard placement cursor position; null outside BUILD phase. */
+  keyboardCursor: { gx: number; gy: number } | null
+}
+
 // ── Game ──
 
 export class Game {
@@ -245,22 +259,8 @@ export class Game {
   /** Wave definitions for the active level. Set by useGameLoop before startLevel(). */
   currentWaves: ReadonlyArray<WaveDef> | null = null
 
-  /**
-   * Id of the path segment the HUD Function Panel is currently hovering
-   * over. The Renderer reads this in `drawSegmentBoundaries` to tint the
-   * matching `xRange`; Phase 5's Function Panel writes it (indirectly,
-   * through the UI store / a composable sync). Kept on `Game` to avoid an
-   * engine → presentation import, per the SoC matrix in §2 of the plan.
-   */
-  hoveredSegmentId: string | null = null
-
-  /**
-   * Keyboard placement cursor (Pedagogical Backlog §19, WCAG 2.2 SC 2.1.1).
-   * `useKeyboardPlacement` writes this in BUILD phase as the player navigates
-   * with arrow keys; `TowerRenderer` reads it to draw a focus ring on the
-   * lattice point. Cleared outside BUILD so the cursor never bleeds into WAVE.
-   */
-  keyboardCursor: { gx: number; gy: number } | null = null
+  /** UI-bridge state shared between the engine and the presentation layer. */
+  hud: HudState = { hoveredSegmentId: null, keyboardCursor: null }
 
   towerModifierProvider: ((towerType: TowerType) => Record<string, number>) | null = null
 
@@ -576,7 +576,7 @@ export class Game {
           }
         }
       } else {
-        renderer.drawSegmentBoundaries(this.levelContext.path, this.hoveredSegmentId)
+        renderer.drawSegmentBoundaries(this.levelContext.path, this.hud.hoveredSegmentId)
         for (const seg of this.levelContext.path.segments) {
           const [lo, hi] = seg.xRange
           if (lo !== hi) {

@@ -141,7 +141,7 @@ export function useSessionSync() {
           const job = pending.value
           pending.value = null
           if (!sessionId.value) break
-          if (job.gen !== sessionGeneration) break
+          if (job.gen !== sessionGeneration) continue
           if (job.snapshot.wave === lastSyncedWave) continue
           await pushWaveSnapshot(sessionId.value, job.snapshot)
           lastSyncedWave = job.snapshot.wave

@@ -93,3 +93,29 @@ export interface EnemySceneView {
 export interface PetSceneView {
   readonly pets: ReadonlyArray<PetView>
 }
+
+// ── Matrix laser views ───────────────────────────────────────────────────────
+
+export interface MatrixLaserPairView {
+  readonly towerX: number
+  readonly towerY: number
+  readonly pairX: number
+  readonly pairY: number
+  readonly color: string
+  /** null when the laser is idle (no active targets or invalid pair geometry). */
+  readonly laser: {
+    readonly rampTime: number
+    readonly targets: ReadonlyArray<{ readonly x: number; readonly y: number }>
+  } | null
+}
+
+// ── Magic zone views ─────────────────────────────────────────────────────────
+
+export interface MagicZoneView {
+  readonly x: number
+  readonly y: number
+  readonly range: number
+  readonly mode: 'debuff' | 'buff'
+  /** Evaluated curve function for the tower's expression. */
+  readonly curve: (x: number) => number
+}

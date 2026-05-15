@@ -19,6 +19,8 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: mathdefense
+          # Intentional placeholder — config.py skips the reject_default_password
+          # check when _is_test_env() is true, so "changeme" is safe here.
           POSTGRES_PASSWORD: changeme
           POSTGRES_DB: math_defense
         ports:
@@ -43,6 +45,8 @@ jobs:
           SECRET_KEY: ci-placeholder-secret-key-not-used-in-prod
           # conftest derives the test DB name by appending _test; it also creates
           # the DB on first run against the postgres admin DB.
+          # "changeme" is safe here: config.py's reject_default_password validator
+          # is bypassed when _is_test_env() is true (CI=true is set by GitHub Actions).
           DATABASE_URL: postgresql+psycopg://mathdefense:changeme@localhost:5432/math_defense
           CORS_ORIGINS: http://localhost:5173
           FRONTEND_URL: http://localhost:5173

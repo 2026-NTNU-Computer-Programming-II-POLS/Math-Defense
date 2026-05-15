@@ -8,6 +8,8 @@ services:
       POSTGRES_DB: math_defense
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Bound to loopback only — not internet-exposed. Intentional for dev
+    # convenience (psql/pgAdmin from host). Prod compose publishes nothing.
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
@@ -30,7 +32,6 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     # Pin container UID/GID to the typical Linux host dev user so files written
     # through the ./backend bind-mount below are owned by the host user instead
     # of root. The Dockerfile's `useradd --system app` picks a UID from the

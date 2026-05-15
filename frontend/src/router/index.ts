@@ -231,6 +231,8 @@ router.beforeEach(async (to) => {
     return { name: 'auth', query: { mode: 'login', next: to.fullPath } }
   }
 
+  // UX-only guard: role comes from /auth/me and is bypassable client-side.
+  // Every protected API endpoint enforces the same role constraint server-side.
   const role = to.meta.requiresRole
   if (role === 'admin' && !auth.isAdmin) return { name: 'menu' }
   if (role === 'teacher' && !(auth.isTeacher || auth.isAdmin)) return { name: 'menu' }

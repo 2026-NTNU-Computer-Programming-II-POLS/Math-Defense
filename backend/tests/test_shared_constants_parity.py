@@ -2,6 +2,10 @@
 
 Catches drift where a designer changes a value in the JSON but forgets the
 backend is now loading from it — the comparison here fails loudly.
+
+Coverage is intentionally limited to the keys the backend currently consumes
+(player.initialHp, player.initialGold).  Extend this file in lockstep when
+the backend starts reading additional sections (e.g. economy.*).
 """
 import json
 from pathlib import Path

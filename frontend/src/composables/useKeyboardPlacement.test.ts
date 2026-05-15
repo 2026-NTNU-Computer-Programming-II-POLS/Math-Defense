@@ -42,7 +42,7 @@ function makeGameStub(phase: GamePhase = GamePhase.BUILD): GameLike {
     eventBus,
     state: { phase } as GameLike['state'],
     levelContext: { path: {} } as unknown as GameLike['levelContext'],
-    keyboardCursor: null,
+    hud: { keyboardCursor: null },
   }
 }
 
@@ -71,7 +71,7 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     const game = makeGameStub()
     const gameRef = ref<GameLike | null>(game)
     const wrapper = mountComposable(gameRef)
-    expect(game.keyboardCursor).toEqual({ gx: 0, gy: 0 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
     wrapper.unmount()
   })
 
@@ -80,16 +80,16 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     const wrapper = mountComposable(ref<GameLike | null>(game))
 
     dispatchKey('ArrowRight')
-    expect(game.keyboardCursor).toEqual({ gx: 1, gy: 0 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 1, gy: 0 })
 
     dispatchKey('ArrowUp')
-    expect(game.keyboardCursor).toEqual({ gx: 1, gy: 1 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 1, gy: 1 })
 
     dispatchKey('ArrowLeft')
-    expect(game.keyboardCursor).toEqual({ gx: 0, gy: 1 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 1 })
 
     dispatchKey('ArrowDown')
-    expect(game.keyboardCursor).toEqual({ gx: 0, gy: 0 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
 
     wrapper.unmount()
   })
@@ -99,9 +99,9 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     const wrapper = mountComposable(ref<GameLike | null>(game))
     dispatchKey('ArrowRight')
     dispatchKey('ArrowRight') // (1,0) → (2,0)
-    expect(game.keyboardCursor).toEqual({ gx: 2, gy: 0 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 2, gy: 0 })
     dispatchKey('ArrowRight') // no candidate further right; cursor stays
-    expect(game.keyboardCursor).toEqual({ gx: 2, gy: 0 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 2, gy: 0 })
     wrapper.unmount()
   })
 
@@ -156,15 +156,15 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
   it('clears cursor when phase leaves BUILD and restores it on re-entry', () => {
     const game = makeGameStub()
     const wrapper = mountComposable(ref<GameLike | null>(game))
-    expect(game.keyboardCursor).not.toBeNull()
+    expect(game.hud.keyboardCursor).not.toBeNull()
 
     game.state.phase = GamePhase.WAVE
     game.eventBus.emit(Events.PHASE_CHANGED, { from: GamePhase.BUILD, to: GamePhase.WAVE })
-    expect(game.keyboardCursor).toBeNull()
+    expect(game.hud.keyboardCursor).toBeNull()
 
     game.state.phase = GamePhase.BUILD
     game.eventBus.emit(Events.PHASE_CHANGED, { from: GamePhase.WAVE, to: GamePhase.BUILD })
-    expect(game.keyboardCursor).toEqual({ gx: 0, gy: 0 })
+    expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
 
     wrapper.unmount()
   })
@@ -194,10 +194,10 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     game.eventBus.on(Events.CANVAS_CLICK, handler)
     const wrapper = mountComposable(ref<GameLike | null>(game))
 
-    expect(game.keyboardCursor).toBeNull()
+    expect(game.hud.keyboardCursor).toBeNull()
     dispatchKey('ArrowRight')
     dispatchKey('Enter')
-    expect(game.keyboardCursor).toBeNull()
+    expect(game.hud.keyboardCursor).toBeNull()
     expect(handler).not.toHaveBeenCalled()
     wrapper.unmount()
   })

@@ -60,6 +60,8 @@ Thumbs.db
 *.dylib
 *.dll
 *.wasm
+!frontend/src/math/wasm/math_engine.wasm
+!frontend/src/math/wasm/math_engine.js
 
 # WASM / compiled outputs
 backend/data/

@@ -18,7 +18,7 @@
  *   - reaching into systems (e.g. MontyHallSystem) → gameCommandService
  */
 import { defineStore } from 'pinia'
-import { ref, reactive, shallowRef, computed } from 'vue'
+import { ref, reactive, shallowRef, computed, onScopeDispose } from 'vue'
 import { GamePhase, Events, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
 import type { EnemyType } from '@/data/constants'
 import { isCounterEnemy } from '@/data/counter-enemy-info'
@@ -355,7 +355,7 @@ export const useGameStore = defineStore('game', () => {
     clearPathPanel()
   }
 
-  appBus.on('auth:logout', () => { clear() })
+  onScopeDispose(appBus.on('auth:logout', () => { clear() }))
 
   return {
     phase, level, starRating, wave, totalWaves,

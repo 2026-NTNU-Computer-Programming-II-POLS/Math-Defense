@@ -126,11 +126,12 @@ describe('applyDamage — V3 damage-source contract', () => {
   })
 
   describe('both traits together resolve in the documented order', () => {
-    it('vulnerability → evasion → cap, for a capped discrete hit', () => {
-      // raw 100 → *1.5 vuln = 150 → *0.35 evasion = 52.5 → cap 14.
+    it('vulnerability → cap → evasion, for a capped discrete hit', () => {
+      // raw 100 → *1.5 vuln = 150 → cap 14 → *0.35 evasion = 4.9.
+      // Cap is applied before evasion so the Bulwark limit is deterministic.
       const enemy = makeEnemy({ towerDamageMult: 0.35, damageCapPerHit: 14 })
       applyDamage(enemy, 100, makeContext(1.5), 'towerHit')
-      expect(enemy.hp).toBeCloseTo(986, 5)
+      expect(enemy.hp).toBeCloseTo(995.1, 5)
     })
 
     it('cap does not apply to a continuous source even with evasion present', () => {

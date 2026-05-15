@@ -22,12 +22,11 @@
  *   - Periodic flush every {@link FLUSH_INTERVAL_MS} via setInterval.
  *   - Forced flush on LEVEL_END / GAME_OVER (terminal events) and on
  *     destroy() so a tab-close still ships the tail.
- *   - Best-effort beforeunload flush via sendBeacon for the final chunk
+ *   - Best-effort beforeunload flush via fetch+keepalive for the final chunk
  *     when the user navigates away mid-run.
  */
 import { Events } from '@/data/constants'
 import type { Game, GameEvents } from '@/engine/Game'
-import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME, readCookie } from '@/services/api'
 import { sessionService } from '@/services/sessionService'
 
 export interface RecordedEvent {
@@ -145,8 +144,8 @@ export class EventRecorder {
 
     this._intervalId = setInterval(() => { void this._flush() }, FLUSH_INTERVAL_MS)
 
-    // Best-effort tail flush on hard navigation. sendBeacon is fire-and-
-    // forget but survives unload where fetch() does not.
+    // Best-effort tail flush on hard navigation. fetch+keepalive survives page
+    // unload and supports custom headers (unlike sendBeacon which can't carry CSRF).
     if (typeof window !== 'undefined') {
       this._onBeforeUnload = () => { this._beaconFlush() }
       window.addEventListener('beforeunload', this._onBeforeUnload)
@@ -257,31 +256,13 @@ export class EventRecorder {
     const sessionId = this._getSessionId()
     if (!sessionId) return
     // sendBeacon doesn't support custom headers, so it can't carry the
-    // CSRF token the backend's CsrfMiddleware demands on POST. fetch with
-    // keepalive: true is the modern equivalent that DOES support headers
-    // — the request survives the page unload and the browser keeps the
-    // socket open until it completes (subject to a 64 KB body cap, which
+    // CSRF token the backend's CsrfMiddleware demands on POST. api.post
+    // with keepalive: true is the modern equivalent — the request survives
+    // page unload (subject to the browser's 64 KB keepalive body cap, which
     // a typical replay tail batch comfortably fits within).
-    if (typeof fetch !== 'function') return
-    try {
-      const url = `/api/sessions/${encodeURIComponent(sessionId)}/events`
-      const body = JSON.stringify({ events: this._buffer })
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-      const csrf = readCookie(CSRF_COOKIE_NAME)
-      if (csrf) headers[CSRF_HEADER_NAME] = csrf
-      // Fire-and-forget: the unload event has already begun; we don't await.
-      void fetch(url, {
-        method: 'POST',
-        credentials: 'include',
-        headers,
-        body,
-        keepalive: true,
-      })
-      this._buffer = []
-    } catch {
-      // Best-effort; drop on failure rather than holding up unload.
-    }
+    const batch = this._buffer
+    this._buffer = []
+    // Fire-and-forget; we don't await so we don't hold up the unload.
+    void sessionService.appendReplayEvents(sessionId, batch, { keepalive: true })
   }
 }

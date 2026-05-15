@@ -4,7 +4,7 @@ import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 
-interface LaserState {
+export interface LaserState {
   targetIds: string[]
   rampTime: number
   invalid: boolean

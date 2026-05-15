@@ -167,9 +167,14 @@ async function requestOnce<T>(
   // (b) our own timeout. Either trigger aborts the fetch. Using a dedicated
   // controller (rather than AbortSignal.any / AbortSignal.timeout, which
   // aren't available everywhere) keeps this working on older browsers.
+  // keepalive requests skip the timeout: the browser owns the socket through
+  // page unload, so a JS-side abort timer would race the unload sequence.
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   const callerSignal = options.signal
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  if (!options.keepalive) {
+    timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  }
   if (callerSignal) {
     if (callerSignal.aborted) controller.abort()
     else callerSignal.addEventListener('abort', () => controller.abort(), { once: true })
@@ -197,7 +202,7 @@ async function requestOnce<T>(
     }
     throw e
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId !== undefined) clearTimeout(timeoutId)
   }
 
   if (!res.ok) {
@@ -227,6 +232,10 @@ async function requestOnce<T>(
 
 export interface ApiOptions {
   signal?: AbortSignal
+  // keepalive: true makes the request survive page unload (beforeunload / pagehide).
+  // When set, the per-request timeout is skipped — the browser owns the socket until
+  // the tab fully closes, so a JS-side abort timer would race against the unload.
+  keepalive?: boolean
 }
 
 export const api = {
@@ -234,7 +243,7 @@ export const api = {
     return request<T>(path, { signal: opts.signal })
   },
   post<T>(path: string, body: unknown, opts: ApiOptions = {}) {
-    return request<T>(path, { method: 'POST', body: JSON.stringify(body), signal: opts.signal })
+    return request<T>(path, { method: 'POST', body: JSON.stringify(body), signal: opts.signal, keepalive: opts.keepalive })
   },
   put<T>(path: string, body: unknown, opts: ApiOptions = {}) {
     return request<T>(path, { method: 'PUT', body: JSON.stringify(body), signal: opts.signal })
