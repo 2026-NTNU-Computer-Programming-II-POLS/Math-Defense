@@ -199,23 +199,27 @@ class SessionEventBus:
         for event in events:
             if not isinstance(event, SessionCompleted):
                 continue
+            # Catch Exception (not just DomainError) so unexpected errors
+            # (e.g. network, ORM bugs) are logged rather than crashing
+            # end_session. The leaderboard row remains missing with no retry;
+            # a future outbox table would close that durability gap.
             try:
                 self.leaderboard(event)
-            except DomainError:
+            except Exception:
                 logger.exception(
                     "leaderboard handler failed session=%s", event.session_id
                 )
             try:
                 unlocked = self.achievement(event)
                 newly_unlocked.extend(unlocked)
-            except DomainError:
+            except Exception:
                 logger.exception(
                     "achievement handler failed session=%s", event.session_id
                 )
             if self.ia_accuracy is not None:
                 try:
                     self.ia_accuracy(event)
-                except DomainError:
+                except Exception:
                     logger.exception(
                         "ia_accuracy handler failed session=%s", event.session_id
                     )

@@ -59,6 +59,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/RadarTowerSystem',           handler: 'anonymous', purpose: 'Reset radar-tower transient state per level' },
     { module: 'systems/TowerPlacementSystem',       handler: 'anonymous', purpose: 'Recompute placement constraints per level' },
     { module: 'systems/EconomySystem',              handler: 'anonymous', purpose: 'Reset per-level economy counters' },
+    { module: 'renderers/CombatFeedbackRenderer',   handler: 'anonymous', purpose: 'Clear floating combat text on level start' },
   ],
   LEVEL_END: [
     { module: 'composables/useSessionSync', handler: 'endSession',  purpose: 'Finalize backend session' },
@@ -70,8 +71,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   BUILD_PHASE_START: [],
   BUILD_PHASE_END:   [],
   TOWER_PLACED: [
-    { module: 'composables/useEngineUiBridges', handler: 'anonymous', purpose: 'UI feedback on tower placement' },
-    { module: 'systems/MatrixTowerSystem',      handler: 'anonymous', purpose: 'Auto-pair newly placed Matrix towers' },
+    { module: 'composables/useEngineUiBridges',     handler: 'anonymous', purpose: 'UI feedback on tower placement' },
+    { module: 'systems/MatrixTowerSystem',          handler: 'anonymous', purpose: 'Auto-pair newly placed Matrix towers' },
+    { module: 'systems/TowerInterferenceSystem',    handler: 'anonymous', purpose: 'Recompute same-type interference factors so the BUILD preview is correct' },
   ],
   TOWER_SELECTED: [
     { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Open build/inspect panel' },
@@ -93,8 +95,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/EconomySystem',          handler: 'anonymous',  purpose: 'Award wave-completion bonus' },
   ],
   ENEMY_SPAWNED: [
-    { module: 'stores/gameStore',          handler: 'anonymous', purpose: 'Mirror live enemy count for UI' },
-    { module: 'systems/EnemyAbilitySystem',handler: 'anonymous', purpose: 'Initialize per-enemy ability state on spawn' },
+    { module: 'stores/gameStore',                 handler: 'anonymous', purpose: 'Mirror live enemy count for UI' },
+    { module: 'systems/EnemyAbilitySystem',       handler: 'anonymous', purpose: 'Initialize per-enemy ability state on spawn' },
+    { module: 'composables/useFirstEncounterCards',handler: 'onSpawn',   purpose: 'Queue first-encounter card + soft-pause on first sighting of a counter-enemy' },
   ],
   ENEMY_KILLED: [
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger kill SFX' },
@@ -107,6 +110,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/EconomySystem', handler: 'anonymous', purpose: 'Apply HP damage unless shielded' },
   ],
   TOWER_ATTACK: [],
+  DAMAGE_RESOLVED: [
+    { module: 'renderers/CombatFeedbackRenderer', handler: 'anonymous', purpose: 'Spawn floating combat text for a defensively-modified hit' },
+  ],
 
   // ── Buff phase ──
   BUFF_PHASE_START:   [],
@@ -175,10 +181,12 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Refund tower cost and remove it' },
   ],
   TOWER_REFUND_RESULT: [
-    { module: 'systems/MatrixTowerSystem', handler: 'anonymous', purpose: 'Clean up stale laser state and partner matrixPairId when a Matrix tower is sold' },
+    { module: 'systems/MatrixTowerSystem',       handler: 'anonymous', purpose: 'Clean up stale laser state and partner matrixPairId when a Matrix tower is sold' },
+    { module: 'systems/TowerInterferenceSystem', handler: 'anonymous', purpose: 'Recompute interference factors after a tower is refunded so neighbours lift the penalty' },
   ],
   TOWER_REMOVED: [
-    { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Close build panel when tower is system-removed' },
+    { module: 'composables/useGameLoop',         handler: 'anonymous', purpose: 'Close build panel when tower is system-removed' },
+    { module: 'systems/TowerInterferenceSystem', handler: 'anonymous', purpose: 'Recompute interference factors after a tower is removed' },
   ],
   PET_SPAWNED:  [],
   PET_KILLED:   [],
@@ -257,9 +265,10 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
  * every entry here must also dispose its subscriptions on unmount / destroy.
  */
 export const EVENT_SUBSCRIBER_MODULES = Object.freeze([
-  'composables/useGameLoop',          // Vue onUnmounted
-  'composables/useKeyboardPlacement', // Vue onBeforeUnmount
-  'composables/useSessionSync',       // Vue onUnmounted
+  'composables/useGameLoop',            // Vue onUnmounted
+  'composables/useKeyboardPlacement',   // Vue onBeforeUnmount
+  'composables/useSessionSync',         // Vue onUnmounted
+  'composables/useFirstEncounterCards', // Vue onUnmounted
   'stores/gameStore',                 // unbindEngine()
   'systems/BuffSystem',               // destroy()
   'systems/CalculusTowerSystem',      // destroy()
@@ -272,6 +281,7 @@ export const EVENT_SUBSCRIBER_MODULES = Object.freeze([
   'systems/MontyHallSystem',          // destroy()
   'systems/RadarTowerSystem',         // destroy()
   'systems/SpellSystem',              // destroy()
+  'systems/TowerInterferenceSystem',  // destroy()
   'systems/TowerPlacementSystem',     // destroy()
   'systems/TowerUpgradeSystem',       // destroy()
   'systems/WaveSystem',               // destroy()

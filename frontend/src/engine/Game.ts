@@ -32,6 +32,7 @@ import type { WaveSystem } from '@/systems/WaveSystem'
 import type { TowerPlacementSystem } from '@/systems/TowerPlacementSystem'
 import type { EconomySystem } from '@/systems/EconomySystem'
 import type { MagicTowerSystem } from '@/systems/MagicTowerSystem'
+import type { TowerInterferenceSystem } from '@/systems/TowerInterferenceSystem'
 import type { RadarTowerSystem } from '@/systems/RadarTowerSystem'
 import type { MatrixTowerSystem } from '@/systems/MatrixTowerSystem'
 import type { LimitTowerSystem } from '@/systems/LimitTowerSystem'
@@ -45,6 +46,7 @@ import type { EnemyRenderer } from '@/renderers/EnemyRenderer'
 import type { SpellEffectRenderer } from '@/renderers/SpellEffectRenderer'
 import type { TowerRenderer } from '@/renderers/TowerRenderer'
 import type { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
+import type { CombatFeedbackRenderer } from '@/renderers/CombatFeedbackRenderer'
 
 // ── Type-safe event map ──
 
@@ -68,6 +70,19 @@ export interface WaveEndSnapshot {
   readonly costTotal: number
 }
 
+/**
+ * Payload of DAMAGE_RESOLVED — emitted by `applyDamage` only when a defensive
+ * trait changed a discrete hit's number. `raw` is the post-vulnerability
+ * incoming amount; `applied` is what landed after evasion / per-hit cap.
+ */
+export interface DamageResolvedPayload {
+  readonly x: number
+  readonly y: number
+  readonly raw: number
+  readonly applied: number
+  readonly kind: 'capped' | 'reduced'
+}
+
 export interface GameEvents {
   [Events.PHASE_CHANGED]:        { from: GamePhase; to: GamePhase }
   [Events.LEVEL_START]:          number
@@ -85,6 +100,7 @@ export interface GameEvents {
   [Events.ENEMY_KILLED]:         Enemy
   [Events.ENEMY_REACHED_ORIGIN]: Enemy
   [Events.TOWER_ATTACK]:         { tower: Tower; target: Enemy }
+  [Events.DAMAGE_RESOLVED]:      DamageResolvedPayload
   [Events.BUFF_PHASE_START]:     void
   [Events.BUFF_CARDS_UPDATED]:   ReadonlyArray<BuffCard>
   [Events.BUFF_CARD_SELECTED]:   string
@@ -184,6 +200,7 @@ export interface SystemMap {
   buff: BuffSystem
   economy: EconomySystem
   magicTower: MagicTowerSystem
+  towerInterference: TowerInterferenceSystem
   radarTower: RadarTowerSystem
   matrixTower: MatrixTowerSystem
   limitTower: LimitTowerSystem
@@ -197,6 +214,21 @@ export interface SystemMap {
   towerRenderer: TowerRenderer
   projectileRenderer: ProjectileRenderer
   spellEffectRenderer: SpellEffectRenderer
+  combatFeedbackRenderer: CombatFeedbackRenderer
+}
+
+// ── HUD / Input state ──
+
+/**
+ * Groups the UI-bridge fields that the engine owns but that are read/written
+ * by the presentation layer (composables, renderers). Keeping them in one
+ * named object makes the cross-layer surface explicit and easy to locate.
+ */
+export interface HudState {
+  /** Path-segment the Function Panel is hovering over; null when none. */
+  hoveredSegmentId: string | null
+  /** Keyboard placement cursor position; null outside BUILD phase. */
+  keyboardCursor: { gx: number; gy: number } | null
 }
 
 // ── Game ──
@@ -227,22 +259,8 @@ export class Game {
   /** Wave definitions for the active level. Set by useGameLoop before startLevel(). */
   currentWaves: ReadonlyArray<WaveDef> | null = null
 
-  /**
-   * Id of the path segment the HUD Function Panel is currently hovering
-   * over. The Renderer reads this in `drawSegmentBoundaries` to tint the
-   * matching `xRange`; Phase 5's Function Panel writes it (indirectly,
-   * through the UI store / a composable sync). Kept on `Game` to avoid an
-   * engine → presentation import, per the SoC matrix in §2 of the plan.
-   */
-  hoveredSegmentId: string | null = null
-
-  /**
-   * Keyboard placement cursor (Pedagogical Backlog §19, WCAG 2.2 SC 2.1.1).
-   * `useKeyboardPlacement` writes this in BUILD phase as the player navigates
-   * with arrow keys; `TowerRenderer` reads it to draw a focus ring on the
-   * lattice point. Cleared outside BUILD so the cursor never bleeds into WAVE.
-   */
-  keyboardCursor: { gx: number; gy: number } | null = null
+  /** UI-bridge state shared between the engine and the presentation layer. */
+  hud: HudState = { hoveredSegmentId: null, keyboardCursor: null }
 
   towerModifierProvider: ((towerType: TowerType) => Record<string, number>) | null = null
 
@@ -511,6 +529,12 @@ export class Game {
       for (let step = 0; step < speedSteps; step++) {
         this._update(FIXED_DT)
         this.time += FIXED_DT
+        // A sub-step can end the wave (e.g. the last enemy is cleared). Stop
+        // the remaining perceived-speed sub-steps so a non-WAVE phase never
+        // receives a doubled tick: the extra _update would advance `time` —
+        // and so the scored `timeTotal` — by a FIXED_DT that belongs to no
+        // wave and that timeExcludePrepare never subtracts back out.
+        if (this.state.phase !== GamePhase.WAVE) break
       }
       this._accumulator -= FIXED_DT
     }
@@ -552,7 +576,7 @@ export class Game {
           }
         }
       } else {
-        renderer.drawSegmentBoundaries(this.levelContext.path, this.hoveredSegmentId)
+        renderer.drawSegmentBoundaries(this.levelContext.path, this.hud.hoveredSegmentId)
         for (const seg of this.levelContext.path.segments) {
           const [lo, hi] = seg.xRange
           if (lo !== hi) {

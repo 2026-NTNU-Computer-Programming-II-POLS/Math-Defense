@@ -525,7 +525,7 @@ docker-compose up backend        # from project root
 
 | Variable | Required | Description |
 |---|---|---|
-| `SECRET_KEY` | Yes | JWT signing secret — minimum 16 characters |
+| `SECRET_KEY` | Yes | JWT signing secret — minimum 32 characters; generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense`. Scheme must be `postgresql+psycopg` (psycopg v3); the bare `postgresql://` alias resolves to unmaintained psycopg2. |
 | `POSTGRES_PASSWORD` | Yes (Docker) | Password for the `postgres` service. Must match the password embedded in `DATABASE_URL`. |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins. No default — an absent value raises at startup rather than silently defaulting to localhost in prod. |

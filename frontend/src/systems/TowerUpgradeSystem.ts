@@ -1,5 +1,6 @@
 import { Events } from '@/data/constants'
 import { TOWER_DEFS } from '@/data/tower-defs'
+import { recomputeEffectiveDamage } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 
@@ -60,7 +61,7 @@ export class TowerUpgradeSystem {
     tower.baseRange = tower.baseRange * (1 + tier.rangeBonus)
     tower.damageBonus = talentDmg
     tower.rangeBonus = talentRange
-    tower.effectiveDamage = tower.baseDamage * tower.damageBonus
+    recomputeEffectiveDamage(tower)
     tower.effectiveRange = tower.baseRange * tower.rangeBonus
     tower.talentMods = mods
     let cd = def.cooldown

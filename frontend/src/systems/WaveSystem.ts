@@ -11,7 +11,7 @@ import type { SegmentedPath } from '@/domain/path/segmented-path'
 export class WaveSystem {
   private _spawnQueue: EnemySpawnEntry[] = []
   private _spawnTimer = 0
-  private _spawnInterval = 1.0
+  private _waveSpawnInterval = 1.0
   private _spawnIndex = 0
   private _unsubs: (() => void)[] = []
 
@@ -38,9 +38,15 @@ export class WaveSystem {
 
     game.state.totalWaves = waves.length
     this._spawnQueue = [...waveDef.enemies]
-    this._spawnInterval = Math.max(0.05, waveDef.spawnInterval)
-    this._spawnTimer = this._spawnInterval
+    this._waveSpawnInterval = waveDef.spawnInterval
+    this._spawnTimer = this._intervalBefore(this._spawnQueue[0])
     this._spawnIndex = 0
+  }
+
+  /** Delay before `entry` spawns: its per-entry interval if set (burst), else
+   *  the wave default. Clamped so a degenerate value can't stall the loop. */
+  private _intervalBefore(entry: EnemySpawnEntry | undefined): number {
+    return Math.max(0.05, entry?.interval ?? this._waveSpawnInterval)
   }
 
   update(dt: number, game: Game): void {
@@ -50,7 +56,9 @@ export class WaveSystem {
       this._spawnTimer -= dt
       while (this._spawnQueue.length > 0 && this._spawnTimer <= 0) {
         this._spawn(this._spawnQueue.shift()!, game)
-        this._spawnTimer += this._spawnInterval
+        if (this._spawnQueue.length > 0) {
+          this._spawnTimer += this._intervalBefore(this._spawnQueue[0])
+        }
       }
       if (this._spawnQueue.length > 0) return
     }

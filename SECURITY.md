@@ -126,9 +126,10 @@ The following values must be set via environment variables or an `.env` file and
 
 | Variable | Requirement |
 |---|---|
-| `SECRET_KEY` | Minimum 16 characters; used to sign JWTs |
+| `SECRET_KEY` | Minimum 32 characters; used to sign JWTs. Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `DATABASE_URL` | Must use the `postgresql+psycopg` scheme; the application rejects URLs containing the literal password `changeme` in non-test environments |
 | `CORS_ORIGINS` | One or more valid HTTP/HTTPS origins |
+| `FRONTEND_URL` | Absolute `http://` or `https://` URL used in outbound email links |
 | `POSTGRES_PASSWORD` | Used by Docker Compose; should be a strong random value |
 
 The application logs which source supplied `SECRET_KEY` (environment variable or `.env` file) at startup so that operators can confirm the correct secret was loaded. Changing the secret key invalidates all issued JWTs immediately.

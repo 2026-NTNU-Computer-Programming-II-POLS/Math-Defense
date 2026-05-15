@@ -84,11 +84,11 @@ onBeforeUnmount(clearTimer)
   width: 460px;
   max-width: calc(100vw - 32px);
   padding: 14px 18px 12px;
-  background: rgba(26, 21, 32, 0.96);
+  background: var(--overlay-panel-bg);
   border: 1px solid var(--gold);
   border-radius: 4px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
-  color: #e8dcc8;
+  color: var(--overlay-text);
   font-family: var(--font-mono);
   display: flex;
   flex-direction: column;

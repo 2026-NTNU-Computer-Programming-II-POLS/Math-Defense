@@ -62,6 +62,9 @@ export const EnemyType = {
   HELPER:   'helper',
   BOSS_A:   'bossA',
   BOSS_B:   'bossB',
+  REGENERATOR: 'regenerator',
+  BULWARK:     'bulwark',
+  SWARMLING:   'swarmling',
 } as const
 export type EnemyType = (typeof EnemyType)[keyof typeof EnemyType]
 
@@ -85,6 +88,10 @@ export const Events = Object.freeze({
   ENEMY_KILLED:         'enemyKilled',
   ENEMY_REACHED_ORIGIN: 'enemyReachedOrigin',
   TOWER_ATTACK:         'towerAttack',
+  // Rare feedback event: a discrete hit whose number a defensive trait
+  // (Bulwark cap / Swarmling evasion) actually changed. Drives the floating
+  // combat text. Never fires for unmodified or continuous (dt-scaled) damage.
+  DAMAGE_RESOLVED:      'damageResolved',
 
   BUFF_PHASE_START:     'buffPhaseStart',
   BUFF_CARDS_UPDATED:   'buffCardsUpdated',
@@ -166,4 +173,9 @@ export const Colors = Object.freeze({
   ORIGIN_GLOW:      '#ffd700',
   GOLD_TEXT:        '#d4a840',
   HP_RED:           '#cc4444',
+  // V3 counter-enemies. Distinguish Regenerator from Helper via the aura
+  // style, not just hue; verify colour-blind / greyscale legibility.
+  REGENERATOR:      '#5fbf6f',
+  BULWARK:          '#7a8290',
+  SWARMLING:        '#8a7a3a',
 } as const)

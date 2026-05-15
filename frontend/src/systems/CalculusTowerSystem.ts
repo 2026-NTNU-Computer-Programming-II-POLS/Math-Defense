@@ -54,17 +54,27 @@ export class CalculusTowerSystem {
         }
 
         if (payload.operation && tower.calculusState) {
-          if (tower.calculusState.opApplied) {
+          // The op cost is charged up-front (only on chain ops). A collapse is
+          // a free retry, so capture whether we charged and refund on collapse.
+          const wasApplied = tower.calculusState.opApplied
+          if (wasApplied) {
             if (game.state.gold < CALCULUS_OP_COST) return
             game.economy.changeGold(-CALCULUS_OP_COST)
             game.economy.addCost(CALCULUS_OP_COST)
           }
-          tower.calculusState.opApplied = true
-          this._applyOperation(tower, payload.operation, game)
-          const stillExists = game.towers.includes(tower)
+          const status = this._applyOperation(tower, payload.operation, game)
+          if (status === 'collapsed') {
+            if (wasApplied) {
+              game.economy.changeGold(CALCULUS_OP_COST)
+              game.economy.addCost(-CALCULUS_OP_COST)
+            }
+            // Leave opApplied unchanged — a collapse does not advance the chain.
+          } else {
+            tower.calculusState.opApplied = true
+          }
           game.eventBus.emit(Events.CALCULUS_STATE_CHANGED, {
             towerId: tower.id,
-            state: stillExists && tower.calculusState ? { ...tower.calculusState } : null,
+            state: { ...tower.calculusState },
           })
         }
       }),
@@ -106,7 +116,14 @@ export class CalculusTowerSystem {
     return presets
   }
 
-  private _applyOperation(tower: Tower, op: 'derivative' | 'derivative2' | 'integral', game: Game): void {
+  // Returns 'collapsed' when the operation degenerates the monomial (to 0 or to
+  // a constant). A collapse never removes or disables the tower — it falls back
+  // to the minimal f(x) = x so the student can immediately try another op.
+  private _applyOperation(
+    tower: Tower,
+    op: 'derivative' | 'derivative2' | 'integral',
+    game: Game,
+  ): 'ok' | 'collapsed' {
     const state = tower.calculusState!
     let newCoeff: number
     let newExp: number
@@ -123,24 +140,14 @@ export class CalculusTowerSystem {
       newExp = state.exponent + 1
     }
 
-    if (newCoeff === 0 || (op === 'derivative' && state.exponent === 0)) {
-      const idx = game.towers.findIndex((t) => t.id === tower.id)
-      if (idx >= 0) {
-        game.getSystem('buff')?.onTowerRemoved(game, tower.id)
-        game.towers.splice(idx, 1)
-        game.eventBus.emit(Events.TOWER_REMOVED, { towerId: tower.id })
-      }
-      this._removePets(tower.id, game)
-      return
-    }
-
-    if (newExp === 0) {
-      tower.disabled = true
-      this._removePets(tower.id, game)
-      state.coefficient = newCoeff
-      state.exponent = newExp
-      state.currentExpr = `${newCoeff}`
-      return
+    if (newCoeff === 0 || (op === 'derivative' && state.exponent === 0) || newExp === 0) {
+      state.coefficient = 1
+      state.exponent = 1
+      state.currentExpr = 'x'
+      tower.configured = true
+      tower.disabled = false
+      this._respawnPets(tower, game)
+      return 'collapsed'
     }
 
     state.coefficient = newCoeff
@@ -153,6 +160,7 @@ export class CalculusTowerSystem {
     tower.disabled = false
 
     this._respawnPets(tower, game)
+    return 'ok'
   }
 
   private _respawnPets(tower: Tower, game: Game): void {

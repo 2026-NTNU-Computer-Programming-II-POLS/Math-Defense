@@ -53,6 +53,10 @@ export function createEnemy(
     helperHealPerSec: def.helper?.healPerSec ?? 0,
     helperSpeedBuff: def.helper?.speedBuff ?? 0,
 
+    regenPerSec:     def.regenPerSec ?? 0,
+    damageCapPerHit: def.damageCapPerHit ?? 0,
+    towerDamageMult: def.towerDamageMult ?? 1,
+
     minionTimer: 0,
     minionInterval: def.minion?.interval ?? 0,
     minionType: def.minion?.type ?? null,

@@ -6,6 +6,10 @@ import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, LimitResult } from '@/entities/types'
 
+// A wrong or degenerate limit answer no longer removes the tower or heals
+// enemies — it clamps the tower to a weak chip of its effective damage.
+const WRONG_ANSWER_CHIP = 0.10
+
 export class LimitTowerSystem {
   private _unsubs: (() => void)[] = []
   private _questionSeed = 0
@@ -19,7 +23,6 @@ export class LimitTowerSystem {
         if (!tower || tower.type !== TowerType.LIMIT) return
         tower.limitResult = answer
         tower.configured = true
-        this._applyLimitEffect(tower, answer, game)
       }),
       game.eventBus.on(Events.LEVEL_START, () => {
         this._levelSeedNonce += 1
@@ -49,7 +52,6 @@ export class LimitTowerSystem {
       tower.cooldownTimer = tower.cooldown
 
       const result = tower.limitResult
-      if (result.outcome === 'zero' || result.outcome === 'constant') continue
 
       const range = tower.effectiveRange
       for (const enemy of game.enemies) {
@@ -58,34 +60,21 @@ export class LimitTowerSystem {
 
         let dmg: number
         switch (result.outcome) {
-          case '+inf': dmg = Math.max(tower.effectiveDamage, enemy.hp); break
+          case '+inf': dmg = enemy.hp + enemy.shield; break
           case '+c': dmg = tower.effectiveDamage * Math.abs(result.value); break
+          case 'zero':
+          case 'constant':
           case '-c':
-            enemy.hp = Math.min(enemy.maxHp, enemy.hp + tower.effectiveDamage * Math.abs(result.value) * 0.5)
-            continue
           case '-inf':
-            enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.1)
-            continue
+            dmg = tower.effectiveDamage * WRONG_ANSWER_CHIP
+            break
           default: dmg = 0
         }
 
         if (dmg > 0) {
-          applyDamage(enemy, dmg, game)
+          applyDamage(enemy, dmg, game, 'towerHit')
         }
       }
-    }
-  }
-
-  private _applyLimitEffect(tower: Tower, result: LimitResult, game: Game): void {
-    if (result.outcome === 'zero') {
-      const idx = game.towers.findIndex((t) => t.id === tower.id)
-      if (idx >= 0) {
-        game.getSystem('buff')?.onTowerRemoved(game, tower.id)
-        game.towers.splice(idx, 1)
-        game.eventBus.emit(Events.TOWER_REMOVED, { towerId: tower.id })
-      }
-    } else if (result.outcome === 'constant') {
-      tower.disabled = true
     }
   }
 

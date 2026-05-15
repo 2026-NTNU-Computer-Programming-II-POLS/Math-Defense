@@ -174,7 +174,8 @@ export class RadarTowerSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    applyDamage(enemy, amount, game)
+    // Radar A's sweep is continuous, dt-scaled damage.
+    applyDamage(enemy, amount, game, 'towerTick')
   }
 
 }

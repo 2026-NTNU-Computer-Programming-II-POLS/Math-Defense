@@ -2,8 +2,10 @@ import type { Pet, PetTrait } from './types'
 
 let _nextPetId = 0
 
-const ATTACK_RANGE = 20
-const SPAWN_OFFSET = 25
+// Distances are in game units (UNIT_PX = 20 px/unit); the grid spans only ±14 units,
+// so these must be unit-scale values, not pixel-scale.
+const ATTACK_RANGE = 1
+const SPAWN_OFFSET = 1.25
 
 function traitFromExponent(n: number): PetTrait {
   if (n === 1) return 'slow'
@@ -47,16 +49,21 @@ export function spawnPets(
 
   const baseDmg      = trait === 'heavy' ? 15 : trait === 'fast' ? 5 : 8
   const baseAtkSpd   = trait === 'fast' ? 0.3 : trait === 'heavy' ? 1.5 : 0.8
-  const baseMoveSpd  = trait === 'fast' ? 220 : trait === 'slow' ? 60 : trait === 'heavy' ? 45 : 100
+  // Game units per second (cf. enemy speeds 0.7–4.0 in enemy-defs.ts).
+  const baseMoveSpd  = trait === 'fast' ? 11 : trait === 'slow' ? 3 : trait === 'heavy' ? 2.25 : 5
 
   const pets: Pet[] = []
   for (let i = 0; i < count; i++) {
     const angle = (2 * Math.PI * i) / count
+    const homeX = x + Math.cos(angle) * SPAWN_OFFSET
+    const homeY = y + Math.sin(angle) * SPAWN_OFFSET
     pets.push({
       id: `pet_${++_nextPetId}`,
       ownerId,
-      x: x + Math.cos(angle) * SPAWN_OFFSET,
-      y: y + Math.sin(angle) * SPAWN_OFFSET,
+      x: homeX,
+      y: homeY,
+      homeX,
+      homeY,
       damage:      baseDmg * abilityMod * dmgMult * levelDmgMult * coeffDmgBonus,
       speed:       baseMoveSpd * levelMoveMult * expMoveBonus * moveSpdMod,
       attackSpeed: Math.max(0.1, baseAtkSpd * atkSpdMult * levelAtkMult),

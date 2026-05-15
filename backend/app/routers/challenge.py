@@ -113,7 +113,7 @@ def rename_challenge(
     request: Request,
     challenge_id: str,
     req: ChallengeRename,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     challenge = build_challenge_service(db).rename(
@@ -131,7 +131,7 @@ def update_constraints(
     request: Request,
     challenge_id: str,
     req: ChallengeConstraintsUpdate,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     challenge = build_challenge_service(db).replace_constraints(
@@ -147,7 +147,7 @@ def update_constraints(
 def delete_challenge(
     request: Request,
     challenge_id: str,
-    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
+    user: User = Depends(require_role(Role.TEACHER)),
     db: Session = Depends(get_db),
 ):
     build_challenge_service(db).delete(challenge_id=challenge_id, teacher_id=user.id)

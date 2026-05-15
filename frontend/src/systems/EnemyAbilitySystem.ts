@@ -55,6 +55,10 @@ export class EnemyAbilitySystem implements GameSystem {
         this._tickMinionSpawn(dt, enemy, game)
       }
 
+      if (enemy.regenPerSec > 0 && enemy.hp < enemy.maxHp) {
+        this._tickRegen(dt, enemy)
+      }
+
       if (enemy.type === EnemyType.BOSS_B && !enemy.chainRuleTriggered) {
         // Backstop: if ENEMY_SPAWNED was missed (e.g. boss spawned before
         // this system's init ran), sample now so the ability can never be
@@ -77,6 +81,17 @@ export class EnemyAbilitySystem implements GameSystem {
         other.speedBoost = Math.max(other.speedBoost, helper.helperSpeedBuff)
       }
     }
+  }
+
+  // Regenerator: constant HP regen, never interrupted by taking damage — that
+  // is the point of the mechanic, so there is deliberately no post-hit cooldown.
+  // The 1e4 quantisation mirrors applyDamage's HP rounding so HP values stay on
+  // the same grid for replay determinism. No RNG: pure function of dt.
+  private _tickRegen(dt: number, enemy: Enemy): void {
+    enemy.hp = Math.min(
+      enemy.maxHp,
+      Math.round((enemy.hp + enemy.regenPerSec * dt) * 1e4) / 1e4,
+    )
   }
 
   private _tickMinionSpawn(dt: number, boss: Enemy, game: Game): void {
@@ -114,8 +129,10 @@ export class EnemyAbilitySystem implements GameSystem {
     if (payload.correct) {
       boss.alive = false
       boss.active = false
-      game.eventBus.emit(Events.ENEMY_KILLED, boss)
+      // Children must be in game.enemies before ENEMY_KILLED fires so that
+      // any observer (including a future wave-end check) sees them already.
       this._splitBoss(boss, question, game)
+      game.eventBus.emit(Events.ENEMY_KILLED, boss)
     }
 
     game.setPhase(GamePhase.WAVE)

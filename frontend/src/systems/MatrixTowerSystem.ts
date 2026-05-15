@@ -4,7 +4,7 @@ import { applyDamage } from '@/domain/combat/SplitPolicy'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 
-interface LaserState {
+export interface LaserState {
   targetIds: string[]
   rampTime: number
   invalid: boolean
@@ -157,7 +157,9 @@ export class MatrixTowerSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    applyDamage(enemy, amount, game)
+    // The Matrix laser is continuous, dt-scaled damage — not a discrete hit,
+    // so the Bulwark per-hit cap never bites it.
+    applyDamage(enemy, amount, game, 'towerTick')
   }
 
 }

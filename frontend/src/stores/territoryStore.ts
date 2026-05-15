@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, onScopeDispose } from 'vue'
 import {
   territoryService,
   type ActivityInfo,
@@ -17,7 +17,7 @@ export const useTerritoryStore = defineStore('territory', () => {
   const rankings = ref<RankingEntry[]>([])
   const rankingsMeta = ref<RankingsMeta | null>(null)
 
-  appBus.on('auth:logout', () => { clear() })
+  onScopeDispose(appBus.on('auth:logout', () => { clear() }))
 
   const loadingActivities = ref(false)
   const loadingDetail = ref(false)

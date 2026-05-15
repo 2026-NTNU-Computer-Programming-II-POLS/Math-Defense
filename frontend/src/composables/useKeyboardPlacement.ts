@@ -39,7 +39,7 @@ export type GameLike = {
   }
   state: GameState
   levelContext: LevelContext | GeneratedLevelContext | null
-  keyboardCursor: { gx: number; gy: number } | null
+  hud: { keyboardCursor: { gx: number; gy: number } | null }
 }
 
 export interface KeyboardPlacementHandle {
@@ -64,17 +64,17 @@ export function useKeyboardPlacement(
   }
 
   function ensureCursor(g: GameLike): void {
-    if (g.keyboardCursor !== null) return
+    if (g.hud.keyboardCursor !== null) return
     if (!legal || legal.positions.length === 0) return
     const [gx, gy] = legal.positions[0]
-    g.keyboardCursor = { gx, gy }
+    g.hud.keyboardCursor = { gx, gy }
   }
 
   function moveCursor(dx: -1 | 0 | 1, dy: -1 | 0 | 1): void {
     const g = game.value
     if (!g || !legal || legal.positions.length === 0) return
-    if (g.keyboardCursor === null) { ensureCursor(g); return }
-    const cur = g.keyboardCursor
+    if (g.hud.keyboardCursor === null) { ensureCursor(g); return }
+    const cur = g.hud.keyboardCursor
 
     let best: { gx: number; gy: number } | null = null
     let bestScore = Infinity
@@ -92,7 +92,7 @@ export function useKeyboardPlacement(
       const score = principal + perpendicular * 4
       if (score < bestScore) { bestScore = score; best = { gx, gy } }
     }
-    if (best !== null) g.keyboardCursor = best
+    if (best !== null) g.hud.keyboardCursor = best
   }
 
   function unlockedTowerTypes(): TowerType[] {
@@ -118,8 +118,8 @@ export function useKeyboardPlacement(
 
   function placeAtCursor(): void {
     const g = game.value
-    if (!g || g.keyboardCursor === null) return
-    const { gx, gy } = g.keyboardCursor
+    if (!g || g.hud.keyboardCursor === null) return
+    const { gx, gy } = g.hud.keyboardCursor
     g.eventBus.emit(Events.CANVAS_CLICK, {
       pixel: { x: gameToCanvasX(gx), y: gameToCanvasY(gy) },
       game:  { x: gx, y: gy },
@@ -161,7 +161,7 @@ export function useKeyboardPlacement(
 
     unsubs.push(g.eventBus.on(Events.LEVEL_START, () => {
       recomputeLegal(g)
-      g.keyboardCursor = null
+      g.hud.keyboardCursor = null
       if (g.state.phase === GamePhase.BUILD) ensureCursor(g)
     }))
     unsubs.push(g.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
@@ -169,7 +169,7 @@ export function useKeyboardPlacement(
         recomputeLegal(g)
         ensureCursor(g)
       } else {
-        g.keyboardCursor = null
+        g.hud.keyboardCursor = null
       }
     }))
   }
@@ -191,7 +191,7 @@ export function useKeyboardPlacement(
   onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleKeydown)
     detach()
-    if (game.value) game.value.keyboardCursor = null
+    if (game.value) game.value.hud.keyboardCursor = null
     legal = null
   })
 

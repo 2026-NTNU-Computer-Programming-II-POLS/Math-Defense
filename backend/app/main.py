@@ -118,6 +118,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
+    openapi_url="/openapi.json" if settings.debug else None,
 )
 
 app.state.limiter = limiter
@@ -144,8 +145,7 @@ async def _request_validation_handler(
     _request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     # Pydantic field-level errors must surface with field names so the
-    # frontend can map them back to inputs. Routing them through the generic
-    # ValueError handler below would erase that structure (E1).
+    # frontend can map them back to inputs.
     # exc.errors() may include a raw exception object in ctx["error"] which
     # is not JSON serializable — convert it to a string first.
     # Surface field name + a generic message only. Pydantic's `ctx.error`
@@ -163,14 +163,6 @@ async def _request_validation_handler(
             }
         )
     return JSONResponse(status_code=422, content={"detail": errors})
-
-
-@app.exception_handler(ValueError)
-async def _value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
-    # Domain invariants now raise DomainValueError (a DomainError subclass)
-    # and are handled above. Plain ValueErrors from libraries or Python internals
-    # get a generic message to avoid leaking stack/internal details.
-    return JSONResponse(status_code=422, content={"detail": "Unprocessable request"})
 
 
 @app.exception_handler(Exception)

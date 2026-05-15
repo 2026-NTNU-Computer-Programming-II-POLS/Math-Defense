@@ -73,6 +73,7 @@ const router = useRouter()
   padding: 2.5rem 1.5rem 3rem;
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-base);
   line-height: 1.6;
 }

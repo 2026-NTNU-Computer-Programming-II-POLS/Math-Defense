@@ -1,6 +1,7 @@
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { TOWER_PARAM_FIELDS } from '@/data/ui-defs'
 import { TowerType } from '@/data/constants'
+import { recomputeEffectiveDamage } from './tower-stats'
 import type { Tower, TowerParams } from './types'
 
 let _nextId = 0
@@ -38,7 +39,7 @@ export function createTower(
 
     baseDamage: def.damage,
     baseRange: def.range,
-    effectiveDamage: def.damage * damageBonus,
+    effectiveDamage: 0,
     effectiveRange: def.range * rangeBonus,
     cooldown: def.cooldown * (1 - speedBonus),
     cooldownTimer: 0,
@@ -47,8 +48,10 @@ export function createTower(
     rangeBonus,
     talentMods: mods,
     magicBuff: 1,
+    interferenceFactor: 1,
     color: def.color,
   }
+  recomputeEffectiveDamage(tower)
 
   if (type === TowerType.MAGIC) {
     tower.magicMode = 'debuff'

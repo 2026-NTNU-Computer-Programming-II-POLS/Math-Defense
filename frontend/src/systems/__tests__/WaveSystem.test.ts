@@ -123,6 +123,40 @@ describe('WaveSystem', () => {
     expect(game.state.phase).toBe(GamePhase.LEVEL_END)
   })
 
+  it('burst entries spawn at their per-entry interval, not the wave default', () => {
+    const game = createMockGame({ phase: GamePhase.WAVE, level: 1 })
+    game.phase.forceTransition(GamePhase.WAVE)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    game.levelContext = fakeLevelContext() as any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(game as any).currentWaves = [
+      {
+        spawnInterval: 1.0,
+        enemies: [
+          { type: 'general' },
+          { type: 'fast', interval: 0.15 },
+          { type: 'fast', interval: 0.15 },
+        ],
+      },
+    ]
+    const system = new WaveSystem()
+    system.init(game)
+
+    game.eventBus.emit(Events.WAVE_START, 1)
+
+    // First (non-interval) entry uses the wave default of 1.0s.
+    system.update(0.9, game)
+    expect(game.enemies.length).toBe(0)
+    system.update(0.2, game)
+    expect(game.enemies.length).toBe(1)
+
+    // The two burst entries then arrive 0.15s apart, ignoring the 1.0 default.
+    system.update(0.15, game)
+    expect(game.enemies.length).toBe(2)
+    system.update(0.15, game)
+    expect(game.enemies.length).toBe(3)
+  })
+
   it('does not spawn outside WAVE phase', () => {
     const game = createMockGame({ phase: GamePhase.BUILD, level: 1 })
     game.phase.forceTransition(GamePhase.BUILD)

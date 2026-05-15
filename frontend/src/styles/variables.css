@@ -4,16 +4,16 @@
   --stone-dark: #5b718f;
   --stone-light: #7a8da8;
   --grid-line: rgba(255, 255, 255, 0.2);
-  --axis: #d4a017;
-  --gold: #d4a017;
-  --gold-bright: #ffffff;
-  --gold-dim: #9a7005;
+  --axis: #c47206;
+  --gold: #c47206;
+  --gold-bright: #ffd54f;
+  --gold-dim: #9a5705;
   --tower-cannon: #4a82c8;
 
   --enemy-red: #b84040;
-  --hp-green: #4aab6e;
+  --hp-green: #048634;
   --hp-yellow: #c89848;
-  --hp-red: #cc4444;
+  --hp-red: #a31f1f;
 
   --panel-bg: rgba(235, 242, 250, 0.96);
   --panel-border: var(--gold);
@@ -21,6 +21,15 @@
   --bar-bg: rgba(80, 100, 130, 0.96);
   --overlay-bg: rgba(91, 113, 143, 0.92);
   --text-on-accent: #1a2a3a;
+
+  /* In-game dark overlay surfaces — HUD/Shop/Spell/etc. panels that sit over
+     the game canvas. Kept dark on purpose (see V3 UI plan); these tokens are
+     the single source of truth so the alpha values stop fragmenting. */
+  --overlay-panel-bg:    rgba(26, 21, 32, 0.95);
+  --overlay-text:        #e8dcc8;
+  --overlay-cell-bg:     rgba(255, 255, 255, 0.04);
+  --overlay-cell-hover:  rgba(255, 255, 255, 0.1);
+  --overlay-cell-active: rgba(255, 215, 0, 0.15);
 
   --text-primary: #2c3e50;
   --text-secondary: #5d6d7e;

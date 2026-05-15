@@ -18,6 +18,7 @@ export function parseLevelJson(raw: unknown): GeneratedLevel | null {
   if (!isPlainObject(parsed)) return null
   if (!Array.isArray(parsed.curves)) return null
   if (!isPlainObject(parsed.endpoint)) return null
+  if (!isPlainObject(parsed.region)) return null
   if (!Array.isArray(parsed.interval) || parsed.interval.length !== 2) return null
   if (typeof parsed.starRating !== 'number') return null
   return parsed as unknown as GeneratedLevel

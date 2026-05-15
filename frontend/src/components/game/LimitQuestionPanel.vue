@@ -12,6 +12,9 @@ const gameStore = useGameStore()
 const answered = ref(false)
 const typedInput = ref('')
 const errorMsg = ref('')
+// Re-answer affordance: an answered tower can reopen its (deterministic)
+// question so a wrong choice costs tempo, not the tower.
+const editing = ref(false)
 
 const tower = computed(() => {
   void gameStore.level
@@ -23,12 +26,14 @@ watch(() => props.towerId, () => {
   answered.value = false
   typedInput.value = ''
   errorMsg.value = ''
+  editing.value = false
 })
 watch(tower, (t) => {
   if (!t) {
     answered.value = false
     typedInput.value = ''
     errorMsg.value = ''
+    editing.value = false
   }
 })
 
@@ -48,6 +53,7 @@ function commit(choice: LimitResult): void {
   if (!engine) return
   engine.eventBus.emit(Events.LIMIT_ANSWER, { towerId: props.towerId, answer: choice })
   answered.value = true
+  editing.value = false
 }
 
 function resultsMatch(a: LimitResult, b: LimitResult): boolean {
@@ -78,7 +84,7 @@ function submitTyped(): void {
 
 <template>
   <div class="limit-panel">
-    <template v-if="question && !answered && !tower?.limitResult">
+    <template v-if="question && ((!answered && !tower?.limitResult) || editing)">
       <p class="question-text">
         Given: {{ question.fExpr }}
       </p>
@@ -116,6 +122,11 @@ function submitTyped(): void {
       <p class="result-text">
         Result: {{ outcomeLabel(tower.limitResult) }}
       </p>
+      <button
+        class="btn change-btn"
+        data-testid="limit-change-answer"
+        @click="editing = true"
+      >Change answer</button>
     </template>
   </div>
 </template>
@@ -126,6 +137,7 @@ function submitTyped(): void {
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .choice-btn { font-size: 11px; padding: 8px; }
 .result-text { font-size: 12px; color: var(--gold); margin: 0; }
+.change-btn { font-size: 11px; padding: 6px 12px; align-self: flex-start; }
 .typed-entry { display: flex; gap: 6px; }
 .typed-input {
   flex: 1; padding: 6px; font-size: 12px;

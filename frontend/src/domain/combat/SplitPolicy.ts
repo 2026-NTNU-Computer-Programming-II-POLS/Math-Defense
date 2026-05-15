@@ -88,11 +88,70 @@ export function killEnemy(enemy: Enemy, game: CombatGameContext): void {
   }
 }
 
+// What kind of damage a caller deals. Callers declare their source; they never
+// know about armor, evasion, or per-hit caps — applyDamage owns all of that.
+export type DamageSource =
+  | 'towerHit'   // discrete instantaneous tower hit  (Radar B/C projectile, Limit pulse)
+  | 'towerTick'  // continuous per-frame tower damage already scaled by dt (Radar A sweep, Matrix laser)
+  | 'dot'        // damage-over-time tick, already scaled by dt (Magic debuff zone)
+  | 'pet'        // Calculus pet attack (discrete)
+  | 'spell'      // player-cast spell (Fireball / Lightning)
+  | 'effect'     // power-up / event-driven damage (Monty Hall buff)
+
+// Discrete hits are subject to the Bulwark per-hit cap; continuous (dt-scaled)
+// sources are not — capping a per-frame slice would be meaningless.
+const DISCRETE_SOURCES: ReadonlySet<DamageSource> = new Set<DamageSource>([
+  'towerHit', 'pet', 'spell', 'effect',
+])
+
 // All damage sources (instant hits, DoT ticks, pets, spells) route through here.
-// enemyVulnerability is applied exactly once at this call site.
-export function applyDamage(enemy: Enemy, rawAmount: number, game: CombatGameContext): void {
+// This is the single place that resolves every defensive modifier:
+// vulnerability → per-hit cap → evasion → shield → HP.
+export function applyDamage(
+  enemy: Enemy,
+  rawAmount: number,
+  game: CombatGameContext,
+  source: DamageSource,
+): void {
   if (!enemy.alive) return
   let remaining = rawAmount * game.state.enemyVulnerability
+
+  // Amount entering the defensive pipeline (post-vulnerability). Reported as
+  // the `raw` figure in DAMAGE_RESOLVED so the floating text reads as
+  // "incoming hit → what landed".
+  const preDefense = remaining
+
+  // Per-hit cap (Bulwark): clamps discrete hits only; applied before evasion so
+  // the limit is deterministic regardless of whether evasion also fires.
+  // Continuous towerTick / dot sources are dt-scaled and not capped — this is
+  // what makes a ramping continuous tower (Matrix) the counter to Bulwark.
+  let capped = false
+  if (enemy.damageCapPerHit > 0 && DISCRETE_SOURCES.has(source) && remaining > enemy.damageCapPerHit) {
+    remaining = enemy.damageCapPerHit
+    capped = true
+  }
+
+  // Evasion (Swarmling): only pets and player-earned power-ups bypass it.
+  let evaded = false
+  if (enemy.towerDamageMult < 1 && source !== 'pet' && source !== 'effect') {
+    remaining *= enemy.towerDamageMult
+    evaded = true
+  }
+
+  // Visible in-combat teaching surface: emit a feedback event only when a
+  // defensive trait actually changed a *discrete* hit's number. Continuous
+  // (dt-scaled) towerTick / dot sources are excluded so there is no per-frame
+  // event storm, and unmodified hits never fire it.
+  if ((capped || evaded) && DISCRETE_SOURCES.has(source)) {
+    game.eventBus.emit(Events.DAMAGE_RESOLVED, {
+      x: enemy.x,
+      y: enemy.y,
+      raw: preDefense,
+      applied: remaining,
+      kind: capped ? 'capped' : 'reduced',
+    })
+  }
+
   if (enemy.shield > 0) {
     const absorbed = Math.min(enemy.shield, remaining)
     enemy.shield -= absorbed

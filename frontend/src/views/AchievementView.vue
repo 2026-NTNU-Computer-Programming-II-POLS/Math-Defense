@@ -148,6 +148,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: 24px;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-y: auto;
 }
 

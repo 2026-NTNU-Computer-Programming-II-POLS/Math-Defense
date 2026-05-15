@@ -141,6 +141,7 @@ class LeaderboardApplicationService:
                 kills=session.kills,
                 waves_survived=session.waves_survived,
                 session_id=session_id,
+                challenge_id=session.challenge_id,
             )
             try:
                 self._leaderboard_repo.save(entry)

@@ -1,6 +1,6 @@
 from typing import Callable
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, WebSocket
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -46,6 +46,33 @@ def get_current_user_optional(
     try:
         return get_current_user(request, credentials, db)
     except DomainError:
+        return None
+
+
+async def authenticate_ws(websocket: WebSocket, db: Session) -> User | None:
+    """Authenticate a WebSocket handshake via origin check + access-token cookie.
+
+    CSWSH defence: browsers always send Origin on WS upgrades; a missing or
+    unlisted origin is rejected with close code 4403. Token auth failure closes
+    with 4401. Returns None (socket already closed) on any failure so callers
+    can ``return`` immediately after checking.
+    """
+    from app.config import settings
+
+    origin = websocket.headers.get("origin")
+    if not origin or origin not in settings.cors_origins:
+        await websocket.close(code=4403, reason="forbidden origin")
+        return None
+
+    token = websocket.cookies.get(AUTH_COOKIE_NAME)
+    if not token:
+        await websocket.close(code=4401, reason="unauthenticated")
+        return None
+
+    try:
+        return build_auth_service(db).authenticate_token(token)
+    except Exception:
+        await websocket.close(code=4401, reason="unauthenticated")
         return None
 
 

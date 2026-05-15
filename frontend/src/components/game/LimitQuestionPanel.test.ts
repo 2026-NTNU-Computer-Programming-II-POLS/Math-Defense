@@ -7,6 +7,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import LimitQuestionPanel from './LimitQuestionPanel.vue'
 import { useGameStore } from '@/stores/gameStore'
 import { Events, TowerType } from '@/data/constants'
+import { outcomeLabel } from '@/math/limit-evaluator'
 import type { LimitResult, Tower } from '@/entities/types'
 
 interface FakeEngine {
@@ -181,5 +182,64 @@ describe('LimitQuestionPanel.vue — typed entry (Star ≥ 4)', () => {
       towerId: 't1',
       answer: correct,
     })
+  })
+})
+
+describe('LimitQuestionPanel.vue — MCQ preview & re-answer (Star 1–3)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('renders each MCQ choice button with its outcomeLabel preview text', async () => {
+    const store = useGameStore()
+    store.starRating = 3
+    const choices: LimitResult[] = [
+      { outcome: '+c', value: 3 },
+      { outcome: 'zero', value: 0 },
+      { outcome: '-inf', value: -Infinity },
+    ]
+    const engine = attachFakeEngine([makeFakeTower()], choices[0])
+    engine.getSystem = (key: string) =>
+      key === 'limitTower'
+        ? { generateQuestion: () => makeQuestion(choices[0], choices) }
+        : undefined
+
+    const wrapper = mount(LimitQuestionPanel, { props: { towerId: 't1' } })
+    await flushPromises()
+
+    const btns = wrapper.findAll('.choice-btn')
+    expect(btns.length).toBe(choices.length)
+    btns.forEach((btn, i) => {
+      expect(btn.text()).toBe(outcomeLabel(choices[i]))
+    })
+  })
+
+  it('lets an already-answered tower re-open its question and commit a new answer', async () => {
+    const store = useGameStore()
+    store.starRating = 3
+    const correct: LimitResult = { outcome: '+c', value: 3 }
+    const answeredTower = { id: 't1', type: TowerType.LIMIT, x: 5, y: 0, limitResult: correct } as Tower
+    const engine = attachFakeEngine([answeredTower], correct)
+
+    const wrapper = mount(LimitQuestionPanel, { props: { towerId: 't1' } })
+    await flushPromises()
+
+    // Starts locked on the result, no question block.
+    expect(wrapper.findAll('.choice-btn').length).toBe(0)
+    expect(wrapper.find('[data-testid="limit-change-answer"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="limit-change-answer"]').trigger('click')
+    await flushPromises()
+
+    const btns = wrapper.findAll('.choice-btn')
+    expect(btns.length).toBeGreaterThan(0)
+
+    await btns[0].trigger('click')
+    await flushPromises()
+
+    expect(engine.eventBus.emit).toHaveBeenCalledWith(
+      Events.LIMIT_ANSWER,
+      expect.objectContaining({ towerId: 't1' }),
+    )
   })
 })

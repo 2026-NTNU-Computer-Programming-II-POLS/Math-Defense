@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import OperationalError
 
+from app.domain.constraints import LEVEL_MAX_SCORES, LEVEL_MAX_WAVES, SCORE_MAX
 from app.domain.errors import (
     ConstraintViolationError,
-    PersistenceError,
+    DomainValueError,
     ReplayMismatchError,
     ReplayUnavailableError,
     SessionNotFoundError,
@@ -286,6 +288,24 @@ class SessionApplicationService:
                             session.id, waves_survived, authoritative_waves,
                         )
                     waves_survived = authoritative_waves
+                    # BD-1: with the replay log proving a wave count, bound the
+                    # client-submitted score by it too — otherwise the
+                    # leaderboard's only score-forgery defense is the flat
+                    # per-level ceiling. Deliberately gated on a NON-EMPTY log:
+                    #   - no event_repo wired -> authoritative_waves is None and
+                    #     this whole block is skipped (legacy unit-test path);
+                    #   - empty log -> 0 waves derived, but that means "no replay
+                    #     evidence", not "0 waves cleared". Bounding on it would
+                    #     reject a legitimate run whose event upload raced or
+                    #     failed (EventRecorder flushes best-effort and is not
+                    #     awaited by end_session). The accepted trade-off: a
+                    #     client that posts zero events stays bounded only by
+                    #     the per-level cap — but it also lands on the board with
+                    #     waves_survived=0, so such a forgery is at least visible.
+                    if replay_events:
+                        self._assert_score_plausible_for_waves(
+                            session.level, score, waves_survived
+                        )
                 result = GameResult(
                     score=Score(score),
                     kills=kills,
@@ -343,7 +363,7 @@ class SessionApplicationService:
             # handler's own `with self._uow:` does not nest inside ours.
             try:
                 self._event_bus.replay_leaderboard(_catch_up_event)
-            except PersistenceError:
+            except Exception:
                 logger.exception("leaderboard catch-up failed session=%s", session.id)
             return EndSessionResult(session=session, newly_unlocked=[])
 
@@ -494,6 +514,11 @@ class SessionApplicationService:
         wave_end_ts = sorted(e.ts for e in events if e.event_type == _WAVE_END_EVENT_TYPE)
         wave_start_ts = sorted(e.ts for e in events if e.event_type == _WAVE_START_EVENT_TYPE)
 
+        # INVARIANT: ts is game-time with origin t=0 at game start, which is
+        # the same zero as the client-submitted time_total. max(all_ts) is
+        # therefore a valid lower bound for time_total. If ts were ever
+        # wall-clock-stamped (or had a non-zero start offset), this floor would
+        # silently reject legitimate runs in _verify_score's 0.5 s check.
         time_total_min = max(all_ts)
 
         prepare_durations: list[float] = []
@@ -515,6 +540,46 @@ class SessionApplicationService:
         if challenge is None or challenge.is_deleted:
             return None
         return challenge.constraints.wave_count
+
+    def _assert_score_plausible_for_waves(
+        self, level: Level, score: int, waves_survived: int
+    ) -> None:
+        """BD-1: bound the client-submitted ``score`` by the replay-verified
+        wave count.
+
+        The leaderboard ranks on ``score`` and its only other forgery defense
+        is the coarse per-level ceiling enforced in ``GameSession.complete``.
+        A scripted client making in-range ``update_session`` calls can
+        otherwise climb to that per-level maximum no matter how far it
+        actually got. Tying the ceiling to the number of waves the replay log
+        proves were cleared closes that gap.
+
+        Caller restricts this to sessions with a non-empty event log, so a
+        missing/empty log falls back to the flat per-level cap rather than
+        collapsing the bound to ~0. The ``+ 1`` margin absorbs the single
+        wave the replay count can legitimately under-report: the in-progress
+        wave the player died on emits no ``waveEnd`` event, and the
+        recorder's terminal flush is best-effort and not awaited by
+        ``end_session`` so the final ``waveEnd`` can land just after the
+        score is submitted. The wide safety margin already baked into
+        ``LEVEL_MAX_SCORES`` keeps this from false-rejecting real runs.
+        """
+        level_cap = LEVEL_MAX_SCORES.get(int(level), SCORE_MAX)
+        level_wave_count = LEVEL_MAX_WAVES.get(int(level))
+        if not level_wave_count:
+            return
+        max_plausible = min(
+            level_cap,
+            math.ceil(level_cap * (waves_survived + 1) / level_wave_count),
+        )
+        if score > max_plausible:
+            logger.warning(
+                "score implausible for waves level=%d score=%d waves=%d max_plausible=%d",
+                int(level), score, waves_survived, max_plausible,
+            )
+            raise DomainValueError(
+                "final score is implausible for the number of waves survived"
+            )
 
     def _get_session(self, session_id: str, user_id: str) -> GameSession:
         session = self._session_repo.find_by_id(session_id, user_id)

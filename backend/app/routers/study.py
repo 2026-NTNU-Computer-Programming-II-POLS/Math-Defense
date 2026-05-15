@@ -87,6 +87,16 @@ def submit_affect(
     )
 
 
+_CSV_INJECTION_TRIGGERS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(val: str) -> str:
+    """Prefix val with ' if it starts with a spreadsheet formula-trigger character."""
+    if val and val[0] in _CSV_INJECTION_TRIGGERS:
+        return "'" + val
+    return val
+
+
 # CSV export header — must match Pedagogical_Backlog_Spec.md §27.2 exactly so
 # downstream R/Python analysis scripts can rely on column ordering.
 _EXPORT_HEADER = [
@@ -123,8 +133,14 @@ def export_csv(
     writer.writerow(_EXPORT_HEADER)
     for r in rows:
         writer.writerow([
-            r.user_id,
-            r.group,
+            # Conditionally prefix string cells: if a value starts with a
+            # spreadsheet formula-trigger character (=, +, -, @, tab, CR) prefix
+            # it with ' to prevent formula injection when opened in Excel /
+            # LibreOffice. UUID and enum values never start with these chars, so
+            # downstream R/Python consumers receive unmodified values today; the
+            # guard fires automatically if either field ever carries user text.
+            _csv_safe(str(r.user_id)),
+            _csv_safe(str(r.group)),
             "" if r.pre_score is None else r.pre_score,
             "" if r.post_score is None else r.post_score,
             "" if r.delay_score is None else r.delay_score,

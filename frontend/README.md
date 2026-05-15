@@ -152,10 +152,8 @@ frontend/
 │   │   │   └── SplitPolicy.ts          Single source for Split enemy split rules
 │   │   ├── level/
 │   │   │   ├── level-generator.ts      Reverse-endpoint curve generation algorithm
-│   │   │   ├── distractor-generator.ts Plausible wrong answers for Initial Answer
 │   │   │   ├── decoy-generator.ts      Decoy curve generation for Initial Answer screen
 │   │   │   ├── level-layout-service.ts Builds SegmentedPath + placement rules for a level definition
-│   │   │   ├── path-group-defs.ts      7 runtime path group definitions
 │   │   │   ├── placement-policy.ts     Grid-cell → can-place decision shared by preview and click handler
 │   │   │   └── checkpoint.ts           Star-5 retry-from-checkpoint serialization (gold/HP/costTotal/killValue)
 │   │   ├── movement/               Curve-path and piecewise-path movement strategies
@@ -501,16 +499,43 @@ Panel visibility, selected tower type, build-hint step, modal state.
 `WasmBridge.ts` handles loading and exposes a unified public surface:
 
 ```typescript
-await initWasm()                         // loads math_engine.js; returns false if unavailable
+// ── Lifecycle ──
+await initWasm(urlOverride?)             // loads math_engine.js; returns false if unavailable
+await whenWasmReady()                    // await readiness without triggering a load
+isWasmReady()                            // synchronous readiness check
 isUsingWasm()                            // true if WASM is the active backend
-
-matrixMultiply(a, b)                     // 2×2 × 2×2
-sectorCoverage(r, θ)
-pointInSector(px, py, cx, cy, r, aStart, aWidth)
-numericalIntegrate(a, b, c, lo, hi, n = 100)
-
 setUseWasm(use)                          // force JS fallback (used by parity tests)
-benchmark(fn, iterations = 1000)         // ms per iteration; reports WASM vs JS in dev
+
+// ── Tower math ──
+matrixMultiply(a, b)                     // 2×2 × 2×2 matrix multiply (Matrix tower)
+sectorCoverage(radius, angleWidth)       // 0.5·r²·θ sector area (Radar A)
+pointInSector(px, py, cx, cy, r, aStart, aWidth)  // hit-test (Radar A/B/C)
+numericalIntegrate(a, b, c, lo, hi, n?) // trapezoid ∫(ax²+bx+c)dx (Calculus tower)
+
+// ── Scoring ──
+powerF64(base, exp)                      // bit-deterministic pow via musl; used by score-calculator.ts
+computeTotalScoreWasm(killValue, timeTotal, prepSum, costTotal,
+                      healthOrigin, healthFinal, initialAnswer)  // V2 score formula (FU-A parity)
+
+// ── PRNG (PCG XSL-RR 64/32, replay v2) ──
+createPrng(seed, stream?)                // allocates a PrngHandle (WasmPrngHandle or JsPrngHandle)
+prngNextU32(handle)                      // next uint32
+prngNextF64(handle)                      // next [0,1) double (53-bit mantissa)
+handle.dispose()                         // free WASM heap slot
+
+// ── Curve evaluator ──
+evaluateCurve(curve, x)                  // curve_evaluate (poly/trig/log)
+evaluateCurveDerivative(curve, x)        // curve_derivative
+isCurveInDomain(curve, x)               // curve_in_domain (log domain guard)
+
+// ── Intersection solver / spawn calculator ──
+findPairIntersectionsWasm(c1, c2, xMin, xMax, step?)      // sign-change scan + bisection
+findAllCurvesCommonPointWasm(curves, xMin, xMax, step?)   // N-curve common points → {x,y}[]
+countCommonIntersectionsInIntervalWasm(curves, xMin, xMax) // cardinality only
+computeSpawnPointsWasm(curves, endpoint)                  // boundary spawn points → BridgeSpawnPoint[]
+
+// ── Level generator ──
+generateLevelDeterministic(starRating, prngHandle, multiset)  // full rejection-sampling loop → BridgeGeneratedLevel | null
 ```
 
 **RAII memory management** — `withFloatBuffers<T>(sizes, cb)` allocates via `_malloc`, runs the callback, and `_free`s in a `finally` block.

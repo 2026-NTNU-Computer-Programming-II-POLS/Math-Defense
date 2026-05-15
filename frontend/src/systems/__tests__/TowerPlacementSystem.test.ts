@@ -7,7 +7,7 @@ vi.mock('@/entities/TowerFactory', () => ({
     active: true, configured: false, disabled: false, level: 1,
     effectiveDamage: 20, effectiveRange: 5, cooldown: 1.5, cooldownTimer: 0,
     damageBonus: 1, rangeBonus: 1, baseDamage: 20, baseRange: 5,
-    talentMods: {}, magicBuff: 1,
+    talentMods: {}, magicBuff: 1, interferenceFactor: 1,
     color: '#a855f7',
   }),
 }))

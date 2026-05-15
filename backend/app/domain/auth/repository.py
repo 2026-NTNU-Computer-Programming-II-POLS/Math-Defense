@@ -7,7 +7,9 @@ commit.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Protocol, runtime_checkable
 
 
@@ -40,12 +42,43 @@ class EmailVerificationRepository(Protocol):
         ...
 
 
+class RefreshTokenConsumeStatus(Enum):
+    """Outcome of RefreshTokenRepository.consume()."""
+
+    OK = "ok"  # token rotated; user_id is set
+    INVALID = "invalid"  # not found / expired; user_id is None
+    # Token presented after rotation or revocation — a stolen-cookie replay.
+    # user_id is set so the caller can revoke the whole token family.
+    REUSE_DETECTED = "reuse_detected"
+
+
+@dataclass(frozen=True)
+class RefreshTokenConsumeResult:
+    """Typed result of consume().
+
+    consume() deliberately does not perform the reuse->revoke cascade itself.
+    Returning REUSE_DETECTED hands that decision to the caller, which owns the
+    Unit of Work and so can revoke the token family and commit it where the
+    transaction boundary is visible (BA-S1 / BA-U1).
+    """
+
+    status: RefreshTokenConsumeStatus
+    user_id: str | None = None
+
+
 @runtime_checkable
 class RefreshTokenRepository(Protocol):
     def create(self, user_id: str, token_hash: str, expires_at: datetime) -> None: ...
 
-    def consume(self, token_hash: str) -> str | None:
-        """Mark token used (rotation) and return its user_id, or None if invalid/expired/used/revoked."""
+    def consume(self, token_hash: str) -> RefreshTokenConsumeResult:
+        """Mark the token used (rotation) and report the outcome.
+
+        Returns OK with the user_id on a valid token, INVALID when the token
+        is missing/expired, and REUSE_DETECTED (with the user_id) when the
+        token was already used or revoked. consume() does NOT revoke the
+        token family on reuse — the caller owns that decision and the commit
+        that makes it durable.
+        """
         ...
 
     def revoke_all_for_user(self, user_id: str) -> None:

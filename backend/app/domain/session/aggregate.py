@@ -161,6 +161,11 @@ class GameSession:
     def is_active(self) -> bool:
         return self.status == SessionStatus.ACTIVE
 
+    @classmethod
+    def stale_cutoff_hours(cls) -> float:
+        """Single accessor for the stale-session cutoff so is_stale and DB queries stay in sync."""
+        return cls._stale_cutoff_hours
+
     @property
     def is_stale(self) -> bool:
         """Session still active after 2 hours → considered stale"""
@@ -171,7 +176,7 @@ class GameSession:
         # SQLite returns naive datetime; normalize to aware before comparing
         if started.tzinfo is None:
             started = started.replace(tzinfo=UTC)
-        return now - started > timedelta(hours=type(self)._stale_cutoff_hours)
+        return now - started > timedelta(hours=type(self).stale_cutoff_hours())
 
     # ── Commands (state-mutating methods) ──
 

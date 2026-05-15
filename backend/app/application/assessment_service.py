@@ -96,33 +96,6 @@ class AssessmentApplicationService:
                 user_id, event_id, success, [c.value for c in updated],
             )
 
-    def record_events(
-        self, user_id: str, events: list[tuple[str, bool]]
-    ) -> None:
-        """Apply a batch of (event_id, success) pairs in one UoW.
-
-        Used by ``end_session`` so achievement unlocks accumulated within a
-        single session-completion flow share one transaction with the
-        achievement insert and don't N+1 the user's competency row.
-        """
-        if not events:
-            return
-        with self._uow:
-            # B-BUG-6: lock rows on the read so concurrent evidence events
-            # for the same (user, competency) cannot lose-update each other.
-            state = self._repo.find_by_user_for_update(user_id)
-            for event_id, success in events:
-                try:
-                    state.apply_event(self._q_matrix, event_id, success)
-                except UnknownEventError:
-                    logger.warning(
-                        "assessment.record_events: unknown event id %r — skipping (user=%s)",
-                        event_id,
-                        user_id,
-                    )
-            self._repo.save(state)
-            self._uow.commit()
-
     def apply_evidence_in_open_uow(
         self, user_id: str, events: list[tuple[str, bool]]
     ) -> None:

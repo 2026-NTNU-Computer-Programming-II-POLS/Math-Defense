@@ -2,12 +2,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { STAR_MIN, STAR_MAX } from '@/data/difficulty-defs'
-import { generate as generateLevelForRun } from '@/services/levelGenerationService'
 import { useAuthStore } from '@/stores/authStore'
 import { recommendationService } from '@/services/recommendationService'
+import { useStartRun } from '@/composables/useStartRun'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { startRun } = useStartRun()
 const selectedStar = ref(1)
 const generating = ref(false)
 const error = ref<string | null>(null)
@@ -83,12 +84,7 @@ async function startLevel() {
   generating.value = true
   error.value = null
   try {
-    const seed = Date.now()
-    const { level } = await generateLevelForRun(selectedStar.value, seed)
-    router.push({
-      name: 'initial-answer',
-      state: { level: JSON.stringify(level), seed },
-    })
+    await startRun(selectedStar.value, Date.now())
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -152,6 +148,7 @@ async function startLevel() {
   padding: 2rem;
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-base);
 }
 

@@ -69,7 +69,9 @@ export class EconomySystem implements GameSystem {
   }
 
   update(_dt: number, game: Game): void {
-    game.state.timeTotal = game.time
+    if (game.state.phase === GamePhase.WAVE) {
+      game.state.timeTotal = game.time
+    }
   }
 
 

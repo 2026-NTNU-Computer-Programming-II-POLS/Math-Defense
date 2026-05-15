@@ -5,11 +5,7 @@ import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
 import { stringHash } from '@/math/MathUtils'
-import {
-  generate as generateLevelForRun,
-  LevelGenerationFailedError,
-} from '@/services/levelGenerationService'
-import { sessionService } from '@/services/sessionService'
+import { useStartRun } from '@/composables/useStartRun'
 import TerritorySlotCard from '@/components/territory/TerritorySlotCard.vue'
 import DeadlineProgressBar from '@/components/territory/DeadlineProgressBar.vue'
 import SlotChallengePreview from '@/components/territory/SlotChallengePreview.vue'
@@ -25,6 +21,7 @@ const route = useRoute()
 const store = useTerritoryStore()
 const auth = useAuthStore()
 const ui = useUiStore()
+const { startRun } = useStartRun()
 
 const activityId = computed(() => route.params.id as string)
 const detail = computed(() => store.currentDetail)
@@ -102,51 +99,9 @@ function onPreviewCancel(): void {
 async function handlePlay(slotId: string): Promise<void> {
   const slot = detail.value?.slots.find(s => s.id === slotId)
   if (!slot) return
-
-  // B-M-6: warn before silently abandoning an in-progress game session
-  try {
-    const active = await sessionService.getActive()
-    if (active) {
-      const ok = await ui.showConfirm(
-        'Active session in progress',
-        'You have an active game session in progress. Starting a territory game will abandon it. Continue?',
-        { confirmLabel: 'Continue', cancelLabel: '取消' },
-      )
-      if (!ok) return
-    }
-  } catch (error) {
-    // non-critical — proceed if the check fails
-    console.error('Failed to check active session:', error)
-  }
-
-  // Stable seed derived from the slot id so every student faces the same level
+  // Stable seed derived from the slot id so every student faces the same level.
   const seed = stringHash(slotId)
-  let level
-  try {
-    ({ level } = await generateLevelForRun(slot.star_rating, seed))
-  } catch (e) {
-    if (e instanceof LevelGenerationFailedError) {
-      console.error('[TerritoryDetail] Level generation failed via WASM v2 path', { slotId, seed })
-      ui.showModal('Level generation failed', 'Please try a different territory slot.')
-      return
-    }
-    throw e
-  }
-  const territoryContext = { activityId: activityId.value, slotId }
-
-  // F-BUG-14: pass via history.state to match LevelSelectView; cap the
-  // serialized size so a malformed level can't bloat the history entry.
-  const levelJson = JSON.stringify(level)
-  const MAX_LEVEL_JSON_BYTES = 64 * 1024
-  if (levelJson.length > MAX_LEVEL_JSON_BYTES) {
-    console.error('[TerritoryDetail] Generated level JSON exceeds size cap', { bytes: levelJson.length })
-    ui.showModal('Level too large', 'Generated level payload is unexpectedly large; please try a different slot.')
-    return
-  }
-  router.push({
-    name: 'initial-answer',
-    state: { level: levelJson, seed, territoryContext: JSON.stringify(territoryContext) },
-  })
+  await startRun(slot.star_rating, seed, { activityId: activityId.value, slotId })
 }
 
 async function handleSettle(): Promise<void> {
@@ -254,6 +209,7 @@ watch(activityId, (id) => {
   align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding-top: 40px;
 }
 

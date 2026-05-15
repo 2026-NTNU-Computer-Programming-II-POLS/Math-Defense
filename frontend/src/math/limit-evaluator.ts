@@ -128,14 +128,16 @@ export function parseLimitAnswer(input: string): LimitResult | null {
   return { outcome: '-c', value: num }
 }
 
+// The label is the teaching surface: it describes the spectrum of limit
+// behaviours, never a punishment. A wrong answer only ever means weak damage.
 export function outcomeLabel(r: LimitResult): string {
   switch (r.outcome) {
-    case '+inf': return '+∞ (max damage)'
-    case '-inf': return '-∞ (max heal)'
-    case 'zero': return '0 (tower removed)'
-    case '+c': return `+${r.value} (damage)`
-    case '-c': return `${r.value} (heal)`
-    case 'constant': return 'Limit undefined (disabled)'
+    case '+inf': return '+∞ — instantly destroys the target'
+    case '+c': return `+${r.value} — strong damage`
+    case 'zero': return '0 — the limit vanishes; tower deals only chip damage'
+    case '-c': return `${r.value} — wrong direction; tower deals only chip damage`
+    case '-inf': return '−∞ — wrong direction; tower deals only chip damage'
+    case 'constant': return 'undefined limit — tower deals only chip damage'
     default: {
       const _exhaustive: never = r.outcome
       return String(_exhaustive)

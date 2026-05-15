@@ -205,6 +205,11 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+  // Restore scroll on browser back/forward; otherwise start fresh routes at
+  // the top so a previously-scrolled page doesn't leave the next one offset.
+  scrollBehavior(_to, _from, savedPosition) {
+    return savedPosition ?? { top: 0 }
+  },
 })
 
 router.beforeEach(() => {
@@ -226,6 +231,8 @@ router.beforeEach(async (to) => {
     return { name: 'auth', query: { mode: 'login', next: to.fullPath } }
   }
 
+  // UX-only guard: role comes from /auth/me and is bypassable client-side.
+  // Every protected API endpoint enforces the same role constraint server-side.
   const role = to.meta.requiresRole
   if (role === 'admin' && !auth.isAdmin) return { name: 'menu' }
   if (role === 'teacher' && !(auth.isTeacher || auth.isAdmin)) return { name: 'menu' }

@@ -1,5 +1,6 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { parseExpression, type CurveFunction } from '@/math/expressionParser'
+import { recomputeEffectiveDamage } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 
@@ -48,6 +49,11 @@ export class MagicTowerSystem {
     return fn
   }
 
+  // Ordering dependency (Phase 7 §7.3): TowerInterferenceSystem must run
+  // before MagicTowerSystem each frame so `tower.interferenceFactor` is set
+  // before the magic buff is folded in. Both systems write effectiveDamage
+  // only through `recomputeEffectiveDamage`, which reads interferenceFactor,
+  // so the two factors compose with no flicker or double-application.
   update(dt: number, game: Game): void {
     if (game.state.phase !== GamePhase.WAVE) return
 
@@ -56,7 +62,7 @@ export class MagicTowerSystem {
     for (const t of game.towers) {
       if (t.magicBuff !== 1) {
         t.magicBuff = 1
-        t.effectiveDamage = t.baseDamage * t.damageBonus * t.magicBuff
+        recomputeEffectiveDamage(t)
       }
     }
 
@@ -108,7 +114,7 @@ export class MagicTowerSystem {
       const curveY = fn(other.x)
       if (Math.abs(other.y - curveY) < zoneWidth * BUFF_ZONE_MULTIPLIER) {
         other.magicBuff = Math.max(other.magicBuff, buffAmount)
-        other.effectiveDamage = other.baseDamage * other.damageBonus * other.magicBuff
+        recomputeEffectiveDamage(other)
       }
     }
   }

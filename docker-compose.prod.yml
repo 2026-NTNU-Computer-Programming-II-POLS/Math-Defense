@@ -94,6 +94,7 @@ services:
       # Mounting directly to conf.d/default.conf bypasses envsubst and leaves
       # the literal "${CORS_ORIGIN_1}" string as the map key → all preflights 403.
       - ./nginx-tls.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./security-headers.conf:/etc/nginx/security-headers.conf:ro
       - ./certs:/etc/nginx/certs:ro
     depends_on:
       backend:

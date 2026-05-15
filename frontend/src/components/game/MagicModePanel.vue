@@ -226,6 +226,7 @@ function toggleMode(mode: MagicMode) {
   border-radius: 4px;
   outline: none;
 }
+.fn-field::placeholder {color: rgba(255, 255, 255, 0.5); }
 .fn-field:focus { border-color: #ffffff; box-shadow: 0 0 5px rgba(255, 215, 0, 0.4); }
 .apply-btn { font-size: 11px; padding: 6px 10px; }
 .hint { font-size: 10px; color: var(--text-primary); margin: 0; opacity: 0.7; }

@@ -10,6 +10,7 @@ import { ref, computed } from 'vue'
 import { authService, type MeResponse } from '@/services/authService'
 import { appBus } from '@/lib/app-bus'
 import router from '@/router'
+import { useTokenProbe } from '@/composables/useTokenProbe'
 
 export type UserRole = 'admin' | 'teacher' | 'student'
 
@@ -26,8 +27,6 @@ export interface User {
   ia_recent_accuracy: number
 }
 
-const TOKEN_PROBE_INTERVAL_MS = 15_000
-
 function mapMeResponseToUser(res: MeResponse): User {
   return {
     id: res.id,
@@ -43,9 +42,7 @@ function mapMeResponseToUser(res: MeResponse): User {
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const initializing = ref(false)
-  let probeTimer: ReturnType<typeof setInterval> | null = null
-  let probePageHideListener: (() => void) | null = null
-  let probePageShowListener: (() => void) | null = null
+  const probe = useTokenProbe(user)
 
   let _initResolve: (() => void) | null = null
   const initPromise = ref<Promise<void> | null>(null)
@@ -62,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await authService.me()
       user.value = mapMeResponseToUser(res)
-      startTokenProbe()
+      probe.start()
     } catch {
       user.value = null
     } finally {
@@ -75,12 +72,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setUser(u: User): void {
     user.value = u
-    startTokenProbe()
+    probe.start()
   }
 
   function clearAuth(): void {
     user.value = null
-    stopTokenProbe()
+    probe.stop()
   }
 
   /**
@@ -93,59 +90,6 @@ export const useAuthStore = defineStore('auth', () => {
     const meta = router.currentRoute.value.meta
     if (meta.requiresAuth) {
       router.push({ name: 'auth' }).catch(() => {})
-    }
-  }
-
-  function startTokenProbe(): void {
-    // Defensive: if a previous interval is still alive (race during BFCache
-    // restore or rapid login/logout cycles), kill it first so we never run
-    // two intervals against the same store.
-    if (probeTimer !== null) {
-      clearInterval(probeTimer)
-      probeTimer = null
-    }
-    probeTimer = setInterval(async () => {
-      if (user.value === null) { stopTokenProbe(); return }
-      if (typeof document !== 'undefined' && document.hidden) return
-      try {
-        await authService.me()
-      } catch {
-        // 401 branch in api.ts handles logout
-      }
-    }, TOKEN_PROBE_INTERVAL_MS)
-
-    // Install page-lifecycle listeners once. They persist across stop/start
-    // so a BFCache restore can resume polling even after stopTokenProbe.
-    if (typeof window !== 'undefined' && probePageHideListener === null) {
-      probePageHideListener = () => {
-        if (probeTimer !== null) {
-          clearInterval(probeTimer)
-          probeTimer = null
-        }
-      }
-      window.addEventListener('pagehide', probePageHideListener)
-    }
-    if (typeof window !== 'undefined' && probePageShowListener === null) {
-      probePageShowListener = () => {
-        // Resume only if we still believe we are logged in.
-        if (user.value !== null) startTokenProbe()
-      }
-      window.addEventListener('pageshow', probePageShowListener)
-    }
-  }
-
-  function stopTokenProbe(): void {
-    if (probeTimer !== null) {
-      clearInterval(probeTimer)
-      probeTimer = null
-    }
-    if (probePageHideListener !== null && typeof window !== 'undefined') {
-      window.removeEventListener('pagehide', probePageHideListener)
-      probePageHideListener = null
-    }
-    if (probePageShowListener !== null && typeof window !== 'undefined') {
-      window.removeEventListener('pageshow', probePageShowListener)
-      probePageShowListener = null
     }
   }
 
@@ -231,6 +175,6 @@ export const useAuthStore = defineStore('auth', () => {
     refreshProfile,
     updateAvatar,
     updatePlayerName,
-    stopProbe: stopTokenProbe,
+    stopProbe: probe.stop,
   }
 })

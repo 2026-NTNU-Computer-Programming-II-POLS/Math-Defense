@@ -21,9 +21,9 @@ export function projectTowerScene(game: Game): TowerSceneView {
   }))
   return {
     phase,
-    cursor: game.keyboardCursor === null
+    cursor: game.hud.keyboardCursor === null
       ? null
-      : { gx: game.keyboardCursor.gx, gy: game.keyboardCursor.gy },
+      : { gx: game.hud.keyboardCursor.gx, gy: game.hud.keyboardCursor.gy },
     towers,
     showCoords: phase === GamePhase.BUILD,
   }

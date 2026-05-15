@@ -115,4 +115,6 @@ class TerritorySessionUse(Base):
     """
     __tablename__ = "territory_session_uses"
 
-    session_id: Mapped[str] = mapped_column(String, primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        String, ForeignKey("game_sessions.id", ondelete="RESTRICT"), primary_key=True,
+    )

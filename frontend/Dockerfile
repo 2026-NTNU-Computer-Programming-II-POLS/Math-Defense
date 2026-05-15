@@ -35,5 +35,6 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Place nginx.conf as a template so Docker's entrypoint runs envsubst on
 # ${CORS_ORIGIN_1} / ${CORS_ORIGIN_2} before nginx starts.
 COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY security-headers.conf /etc/nginx/security-headers.conf
 ENV CORS_ORIGIN_1="http://localhost:5173" CORS_ORIGIN_2="http://localhost:3000"
 EXPOSE 8080

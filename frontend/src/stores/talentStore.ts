@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, onScopeDispose } from 'vue'
 import { talentService } from '@/services/talentService'
 import { appBus } from '@/lib/app-bus'
 import type { TowerType } from '@/data/constants'
@@ -8,10 +8,7 @@ export const useTalentStore = defineStore('talent', () => {
   const modifiers = ref<Record<string, Record<string, number>>>({})
   const loaded = ref(false)
 
-  // Subscribe once on store init. The store is a Pinia singleton for the
-  // page lifetime so the listener never needs to detach. (HMR may register
-  // a duplicate against a stale store — a trivial dev-only leak.)
-  appBus.on('auth:logout', () => { clear() })
+  onScopeDispose(appBus.on('auth:logout', () => { clear() }))
 
   async function load(): Promise<void> {
     try {

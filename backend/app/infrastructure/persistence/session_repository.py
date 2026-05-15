@@ -65,7 +65,7 @@ class SqlAlchemySessionRepository:
             )
 
     def find_stale_sessions(self, user_id: str) -> list[GameSession]:
-        cutoff = datetime.now(UTC) - timedelta(hours=GameSession._stale_cutoff_hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=GameSession.stale_cutoff_hours())
         rows = self._db.query(GameSessionModel).filter(
             GameSessionModel.user_id == user_id,
             GameSessionModel.status == SessionStatus.ACTIVE.value,

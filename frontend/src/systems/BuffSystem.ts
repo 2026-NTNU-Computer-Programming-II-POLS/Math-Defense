@@ -1,6 +1,7 @@
 import { Events, TowerType } from '@/data/constants'
 import { PURCHASABLE_BUFFS } from '@/data/buff-defs'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
+import { recomputeEffectiveDamage } from '@/entities/tower-stats'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { ActiveBuffEntry } from '@/engine/GameState'
 
@@ -11,7 +12,7 @@ function snap(v: number): number {
 }
 
 function recalcDamage(g: Game): void {
-  g.towers.forEach((t) => { t.effectiveDamage = t.baseDamage * t.damageBonus })
+  g.towers.forEach(recomputeEffectiveDamage)
 }
 
 function recalcRange(g: Game): void {
@@ -120,7 +121,7 @@ const effectStrategies: Record<string, EffectFn> = {
     const enemies = [...g.enemies]
     for (const enemy of enemies) {
       if (!enemy.alive) continue
-      applyDamage(enemy, 50, g)
+      applyDamage(enemy, 50, g, 'effect')
     }
   },
   DISABLE_RANDOM_TOWER: (g) => {

@@ -133,4 +133,24 @@ describe('Game perceived speed', () => {
     expect(update).toHaveBeenCalledTimes(1)
     expect(game.time).toBeCloseTo(FIXED_DT)
   })
+
+  it('stops perceived-speed sub-steps the moment a sub-step ends the wave', () => {
+    // The wave-ending sub-step is legitimate WAVE time; the *extra* sub-step
+    // must not run, or it would advance scored time into a non-WAVE phase.
+    const update = vi.fn(() => { game.state.phase = GamePhase.BUILD })
+    game.addSystem('probe', { update })
+    game.phase.forceTransition(GamePhase.WAVE)
+    game.state.phase = GamePhase.WAVE
+    game.setPerceivedSpeedMultiplier(2)
+
+    const internals = game as unknown as { _running: boolean; _lastTime: number; _loop(): void }
+    internals._running = true
+    internals._lastTime = 0
+    nowSpy.mockReturnValue(FIXED_DT * 1000)
+
+    internals._loop()
+
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(game.time).toBeCloseTo(FIXED_DT)
+  })
 })

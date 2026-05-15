@@ -3,14 +3,15 @@
  * Manages panel visibility, selected tower, and other UI-only state.
  */
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, onScopeDispose } from 'vue'
 import { appBus } from '@/lib/app-bus'
-import type { TowerType } from '@/data/constants'
+import type { TowerType, EnemyType } from '@/data/constants'
 
 const PRINCIPLE_OVERLAY_PREF_KEY = 'mdf.principleOverlayEnabled'
 const AUDIO_MUTED_PREF_KEY = 'mdf.audioMuted'
 const AUDIO_VOLUME_PREF_KEY = 'mdf.audioVolume'
 const SLIDER_FALLBACK_PREF_KEY = 'mdf.sliderFallbackEnabled'
+const SEEN_COUNTER_ENEMIES_PREF_KEY = 'mdf.seenCounterEnemies'
 
 function loadPrincipleOverlayPref(): boolean {
   if (typeof window === 'undefined') return true
@@ -54,6 +55,19 @@ function loadAudioVolumePref(): number {
   }
 }
 
+function loadSeenCounterEnemies(): Set<EnemyType> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.localStorage.getItem(SEEN_COUNTER_ENEMIES_PREF_KEY)
+    if (raw === null) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((v): v is EnemyType => typeof v === 'string'))
+  } catch {
+    return new Set()
+  }
+}
+
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return (
     typeof value === 'object'
@@ -64,11 +78,9 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 }
 
 export const useUiStore = defineStore('ui', () => {
-  // Subscribe once on init to dismiss any open modal on logout. Replaces the
-  // dynamic-import that authStore.logout used to do (F-ARCH-2).
-  appBus.on('auth:logout', () => {
+  onScopeDispose(appBus.on('auth:logout', () => {
     if (modalVisible.value) dismissModal()
-  })
+  }))
 
   // currently selected tower type (tower bar selection)
   const selectedTowerType = ref<TowerType | null>(null)
@@ -155,9 +167,33 @@ export const useUiStore = defineStore('ui', () => {
     sliderFallbackEnabled.value = v
   }
 
+  // V3 Phase 6 — first-encounter telegraph. Persisted to localStorage so
+  // "first encounter" means the first time ever, across sessions, not just
+  // the first time this run.
+  const seenCounterEnemies = ref<Set<EnemyType>>(loadSeenCounterEnemies())
+  if (typeof window !== 'undefined') {
+    watch(seenCounterEnemies, (v) => {
+      try { window.localStorage.setItem(SEEN_COUNTER_ENEMIES_PREF_KEY, JSON.stringify([...v])) }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function markCounterEnemySeen(type: EnemyType): void {
+    if (seenCounterEnemies.value.has(type)) return
+    // Reassign rather than mutate so the persistence watcher fires and any
+    // computed consumers re-evaluate.
+    const next = new Set(seenCounterEnemies.value)
+    next.add(type)
+    seenCounterEnemies.value = next
+  }
+
+  function hasSeenCounterEnemy(type: EnemyType): boolean {
+    return seenCounterEnemies.value.has(type)
+  }
+
   // Piecewise paths Phase 5: Function Panel ↔ Renderer hover sync.
-  // Panel writes via `setHoveredSegmentId`; `useGameLoop` mirrors the
-  // value onto `game.hoveredSegmentId` so the Renderer (engine layer)
+  // Panel writes via `setHoveredSegmentId`; `useEngineUiBridges` mirrors the
+  // value onto `game.hud.hoveredSegmentId` so the Renderer (engine layer)
   // reads it without pulling in Pinia.
   const hoveredSegmentId = ref<string | null>(null)
 
@@ -230,6 +266,9 @@ export const useUiStore = defineStore('ui', () => {
     modalTitle.value = 'Error'
     modalMessage.value = 'The operation could not be completed. Please try again.'
     modalCallback.value = null
+    modalSticky.value = false
+    modalConfirmMode.value = false
+    modalConfirmResolver = null
     modalVisible.value = true
   }
 
@@ -307,6 +346,7 @@ export const useUiStore = defineStore('ui', () => {
     principleOverlayEnabled,
     audioMuted, audioVolume,
     sliderFallbackEnabled,
+    seenCounterEnemies,
     showModal, showConfirm, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
     setBuildHintStep,
@@ -314,5 +354,6 @@ export const useUiStore = defineStore('ui', () => {
     setPrincipleOverlayEnabled,
     setAudioVolume,
     setSliderFallbackEnabled,
+    markCounterEnemySeen, hasSeenCounterEnemy,
   }
 })

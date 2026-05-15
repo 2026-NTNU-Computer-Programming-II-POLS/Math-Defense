@@ -18,8 +18,10 @@
  *   - reaching into systems (e.g. MontyHallSystem) → gameCommandService
  */
 import { defineStore } from 'pinia'
-import { ref, reactive, shallowRef, computed } from 'vue'
+import { ref, reactive, shallowRef, computed, onScopeDispose } from 'vue'
 import { GamePhase, Events, GRID_MIN_X, GRID_MAX_X, GRID_MIN_Y, GRID_MAX_Y } from '@/data/constants'
+import type { EnemyType } from '@/data/constants'
+import { isCounterEnemy } from '@/data/counter-enemy-info'
 import { appBus } from '@/lib/app-bus'
 import type { Game } from '@/engine/Game'
 import type { ActiveBuffEntry } from '@/engine/GameState'
@@ -145,6 +147,26 @@ export const useGameStore = defineStore('game', () => {
   // ── Engine binding ──
   let _game: Game | null = null
   let _unsubscribes: (() => void)[] = []
+
+  // ── V3 Phase 6: pre-wave counter-enemy forecast (§6.1) ──
+  // Distinct counter-enemy types in the *upcoming* wave. During BUILD before
+  // wave N (1-indexed), `wave` equals N-1, so the upcoming WaveDef is
+  // currentWaves[wave]. `_game` itself is not reactive, but this is gated on
+  // `phase` and reads `wave` — both reactive and both move whenever a new
+  // wave becomes "upcoming", so the computed re-evaluates when it matters.
+  // Guarded for a null engine, missing waves, and an out-of-range index.
+  const upcomingCounterEnemyTypes = computed<EnemyType[]>(() => {
+    if (phase.value !== GamePhase.BUILD) return []
+    const waves = _game?.currentWaves
+    if (!waves) return []
+    const upcoming = waves[wave.value]
+    if (!upcoming) return []
+    const types = new Set<EnemyType>()
+    for (const entry of upcoming.enemies) {
+      if (isCounterEnemy(entry.type)) types.add(entry.type)
+    }
+    return [...types]
+  })
 
   function bindEngine(game: Game): void {
     unbindEngine()
@@ -333,7 +355,7 @@ export const useGameStore = defineStore('game', () => {
     clearPathPanel()
   }
 
-  appBus.on('auth:logout', () => { clear() })
+  onScopeDispose(appBus.on('auth:logout', () => { clear() }))
 
   return {
     phase, level, starRating, wave, totalWaves,
@@ -344,6 +366,7 @@ export const useGameStore = defineStore('game', () => {
     pathLabelOpacity,
     pathPanel,
     lastCheckpoint, isCheckpointRun,
+    upcomingCounterEnemyTypes,
     setPathPanelSegments, setCurrentSegment, setLeadEnemyX, clearPathPanel,
     isBuilding, isWave, isBuff, isMontyHall, hpPercent, activeTime,
     bindEngine, unbindEngine, syncFromEngine, getEngine, selfCastCenter,
