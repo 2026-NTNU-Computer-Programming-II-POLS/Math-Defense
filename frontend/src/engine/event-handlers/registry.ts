@@ -83,9 +83,10 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
 
   // ── Wave / enemies ──
   WAVE_START: [
-    { module: 'systems/WaveSystem',   handler: '_startWave',  purpose: 'Load wave spawn queue + timers' },
-    { module: 'systems/CombatSystem', handler: 'anonymous',   purpose: 'Reset per-wave cooldowns' },
-    { module: 'stores/gameStore',     handler: 'anonymous',   purpose: 'Track current wave in store' },
+    { module: 'systems/WaveSystem',              handler: '_startWave',  purpose: 'Load wave spawn queue + timers' },
+    { module: 'systems/CombatSystem',            handler: 'anonymous',   purpose: 'Reset per-wave cooldowns' },
+    { module: 'stores/gameStore',                handler: 'anonymous',   purpose: 'Track current wave in store' },
+    { module: 'systems/TowerInterferenceSystem', handler: 'anonymous',   purpose: 'Mark interference dirty so factors recompute at wave start' },
   ],
   WAVE_END: [
     { module: 'composables/useSessionSync',     handler: 'anonymous',  purpose: 'Persist wave snapshot to backend (generation-guarded)' },
