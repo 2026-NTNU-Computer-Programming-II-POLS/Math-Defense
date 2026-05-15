@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import ManualModal from '@/components/common/ManualModal.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+
+const manualOpen = ref(false)
 
 const mathGlyphs = [
   { text: '7', left: '7%', top: '78%', size: '34px', duration: '20s', delay: '-4s', drift: '18px', rotate: '-8deg' },
@@ -76,10 +80,15 @@ const mathGlyphs = [
       <button v-if="auth.isAdmin" class="btn menu-btn" @click="router.push({ name: 'admin-teachers' })">
         ✦ 管理面板
       </button>
+      <button class="btn menu-btn" @click="manualOpen = true">
+        ◇ 遊戲手冊
+      </button>
       <button class="btn menu-btn" @click="auth.isLoggedIn ? auth.logout() : router.push({ name: 'auth' })">
         {{ auth.isLoggedIn ? '⏻ 登出' : '⬡ 登入 / 註冊' }}
       </button>
     </nav>
+
+    <ManualModal :open="manualOpen" mode="full" @close="manualOpen = false" />
 
     <footer class="menu-footer">
       <span>程式設計（二）期末專題 · 2026</span>

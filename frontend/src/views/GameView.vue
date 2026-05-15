@@ -28,6 +28,7 @@ import StartWaveButton from '@/components/game/StartWaveButton.vue'
 import Modal from '@/components/common/Modal.vue'
 import AchievementToast from '@/components/game/AchievementToast.vue'
 import PrincipleOverlay from '@/components/game/PrincipleOverlay.vue'
+import ManualModal from '@/components/common/ManualModal.vue'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -214,6 +215,8 @@ function onAbandonCheckpoint(): void {
   navigateAfterLoss()
 }
 
+const manualOpen = ref(false)
+
 // U-1: pause / resume. The game loop is owned by the engine via
 // `Game.start/stop` which already cancels its RAF cleanly. Pausing outside
 // the WAVE phase is meaningless (BUILD and BUFF_SELECT don't advance the
@@ -249,6 +252,8 @@ function onKeydown(e: KeyboardEvent): void {
   // game could resume behind a stale pause overlay, or the card's pause could
   // be lifted out from under it. Defer to the card while it is showing.
   if (firstEncounterCard.value) return
+  // While the manual is open it owns Escape (close) and Space should not pause.
+  if (manualOpen.value) return
   if (e.code === 'Space' || e.code === 'Escape') {
     e.preventDefault()
     togglePause()
@@ -368,6 +373,17 @@ onBeforeUnmount(() => {
         <span aria-hidden="true">←</span>
         Exit Run
       </button>
+      <button
+        type="button"
+        class="manual-btn"
+        aria-label="Open field reference manual"
+        title="Field reference (towers, enemies, spells)"
+        @click="manualOpen = true"
+      >
+        <span aria-hidden="true">◇</span>
+        Manual
+      </button>
+      <ManualModal :open="manualOpen" mode="reference" @close="manualOpen = false" />
       <!-- Backlog §20 — practice-mode badge persists for the entire WAVE/BUILD
            session so the player never forgets the run is leaderboard-ineligible. -->
       <div
@@ -532,6 +548,37 @@ onBeforeUnmount(() => {
 }
 
 .return-level-btn:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+.manual-btn {
+  position: absolute;
+  top: calc(var(--hud-height, 48px) + 12px);
+  right: 12px;
+  z-index: var(--z-action);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--gold-border);
+  border-radius: 4px;
+  background: rgba(44, 62, 80, 0.82);
+  color: var(--gold-bright);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.manual-btn:hover {
+  background: rgba(44, 62, 80, 0.96);
+  border-color: var(--gold);
+}
+
+.manual-btn:focus-visible {
   outline: 2px solid var(--gold-bright);
   outline-offset: 2px;
 }
