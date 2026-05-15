@@ -4,10 +4,10 @@ import { recomputeEffectiveDamage } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 
-const ZONE_WIDTH = 1.5
+export const ZONE_WIDTH = 1.5
 // Buff zone uses a 2× multiplier relative to the debuff zone: towers sit on a
 // fixed grid so a tighter width would miss well-placed towers.
-const BUFF_ZONE_MULTIPLIER = 2
+export const BUFF_ZONE_MULTIPLIER = 2
 
 export class MagicTowerSystem {
   private _unsubs: (() => void)[] = []
@@ -92,8 +92,14 @@ export class MagicTowerSystem {
     const zoneWidth = ZONE_WIDTH * (1 + (mods['zone_width'] ?? 0))
     const strengthMult = 1 + (mods['zone_strength'] ?? 0)
     const dotDuration = 1.0 * (1 + (mods['duration'] ?? 0))
+    const range = tower.effectiveRange
+    // Curve is evaluated in world coordinates so students must compute the
+    // translation `y = f(x − h) + k` themselves — but the influence is gated
+    // by the tower's range on x, otherwise a curve passing far away would
+    // still tag distant enemies.
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
+      if (Math.abs(enemy.x - tower.x) > range) continue
       const curveY = fn(enemy.x)
       if (Math.abs(enemy.y - curveY) < zoneWidth) {
         enemy.slowFactor = Math.max(enemy.slowFactor, 0.4)
@@ -109,8 +115,10 @@ export class MagicTowerSystem {
     const zoneWidth = ZONE_WIDTH * (1 + (mods['zone_width'] ?? 0))
     const strengthMult = 1 + (mods['zone_strength'] ?? 0)
     const buffAmount = 1.25 * strengthMult
+    const range = tower.effectiveRange
     for (const other of game.towers) {
       if (other.id === tower.id || other.disabled) continue
+      if (Math.abs(other.x - tower.x) > range) continue
       const curveY = fn(other.x)
       if (Math.abs(other.y - curveY) < zoneWidth * BUFF_ZONE_MULTIPLIER) {
         other.magicBuff = Math.max(other.magicBuff, buffAmount)

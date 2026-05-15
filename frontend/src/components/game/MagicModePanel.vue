@@ -86,6 +86,20 @@ const placeholder = computed(() => {
   return 'e.g. 2*x^2 - x + 5  (use * for multiply)'
 })
 
+// Render a parabola translated to pass through the tower position. The world
+// origin sits at canvas centre so both coordinates can be negative; emit clean
+// math notation rather than literal `(x - -3)^2 + -5`.
+const translatedExample = computed(() => {
+  const t = tower.value
+  if (!t) return ''
+  const h = t.x
+  const k = t.y
+  const inner = h === 0 ? 'x' : h > 0 ? `x - ${h}` : `x + ${-h}`
+  const base = h === 0 ? 'x^2' : `(${inner})^2`
+  if (k === 0) return base
+  return k > 0 ? `${base} + ${k}` : `${base} - ${-k}`
+})
+
 watch(tower, (t) => {
   inputExpr.value = t?.magicExpression ?? ''
   error.value = ''
@@ -174,6 +188,11 @@ function toggleMode(mode: MagicMode) {
     </div>
     <div v-else class="fn-input">
       <p class="section-label">Function f(x):</p>
+      <p v-if="tower" class="hint origin-hint" data-testid="magic-origin-hint">
+        Curve is plotted in world coordinates (origin = (0, 0)).
+        This tower sits at ({{ tower.x }}, {{ tower.y }}) — to pass the curve
+        through it, translate manually, e.g. <code>{{ translatedExample }}</code>.
+      </p>
       <div class="input-row">
         <input
           v-model="inputExpr"
@@ -230,6 +249,13 @@ function toggleMode(mode: MagicMode) {
 .fn-field:focus { border-color: #ffffff; box-shadow: 0 0 5px rgba(255, 215, 0, 0.4); }
 .apply-btn { font-size: 11px; padding: 6px 10px; }
 .hint { font-size: 10px; color: var(--text-primary); margin: 0; opacity: 0.7; }
+.origin-hint code {
+  font-family: var(--font-mono, monospace);
+  color: var(--gold, #d4a840);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0 3px;
+  border-radius: 2px;
+}
 .fn-locked { color: var(--hp-red); opacity: 0.85; text-decoration: line-through; }
 .error-msg { font-size: 10px; color: #ff8888; margin: 0; }
 .mode-btns { display: flex; gap: 6px; }

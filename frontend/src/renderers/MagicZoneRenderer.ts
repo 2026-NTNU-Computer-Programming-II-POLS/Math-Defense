@@ -5,8 +5,6 @@ import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import { projectMagicZones } from '@/engine/projections/project-magic-zones'
 import type { MagicZoneView } from '@/engine/projections/views'
 
-const ZONE_WIDTH_PX = 1.5 * UNIT_PX
-
 export class MagicZoneRenderer {
   update(_dt: number, _game: Game): void {}
 
@@ -34,19 +32,20 @@ export class MagicZoneRenderer {
     const xMin = view.x - view.range
     const xMax = view.x + view.range
     const step = 0.2
+    const halfWidthPx = view.zoneHalfWidth * UNIT_PX
 
     for (let x = xMin; x <= xMax; x += step) {
       const y = view.curve(x)
       const px = gameToCanvasX(x)
       const py = gameToCanvasY(y)
-      if (x === xMin) ctx.moveTo(px, py - ZONE_WIDTH_PX)
-      else ctx.lineTo(px, py - ZONE_WIDTH_PX)
+      if (x === xMin) ctx.moveTo(px, py - halfWidthPx)
+      else ctx.lineTo(px, py - halfWidthPx)
     }
     for (let x = xMax; x >= xMin; x -= step) {
       const y = view.curve(x)
       const px = gameToCanvasX(x)
       const py = gameToCanvasY(y)
-      ctx.lineTo(px, py + ZONE_WIDTH_PX)
+      ctx.lineTo(px, py + halfWidthPx)
     }
     ctx.closePath()
     ctx.fill()

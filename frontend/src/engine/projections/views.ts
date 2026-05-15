@@ -118,4 +118,10 @@ export interface MagicZoneView {
   readonly mode: 'debuff' | 'buff'
   /** Evaluated curve function for the tower's expression. */
   readonly curve: (x: number) => number
+  /**
+   * Half-thickness of the influence band along the y-axis, in game units.
+   * Mirrors the system-side `zoneWidth * (BUFF_ZONE_MULTIPLIER on buff)` so
+   * the rendered band matches the actual hit region (including talent mods).
+   */
+  readonly zoneHalfWidth: number
 }

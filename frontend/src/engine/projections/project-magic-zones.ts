@@ -5,7 +5,7 @@
  */
 import { TowerType, GamePhase } from '@/data/constants'
 import type { Game } from '@/engine/Game'
-import type { MagicTowerSystem } from '@/systems/MagicTowerSystem'
+import { BUFF_ZONE_MULTIPLIER, ZONE_WIDTH, type MagicTowerSystem } from '@/systems/MagicTowerSystem'
 import type { MagicZoneView } from './views'
 
 export function projectMagicZones(game: Game): MagicZoneView[] {
@@ -16,15 +16,19 @@ export function projectMagicZones(game: Game): MagicZoneView[] {
 
   const views: MagicZoneView[] = []
   for (const tower of game.towers) {
-    if (tower.type !== TowerType.MAGIC || !tower.configured) continue
+    if (tower.type !== TowerType.MAGIC || !tower.configured || tower.disabled) continue
     const curve = magicSystem.getTowerCurve(tower)
     if (!curve) continue
+    const mode: 'debuff' | 'buff' = tower.magicMode === 'debuff' ? 'debuff' : 'buff'
+    const widthMod = tower.talentMods['zone_width'] ?? 0
+    const zoneHalfWidth = ZONE_WIDTH * (1 + widthMod) * (mode === 'buff' ? BUFF_ZONE_MULTIPLIER : 1)
     views.push({
       x: tower.x,
       y: tower.y,
       range: tower.effectiveRange,
-      mode: tower.magicMode === 'debuff' ? 'debuff' : 'buff',
+      mode,
       curve,
+      zoneHalfWidth,
     })
   }
   return views
