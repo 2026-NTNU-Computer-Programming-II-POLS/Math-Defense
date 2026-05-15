@@ -1,4 +1,4 @@
-import { useRouter } from 'vue-router'
+import { useRouter, type HistoryState } from 'vue-router'
 import { useUiStore } from '@/stores/uiStore'
 import { sessionService } from '@/services/sessionService'
 import {
@@ -57,7 +57,7 @@ export function useStartRun() {
       return
     }
 
-    const state: Record<string, unknown> = { level: levelJson, seed }
+    const state: HistoryState = { level: levelJson, seed }
     if (territoryContext) {
       state.territoryContext = JSON.stringify(territoryContext)
     }
