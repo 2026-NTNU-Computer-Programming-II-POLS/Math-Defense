@@ -64,19 +64,24 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   LEVEL_END: [
     { module: 'composables/useSessionSync', handler: 'endSession',  purpose: 'Finalize backend session' },
     { module: 'composables/useGameLoop',    handler: 'anonymous',   purpose: 'Stop loop and surface end-of-level UI' },
+    { module: 'composables/useEngineAudio', handler: 'anonymous',   purpose: 'Trigger level-victory SFX' },
   ],
-  GAME_OVER: [],
+  GAME_OVER: [
+    { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger game-over SFX' },
+  ],
 
   // ── Build phase ──
   BUILD_PHASE_START: [],
   BUILD_PHASE_END:   [],
   TOWER_PLACED: [
     { module: 'composables/useEngineUiBridges',     handler: 'anonymous', purpose: 'UI feedback on tower placement' },
+    { module: 'composables/useEngineAudio',         handler: 'anonymous', purpose: 'Trigger tower-place SFX' },
     { module: 'systems/MatrixTowerSystem',          handler: 'anonymous', purpose: 'Auto-pair newly placed Matrix towers' },
     { module: 'systems/TowerInterferenceSystem',    handler: 'anonymous', purpose: 'Recompute same-type interference factors so the BUILD preview is correct' },
   ],
   TOWER_SELECTED: [
-    { module: 'composables/useGameLoop', handler: 'anonymous', purpose: 'Open build/inspect panel' },
+    { module: 'composables/useEngineUiBridges', handler: 'anonymous', purpose: 'Open build/inspect panel' },
+    { module: 'composables/useEngineAudio',     handler: 'anonymous', purpose: 'Trigger tower-select SFX' },
   ],
   TOWER_PARAMS_SET: [],
   CAST_SPELL: [],
@@ -87,6 +92,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/CombatSystem',            handler: 'anonymous',   purpose: 'Reset per-wave cooldowns' },
     { module: 'stores/gameStore',                handler: 'anonymous',   purpose: 'Track current wave in store' },
     { module: 'systems/TowerInterferenceSystem', handler: 'anonymous',   purpose: 'Mark interference dirty so factors recompute at wave start' },
+    { module: 'composables/useEngineAudio',      handler: 'anonymous',   purpose: 'Trigger wave-start SFX' },
   ],
   WAVE_END: [
     { module: 'composables/useSessionSync',     handler: 'anonymous',  purpose: 'Persist wave snapshot to backend (generation-guarded)' },
@@ -96,9 +102,10 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/EconomySystem',          handler: 'anonymous',  purpose: 'Award wave-completion bonus' },
   ],
   ENEMY_SPAWNED: [
-    { module: 'stores/gameStore',                 handler: 'anonymous', purpose: 'Mirror live enemy count for UI' },
-    { module: 'systems/EnemyAbilitySystem',       handler: 'anonymous', purpose: 'Initialize per-enemy ability state on spawn' },
-    { module: 'composables/useFirstEncounterCards',handler: 'onSpawn',   purpose: 'Queue first-encounter card + soft-pause on first sighting of a counter-enemy' },
+    { module: 'stores/gameStore',                  handler: 'anonymous', purpose: 'Mirror live enemy count for UI' },
+    { module: 'systems/EnemyAbilitySystem',        handler: 'anonymous', purpose: 'Initialize per-enemy ability state on spawn' },
+    { module: 'composables/useFirstEncounterCards', handler: 'onSpawn',   purpose: 'Queue first-encounter card + soft-pause on first sighting of a counter-enemy' },
+    { module: 'composables/useEngineAudio',        handler: 'anonymous', purpose: 'Trigger enemy-spawn or boss-spawn SFX' },
   ],
   ENEMY_KILLED: [
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger kill SFX' },
@@ -107,10 +114,13 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/EnemyAbilitySystem', handler: 'anonymous', purpose: 'Trigger on-kill ability effects (split, etc.)' },
   ],
   ENEMY_REACHED_ORIGIN: [
-    { module: 'stores/gameStore',      handler: 'anonymous', purpose: 'Mirror leak count for UI' },
-    { module: 'systems/EconomySystem', handler: 'anonymous', purpose: 'Apply HP damage unless shielded' },
+    { module: 'stores/gameStore',          handler: 'anonymous', purpose: 'Mirror leak count for UI' },
+    { module: 'systems/EconomySystem',     handler: 'anonymous', purpose: 'Apply HP damage unless shielded' },
+    { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger enemy-reached SFX' },
   ],
-  TOWER_ATTACK: [],
+  TOWER_ATTACK: [
+    { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger heavy or light attack SFX based on tower type' },
+  ],
   DAMAGE_RESOLVED: [
     { module: 'renderers/CombatFeedbackRenderer', handler: 'anonymous', purpose: 'Spawn floating combat text for a defensively-modified hit' },
   ],
@@ -144,7 +154,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   SEGMENT_CHANGED: [
     { module: 'engine/projections/project-path-panel', handler: 'anonymous', purpose: 'Recompute projected path panel when active segment changes' },
   ],
-  PLACEMENT_REJECTED: [],
+  PLACEMENT_REJECTED: [
+    { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger cancel SFX on rejected placement' },
+  ],
 
   // ── V2 tower events ──
   MAGIC_FUNCTION_SELECTED: [
@@ -175,15 +187,17 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Upgrade tower level and stats' },
   ],
   TOWER_UPGRADED: [
-    { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Increment towerUpgradeTick to force TowerInfoPanel re-render' },
+    { module: 'stores/gameStore',           handler: 'anonymous', purpose: 'Increment towerUpgradeTick to force TowerInfoPanel re-render' },
     { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Respawn Calculus pets so upgrade extras and stat bonuses propagate' },
+    { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger tower-upgrade SFX' },
   ],
   TOWER_REFUND: [
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Refund tower cost and remove it' },
   ],
   TOWER_REFUND_RESULT: [
-    { module: 'systems/MatrixTowerSystem',       handler: 'anonymous', purpose: 'Clean up stale laser state and partner matrixPairId when a Matrix tower is sold' },
-    { module: 'systems/TowerInterferenceSystem', handler: 'anonymous', purpose: 'Recompute interference factors after a tower is refunded so neighbours lift the penalty' },
+    { module: 'systems/MatrixTowerSystem',        handler: 'anonymous', purpose: 'Clean up stale laser state and partner matrixPairId when a Matrix tower is sold' },
+    { module: 'systems/TowerInterferenceSystem',  handler: 'anonymous', purpose: 'Recompute interference factors after a tower is refunded so neighbours lift the penalty' },
+    { module: 'composables/useEngineAudio',       handler: 'anonymous', purpose: 'Trigger refund-success SFX' },
   ],
   TOWER_REMOVED: [
     { module: 'composables/useGameLoop',         handler: 'anonymous', purpose: 'Close build panel when tower is system-removed' },
