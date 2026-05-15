@@ -5,10 +5,11 @@ Revises: x8a9b0c1d2e3f
 Create Date: 2026-05-15
 
 BD-8: territory_session_uses.session_id had no FK to game_sessions.id, allowing
-orphan rows and typo'd session ids to be inserted.  RESTRICT prevents deleting a
+orphan rows and typo'd session ids to be inserted. RESTRICT prevents deleting a
 game_session whose id appears in territory_session_uses, which is the desired
-behaviour — these records must be durable (replay prevention).  CASCADE would
-re-open the replay window and SET NULL is impossible because session_id is the PK.
+behaviour: these records must be durable for replay prevention. CASCADE would
+re-open the replay window, and SET NULL is impossible because session_id is the
+primary key.
 """
 from alembic import op
 
