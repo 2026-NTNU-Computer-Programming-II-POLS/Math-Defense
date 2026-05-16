@@ -70,7 +70,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 | `−C` (finite negative) | heals your origin a little |
 | `−∞` | maximum heal |
 
-- **Pick when:** you understand the question. The tower punishes wrong picks hard, so the reward for a correct ±∞ answer is enormous.
+- **Pick when:** you can reliably solve the shown `lim[x→a] f(x)/(x − a)` quickly, especially against long-lived high-HP enemies where a correct `±∞` result has time to swing the wave. If you're unsure, skip it — wrong picks are heavily punished.
 - **Exam tie-in:** AP Calculus AB one-sided / infinite limits; AST calculus subject test.
 
 ### Calculus Tower — ∫
