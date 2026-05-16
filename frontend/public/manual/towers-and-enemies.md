@@ -6,7 +6,7 @@ Quick-lookup tables for towers, enemies, spells, buffs, and Monty Hall rewards. 
 
 ## Towers
 
-Seven tower types, each tied to a real math concept. Stats below are the **base** tier; Tier 2 adds +25% damage, +10% range, +0% speed at 60% of base cost, and Tier 3 adds +50% damage, +20% range, +15% speed at 100% of base cost — plus type-specific bonuses noted in their row.
+Seven tower types, each tied to a real math concept. Stats below are the **base** tier; Tier 2 adds +25% damage and +10% range at 60% of base cost, and Tier 3 adds +50% damage and +20% range at 100% of base cost. Speed changes, if any, are tower-specific bonuses noted in each row.
 
 ### Magic Tower — ✦
 
@@ -70,7 +70,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 | `−C` (finite negative) | heals your origin a little |
 | `−∞` | maximum heal |
 
-- **Pick when:** you understand the question. The tower punishes wrong picks hard, so the reward for a correct ±∞ answer is enormous.
+- **Pick when:** you can reliably solve the shown `lim[x→a] f(x)/(x − a)` quickly, especially against long-lived high-HP enemies where a correct `±∞` result has time to swing the wave. If you're unsure, skip it — wrong picks are heavily punished.
 - **Exam tie-in:** AP Calculus AB one-sided / infinite limits; AST calculus subject test.
 
 ### Calculus Tower — ∫
@@ -80,7 +80,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Unlocked from:** Star 3
 - **Mechanic:** pick a polynomial function, then pick **derivative** or **integral**. The result of `d/dx` or `∫` is a monomial of the form `C·x^n`. The tower spawns **C pets**, each whose trait is determined by **n** — homing speed, lifetime, damage profile, AoE radius. Pets fly out, home onto the nearest enemy, and detonate.
 - **Tier 2/3:** pet damage +25% / +50%; Tier 3 also +1 pet count and +20% pet speed.
-- **Pick when:** you want chip damage between waves or extra cleanup that doesn't need a firing line.
+- **Pick when:** you want autonomous chip damage during waves or extra cleanup that doesn't need direct line-of-sight positioning.
 - **Exam tie-in:** AP Calculus AB Section I differentiation/integration of polynomials.
 
 ### Tower Roster At-a-Glance
@@ -133,7 +133,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 
 | Threat | Why standard towers struggle | What to do |
 |---|---|---|
-| Regenerator | constant HP regen | Burst damage (Radar C, Lightning spell). DoT alone is unreliable. |
+| Regenerator | constant HP regen | Burst damage (Radar C, Lightning spell). Damage over Time (DoT) alone is unreliable. |
 | Bulwark | 14-damage hit cap | Many small hits — Radar B, Magic curve zone, Matrix laser tick |
 | Swarmling | -65% tower damage; bursty | Calculus pets ignore the modifier. Frost Nova to slow the cluster. |
 | Helper | buffs nearby allies | Kill the Helper *first*. Radar C or a Lightning spell are reliable openers. |
