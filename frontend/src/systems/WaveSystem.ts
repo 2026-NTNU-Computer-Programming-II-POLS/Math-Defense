@@ -63,7 +63,12 @@ export class WaveSystem {
       if (this._spawnQueue.length > 0) return
     }
 
-    if (game.enemies.length === 0) {
+    // Wave ends when no alive enemies remain. Filter on `alive` rather than
+    // `length` so combat-killed corpses lingering through their Visual
+    // Redesign death-animation window do not delay the WAVE→BUFF transition.
+    let aliveCount = 0
+    for (const e of game.enemies) if (e.alive) { aliveCount++; break }
+    if (aliveCount === 0) {
       this._endWave(game)
     }
   }

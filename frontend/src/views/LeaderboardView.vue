@@ -205,7 +205,8 @@ onBeforeUnmount(() => {
 }
 
 .lb-title {
-  font-size: 20px;
+  font-size: var(--text-lg);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
@@ -216,7 +217,7 @@ onBeforeUnmount(() => {
 .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .lb-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.filter-label { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); }
+.filter-label { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .filter-btn.active {
   background: var(--gold);
@@ -225,7 +226,7 @@ onBeforeUnmount(() => {
 }
 
 .lb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.lb-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.lb-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
 
 th, td {
   padding: 10px 12px;
@@ -233,9 +234,9 @@ th, td {
   border-bottom: 1px solid var(--grid-line);
 }
 
-th { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+th { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-2xs); letter-spacing: 2px; text-transform: uppercase; }
 
-.rank     { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 14px; }
+.rank     { color: var(--gold); text-shadow: var(--gold-shadow); font-size: var(--text-sm); }
 .player-name { color: var(--text-primary); }
 .score    { color: var(--gold-bright); font-weight: bold; }
 .lb-loading, .lb-error, .empty { text-align: center; color: var(--axis); text-shadow: var(--gold-shadow); padding: 32px; }
@@ -247,6 +248,6 @@ th { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 10px; lette
   justify-content: center;
   gap: 12px;
 }
-.page-info { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); }
+.page-info { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); }
 .page-btn:disabled { opacity: 0.3; cursor: default; }
 </style>

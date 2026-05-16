@@ -114,7 +114,7 @@ defineExpose({ castingSpell, castAtPosition })
   color: var(--spell-color, #888);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: bold;
   overflow: hidden;
   transition: background 120ms, transform 80ms;
@@ -154,7 +154,7 @@ defineExpose({ castingSpell, castAtPosition })
   left: 0;
   right: 0;
   text-align: center;
-  font-size: 9px;
+  font-size: var(--text-xs);
   color: #fff;
   z-index: 2;
 }
@@ -163,7 +163,7 @@ defineExpose({ castingSpell, castAtPosition })
   position: absolute;
   top: 1px;
   right: 2px;
-  font-size: 8px;
+  font-size: var(--text-xs);
   color: var(--gold);
   z-index: 2;
 }

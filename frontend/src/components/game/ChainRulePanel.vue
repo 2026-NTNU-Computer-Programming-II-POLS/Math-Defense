@@ -124,13 +124,13 @@ function submit(index: number) {
 
 .title {
   color: var(--gold-bright);
-  font-size: 18px;
+  font-size: var(--text-md);
   margin: 0 0 8px;
 }
 
 .prompt {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   margin: 0 0 12px;
 }
 
@@ -154,7 +154,7 @@ function submit(index: number) {
   padding: 12px 8px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-sm);
   transition: background 0.15s, border-color 0.15s;
 }
 

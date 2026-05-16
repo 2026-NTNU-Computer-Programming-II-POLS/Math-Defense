@@ -218,7 +218,7 @@ function onInput(key: string, event: Event) {
 }
 
 .integral-label {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--axis);
   letter-spacing: 1px;
   text-align: center;
@@ -245,7 +245,7 @@ function onInput(key: string, event: Event) {
 }
 
 .coeff-label {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--gold);
   font-style: italic;
 }
@@ -253,7 +253,8 @@ function onInput(key: string, event: Event) {
 .coeff-input {
   width: 52px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--text-lg);
+  font-family: var(--font-mono);
 }
 
 .bounds-row {
@@ -266,13 +267,13 @@ function onInput(key: string, event: Event) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: var(--text-2xs);
 }
 
 .bounds-label {
   width: 70px;
   color: var(--axis);
-  font-size: 9px;
+  font-size: var(--text-2xs);
 }
 
 .bounds-slider {
@@ -285,17 +286,18 @@ function onInput(key: string, event: Event) {
   text-align: right;
   color: var(--gold);
   font-family: monospace;
-  font-size: 10px;
+  font-size: var(--text-2xs);
 }
 
 .area-display {
   text-align: center;
-  font-size: 11px;
+  font-size: var(--text-lg);
   color: #4a82c8;
+  font-family: var(--font-mono);
 }
 
 .area-hint {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--axis);
   margin-left: 4px;
 }

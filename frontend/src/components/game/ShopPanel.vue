@@ -202,7 +202,7 @@ function purchase(itemId: string, cost: number): void {
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   background: rgba(255, 215, 0, 0.1);
-  font-size: 24px;
+  font-size: var(--text-xl);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -235,7 +235,7 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .shop-title {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--gold);
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -251,7 +251,7 @@ function purchase(itemId: string, cost: number): void {
   border: none;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1;
   color: var(--axis);
   cursor: pointer;
@@ -272,7 +272,7 @@ function purchase(itemId: string, cost: number): void {
   border: 1px solid var(--grid-line);
   border-radius: 12px;
   padding: 3px 8px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: #c8b894;
   cursor: pointer;
   white-space: nowrap;
@@ -300,7 +300,7 @@ function purchase(itemId: string, cost: number): void {
   color: var(--gold-bright);
 }
 .chip-count {
-  font-size: 9px;
+  font-size: var(--text-xs);
   color: var(--axis);
   background: rgba(0, 0, 0, 0.3);
   padding: 0 4px;
@@ -330,7 +330,7 @@ function purchase(itemId: string, cost: number): void {
   color: var(--overlay-text);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
   text-align: left;
   overflow: hidden;
   transition: background 120ms;
@@ -369,7 +369,7 @@ function purchase(itemId: string, cost: number): void {
 .item-desc {
   flex-basis: 100%;
   color: var(--axis);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 /* Progress bar overlays the bottom of an active item, shrinking as the buff
@@ -386,7 +386,7 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .empty-msg {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--axis);
   margin: 0;
   padding: 4px 0;

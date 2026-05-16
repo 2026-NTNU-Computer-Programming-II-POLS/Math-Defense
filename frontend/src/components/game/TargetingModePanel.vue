@@ -80,7 +80,7 @@ function setMode(mode: TargetingMode) {
 }
 
 .section-label {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--axis);
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -127,6 +127,6 @@ function setMode(mode: TargetingMode) {
   box-shadow: inset 0 0 0 1px var(--gold-bright);
 }
 
-.mode-icon { font-size: 14px; }
-.mode-label { font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; }
+.mode-icon { font-size: var(--text-sm); }
+.mode-label { font-size: var(--text-xs); letter-spacing: 0.5px; text-transform: uppercase; }
 </style>

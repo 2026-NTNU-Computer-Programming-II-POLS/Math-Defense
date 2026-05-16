@@ -234,20 +234,20 @@ function onUnhover(): void {
 }
 
 .fn-title {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--axis, #8b7342);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .fn-current-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--gold-bright, #d4a840);
   font-weight: bold;
 }
 
 .fn-expr {
-  font-size: 13px;
+  font-size: var(--text-lg);
   line-height: 1.25;
   letter-spacing: 0.2px;
   font-variant-numeric: tabular-nums;
@@ -301,7 +301,7 @@ function onUnhover(): void {
   justify-content: space-between;
   gap: 8px;
   padding: 4px 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
   border-radius: 3px;

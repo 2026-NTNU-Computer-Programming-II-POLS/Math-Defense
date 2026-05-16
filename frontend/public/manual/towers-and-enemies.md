@@ -147,12 +147,12 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 
 Cast from the spell bar. Cost gold, fire instantly, share no resource pool with Build Phase shop buffs.
 
-| Spell | Cost | Cooldown | Effect |
-|---|---|---|---|
-| **Fireball** | 80 | 12 s | 60 damage in a r=3 AoE around the click point |
-| **Frost Nova** | 60 | 15 s | Slow enemies in r=4 to 40% speed for 5 s |
-| **Lightning** | 100 | 18 s | 150 damage to a single targeted enemy |
-| **Haste** | 120 | 25 s | Boost tower attack speed for 8 s (self-cast) |
+| Spell | Glyph | Cost | Cooldown | Effect |
+|---|---|---|---|---|
+| **Fireball** | eˣ | 80 | 12 s | 60 damage in a r=3 AoE around the click point — exponential blow-up reads as explosive |
+| **Frost Nova** | lim → 0 | 60 | 15 s | Slow enemies in r=4 to 40% speed for 5 s — enemy speed limits to zero |
+| **Lightning** | δ | 100 | 18 s | 150 damage to a single targeted enemy — Dirac delta, a single-point spike |
+| **Haste** | d/dt | 120 | 25 s | Boost tower attack speed for 8 s (self-cast) — derivative of position, i.e. go faster |
 
 When to cast:
 

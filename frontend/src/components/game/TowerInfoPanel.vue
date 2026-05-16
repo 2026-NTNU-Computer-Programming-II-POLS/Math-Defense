@@ -155,6 +155,87 @@ const showTargetingMode = computed(() => {
   <div v-if="tower && towerDef" class="tower-info-panel rune-panel">
     <header class="panel-header">
       <span class="panel-title" :style="{ color: towerDef.color }">
+        <!-- Visual Redesign Phase 5a/5b: preview chip mirrors the in-canvas
+             instrument silhouette per tower type. -->
+        <svg
+          v-if="tower.type === TowerType.MAGIC"
+          class="instrument-preview"
+          viewBox="0 0 24 16"
+          aria-hidden="true"
+        >
+          <path
+            d="M2 8 Q 5 2 8 8 T 14 8 T 20 8 T 22 8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+        <svg
+          v-else-if="tower.type === TowerType.RADAR_A"
+          class="instrument-preview"
+          viewBox="0 0 24 16"
+          aria-hidden="true"
+        >
+          <path d="M3 13 A 10 10 0 0 1 21 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M12 13 L 19 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="12" cy="13" r="1.4" fill="currentColor"/>
+        </svg>
+        <svg
+          v-else-if="tower.type === TowerType.RADAR_B"
+          class="instrument-preview"
+          viewBox="0 0 24 16"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.75"/>
+          <circle cx="12" cy="8" r="1.6" fill="currentColor"/>
+        </svg>
+        <svg
+          v-else-if="tower.type === TowerType.MATRIX"
+          class="instrument-preview"
+          viewBox="0 0 24 16"
+          aria-hidden="true"
+        >
+          <path d="M5 3 L 3 3 L 3 13 L 5 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19 3 L 21 3 L 21 13 L 19 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="8" y="8.5" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">3</text>
+          <text x="14" y="8.5" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">7</text>
+          <text x="8" y="13" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">1</text>
+          <text x="14" y="13" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">4</text>
+        </svg>
+        <svg
+          v-else-if="tower.type === TowerType.RADAR_C"
+          class="instrument-preview"
+          viewBox="0 0 24 16"
+          aria-hidden="true"
+        >
+          <line x1="6" y1="14" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+          <line x1="12" y1="14" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+          <line x1="18" y1="14" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+          <line x1="4" y1="6" x2="20" y2="3" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+          <circle cx="20.5" cy="2.8" r="2" fill="currentColor"/>
+        </svg>
+        <svg
+          v-else-if="tower.type === TowerType.LIMIT"
+          class="instrument-preview"
+          viewBox="0 0 24 16"
+          aria-hidden="true"
+        >
+          <line x1="6" y1="14" x2="6" y2="3" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>
+          <line x1="18" y1="14" x2="18" y2="3" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>
+          <line x1="6" y1="4" x2="18" y2="4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="6.5" r="1.8" fill="currentColor"/>
+        </svg>
+        <svg
+          v-else-if="tower.type === TowerType.CALCULUS"
+          class="instrument-preview"
+          viewBox="0 0 24 16"
+          aria-hidden="true"
+        >
+          <path d="M3 14 Q 12 4 21 14" fill="currentColor" opacity="0.25" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+          <text x="12" y="12" font-family="serif" font-size="14" font-weight="bold" text-anchor="middle" fill="currentColor">∫</text>
+        </svg>
         {{ towerDef.nameEn }}
       </span>
       <button class="close-btn" aria-label="Close" @click="close">
@@ -285,17 +366,28 @@ const showTargetingMode = computed(() => {
 }
 
 .panel-header { display: flex; justify-content: space-between; align-items: center; }
-.panel-title { font-size: 12px; letter-spacing: 2px; }
+.panel-title {
+  font-size: var(--text-xs);
+  letter-spacing: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.instrument-preview {
+  width: 28px;
+  height: 14px;
+  flex-shrink: 0;
+}
 .close-btn {
   background: none; border: none; color: var(--axis); cursor: pointer;
-  font-size: 14px; min-width: 44px; min-height: 44px;
+  font-size: var(--text-sm); min-width: 44px; min-height: 44px;
   display: inline-flex; align-items: center; justify-content: center;
 }
 
 .stats { display: flex; flex-direction: column; gap: 2px; }
 .stat-row {
   display: flex; justify-content: space-between;
-  font-size: 11px; color: var(--text-primary);
+  font-size: var(--text-xs); color: var(--text-primary);
 }
 .stat-row > span:last-child { color: var(--gold); font-weight: bold; }
 
@@ -306,7 +398,7 @@ const showTargetingMode = computed(() => {
 details.stat-row--breakdown {
   display: flex;
   flex-direction: column;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
 }
 details.stat-row--breakdown > summary {
@@ -330,7 +422,7 @@ details.stat-row--breakdown > summary > .stat-value {
   gap: 4px;
 }
 .bd-chevron {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--axis);
   transition: transform 0.15s;
 }
@@ -347,7 +439,7 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 .bd-row {
   display: flex;
@@ -369,9 +461,9 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
 .bd-total > span:first-child { color: var(--text-primary); }
 .bd-total > span:last-child { color: var(--gold); font-weight: bold; }
 
-.math-concept { font-size: 10px; color: var(--axis); letter-spacing: 1px; margin: 0; }
+.math-concept { font-size: var(--text-xs); color: var(--axis); letter-spacing: 1px; margin: 0; }
 .exam-relevance {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
   line-height: 1.45;
   margin: 0;
@@ -383,7 +475,7 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
 .exam-label {
   display: inline-block;
   margin-right: 6px;
-  font-size: 9px;
+  font-size: var(--text-2xs);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--gold);
@@ -392,18 +484,18 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
 
 .panel-actions { display: flex; gap: 8px; }
 .refund-btn {
-  flex: 0 0 auto; font-size: 11px; padding: 8px 12px;
+  flex: 0 0 auto; font-size: var(--text-xs); padding: 8px 12px;
   border-color: var(--hp-red); color: var(--hp-red);
 }
 .refund-btn:hover { background: var(--hp-red); color: #ffffff; }
 .refund-confirm {
   display: flex; align-items: center; gap: 6px; flex: 1;
 }
-.refund-prompt { font-size: 11px; color: var(--hp-red); white-space: nowrap; }
-.refund-yes { font-size: 10px; padding: 6px 10px; min-height: 32px; border-color: var(--hp-red); color: var(--hp-red); }
+.refund-prompt { font-size: var(--text-xs); color: var(--hp-red); white-space: nowrap; }
+.refund-yes { font-size: var(--text-xs); padding: 6px 10px; min-height: 32px; border-color: var(--hp-red); color: var(--hp-red); }
 .refund-yes:hover { background: var(--hp-red); color: var(--stone-dark); }
-.refund-no { font-size: 10px; padding: 6px 10px; min-height: 32px; }
-.upgrade-btn { flex: 1; font-size: 11px; padding: 8px 12px; }
+.refund-no { font-size: var(--text-xs); padding: 6px 10px; min-height: 32px; }
+.upgrade-btn { flex: 1; font-size: var(--text-xs); padding: 8px 12px; }
 .upgrade-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {

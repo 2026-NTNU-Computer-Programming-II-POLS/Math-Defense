@@ -150,13 +150,13 @@ function close(): void {
 
 .mh-title {
   color: var(--gold-bright);
-  font-size: 18px;
+  font-size: var(--text-md);
   margin: 0 0 12px;
 }
 
 .mh-prompt {
   color: var(--overlay-text);
-  font-size: 14px;
+  font-size: var(--text-sm);
   margin: 0 0 16px;
 }
 
@@ -181,7 +181,7 @@ function close(): void {
   color: var(--overlay-text);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 20px;
+  font-size: var(--text-lg);
   font-weight: bold;
   display: flex;
   flex-direction: column;
@@ -211,9 +211,9 @@ function close(): void {
   background: rgba(96, 240, 144, 0.15);
 }
 
-.door-number { font-size: 20px; }
-.door-empty { font-size: 9px; color: var(--hp-red); }
-.door-prize { font-size: 9px; color: #60f090; }
+.door-number { font-size: var(--text-lg); }
+.door-empty { font-size: var(--text-2xs); color: var(--hp-red); }
+.door-prize { font-size: var(--text-2xs); color: #60f090; }
 
 .switch-buttons {
   display: flex;
@@ -226,7 +226,7 @@ function close(): void {
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--text-xs);
   cursor: pointer;
   transition: background 120ms;
 }

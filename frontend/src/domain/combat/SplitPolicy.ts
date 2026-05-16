@@ -1,4 +1,4 @@
-import { Events } from '@/data/constants'
+import { Events, EnemyType, ANIM } from '@/data/constants'
 import { createEnemy } from '@/entities/EnemyFactory'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { Enemy } from '@/entities/types'
@@ -76,7 +76,16 @@ export function killEnemy(enemy: Enemy, game: CombatGameContext): void {
   enemy.hp = 0
   enemy.alive = false
   enemy.active = false
+  // Visual Redesign Phase 0: mark the enemy as dying so MovementSystem keeps
+  // it in the entity list for the death-animation window. Bosses get a
+  // longer window. Combat treats `alive === false` as dead immediately —
+  // only the render lifecycle is extended.
+  const isBoss = enemy.type === EnemyType.BOSS_A || enemy.type === EnemyType.BOSS_B
+  enemy.dying = true
+  enemy.dyingTimer = 0
+  enemy.deathMaxTime = isBoss ? ANIM.BOSS_DEATH : ANIM.ENEMY_DEATH
   game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+  game.eventBus.emit(Events.ENEMY_DYING, enemy)
   if (shouldSplit(enemy) && game.levelContext?.path) {
     spawnChildren(enemy, {
       path: game.levelContext.path,
@@ -114,6 +123,10 @@ export function applyDamage(
   source: DamageSource,
 ): void {
   if (!enemy.alive) return
+  // Visual Redesign Phase 1: arm hit flash. MovementSystem ages the field;
+  // EnemyRenderer reads `hitFlashAge` through the projection and paints a
+  // brief screen-blend overlay while still under ANIM.HIT_FLASH.
+  enemy.hitFlashAge = 0
   let remaining = rawAmount * game.state.enemyVulnerability
 
   // Amount entering the defensive pipeline (post-vulnerability). Reported as

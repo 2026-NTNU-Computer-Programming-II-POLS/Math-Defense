@@ -50,6 +50,15 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
     },
     assignEnemyPath() {},
     getSystem() { return undefined },
+    // ShakeController stub — the real Game owns one; systems may call
+    // shake() from their listeners (Visual Redesign Phase 1+) and the mock
+    // must not throw.
+    shake: {
+      shake() {},
+      update() {},
+      getOffset() { return { dx: 0, dy: 0 } },
+      cancel() {},
+    },
   } as unknown as Game
 
   // Inline economy stub — same shape as EconomySystem's resource API.

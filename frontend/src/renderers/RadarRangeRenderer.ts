@@ -2,6 +2,7 @@ import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { TowerType, GamePhase, UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import type { Tower } from '@/entities/types'
 
 export class RadarRangeRenderer {
   update(_dt: number, _game: Game): void {}
@@ -15,35 +16,109 @@ export class RadarRangeRenderer {
           tower.type !== TowerType.RADAR_B &&
           tower.type !== TowerType.RADAR_C) continue
       if (!tower.configured) continue
+      this._drawRange(ctx, game, tower)
+    }
+  }
 
-      const px = gameToCanvasX(tower.x)
-      const py = gameToCanvasY(tower.y)
-      const radiusPx = tower.effectiveRange * UNIT_PX
+  // Visual Redesign Phase 5b: each radar instrument gets a distinct arc
+  // treatment that mirrors its tower body — sextant graduations for A,
+  // a concentric astrolabe ring for B, a scope-bracketed cone for C.
+  private _drawRange(ctx: CanvasRenderingContext2D, game: import('@/engine/Game').Game, tower: Tower): void {
+    const px = gameToCanvasX(tower.x)
+    const py = gameToCanvasY(tower.y)
+    const radiusPx = tower.effectiveRange * UNIT_PX
+    const color = tower.color
+    const arcStart = tower.arcStart ?? 0
+    const arcEnd = tower.arcEnd ?? Math.PI / 2
 
-      ctx.save()
+    ctx.save()
+    ctx.strokeStyle = `${color}44`
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.arc(px, py, radiusPx, 0, Math.PI * 2)
+    ctx.stroke()
 
-      ctx.strokeStyle = `${tower.color}44`
+    ctx.fillStyle = `${color}22`
+    ctx.beginPath()
+    ctx.moveTo(px, py)
+    ctx.arc(px, py, radiusPx, -arcEnd, -arcStart)
+    ctx.closePath()
+    ctx.fill()
+
+    ctx.strokeStyle = `${color}88`
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(px, py, radiusPx, -arcEnd, -arcStart)
+    ctx.stroke()
+
+    if (tower.type === TowerType.RADAR_A) {
+      ctx.strokeStyle = `${color}cc`
+      ctx.lineWidth = 1
+      const ticks = 8
+      for (let i = 0; i <= ticks; i++) {
+        const a = -arcEnd + (i / ticks) * (arcEnd - arcStart)
+        const x1 = px + Math.cos(a) * (radiusPx - 4)
+        const y1 = py + Math.sin(a) * (radiusPx - 4)
+        const x2 = px + Math.cos(a) * radiusPx
+        const y2 = py + Math.sin(a) * radiusPx
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
+        ctx.stroke()
+      }
+    } else if (tower.type === TowerType.RADAR_B) {
+      ctx.strokeStyle = `${color}55`
       ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.arc(px, py, radiusPx, 0, Math.PI * 2)
+      ctx.arc(px, py, radiusPx * 0.7, -arcEnd, -arcStart)
       ctx.stroke()
-
-      const arcStart = tower.arcStart ?? 0
-      const arcEnd = tower.arcEnd ?? Math.PI / 2
-      ctx.fillStyle = `${tower.color}22`
+    } else {
+      // Telescope C — dashed bore-sight to nearest in-range enemy + scope
+      // bracket ticks at the wedge endpoints. Aim is cosmetic; the actual
+      // firing target is still picked by RadarTowerSystem.
+      const aim = this._nearestEnemyAngle(tower, game)
+      const aimAngle = aim !== null ? -aim : -(arcStart + arcEnd) / 2
+      ctx.strokeStyle = `${color}aa`
+      ctx.lineWidth = 1.4
+      ctx.setLineDash([4, 4])
       ctx.beginPath()
       ctx.moveTo(px, py)
-      ctx.arc(px, py, radiusPx, -arcEnd, -arcStart)
-      ctx.closePath()
-      ctx.fill()
-
-      ctx.strokeStyle = `${tower.color}88`
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.arc(px, py, radiusPx, -arcEnd, -arcStart)
+      ctx.lineTo(px + Math.cos(aimAngle) * radiusPx, py + Math.sin(aimAngle) * radiusPx)
       ctx.stroke()
+      ctx.setLineDash([])
 
-      ctx.restore()
+      ctx.strokeStyle = `${color}cc`
+      ctx.lineWidth = 1.6
+      for (const a of [-arcStart, -arcEnd]) {
+        const ex = px + Math.cos(a) * radiusPx
+        const ey = py + Math.sin(a) * radiusPx
+        const nx = -Math.sin(a)
+        const ny = Math.cos(a)
+        ctx.beginPath()
+        ctx.moveTo(ex - nx * 4, ey - ny * 4)
+        ctx.lineTo(ex + nx * 4, ey + ny * 4)
+        ctx.stroke()
+      }
     }
+
+    ctx.restore()
+  }
+
+  private _nearestEnemyAngle(tower: Tower, game: import('@/engine/Game').Game): number | null {
+    const r = tower.effectiveRange
+    let bestDist = Infinity
+    let bestX = 0
+    let bestY = 0
+    let found = false
+    for (const e of game.enemies) {
+      if (!e.alive) continue
+      const dx = e.x - tower.x
+      const dy = e.y - tower.y
+      const d = Math.hypot(dx, dy)
+      if (d > r) continue
+      if (d < bestDist) { bestDist = d; bestX = e.x; bestY = e.y; found = true }
+    }
+    if (!found) return null
+    return Math.atan2(bestY - tower.y, bestX - tower.x)
   }
 }

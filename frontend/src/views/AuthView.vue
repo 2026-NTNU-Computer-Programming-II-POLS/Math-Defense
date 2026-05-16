@@ -239,7 +239,10 @@ async function submit(): Promise<void> {
 }
 
 .auth-title {
-  font-size: 16px;
+  /* Rune-flavoured title: retain monospace explicitly now that --font-main
+     is system-ui (Phase 1). */
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
@@ -256,17 +259,17 @@ async function submit(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }
 
 .rune-input { width: 100%; }
 
-.auth-error { font-size: 11px; color: var(--enemy-red); }
+.auth-error { font-size: var(--text-sm); color: var(--enemy-red); }
 
 .mfa-hint {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   opacity: 0.8;
@@ -281,7 +284,7 @@ async function submit(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   opacity: 0.7;
@@ -304,7 +307,7 @@ async function submit(): Promise<void> {
 
 .demo-hint {
   text-align: center;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   opacity: 0.6;
@@ -318,7 +321,7 @@ async function submit(): Promise<void> {
 }
 
 .toggle-btn, .back-btn {
-  font-size: 11px;
+  font-size: var(--text-sm);
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);

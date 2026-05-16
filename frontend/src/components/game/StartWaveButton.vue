@@ -29,7 +29,7 @@ function onClick(): void {
   position: absolute;
   bottom: calc(var(--tower-bar-height, 64px) + 56px);
   left: 16px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   letter-spacing: 3px;
   padding: 10px 20px;
   z-index: var(--z-action);

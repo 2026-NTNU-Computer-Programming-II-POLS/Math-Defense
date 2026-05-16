@@ -379,7 +379,8 @@ async function selectAvatar(url: string): Promise<void> {
 }
 
 .profile-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
@@ -431,7 +432,7 @@ async function selectAvatar(url: string): Promise<void> {
 .avatar-btn.selected { border-color: var(--gold); border-width: 2px; }
 .avatar-btn:disabled { opacity: 0.5; cursor: default; }
 
-.avatar-error { font-size: 10px; color: var(--error-red); }
+.avatar-error { font-size: var(--text-xs); color: var(--error-red); }
 
 .profile-info {
   display: flex;
@@ -442,7 +443,7 @@ async function selectAvatar(url: string): Promise<void> {
 .profile-row {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .profile-label { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; }
@@ -457,7 +458,7 @@ async function selectAvatar(url: string): Promise<void> {
   text-shadow: var(--gold-shadow);
   opacity: 0.5;
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 0;
   line-height: 1;
 }
@@ -473,13 +474,13 @@ async function selectAvatar(url: string): Promise<void> {
 
 .name-input {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding: 2px 6px;
   height: 24px;
 }
 
 .name-save-btn, .name-cancel-btn {
-  font-size: 10px;
+  font-size: var(--text-xs);
   padding: 2px 6px;
   height: 24px;
   min-width: 24px;
@@ -491,10 +492,10 @@ async function selectAvatar(url: string): Promise<void> {
 .name-cancel-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .name-cancel-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
-.name-error { font-size: 10px; color: var(--error-red); }
+.name-error { font-size: var(--text-xs); color: var(--error-red); }
 
-.progression-loading { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; text-align: center; }
-.progression-error { font-size: 11px; color: var(--enemy-red); text-align: center; }
+.progression-loading { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; text-align: center; }
+.progression-error { font-size: var(--text-xs); color: var(--enemy-red); text-align: center; }
 
 .progression-summary {
   display: flex;
@@ -511,9 +512,9 @@ async function selectAvatar(url: string): Promise<void> {
 }
 
 .summary-card:hover { border-color: var(--gold); }
-.summary-title { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
-.summary-stat { font-size: 16px; color: var(--gold); text-shadow: var(--gold-shadow); }
-.summary-sub { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 4px; }
+.summary-title { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+.summary-stat { font-size: var(--text-base); color: var(--gold); text-shadow: var(--gold-shadow); }
+.summary-sub { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 4px; }
 
 .profile-links {
   display: flex;
@@ -522,7 +523,7 @@ async function selectAvatar(url: string): Promise<void> {
 
 .link-btn {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 1px;
   border-color: var(--gold);
   color: var(--gold);
@@ -534,7 +535,7 @@ async function selectAvatar(url: string): Promise<void> {
 .pw-section { display: flex; flex-direction: column; }
 
 .pw-toggle-btn {
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
@@ -550,14 +551,14 @@ async function selectAvatar(url: string): Promise<void> {
   gap: 8px;
 }
 
-.section-title { font-size: 12px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.section-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
 
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
 .settings-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
   cursor: pointer;
 }
@@ -567,7 +568,7 @@ async function selectAvatar(url: string): Promise<void> {
 .settings-row--with-hint .settings-checkbox { margin-top: 2px; }
 .settings-label--block { display: flex; flex-direction: column; gap: 2px; }
 .settings-hint {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   opacity: 0.75;
@@ -584,25 +585,25 @@ async function selectAvatar(url: string): Promise<void> {
 }
 .settings-range:disabled { opacity: 0.4; cursor: not-allowed; }
 .volume-pct {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   min-width: 36px;
   text-align: right;
 }
 
-.pw-error { font-size: 10px; color: var(--error-red); }
-.pw-success { font-size: 10px; color: var(--gold); text-shadow: var(--gold-shadow); }
+.pw-error { font-size: var(--text-xs); color: var(--error-red); }
+.pw-success { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .pw-actions { display: flex; gap: 8px; }
 
-.pw-save-btn { font-size: 11px; border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
+.pw-save-btn { font-size: var(--text-xs); border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
 .pw-save-btn:hover:not(:disabled) { background: var(--gold); color: var(--stone-dark); }
-.pw-cancel-btn { font-size: 11px; border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
+.pw-cancel-btn { font-size: var(--text-xs); border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .pw-cancel-btn:hover:not(:disabled) { background: var(--axis); color: var(--stone-dark); }
 
 .back-btn {
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);

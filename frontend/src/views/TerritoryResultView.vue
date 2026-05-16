@@ -85,14 +85,15 @@ function goBack(): void {
 }
 
 .result-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
 }
 
-.error-msg { font-size: 11px; color: var(--enemy-red); text-align: center; }
-.loading { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); text-align: center; }
+.error-msg { font-size: var(--text-sm); color: var(--enemy-red); text-align: center; }
+.loading { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); text-align: center; }
 
 .result-box {
   display: flex;
@@ -107,8 +108,8 @@ function goBack(): void {
 .result-box.success { border-color: var(--gold); }
 .result-box.failure { border-color: var(--enemy-red); }
 
-.result-text { font-size: 14px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
-.result-score { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); }
+.result-text { font-size: var(--text-sm); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
+.result-score { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .result-actions { display: flex; gap: 8px; }
 .retry-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }

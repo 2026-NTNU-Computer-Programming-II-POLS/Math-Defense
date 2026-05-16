@@ -104,16 +104,16 @@ onMounted(load)
 }
 
 .header { text-align: center; }
-.setup-title { font-size: 16px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 3px; margin: 0; }
-.ch-name { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); margin-top: 4px; }
+.setup-title { font-size: var(--text-base); font-family: var(--font-mono); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 3px; margin: 0; }
+.ch-name { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); margin-top: 4px; }
 
-.loading, .empty-msg { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 12px; text-align: center; padding: 16px 0; }
-.error-msg { color: var(--enemy-red); font-size: 11px; }
+.loading, .empty-msg { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-xs); text-align: center; padding: 16px 0; }
+.error-msg { color: var(--enemy-red); font-size: var(--text-xs); }
 
 .ranking-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .ranking-table th, .ranking-table td {
   padding: 6px 8px;

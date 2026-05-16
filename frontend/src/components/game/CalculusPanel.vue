@@ -289,13 +289,13 @@ function pendingLabel(op: CalcOp): string {
 
 <style scoped>
 .calc-panel { display: flex; flex-direction: column; gap: 8px; }
-.section-label { font-size: 11px; color: var(--axis); margin: 0; }
+.section-label { font-size: var(--text-xs); color: var(--axis); margin: 0; }
 
 .trait-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-primary);
   opacity: 0.8;
   padding: 4px 6px;
@@ -314,12 +314,12 @@ function pendingLabel(op: CalcOp): string {
   font-family: var(--font-mono);
   text-align: left;
 }
-.preset-fn { font-size: 13px; }
+.preset-fn { font-size: var(--text-lg); }
 .preset-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-primary);
   opacity: 0.7;
   font-family: var(--font-sans, inherit);
@@ -330,7 +330,7 @@ function pendingLabel(op: CalcOp): string {
   font-family: var(--font-mono);
   color: var(--text-primary);
   opacity: 0.6;
-  font-size: 10px;
+  font-size: var(--text-2xs);
 }
 .preset-deriv--warn { color: var(--hp-red); }
 
@@ -343,13 +343,13 @@ function pendingLabel(op: CalcOp): string {
 }
 
 .current-fn {
-  font-size: 13px;
+  font-size: var(--text-lg);
   color: var(--gold);
   margin: 0;
   font-family: var(--font-mono);
 }
 .coeff-info {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
   margin: 0;
   display: flex;
@@ -361,16 +361,16 @@ function pendingLabel(op: CalcOp): string {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-primary);
   opacity: 0.8;
 }
 
-.chain-cost { font-size: 11px; margin: 0; color: var(--gold); }
+.chain-cost { font-size: var(--text-xs); margin: 0; color: var(--gold); }
 .chain-cost--free { color: #6ee7b7; }
 .chain-cost--broke { color: var(--hp-red); }
 
-.hint { font-size: 10px; color: var(--text-primary); opacity: 0.5; margin: 0; }
+.hint { font-size: var(--text-2xs); color: var(--text-primary); opacity: 0.5; margin: 0; }
 
 .op-btns { display: flex; gap: 6px; }
 .op-btn {
@@ -379,7 +379,7 @@ function pendingLabel(op: CalcOp): string {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 6px 4px;
 }
 .op-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -396,9 +396,9 @@ function pendingLabel(op: CalcOp): string {
 @media (prefers-reduced-motion: reduce) {
   .op-btn--pending { animation: none; }
 }
-.op-label { font-size: 14px; font-family: var(--font-mono); }
+.op-label { font-size: var(--text-lg); font-family: var(--font-mono); }
 .op-preview {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   font-family: var(--font-mono);
   color: var(--text-primary);
   opacity: 0.7;
@@ -410,7 +410,7 @@ function pendingLabel(op: CalcOp): string {
 .op-preview--collapse { color: var(--gold); }
 .op-tag {
   font-family: var(--font-sans, inherit);
-  font-size: 8px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -430,7 +430,7 @@ function pendingLabel(op: CalcOp): string {
   border-color: var(--gold-bright);
 }
 .confirm-text {
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin: 0;
   color: var(--text-primary);
   line-height: 1.4;
@@ -447,13 +447,13 @@ function pendingLabel(op: CalcOp): string {
 .confirm-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .confirm-yes,
 .confirm-no {
-  font-size: 10px;
+  font-size: var(--text-xs);
   padding: 6px 12px;
   min-height: 32px;
 }
 
 .minimal-hint {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   margin: 0;
   color: var(--text-primary);
   opacity: 0.7;

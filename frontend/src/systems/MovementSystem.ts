@@ -37,19 +37,46 @@ export class MovementSystem {
   init(_game: Game): void {}
 
   update(dt: number, game: Game): void {
+    // Dying-corpse cleanup runs every tick regardless of phase. The dying
+    // state extends an enemy's render lifetime past the kill site (Visual
+    // Redesign Phase 0); without this pre-pass, a kill in the last WAVE tick
+    // would leave the corpse stranded in `game.enemies` through BUFF_SELECT
+    // because the rest of update() short-circuits when phase != WAVE.
+    for (let i = game.enemies.length - 1; i >= 0; i--) {
+      const enemy = game.enemies[i]
+      if (enemy.alive) continue
+      if (enemy.dying && (enemy.dyingTimer ?? 0) < (enemy.deathMaxTime ?? 0)) {
+        enemy.dyingTimer = (enemy.dyingTimer ?? 0) + dt
+        // Visual Redesign Phase 1: age the hit-flash on the corpse too. The
+        // killing hit reset hitFlashAge to 0 just before this enemy flipped
+        // to !alive; without ageing here, the white overlay would stick at
+        // full intensity for the whole death window.
+        if (enemy.hitFlashAge !== undefined) enemy.hitFlashAge += dt
+        continue
+      }
+      this._states.delete(enemy.id)
+      this._assignedPaths.delete(enemy.id)
+      this._activeSegmentIds.delete(enemy.id)
+      game.enemies.splice(i, 1)
+    }
+
     if (game.state.phase !== GamePhase.WAVE) return
 
     const ctx: MovementLevelContext | null = game.levelContext
 
     for (let i = game.enemies.length - 1; i >= 0; i--) {
       const enemy = game.enemies[i]
-      if (!enemy.alive) {
-        this._states.delete(enemy.id)
-        this._assignedPaths.delete(enemy.id)
-        this._activeSegmentIds.delete(enemy.id)
-        game.enemies.splice(i, 1)
-        continue
-      }
+
+      // Dying enemies stay in the array but skip the movement step. The
+      // pre-pass above ages the timer and splices them once it expires.
+      if (!enemy.alive) continue
+
+      // Visual Redesign Phase 1: age the hit-flash window. Set to 0 by
+      // SplitPolicy.applyDamage at the moment of impact; the EnemyRenderer
+      // fades the overlay over ANIM.HIT_FLASH. We let the value grow
+      // monotonically and rely on the renderer's clamp rather than maintain
+      // a separate "active" flag.
+      if (enemy.hitFlashAge !== undefined) enemy.hitFlashAge += dt
 
       // Compute speedMultiplier from live fields; consume speedBoost; clear slowFactor
       // once consumed if the timer has run out (preserving the original consume-then-clear order).
@@ -66,7 +93,11 @@ export class MovementSystem {
 
       this._applyPostAdvance(enemy, game)
 
-      if (!enemy.alive) {
+      // Removal predicate: dead AND not in a dying-display window. The
+      // dying flag is only set by combat kills (SplitPolicy.killEnemy);
+      // non-combat removals (reached origin, off-path defensive) leave
+      // `dying` undefined and vanish instantly as before.
+      if (!enemy.alive && (!enemy.dying || (enemy.dyingTimer ?? 0) >= (enemy.deathMaxTime ?? 0))) {
         this._states.delete(enemy.id)
         this._assignedPaths.delete(enemy.id)
         this._activeSegmentIds.delete(enemy.id)
@@ -74,15 +105,18 @@ export class MovementSystem {
       }
     }
 
-    if (ctx && game.enemies.length > 0) {
+    if (ctx) {
       // Lead = enemy closest to targetX. Game convention: targetX < startX,
-      // so "closest to target" = minimum x among alive enemies.
+      // so "closest to target" = minimum x among ALIVE enemies. Dying
+      // corpses are excluded so they don't pin the path tracker after kill.
       let leadX = Infinity
       for (const e of game.enemies) {
-        if (e.x < leadX) leadX = e.x
+        if (e.alive && e.x < leadX) leadX = e.x
       }
-      ctx.tracker.update(leadX)
-      this.setLeadEnemyX?.(leadX)
+      if (leadX !== Infinity) {
+        ctx.tracker.update(leadX)
+        this.setLeadEnemyX?.(leadX)
+      }
     }
   }
 

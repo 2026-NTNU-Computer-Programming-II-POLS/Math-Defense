@@ -14,8 +14,9 @@
     "event-registry-check": "tsx scripts/event-registry-check.ts",
     "lint-chinese-comments": "tsx scripts/lint-chinese-comments.ts",
     "lint-determinism": "tsx scripts/lint-determinism.ts",
+    "no-raw-px": "tsx scripts/no-raw-px.ts",
     "bench": "vitest run --config dev/vitest.bench.config.ts",
-    "ci": "npm run arch-check && npm run event-registry-check && npm run lint-chinese-comments && npm run lint-determinism && vitest run"
+    "ci": "npm run arch-check && npm run event-registry-check && npm run lint-chinese-comments && npm run lint-determinism && npm run no-raw-px && vitest run"
   },
   "dependencies": {
     "katex": "^0.16.45",

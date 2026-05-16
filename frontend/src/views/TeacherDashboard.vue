@@ -209,18 +209,20 @@ onMounted(async () => {
 }
 
 .dashboard-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
   text-align: center;
 }
 
-.error-msg { font-size: 11px; color: var(--enemy-red); }
-.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
+.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
+.loading, .empty { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
 
 .section { display: flex; flex-direction: column; gap: 6px; }
-.section-title { font-size: 12px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.section-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
 
 .item-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 
@@ -231,20 +233,20 @@ onMounted(async () => {
   border: 1px solid var(--axis);
   padding: 8px 10px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 .item:hover { border-color: var(--gold); }
 
 .item-name { color: var(--gold); text-shadow: var(--gold-shadow); }
-.item-meta { font-family: monospace; color: var(--axis); text-shadow: var(--gold-shadow); font-size: 10px; }
+.item-meta { font-family: monospace; color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-xs); }
 
 .item-badge {
   padding: 1px 5px;
   border: 1px solid var(--gold);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
-  font-size: 9px;
+  font-size: var(--text-2xs);
 }
 
 .item-badge.settled { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
@@ -260,7 +262,7 @@ onMounted(async () => {
   gap: 4px;
   border: 1px solid var(--axis);
   padding: 8px 10px;
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 .reflection-head {
@@ -274,7 +276,7 @@ onMounted(async () => {
   margin: 0;
   white-space: pre-wrap;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-sm);
   line-height: 1.4;
 }
 
@@ -284,7 +286,7 @@ onMounted(async () => {
   gap: 6px;
   border: 1px solid var(--axis);
   padding: 8px 10px;
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 .competency-head {
@@ -297,7 +299,7 @@ onMounted(async () => {
 .competency-suggestion {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-sm);
   line-height: 1.3;
   font-style: italic;
 }
@@ -305,7 +307,7 @@ onMounted(async () => {
 .explainer {
   border: 1px solid var(--axis);
   padding: 8px 10px;
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
@@ -317,7 +319,7 @@ onMounted(async () => {
   cursor: pointer;
   color: var(--gold);
   text-shadow: var(--gold-shadow);
-  font-size: 12px;
+  font-size: var(--text-xs);
   list-style: none;
 }
 

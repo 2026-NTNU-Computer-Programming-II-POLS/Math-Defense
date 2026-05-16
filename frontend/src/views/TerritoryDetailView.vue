@@ -228,7 +228,8 @@ watch(activityId, (id) => {
 }
 
 .detail-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
@@ -239,13 +240,13 @@ watch(activityId, (id) => {
   border: 1px solid var(--gold);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .status-badge.settled { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 
-.detail-meta { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); display: flex; gap: 12px; align-items: center; }
-.scope-tag { padding: 2px 6px; border: 1px solid var(--scope-border); color: var(--scope-text); font-size: 9px; letter-spacing: 1px; }
+.detail-meta { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); display: flex; gap: 12px; align-items: center; }
+.scope-tag { padding: 2px 6px; border: 1px solid var(--scope-border); color: var(--scope-text); font-size: var(--text-xs); letter-spacing: 1px; }
 
 .slot-grid {
   display: grid;
@@ -265,7 +266,7 @@ watch(activityId, (id) => {
 .back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
-.loading, .error-msg { text-align: center; padding: 20px; font-size: 11px; }
+.loading, .error-msg { text-align: center; padding: 20px; font-size: var(--text-sm); }
 .loading { color: var(--axis); text-shadow: var(--gold-shadow); }
 .error-msg { color: var(--enemy-red); }
 
@@ -274,12 +275,12 @@ watch(activityId, (id) => {
   padding: 8px 12px;
   border: 1px dashed var(--gold);
   background: var(--gold-tint-faint);
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
-.rec-icon { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 14px; }
+.rec-icon { color: var(--gold); text-shadow: var(--gold-shadow); font-size: var(--text-sm); }
 .rec-text { flex: 1; }
 .rec-text strong { color: var(--gold); text-shadow: var(--gold-shadow); }
-.rec-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); padding: 4px 10px; font-size: 10px; }
+.rec-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); padding: 4px 10px; font-size: var(--text-xs); }
 .rec-btn:hover { background: var(--gold); color: var(--stone-dark); }
 </style>

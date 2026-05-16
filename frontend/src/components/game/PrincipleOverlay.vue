@@ -96,7 +96,7 @@ onBeforeUnmount(clearTimer)
 }
 
 .principle-eyebrow {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   letter-spacing: 2px;
   color: var(--axis);
   text-transform: uppercase;
@@ -104,7 +104,7 @@ onBeforeUnmount(clearTimer)
 
 .principle-title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-base);
   letter-spacing: 1px;
   color: var(--gold-bright, var(--gold));
 }
@@ -116,13 +116,13 @@ onBeforeUnmount(clearTimer)
 
 .principle-prose {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: #d4cab4;
 }
 
 .principle-dismiss-hint {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
   color: var(--axis);
   opacity: 0.6;

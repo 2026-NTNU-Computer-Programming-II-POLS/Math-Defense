@@ -54,7 +54,7 @@ const warnings = computed(() =>
 
 .forecast-line {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
   letter-spacing: 0.5px;
   text-align: center;
@@ -78,7 +78,7 @@ const warnings = computed(() =>
     padding: 6px 10px;
   }
   .forecast-line {
-    font-size: 10px;
+    font-size: var(--text-xs);
   }
 }
 </style>

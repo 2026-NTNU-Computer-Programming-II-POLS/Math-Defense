@@ -55,7 +55,7 @@ function toggleSpeed(): void {
   background: var(--overlay-cell-bg);
   color: var(--overlay-text);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -81,7 +81,7 @@ function toggleSpeed(): void {
 }
 
 .speed-hint {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   line-height: 1;
   color: var(--overlay-text);
   opacity: 0.75;

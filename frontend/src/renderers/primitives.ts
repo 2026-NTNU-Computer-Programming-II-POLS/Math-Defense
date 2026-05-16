@@ -4,80 +4,98 @@
  */
 
 /**
- * Draws a flattened elliptical orbit ring.
- * @param angle  Pre-computed rotation in radians (include any time offset before calling).
- * @param scaleY Vertical squash: 0.48 for towers, 0.45 for pets.
- * @param lw     Line width.
- * @param alpha  Two-digit hex alpha appended to `color`, e.g. `'bb'`.
+ * Canvas font fallback chain for the math-error glyph bodies introduced in
+ * Visual Redesign Phase 6. Unicode math symbols render very differently
+ * across operating systems; the chain pins a math-capable family first,
+ * with Courier/serif fallbacks so the silhouette is never missing.
+ * Kept as a module-level constant so every glyph-body callsite shares the
+ * exact same font string (CI render-smoke test can baseline against it).
  */
-export function drawOrbitRing(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  radius: number,
-  angle: number,
-  color: string,
-  scaleY: number,
-  lw: number,
-  alpha: string,
-): void {
-  ctx.save()
-  ctx.translate(px, py)
-  ctx.rotate(angle)
-  ctx.scale(1, scaleY)
-  ctx.strokeStyle = `${color}${alpha}`
-  ctx.lineWidth = lw
-  ctx.beginPath()
-  ctx.arc(0, 0, radius, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.restore()
+export const GLYPH_BODY_FONT_STACK =
+  `'Cambria Math', 'STIX Two Math', 'Courier New', Courier, monospace, serif`
+
+export interface GlyphBodyOptions {
+  /** Rotation in radians applied after translating to (px, py). */
+  rotation?: number
+  /** CSS font weight; defaults to '900' so the glyph reads as a body, not text. */
+  weight?: string
+  /** Override the default math font stack — e.g. for boss-only Möbius glyphs. */
+  fontFamily?: string
+  /** When true (default), paints a cyan/magenta chromatic-aberration fringe. */
+  fringe?: boolean
+  /** Fringe offset in pixels along the horizontal axis. Defaults to size * 0.07. */
+  fringeOffset?: number
+  /** Fringe alpha. Defaults to 0.55. */
+  fringeAlpha?: number
+  /**
+   * Override the two fringe colors. Defaults to cyan/magenta — the hostile
+   * "math error" signal. Pets use two cyan stops so allied vs hostile reads
+   * at a glance (Visual Redesign Phase 6.5).
+   */
+  fringeColors?: readonly [string, string]
+  /** Adds a thin dark outline behind the fill for readability. Defaults to true. */
+  outline?: boolean
+  /** Outline stroke color. Defaults to a near-black. */
+  outlineColor?: string
 }
 
 /**
- * Draws a diamond (rhombus) crystal with a vertical gradient.
- * @param widthFactor  Half-width as a fraction of size (0.75 for towers, 0.8 for pets).
- * @param bottomColor  Gradient bottom-stop color.
- * @param midStop      Gradient position for the `color` stop (0–1).
- * @param strokeStyle  Outline color.
- * @param lw           Outline line width.
- * @param facet        When true, adds cross-hair facet lines through the centre.
+ * Draws a math-symbol "glyph body" — the construction primitive for Phase 6
+ * chaos-error enemies (`x`, `÷`, `Σ`, `lim`, `∥`, `ε`, …). The recipe is
+ * cyan/magenta chromatic-aberration fringe → outline → fill, so every enemy
+ * shares the same "this is an error" treatment.
+ *
+ * Pure: takes only the 2D context and primitives, mutates ctx state under
+ * a save/restore guard so callers don't have to.
  */
-export function drawDiamondCrystal(
+export function drawGlyphBody(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
   size: number,
+  glyph: string,
   color: string,
-  widthFactor: number,
-  bottomColor: string,
-  midStop: number,
-  strokeStyle: string,
-  lw: number,
-  facet = false,
+  options: GlyphBodyOptions = {},
 ): void {
-  const hw = size * widthFactor
-  const g = ctx.createLinearGradient(px, py - size, px, py + size)
-  g.addColorStop(0, '#ffffff')
-  g.addColorStop(midStop, color)
-  g.addColorStop(1, bottomColor)
-  ctx.fillStyle = g
-  ctx.strokeStyle = strokeStyle
-  ctx.lineWidth = lw
-  ctx.beginPath()
-  ctx.moveTo(px, py - size)
-  ctx.lineTo(px + hw, py)
-  ctx.lineTo(px, py + size)
-  ctx.lineTo(px - hw, py)
-  ctx.closePath()
-  ctx.fill()
-  ctx.stroke()
-  if (!facet) return
-  ctx.strokeStyle = 'rgba(255,255,255,0.45)'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(px, py - size)
-  ctx.lineTo(px, py + size)
-  ctx.moveTo(px - hw, py)
-  ctx.lineTo(px + hw, py)
-  ctx.stroke()
+  const {
+    rotation = 0,
+    weight = '900',
+    fontFamily = GLYPH_BODY_FONT_STACK,
+    fringe = true,
+    fringeOffset = size * 0.07,
+    fringeAlpha = 0.55,
+    fringeColors = ['#00d6ff', '#ff2bd6'],
+    outline = true,
+    outlineColor = '#15111d',
+  } = options
+
+  ctx.save()
+  ctx.translate(px, py)
+  if (rotation !== 0) ctx.rotate(rotation)
+  ctx.font = `${weight} ${size}px ${fontFamily}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  if (fringe) {
+    ctx.save()
+    ctx.globalAlpha = fringeAlpha
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.fillStyle = fringeColors[0]
+    ctx.fillText(glyph, -fringeOffset, 0)
+    ctx.fillStyle = fringeColors[1]
+    ctx.fillText(glyph, fringeOffset, 0)
+    ctx.restore()
+  }
+
+  if (outline) {
+    ctx.lineWidth = Math.max(1, size / 14)
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = outlineColor
+    ctx.strokeText(glyph, 0, 0)
+  }
+
+  ctx.fillStyle = color
+  ctx.fillText(glyph, 0, 0)
+
+  ctx.restore()
 }

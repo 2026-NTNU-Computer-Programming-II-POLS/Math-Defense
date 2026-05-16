@@ -172,7 +172,10 @@ const mathGlyphs = [
 }
 
 .title-main {
-  font-size: 56px;
+  /* Display hero — explicitly monospace to preserve "rune" feel after
+     --font-main moved to system-ui in Phase 1. */
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
   color: var(--menu-navy);
   text-shadow: 0 2px 20px rgba(255,255,255,0.8), 0 4px 12px rgba(164,185,212,0.4);
   letter-spacing: 12px;
@@ -181,7 +184,8 @@ const mathGlyphs = [
 }
 
 .title-sub {
-  font-size: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 16px;
@@ -200,17 +204,18 @@ const mathGlyphs = [
 
 @media (max-width: 480px) {
   .title-main {
-    font-size: 32px;
+    font-size: var(--text-2xl);
     letter-spacing: 4px;
   }
   .title-sub {
-    font-size: 16px;
+    font-size: var(--text-base);
     letter-spacing: 6px;
   }
 }
 
 .title-motto {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
@@ -233,7 +238,7 @@ const mathGlyphs = [
 }
 
 .menu-btn {
-  font-size: 14px;
+  font-size: var(--text-md);
   padding: 14px 24px;
   letter-spacing: 4px;
   width: 100%;
@@ -244,7 +249,7 @@ const mathGlyphs = [
 .menu-footer {
   position: relative;
   z-index: 1;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: rgba(15, 42, 88, 0.5);
   letter-spacing: 2px;
 }

@@ -175,13 +175,13 @@ function pairWith(pairId: string) {
 
 <style scoped>
 .matrix-panel { display: flex; flex-direction: column; gap: 6px; }
-.info-line { font-size: 11px; color: var(--text-primary); margin: 0; }
+.info-line { font-size: var(--text-xs); color: var(--text-primary); margin: 0; }
 .info-line strong { color: var(--gold); }
-.section-label { font-size: 10px; color: var(--axis); margin: 4px 0 2px; }
-.no-pair .btn { font-size: 10px; margin-top: 4px; }
+.section-label { font-size: var(--text-2xs); color: var(--axis); margin: 4px 0 2px; }
+.no-pair .btn { font-size: var(--text-xs); margin-top: 4px; }
 
 .laser-status {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   padding: 6px 8px;
   border-radius: 4px;
   margin-top: 4px;
@@ -208,7 +208,7 @@ function pairWith(pairId: string) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 10px;
+  font-size: var(--text-2xs);
 }
 
 .ramp-label {
@@ -222,7 +222,7 @@ function pairWith(pairId: string) {
 }
 
 .ramp-state {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   padding: 1px 5px;
   border-radius: 8px;
   text-transform: none;
@@ -235,7 +235,7 @@ function pairWith(pairId: string) {
 .ramp-mult {
   color: var(--gold-bright);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-lg);
   font-weight: bold;
 }
 
@@ -264,7 +264,7 @@ function pairWith(pairId: string) {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 8px;
+  font-size: var(--text-2xs);
   color: rgba(232, 220, 200, 0.45);
   pointer-events: none;
   font-family: var(--font-mono);
@@ -274,7 +274,7 @@ function pairWith(pairId: string) {
 .ramp-cap-label--right { right: 2px; }
 
 .ramp-detail {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-primary);
   margin: 0;
 }

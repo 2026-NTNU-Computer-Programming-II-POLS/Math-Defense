@@ -197,7 +197,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .score-title {
   color: var(--gold-bright);
-  font-size: 20px;
+  font-size: var(--text-lg);
   margin: 0 0 8px;
 }
 
@@ -205,7 +205,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   margin-bottom: 16px;
 }
 
-.star { font-size: 24px; }
+.star { font-size: var(--text-xl); }
 .star.filled { color: var(--gold-bright); }
 .star.empty { color: var(--panel-border); }
 
@@ -217,7 +217,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .breakdown td {
   padding: 3px 8px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .breakdown .label {
@@ -247,13 +247,13 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 .total-label {
   color: var(--gold);
   text-shadow: var(--gold-shadow);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: bold;
 }
 
 .total-value {
   color: var(--gold-bright);
-  font-size: 22px;
+  font-size: var(--text-xl);
   font-weight: bold;
 }
 
@@ -262,7 +262,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   padding: 8px 12px;
   border: 1px dashed var(--gold-dim);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--gold-dim);
   font-style: italic;
   text-align: center;
@@ -275,7 +275,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   background: var(--gold);
   color: var(--text-on-accent);
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: bold;
   cursor: pointer;
   transition: transform 0.1s, background 0.1s;
@@ -297,14 +297,14 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 .reflection-label {
   color: var(--axis);
   text-shadow: var(--gold-shadow);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .reflection-input {
   width: 100%;
   resize: vertical;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   background: var(--stone-selected);
   color: var(--text-primary);
   border: 1px solid var(--panel-border);
@@ -325,7 +325,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .reflection-meta {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }
@@ -341,7 +341,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 

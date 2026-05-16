@@ -153,7 +153,8 @@ async function startLevel() {
 }
 
 h1 {
-  font-size: 2rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
   margin-bottom: 2rem;
   color: var(--gold);
   text-shadow: var(--gold-shadow);
@@ -202,25 +203,25 @@ h1 {
 
 .lock-badge {
   margin-top: 0.4rem;
-  font-size: 1rem;
+  font-size: var(--text-base);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }
 
 .star-icons {
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
 }
 
 .star-label {
-  font-size: 0.9rem;
+  font-size: var(--text-lg);
 }
 
 .start-btn {
   padding: 0.8rem 2rem;
-  font-size: 1.1rem;
+  font-size: var(--text-md);
   background: var(--tower-cannon);
   color: #fff;
   border: none;
@@ -264,7 +265,7 @@ h1 {
   border-radius: 999px;
   padding: 0.4rem 0.9rem;
   margin-bottom: 1rem;
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
 }
 
 .suggestion-text strong {
@@ -276,7 +277,7 @@ h1 {
   background: transparent;
   border: none;
   color: inherit;
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
   line-height: 1;
   cursor: pointer;
   padding: 0 0.2rem;

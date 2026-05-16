@@ -100,7 +100,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-sm);
   min-width: 44px;
   min-height: 44px;
   display: inline-flex;
@@ -129,7 +129,8 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .select-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 6px;
@@ -159,8 +160,8 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   background: rgba(212,168,64,0.08);
 }
 
-.lv-num  { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
-.lv-name { font-size: 18px; color: var(--gold-bright); }
-.lv-name-en { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
-.lv-desc { font-size: 10px; color: #9a8a70; margin-top: 4px; }
+.lv-num  { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
+.lv-name { font-size: var(--text-md); color: var(--gold-bright); }
+.lv-name-en { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
+.lv-desc { font-size: var(--text-xs); color: #9a8a70; margin-top: 4px; }
 </style>

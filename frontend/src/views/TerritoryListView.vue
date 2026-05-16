@@ -112,7 +112,8 @@ onMounted(() => store.loadActivities())
 }
 
 .panel-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
@@ -120,8 +121,8 @@ onMounted(() => store.loadActivities())
 
 .header-actions { display: flex; gap: 8px; }
 
-.error-msg { font-size: 11px; color: var(--enemy-red); }
-.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; text-align: center; padding: 20px; }
+.error-msg { font-size: var(--text-sm); color: var(--enemy-red); }
+.loading, .empty { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; text-align: center; padding: 20px; }
 
 .activity-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 
@@ -136,13 +137,13 @@ onMounted(() => store.loadActivities())
 
 .activity-item:hover { border-color: var(--gold); }
 
-.activity-title { color: var(--gold); text-shadow: var(--gold-shadow); font-size: 13px; }
+.activity-title { color: var(--gold); text-shadow: var(--gold-shadow); font-size: var(--text-sm); }
 
 .activity-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }
@@ -152,7 +153,7 @@ onMounted(() => store.loadActivities())
   border: 1px solid var(--gold);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
-  font-size: 9px;
+  font-size: var(--text-xs);
   letter-spacing: 1px;
 }
 
@@ -163,14 +164,14 @@ onMounted(() => store.loadActivities())
   padding: 2px 6px;
   border: 1px solid var(--scope-border);
   color: var(--scope-text);
-  font-size: 9px;
+  font-size: var(--text-xs);
   letter-spacing: 1px;
 }
 
-.deadline { font-size: 10px; }
+.deadline { font-size: var(--text-xs); }
 
 .back-btn {
-  font-size: 11px;
+  font-size: var(--text-xs);
   border-color: var(--axis);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
@@ -179,6 +180,6 @@ onMounted(() => store.loadActivities())
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.page-info { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); }
+.page-info { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); }
 .page-btn:disabled { opacity: 0.3; cursor: default; }
 </style>

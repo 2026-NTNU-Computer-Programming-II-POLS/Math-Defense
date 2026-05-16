@@ -53,6 +53,11 @@ export interface Tower {
   // Targeting preference for towers that pick a finite N targets per attack
   // (currently RADAR_B / RADAR_C). Other types (sweep, zone, AoE) ignore it.
   targetingMode?: TargetingMode
+
+  // Visual Redesign Phase 1: muzzle-flash age in seconds. Reset to 0 by the
+  // firing system on TOWER_FIRED; aged each tick. The TowerRenderer paints
+  // an outward ring + core flash while < ANIM.TOWER_FIRE_FLASH.
+  firingFlashAge?: number
 }
 
 export type TargetingMode = 'first' | 'last' | 'closest' | 'strongest'
@@ -154,6 +159,18 @@ export interface Enemy {
   dotTimer: number
 
   _emittedReachedOrigin?: boolean
+
+  // Render-only lifecycle fields (Visual Redesign Phase 0).
+  // `dying` is set the instant `alive` flips false from a combat kill. The
+  // enemy is then kept around in the entity list for `deathMaxTime` seconds
+  // so the death-particle / corpse renderer can play its animation; it does
+  // NOT move and is treated as dead by every combat read (`alive === false`).
+  dying?: boolean
+  dyingTimer?: number
+  deathMaxTime?: number
+  // Per-hit flash. Set to 0 by the damage path (Phase 1) and aged by
+  // MovementSystem; the EnemyRenderer overlays a screen-blend flash while > 0.
+  hitFlashAge?: number
 }
 
 // ── Projectile ──
@@ -169,6 +186,11 @@ export interface Projectile {
   active: boolean
   ownerId: string
   age: number
+  // Visual Redesign Phase 1: ring buffer of recent positions used by
+  // ProjectileRenderer to paint a fading trail. Populated each tick by
+  // CombatSystem._tickProjectiles; trimmed once length exceeds the cap
+  // implied by ANIM.PROJECTILE_TRAIL at the expected frame rate.
+  history: { x: number; y: number }[]
 }
 
 // ── Param accessor ──

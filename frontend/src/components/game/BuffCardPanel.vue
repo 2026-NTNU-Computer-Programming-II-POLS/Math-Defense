@@ -192,7 +192,7 @@ function skipBuff(): void {
 }
 
 .buff-title {
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--gold);
   letter-spacing: 4px;
   text-align: center;
@@ -239,7 +239,7 @@ function skipBuff(): void {
 }
 
 .card-name {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--gold);
   letter-spacing: 1px;
 }
@@ -249,7 +249,7 @@ function skipBuff(): void {
 /* T-2 + T-3: bump size to 12px and lift contrast from #9a8a70 (≈4.2:1) to
    #c9b895 on the panel background so small body text clears WCAG AA. */
 .card-desc {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: #c9b895;
   line-height: 1.5;
   flex: 1;
@@ -261,12 +261,12 @@ function skipBuff(): void {
   align-items: center;
 }
 
-.card-cost  { font-size: 11px; color: var(--gold-bright); }
-.card-reward { font-size: 11px; color: var(--hp-green); }
-.card-prob  { font-size: 10px; color: var(--axis); }
+.card-cost  { font-size: var(--text-xs); color: var(--gold-bright); }
+.card-reward { font-size: var(--text-xs); color: var(--hp-green); }
+.card-prob  { font-size: var(--text-xs); color: var(--axis); }
 
 .empty-state {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-align: center;
   letter-spacing: 1px;

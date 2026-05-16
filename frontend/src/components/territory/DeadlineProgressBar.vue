@@ -50,8 +50,8 @@ const display = computed(() => {
 
 <style scoped>
 .deadline-progress { display: flex; flex-direction: column; gap: 6px; }
-.timer-line { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); }
-.icon { font-size: 12px; }
+.timer-line { display: flex; gap: 6px; align-items: center; font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); }
+.icon { font-size: var(--text-xs); }
 .bar-track {
   height: 6px;
   background: rgba(107, 107, 107, 0.3);

@@ -34,7 +34,7 @@ const show = computed(() => gameStore.phase === GamePhase.BUILD)
   background: var(--overlay-panel-bg);
   border: 1px solid var(--gold-dim);
   padding: 6px 16px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--gold);
   letter-spacing: 1px;
   max-width: calc(100% - 320px);
@@ -49,7 +49,7 @@ const show = computed(() => gameStore.phase === GamePhase.BUILD)
 @media (max-width: 640px) {
   .build-hint {
     max-width: calc(100% - 24px);
-    font-size: 10px;
+    font-size: var(--text-xs);
     padding: 5px 10px;
   }
 }

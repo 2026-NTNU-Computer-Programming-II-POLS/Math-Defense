@@ -7,6 +7,7 @@ import { EventBus } from './EventBus'
 import { Renderer } from './Renderer'
 import { InputManager } from './InputManager'
 import { PhaseStateMachine } from './PhaseStateMachine'
+import { ShakeController } from './ShakeController'
 import { type GameState, createInitialState } from './GameState'
 import { GamePhase, Events, FIXED_DT, type TowerType } from '@/data/constants'
 import { mulberry32 } from '@/math/MathUtils'
@@ -98,8 +99,10 @@ export interface GameEvents {
   [Events.WAVE_END]:             WaveEndSnapshot
   [Events.ENEMY_SPAWNED]:        Enemy
   [Events.ENEMY_KILLED]:         Enemy
+  [Events.ENEMY_DYING]:          Enemy
   [Events.ENEMY_REACHED_ORIGIN]: Enemy
   [Events.TOWER_ATTACK]:         { tower: Tower; target: Enemy }
+  [Events.TOWER_FIRED]:          { towerId: string; x: number; y: number; type: TowerType }
   [Events.DAMAGE_RESOLVED]:      DamageResolvedPayload
   [Events.BUFF_PHASE_START]:     void
   [Events.BUFF_CARDS_UPDATED]:   ReadonlyArray<BuffCard>
@@ -238,6 +241,12 @@ export class Game {
   readonly renderer: Renderer
   readonly input: InputManager
   readonly phase: PhaseStateMachine
+  /**
+   * Screen-shake state. Wired in Phase 0 with zero amplitude; Phase 1 will
+   * start triggering shakes from combat events. Lives on the engine so
+   * `_render` can apply the translate before any system paints.
+   */
+  readonly shake: ShakeController = new ShakeController()
 
   state: GameState
 
@@ -547,6 +556,10 @@ export class Game {
   }
 
   private _update(dt: number): void {
+    // Advance screen-shake age via the simulation dt so pause / wave-clear
+    // freezes the shake. The translate that consumes the offset is applied
+    // in _render below.
+    this.shake.update(dt)
     for (const system of this._systems.values()) {
       system.update?.(dt, this)
     }
@@ -555,6 +568,15 @@ export class Game {
   private _render(): void {
     const { renderer } = this
     renderer.clear()
+    // Screen-shake transform: apply once before any system renders so every
+    // layer (grid, paths, towers, enemies, effects) translates together.
+    // Restored at the end of the frame to keep the next clear() aligned.
+    const { dx, dy } = this.shake.getOffset()
+    const shaking = dx !== 0 || dy !== 0
+    if (shaking) {
+      renderer.ctx.save()
+      renderer.ctx.translate(dx, dy)
+    }
     // Pass the layout so the renderer paints each cell by its classified
     // TileClass instead of the legacy stone checkerboard. When no level is
     // active (MENU, or flag-off legacy path) drawGrid falls back to the
@@ -588,6 +610,10 @@ export class Game {
 
     for (const system of this._systems.values()) {
       system.render?.(renderer, this)
+    }
+
+    if (shaking) {
+      renderer.ctx.restore()
     }
   }
 

@@ -6,9 +6,77 @@
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
-import { UNIT_PX } from '@/data/constants'
+import { UNIT_PX, ANIM } from '@/data/constants'
 import { projectEnemyScene } from '@/engine/projections/project-enemies'
-import type { EnemyAppearance, EnemyView } from '@/engine/projections/views'
+import type { EnemyView } from '@/engine/projections/views'
+import { drawGlyphBody } from './primitives'
+
+// Phase 6d: Regenerator's `lim` is a three-letter operator. Pinning the font
+// size to ~55% of the body keeps the glyph inside the standard 22x22 silhouette
+// instead of spilling horizontally past the auras.
+const REGENERATOR_LIM_SCALE = 0.55
+// Helper's `Σ` breathes slightly when the helper aura is active. The breath
+// amplitude is small enough that the silhouette still reads as a single glyph
+// from a distance — purely a "this thing is doing something" cue.
+const HELPER_SIGMA_BREATH = 0.06
+
+// Phase 6e: Bulwark's `∥` body. The glyph reads as two thick parallel walls.
+// Rivet positions are unit fractions of `size` — two per bar, top and bottom —
+// transplanted from the legacy pauldron treatment so the "armoured" identity
+// survives the body swap.
+const BULWARK_RIVET_OFFSETS_X = [-0.18, 0.18] as const
+const BULWARK_RIVET_OFFSETS_Y = [-0.26, 0.26] as const
+// Phase 6e: Swarmling's tiny `ε` body. Three satellite `ε` glyphs orbit the
+// core at half size, evoking the legacy four-dot swarm cluster while staying
+// in the math-error vocabulary.
+const SWARMLING_SATELLITE_COUNT = 3
+const SWARMLING_SATELLITE_SCALE = 0.42
+const SWARMLING_ORBIT_RADIUS = 0.46
+
+// Phase 6f: Boss A wears its unsolvable equation as a body. The string is long,
+// so it renders at ~28% of `size` to fit the silhouette. A halo of flickering
+// "QED" boxes orbits the upper hemisphere where the slime crown used to sit.
+const BOSS_A_EQUATION_GLYPH = '∀x. f(x) ≠ 0'
+const BOSS_A_EQUATION_SCALE = 0.28
+const BOSS_A_QED_COUNT = 5
+const BOSS_A_QED_RADIUS = 0.62
+// Phase 6f: Boss B is a Mobius-strip paradox loop. The body is a lemniscate
+// (figure-8) traced with the chromatic-fringe recipe; satellites of `↻`
+// orbit the loop replacing the legacy crown halo.
+const BOSS_B_SATELLITE_COUNT = 4
+const BOSS_B_SATELLITE_RADIUS = 0.68
+const BOSS_B_SATELLITE_GLYPH = '↻'
+
+// Phase 6c: Split's fraction-body layout. Numerator above, vinculum at center,
+// denominator below. dy values are unit fractions of `size` (renderer scales).
+// Classic algebra placeholders `a` / `b` read as "this is a fraction" without
+// committing to a specific value.
+const SPLIT_FRACTION = {
+  numeratorGlyph: 'a',
+  denominatorGlyph: 'b',
+  numeratorDy: -0.32,
+  denominatorDy: 0.32,
+  glyphSize: 0.52,
+  vinculumHalfWidth: 0.36,
+  vinculumThickness: 0.08,
+} as const
+
+// Phase 6b: Strong's tangled-equation cluster. Five operators arranged so the
+// cluster reads as a square knot — corner parens hold a sum/difference frame
+// around a centred `=`. Positions are unit fractions of `size`; the renderer
+// scales them around the body origin.
+const STRONG_CLUSTER: ReadonlyArray<{
+  readonly g: string
+  readonly dx: number
+  readonly dy: number
+  readonly rot: number
+}> = [
+  { g: '(', dx: -0.30, dy: -0.18, rot: -0.18 },
+  { g: ')', dx:  0.30, dy: -0.18, rot:  0.18 },
+  { g: '+', dx: -0.26, dy:  0.22, rot:  0.10 },
+  { g: '−', dx:  0.26, dy:  0.22, rot: -0.10 },
+  { g: '=', dx:  0.00, dy:  0.00, rot:  0.00 },
+]
 
 export class EnemyRenderer {
   // Semantically meaningful game-art colors — centralized so theme adjustments
@@ -36,32 +104,47 @@ export class EnemyRenderer {
     const px = gameToCanvasX(enemy.x)
     const py = gameToCanvasY(enemy.y)
     const half = enemy.size / 2
+    const dying = enemy.dyingProgress
 
-    if (enemy.helperRadius > 0) {
-      ctx.save()
-      const auraRadius = enemy.helperRadius * UNIT_PX
-      ctx.globalAlpha = 0.12
-      ctx.fillStyle = EnemyRenderer.HELPER_AURA
-      ctx.beginPath()
-      ctx.arc(px, py, auraRadius, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.globalAlpha = 0.4
-      ctx.strokeStyle = EnemyRenderer.HELPER_AURA
-      ctx.lineWidth = 1
-      ctx.stroke()
-      ctx.restore()
-    }
+    // Visual Redesign Phase 2: during the death window, suppress living
+    // auras and HP / shield bars — the corpse no longer buffs neighbours and
+    // the bars would distract from the death animation. Frost overlays are
+    // also skipped so the corpse fades cleanly.
+    if (dying === 0) {
+      if (enemy.helperRadius > 0) {
+        ctx.save()
+        const auraRadius = enemy.helperRadius * UNIT_PX
+        ctx.globalAlpha = 0.12
+        ctx.fillStyle = EnemyRenderer.HELPER_AURA
+        ctx.beginPath()
+        ctx.arc(px, py, auraRadius, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.globalAlpha = 0.4
+        ctx.strokeStyle = EnemyRenderer.HELPER_AURA
+        ctx.lineWidth = 1
+        ctx.stroke()
+        ctx.restore()
+      }
 
-    if (enemy.regenerating) {
-      this._drawRegenAura(ctx, px, py, enemy.size)
+      if (enemy.regenerating) {
+        this._drawRegenAura(ctx, px, py, enemy.size)
+      }
     }
 
     ctx.save()
-    if (enemy.frostRatio > 0) {
+    if (dying > 0) {
+      // Body fades over the death window; the death-particle layer paints
+      // colour back over the spot so the visual doesn't go empty.
+      ctx.globalAlpha = Math.max(0, 1 - dying)
+    }
+    if (enemy.frostRatio > 0 && dying === 0) {
       this._drawFrostAura(ctx, px, py, enemy.size, enemy.frostRatio)
     }
     this._drawSlime(ctx, px, py, enemy)
+    if (dying === 0) this._drawHitFlash(ctx, px, py, enemy)
     ctx.restore()
+
+    if (dying > 0) return
 
     let barY = -(half + 6)
 
@@ -82,57 +165,307 @@ export class EnemyRenderer {
 
   private _drawSlime(ctx: CanvasRenderingContext2D, px: number, py: number, enemy: EnemyView): void {
     const size = enemy.size
-    const half = size / 2
     const pulse = Math.sin(this._time * 5 + px * 0.05) * 0.5 + 0.5
     const squash = 1 + Math.sin(this._time * 6 + py * 0.04) * 0.04
+    const dying = enemy.dyingProgress
 
-    this._drawGroundShadow(ctx, px, py, size)
+    if (dying === 0) this._drawGroundShadow(ctx, px, py, size)
 
     ctx.save()
-    ctx.translate(px, py + (pulse - 0.5) * 1.2)
-    ctx.scale(1 + (1 - squash) * 0.6, squash)
+    // Visual Redesign Phase 2: death squash + slight upward drift. ScaleY
+    // collapses toward zero as dyingProgress reaches 1, and the body lifts a
+    // bit so the corpse appears to deflate / float off the ground plane.
+    const deathSquashY = dying > 0 ? Math.max(0.05, 1 - dying * 0.92) : 1
+    const deathSpreadX = dying > 0 ? 1 + dying * 0.18 : 1
+    const deathDriftY = dying > 0 ? -size * dying * 0.18 : 0
 
-    this._drawSlimeBody(ctx, 0, 0, size, enemy.color)
+    ctx.translate(px, py + (pulse - 0.5) * 1.2 + deathDriftY)
+    ctx.scale((1 + (1 - squash) * 0.6) * deathSpreadX, squash * deathSquashY)
 
-    switch (enemy.type) {
-      case 'fast':
-        this._drawFastDetails(ctx, 0, 0, size, enemy.color)
-        break
-      case 'strong':
-        this._drawStrongDetails(ctx, 0, 0, size)
-        break
-      case 'split':
-        this._drawWizardSplitDetails(ctx, 0, 0, size, enemy.color)
-        break
-      case 'helper':
-        this._drawHelperDetails(ctx, 0, 0, size)
-        break
-      case 'bossA':
-        this._drawBossADetails(ctx, 0, 0, size)
-        break
-      case 'bossB':
-        this._drawBossBDetails(ctx, 0, 0, size)
-        break
-      case 'regenerator':
-        this._drawRegeneratorDetails(ctx, 0, 0, size)
-        break
-      case 'bulwark':
-        this._drawBulwarkDetails(ctx, 0, 0, size)
-        break
-      case 'swarmling':
-        this._drawSwarmlingDetails(ctx, 0, 0, size)
-        break
-      default:
-        this._drawGeneralDetails(ctx, 0, 0, size)
-        break
+    this._drawGlyphEnemy(ctx, 0, 0, size, enemy)
+    ctx.restore()
+  }
+
+  /**
+   * Phase 6a math-error body. Per-type recipe:
+   *  - general → tall `x` with a slight gait wobble (rotation tied to time).
+   *  - fast    → leaning `÷` that drags two ghosted motion-blur copies.
+   *  - strong  → tangled `( + − = )` cluster whose chromatic fringe widens
+   *              as HP drops, signalling the equation block destabilising.
+   *  - split   → numerator / vinculum / denominator stack; on death the
+   *              numerator drifts up and the denominator down, reading as
+   *              the fraction tearing apart (the actual child spawns are
+   *              the game-side split — this is the parent's farewell).
+   *  - helper  → `Σ` summation glyph that breathes slightly while the helper
+   *              aura is active (helperRadius > 0), reading as the enemy
+   *              "absorbing" / radiating support.
+   *  - regenerator → smaller `lim` glyph nested inside the existing rotating
+   *              dashed regen ring (drawn by `_drawRegenAura` from the caller).
+   *  - bulwark → `∥` two thick parallel walls with rivet dots at top/bottom of
+   *              each bar (legacy pauldron concept transplanted to the glyph).
+   *  - swarmling → tiny `ε` core with three smaller orbiting `ε` satellites
+   *              jittering around it (legacy four-dot swarm in the new
+   *              vocabulary).
+   *  - bossA   → the unsolvable equation `∀x. f(x) ≠ 0` painted small enough
+   *              to fit the silhouette, with a halo of flickering "QED" boxes
+   *              orbiting the upper hemisphere where the legacy crown sat.
+   *  - bossB   → lemniscate (figure-8) body painted with the same fringe
+   *              recipe as drawGlyphBody, surrounded by orbiting `↻` paradox
+   *              satellites in place of the legacy crown halo.
+   * Living auras / hp bars are drawn by the caller; this method only paints
+   * the glyph silhouette and any per-type motion treatment.
+   */
+  private _drawGlyphEnemy(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    size: number,
+    enemy: EnemyView,
+  ): void {
+    // Per-enemy phase, derived from world position so adjacent enemies do
+    // not wobble in unison. Renderer-only — no game-state mutation.
+    const phase = enemy.x * 0.31 + enemy.y * 0.17
+    if (enemy.type === 'fast') {
+      // Trailing motion-blur ghosts behind the body. Enemies travel left→right
+      // along the lane, so the streak trails to the left in world space.
+      const lean = -0.22
+      const ghostColor = enemy.color
+      // Paint older ghosts first (farther-back, more faded) so the most
+      // recent ghost lands on top of them, just under the main body.
+      for (let i = 2; i >= 1; i--) {
+        ctx.save()
+        ctx.globalAlpha = 0.36 / i
+        drawGlyphBody(ctx, px - size * 0.32 * i, py + size * 0.02 * i, size * 0.94, '÷', ghostColor, {
+          rotation: lean,
+          fringe: false,
+          outline: false,
+        })
+        ctx.restore()
+      }
+      drawGlyphBody(ctx, px, py, size, '÷', enemy.color, { rotation: lean })
+    } else if (enemy.type === 'strong') {
+      const hp = enemy.hpRatio ?? 1
+      const distress = 1 - hp
+      // Idle breath at full HP; faster, wider pulse as the cluster takes
+      // damage. The fringe widens with `distress` so the equation visibly
+      // tears apart in the final third of its life.
+      const pulse = Math.sin(this._time * (3 + distress * 4) + phase) * 0.5 + 0.5
+      const fringeOffset = size * (0.05 + distress * 0.05 + pulse * distress * 0.04)
+      const fringeAlpha = 0.45 + distress * 0.35
+      const glyphSize = size * 0.55
+      for (const { g, dx, dy, rot } of STRONG_CLUSTER) {
+        drawGlyphBody(ctx, px + dx * size, py + dy * size, glyphSize, g, enemy.color, {
+          rotation: rot,
+          fringeOffset,
+          fringeAlpha,
+        })
+      }
+    } else if (enemy.type === 'split') {
+      const dying = enemy.dyingProgress
+      // Separation grows during the death window; numerator drifts up and the
+      // denominator down so the fraction visibly tears apart before the body
+      // fade hits.
+      const separation = dying * size * 0.45
+      const glyphSize = size * SPLIT_FRACTION.glyphSize
+      drawGlyphBody(
+        ctx,
+        px,
+        py + SPLIT_FRACTION.numeratorDy * size - separation,
+        glyphSize,
+        SPLIT_FRACTION.numeratorGlyph,
+        enemy.color,
+      )
+      // Vinculum: a horizontal bar with the same cyan/magenta fringe recipe
+      // as a glyph, painted inline because no single Unicode bar reads at the
+      // required width across systems.
+      const vw = size * SPLIT_FRACTION.vinculumHalfWidth
+      const vh = size * SPLIT_FRACTION.vinculumThickness
+      const fringeOffset = size * 0.07
+      const vinculumAlpha = Math.max(0, 1 - dying * 2)
+      ctx.save()
+      ctx.globalAlpha *= vinculumAlpha
+      ctx.save()
+      ctx.globalAlpha *= 0.55
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.fillStyle = '#00d6ff'
+      ctx.fillRect(px - vw - fringeOffset, py - vh / 2, vw * 2, vh)
+      ctx.fillStyle = '#ff2bd6'
+      ctx.fillRect(px - vw + fringeOffset, py - vh / 2, vw * 2, vh)
+      ctx.restore()
+      ctx.fillStyle = enemy.color
+      ctx.fillRect(px - vw, py - vh / 2, vw * 2, vh)
+      ctx.strokeStyle = '#15111d'
+      ctx.lineWidth = Math.max(1, size / 26)
+      ctx.strokeRect(px - vw, py - vh / 2, vw * 2, vh)
+      ctx.restore()
+      drawGlyphBody(
+        ctx,
+        px,
+        py + SPLIT_FRACTION.denominatorDy * size + separation,
+        glyphSize,
+        SPLIT_FRACTION.denominatorGlyph,
+        enemy.color,
+      )
+    } else if (enemy.type === 'helper') {
+      // Σ body breathes when the support aura is live. The breath multiplier
+      // sits at 1 when the enemy has no aura, so a future Helper without an
+      // aura still renders cleanly.
+      const breath = enemy.helperRadius > 0
+        ? 1 + (Math.sin(this._time * 2.8 + phase) * 0.5 + 0.5) * HELPER_SIGMA_BREATH
+        : 1
+      drawGlyphBody(ctx, px, py, size * breath, 'Σ', enemy.color)
+    } else if (enemy.type === 'regenerator') {
+      // lim glyph is centered inside the rotating dashed ring that
+      // `_drawRegenAura` paints; the ring lives outside the death-fade ctx
+      // save block so it survives the body translate/scale here.
+      drawGlyphBody(ctx, px, py, size * REGENERATOR_LIM_SCALE, 'lim', enemy.color)
+    } else if (enemy.type === 'bulwark') {
+      drawGlyphBody(ctx, px, py, size, '∥', enemy.color)
+      // Rivet dots on each bar — light grey caps over the glyph fringe so the
+      // "armoured" read survives at small sizes where the ∥ thickness alone
+      // would not.
+      ctx.save()
+      ctx.fillStyle = '#d6dbe2'
+      ctx.strokeStyle = '#33383f'
+      ctx.lineWidth = Math.max(1, size / 26)
+      const rivetR = Math.max(1, size * 0.055)
+      for (const ox of BULWARK_RIVET_OFFSETS_X) {
+        for (const oy of BULWARK_RIVET_OFFSETS_Y) {
+          ctx.beginPath()
+          ctx.arc(px + ox * size, py + oy * size, rivetR, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.stroke()
+        }
+      }
+      ctx.restore()
+    } else if (enemy.type === 'swarmling') {
+      drawGlyphBody(ctx, px, py, size * 0.78, 'ε', enemy.color)
+      // Orbiting `ε` satellites with the same jitter cadence as the legacy
+      // four-dot swarm, so identity reads at a glance.
+      for (let i = 0; i < SWARMLING_SATELLITE_COUNT; i++) {
+        const ang = (i / SWARMLING_SATELLITE_COUNT) * Math.PI * 2 + this._time * 2.2 + phase
+        const jitter = Math.sin(this._time * 18 + i * 5) * size * 0.06
+        const orbit = size * SWARMLING_ORBIT_RADIUS + jitter
+        const sx = px + Math.cos(ang) * orbit
+        const sy = py + Math.sin(ang) * orbit
+        drawGlyphBody(ctx, sx, sy, size * SWARMLING_SATELLITE_SCALE, 'ε', enemy.color, {
+          fringe: false,
+        })
+      }
+    } else if (enemy.type === 'bossA') {
+      drawGlyphBody(ctx, px, py, size * BOSS_A_EQUATION_SCALE, BOSS_A_EQUATION_GLYPH, enemy.color)
+      // Halo of "QED" boxes orbiting the upper hemisphere; per-box flicker
+      // gives the unsolvable feel without using Math.random (deterministic
+      // sin wave keyed by index + time).
+      for (let i = 0; i < BOSS_A_QED_COUNT; i++) {
+        const ang = -Math.PI + (i / (BOSS_A_QED_COUNT - 1)) * Math.PI + this._time * 0.4 + phase
+        const flicker = Math.sin(this._time * 6 + i * 1.7) * 0.5 + 0.5
+        if (flicker < 0.25) continue
+        const sx = px + Math.cos(ang) * size * BOSS_A_QED_RADIUS
+        const sy = py + Math.sin(ang) * size * BOSS_A_QED_RADIUS * 0.55
+        ctx.save()
+        ctx.globalAlpha *= 0.4 + flicker * 0.6
+        drawGlyphBody(ctx, sx, sy, size * 0.22, 'QED', '#fbbf24', { fringe: false })
+        ctx.restore()
+      }
+    } else if (enemy.type === 'bossB') {
+      // Lemniscate (figure-8) body — a stand-in for the Mobius fold drawn via
+      // two mirrored bezier lobes. Painted with the same fringe-then-fill
+      // recipe as drawGlyphBody so identity sits inside the math-error
+      // vocabulary.
+      this._drawLemniscate(ctx, px, py, size, enemy.color)
+      // Halo of orbiting `↻` paradox-loop satellites.
+      for (let i = 0; i < BOSS_B_SATELLITE_COUNT; i++) {
+        const ang = (i / BOSS_B_SATELLITE_COUNT) * Math.PI * 2 + this._time * 0.8 + phase
+        const sx = px + Math.cos(ang) * size * BOSS_B_SATELLITE_RADIUS
+        const sy = py + Math.sin(ang) * size * BOSS_B_SATELLITE_RADIUS * 0.6
+        drawGlyphBody(ctx, sx, sy, size * 0.32, BOSS_B_SATELLITE_GLYPH, '#f0abfc', {
+          rotation: ang,
+          fringe: false,
+        })
+      }
+    } else {
+      // General — gait wobble is a tiny back-and-forth tilt.
+      const wobble = Math.sin(this._time * 4 + phase) * 0.08
+      drawGlyphBody(ctx, px, py, size, 'x', enemy.color, { rotation: wobble })
     }
 
-    this._drawFace(ctx, 0, 0, size, enemy.type)
-    this._drawGloss(ctx, -half * 0.35, -half * 0.35, size)
-    if (enemy.frostRatio > 0) {
-      this._drawFrostTint(ctx, 0, 0, size, enemy.frostRatio)
-      this._drawFrozenOverlay(ctx, 0, 0, size, enemy.frostRatio)
+    // Frost tint on a glyph body: re-stroke / re-fill the glyph in cyan at
+    // low alpha. The full slime-shaped frost overlay is intentionally
+    // skipped — adapting it to glyphs is deferred to the broader Phase 6
+    // sweep so 6a/6b keep their diffs tight.
+    if (enemy.frostRatio > 0 && enemy.dyingProgress === 0) {
+      ctx.save()
+      ctx.globalAlpha = 0.55 * enemy.frostRatio
+      ctx.globalCompositeOperation = 'lighter'
+      if (enemy.type === 'strong') {
+        const glyphSize = size * 0.55
+        for (const { g, dx, dy, rot } of STRONG_CLUSTER) {
+          drawGlyphBody(ctx, px + dx * size, py + dy * size, glyphSize, g, '#bfeaff', {
+            rotation: rot,
+            fringe: false,
+            outline: false,
+          })
+        }
+      } else if (enemy.type === 'split') {
+        const glyphSize = size * SPLIT_FRACTION.glyphSize
+        drawGlyphBody(ctx, px, py + SPLIT_FRACTION.numeratorDy * size, glyphSize,
+          SPLIT_FRACTION.numeratorGlyph, '#bfeaff', { fringe: false, outline: false })
+        drawGlyphBody(ctx, px, py + SPLIT_FRACTION.denominatorDy * size, glyphSize,
+          SPLIT_FRACTION.denominatorGlyph, '#bfeaff', { fringe: false, outline: false })
+        const vw = size * SPLIT_FRACTION.vinculumHalfWidth
+        const vh = size * SPLIT_FRACTION.vinculumThickness
+        ctx.fillStyle = '#bfeaff'
+        ctx.fillRect(px - vw, py - vh / 2, vw * 2, vh)
+      } else if (enemy.type === 'helper') {
+        drawGlyphBody(ctx, px, py, size, 'Σ', '#bfeaff', { fringe: false, outline: false })
+      } else if (enemy.type === 'regenerator') {
+        drawGlyphBody(ctx, px, py, size * REGENERATOR_LIM_SCALE, 'lim', '#bfeaff', {
+          fringe: false,
+          outline: false,
+        })
+      } else if (enemy.type === 'bulwark') {
+        drawGlyphBody(ctx, px, py, size, '∥', '#bfeaff', { fringe: false, outline: false })
+      } else if (enemy.type === 'swarmling') {
+        drawGlyphBody(ctx, px, py, size * 0.78, 'ε', '#bfeaff', { fringe: false, outline: false })
+      } else if (enemy.type === 'bossA') {
+        drawGlyphBody(ctx, px, py, size * BOSS_A_EQUATION_SCALE, BOSS_A_EQUATION_GLYPH, '#bfeaff', {
+          fringe: false,
+          outline: false,
+        })
+      } else if (enemy.type === 'bossB') {
+        this._drawLemniscate(ctx, px, py, size, '#bfeaff', { fringe: false, outline: false })
+      } else {
+        const glyph = enemy.type === 'fast' ? '÷' : 'x'
+        const rot = enemy.type === 'fast' ? -0.22 : 0
+        drawGlyphBody(ctx, px, py, size, glyph, '#bfeaff', {
+          rotation: rot,
+          fringe: false,
+          outline: false,
+        })
+      }
+      ctx.restore()
     }
+  }
+
+  // Visual Redesign Phase 1: brief screen-blend overlay on impact. Anchored
+  // to the post-translate origin used by `_drawSlime` so the flash tracks
+  // the squash/pulse offset exactly.
+  private _drawHitFlash(ctx: CanvasRenderingContext2D, px: number, py: number, enemy: EnemyView): void {
+    const age = enemy.hitFlashAge
+    if (age <= 0 || age >= ANIM.HIT_FLASH) return
+    const intensity = 1 - age / ANIM.HIT_FLASH
+    const half = enemy.size / 2
+
+    ctx.save()
+    ctx.globalCompositeOperation = 'screen'
+    ctx.globalAlpha = intensity
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    // All enemies now use a circular flash sized to the glyph silhouette.
+    ctx.arc(px, py, half * 0.9, 0, Math.PI * 2)
+    ctx.closePath()
+    ctx.fill()
     ctx.restore()
   }
 
@@ -141,75 +474,6 @@ export class EnemyRenderer {
     ctx.beginPath()
     ctx.ellipse(px, py + size * 0.42, size * 0.52, size * 0.18, 0, 0, Math.PI * 2)
     ctx.fill()
-  }
-
-  private _drawSlimeBody(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    color: string,
-  ): void {
-    const half = size / 2
-    const g = ctx.createRadialGradient(px - half * 0.35, py - half * 0.45, size * 0.08, px, py, size * 0.75)
-    g.addColorStop(0, '#ffffff')
-    g.addColorStop(0.18, color)
-    g.addColorStop(1, '#1b1220')
-
-    ctx.fillStyle = g
-    ctx.strokeStyle = 'rgba(255,255,255,0.34)'
-    ctx.lineWidth = Math.max(1, size / 16)
-    ctx.beginPath()
-    ctx.moveTo(px - half * 0.78, py + half * 0.36)
-    ctx.bezierCurveTo(px - half * 1.02, py - half * 0.18, px - half * 0.52, py - half * 0.92, px, py - half * 0.88)
-    ctx.bezierCurveTo(px + half * 0.58, py - half * 0.88, px + half * 1.02, py - half * 0.16, px + half * 0.78, py + half * 0.36)
-    ctx.quadraticCurveTo(px, py + half * 0.76, px - half * 0.78, py + half * 0.36)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-  }
-
-  private _drawFace(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, type: EnemyAppearance): void {
-    const eyeR = Math.max(1.8, size / 9)
-    const eyeY = py - size * 0.12
-    const eyeGap = size * 0.22
-    const pupilX = type === 'fast' ? size * 0.02 : 0
-
-    this._drawEye(ctx, px - eyeGap, eyeY, eyeR, pupilX)
-    this._drawEye(ctx, px + eyeGap, eyeY, eyeR, pupilX)
-
-    ctx.strokeStyle = type === 'strong' || type === 'bossA' || type === 'bulwark' ? '#1b0b0b' : 'rgba(20,12,22,0.75)'
-    ctx.lineWidth = Math.max(1, size / 18)
-    ctx.beginPath()
-    if (type === 'bossB') {
-      ctx.moveTo(px - size * 0.18, py + size * 0.15)
-      ctx.quadraticCurveTo(px, py + size * 0.28, px + size * 0.18, py + size * 0.15)
-    } else {
-      ctx.moveTo(px - size * 0.12, py + size * 0.14)
-      ctx.quadraticCurveTo(px, py + size * 0.22, px + size * 0.12, py + size * 0.14)
-    }
-    ctx.stroke()
-  }
-
-  private _drawEye(ctx: CanvasRenderingContext2D, px: number, py: number, r: number, pupilOffset: number): void {
-    ctx.fillStyle = '#fffaf0'
-    ctx.beginPath()
-    ctx.arc(px, py, r, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.fillStyle = '#15111d'
-    ctx.beginPath()
-    ctx.arc(px + pupilOffset, py + r * 0.08, r * 0.45, 0, Math.PI * 2)
-    ctx.fill()
-  }
-
-  private _drawGloss(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    ctx.save()
-    ctx.globalAlpha = 0.42
-    ctx.fillStyle = '#ffffff'
-    ctx.beginPath()
-    ctx.ellipse(px, py, size * 0.14, size * 0.08, -0.7, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.restore()
   }
 
   private _drawFrostAura(
@@ -260,182 +524,6 @@ export class EnemyRenderer {
     ctx.restore()
   }
 
-  private _drawFrostTint(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    intensity: number,
-  ): void {
-    const half = size / 2
-    const tint = ctx.createRadialGradient(px - half * 0.25, py - half * 0.45, size * 0.08, px, py, size * 0.78)
-    tint.addColorStop(0, `rgba(255, 255, 255, ${0.4 * intensity})`)
-    tint.addColorStop(0.28, `rgba(178, 241, 255, ${0.34 * intensity})`)
-    tint.addColorStop(0.74, `rgba(66, 156, 235, ${0.24 * intensity})`)
-    tint.addColorStop(1, `rgba(22, 61, 128, ${0.08 * intensity})`)
-    ctx.fillStyle = tint
-    ctx.beginPath()
-    ctx.moveTo(px - half * 0.78, py + half * 0.36)
-    ctx.bezierCurveTo(px - half * 1.02, py - half * 0.18, px - half * 0.52, py - half * 0.92, px, py - half * 0.88)
-    ctx.bezierCurveTo(px + half * 0.58, py - half * 0.88, px + half * 1.02, py - half * 0.16, px + half * 0.78, py + half * 0.36)
-    ctx.quadraticCurveTo(px, py + half * 0.76, px - half * 0.78, py + half * 0.36)
-    ctx.closePath()
-    ctx.fill()
-  }
-
-  private _drawFrozenOverlay(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    intensity: number,
-  ): void {
-    const half = size / 2
-    const shimmer = Math.sin(this._time * 7.2 + size) * 0.5 + 0.5
-
-    ctx.save()
-    ctx.globalCompositeOperation = 'lighter'
-
-    const shell = ctx.createLinearGradient(px - half, py - half, px + half, py + half)
-    shell.addColorStop(0, `rgba(255, 255, 255, ${0.58 * intensity})`)
-    shell.addColorStop(0.32, `rgba(160, 238, 255, ${0.34 * intensity})`)
-    shell.addColorStop(0.72, `rgba(60, 168, 245, ${0.22 * intensity})`)
-    shell.addColorStop(1, `rgba(20, 78, 170, ${0.16 * intensity})`)
-    ctx.fillStyle = shell
-    ctx.beginPath()
-    ctx.moveTo(px - half * 0.78, py + half * 0.36)
-    ctx.bezierCurveTo(px - half * 1.02, py - half * 0.18, px - half * 0.52, py - half * 0.92, px, py - half * 0.88)
-    ctx.bezierCurveTo(px + half * 0.58, py - half * 0.88, px + half * 1.02, py - half * 0.16, px + half * 0.78, py + half * 0.36)
-    ctx.quadraticCurveTo(px, py + half * 0.76, px - half * 0.78, py + half * 0.36)
-    ctx.closePath()
-    ctx.fill()
-
-    ctx.strokeStyle = `rgba(245, 255, 255, ${(0.68 + shimmer * 0.2) * intensity})`
-    ctx.lineWidth = Math.max(1.4, size / 15)
-    ctx.beginPath()
-    ctx.moveTo(px - half * 0.62, py + half * 0.22)
-    ctx.bezierCurveTo(px - half * 0.94, py - half * 0.16, px - half * 0.42, py - half * 0.84, px, py - half * 0.82)
-    ctx.bezierCurveTo(px + half * 0.54, py - half * 0.82, px + half * 0.92, py - half * 0.18, px + half * 0.62, py + half * 0.22)
-    ctx.stroke()
-
-    this._drawIceRim(ctx, px, py, size, intensity, shimmer)
-    this._drawFrostCracks(ctx, px, py, size, intensity)
-
-    this._drawIceCrystal(ctx, px - size * 0.34, py - size * 0.2, size * 0.16, -0.36, intensity)
-    this._drawIceCrystal(ctx, px + size * 0.34, py + size * 0.02, size * 0.14, 0.28, intensity)
-    this._drawIceCrystal(ctx, px + size * 0.02, py - size * 0.44, size * 0.12, 0.02, intensity)
-
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + this._time * 0.35
-      const r = size * (0.22 + (i % 2) * 0.13)
-      ctx.fillStyle = `rgba(235, 255, 255, ${0.42 * intensity})`
-      ctx.beginPath()
-      ctx.arc(px + Math.cos(a) * r, py + Math.sin(a) * r - size * 0.04, Math.max(1, size * 0.025), 0, Math.PI * 2)
-      ctx.fill()
-    }
-
-    ctx.restore()
-  }
-
-  private _drawIceRim(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    intensity: number,
-    shimmer: number,
-  ): void {
-    const half = size / 2
-    ctx.save()
-    ctx.strokeStyle = `rgba(235, 255, 255, ${(0.54 + shimmer * 0.2) * intensity})`
-    ctx.fillStyle = `rgba(238, 255, 255, ${0.46 * intensity})`
-    ctx.lineWidth = Math.max(1, size / 28)
-    const points = [
-      [-0.58, -0.72, 0.16],
-      [-0.22, -0.9, 0.12],
-      [0.18, -0.86, 0.15],
-      [0.52, -0.58, 0.13],
-      [0.74, -0.14, 0.11],
-      [-0.76, -0.12, 0.1],
-    ] as const
-    for (const [x, y, h] of points) {
-      ctx.beginPath()
-      ctx.moveTo(px + half * x, py + half * y)
-      ctx.lineTo(px + half * (x + 0.09), py + half * (y + h))
-      ctx.lineTo(px + half * (x - 0.09), py + half * (y + h * 0.85))
-      ctx.closePath()
-      ctx.fill()
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  private _drawFrostCracks(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    intensity: number,
-  ): void {
-    ctx.save()
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.52 * intensity})`
-    ctx.lineWidth = Math.max(1, size / 34)
-    const cracks: ReadonlyArray<ReadonlyArray<[number, number]>> = [
-      [[-0.32, -0.42], [-0.18, -0.22], [-0.28, -0.02], [-0.1, 0.18]],
-      [[0.28, -0.5], [0.12, -0.3], [0.24, -0.12], [0.08, 0.08]],
-      [[-0.08, -0.7], [0.02, -0.48], [-0.06, -0.28]],
-    ]
-    for (const crack of cracks) {
-      ctx.beginPath()
-      crack.forEach(([x, y], index) => {
-        const cx = px + x * size
-        const cy = py + y * size
-        if (index === 0) ctx.moveTo(cx, cy)
-        else ctx.lineTo(cx, cy)
-      })
-      ctx.stroke()
-    }
-
-    ctx.strokeStyle = `rgba(86, 210, 255, ${0.38 * intensity})`
-    ctx.lineWidth = Math.max(1, size / 46)
-    ctx.beginPath()
-    ctx.moveTo(px - size * 0.38, py + size * 0.18)
-    ctx.lineTo(px - size * 0.18, py + size * 0.06)
-    ctx.lineTo(px - size * 0.02, py + size * 0.22)
-    ctx.moveTo(px + size * 0.36, py + size * 0.16)
-    ctx.lineTo(px + size * 0.16, py + size * 0.02)
-    ctx.lineTo(px + size * 0.26, py - size * 0.14)
-    ctx.stroke()
-    ctx.restore()
-  }
-
-  private _drawIceCrystal(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    rotation: number,
-    intensity: number,
-  ): void {
-    ctx.save()
-    ctx.translate(px, py)
-    ctx.rotate(rotation)
-    ctx.fillStyle = `rgba(238, 255, 255, ${0.56 * intensity})`
-    ctx.strokeStyle = `rgba(108, 215, 255, ${0.42 * intensity})`
-    ctx.lineWidth = Math.max(1, size * 0.12)
-    ctx.beginPath()
-    ctx.moveTo(0, -size)
-    ctx.lineTo(size * 0.46, -size * 0.12)
-    ctx.lineTo(size * 0.22, size)
-    ctx.lineTo(-size * 0.4, size * 0.18)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-    ctx.restore()
-  }
-
   private _traceTinySnowflake(ctx: CanvasRenderingContext2D, size: number): void {
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2
@@ -450,90 +538,10 @@ export class EnemyRenderer {
     }
   }
 
-  private _drawGeneralDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)'
-    ctx.lineWidth = Math.max(1, size / 20)
-    ctx.beginPath()
-    ctx.arc(px, py + size * 0.1, size * 0.28, 0.15, Math.PI - 0.15)
-    ctx.stroke()
-  }
-
-  private _drawFastDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, color: string): void {
-    ctx.strokeStyle = `${color}aa`
-    ctx.lineWidth = Math.max(1.4, size / 9)
-    ctx.beginPath()
-    ctx.moveTo(px - size * 0.62, py + size * 0.04)
-    ctx.lineTo(px - size * 0.98, py + size * 0.16)
-    ctx.moveTo(px - size * 0.55, py - size * 0.18)
-    ctx.lineTo(px - size * 0.88, py - size * 0.12)
-    ctx.stroke()
-
-    ctx.fillStyle = '#dbeafe'
-    ctx.beginPath()
-    ctx.moveTo(px + size * 0.12, py - size * 0.45)
-    ctx.lineTo(px + size * 0.32, py - size * 0.18)
-    ctx.lineTo(px + size * 0.12, py - size * 0.2)
-    ctx.lineTo(px + size * 0.3, py + size * 0.12)
-    ctx.lineTo(px - size * 0.04, py - size * 0.22)
-    ctx.lineTo(px + size * 0.14, py - size * 0.2)
-    ctx.closePath()
-    ctx.fill()
-  }
-
-  private _drawStrongDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    ctx.fillStyle = '#5b1f1f'
-    ctx.strokeStyle = '#ffd7d7'
-    ctx.lineWidth = Math.max(1, size / 20)
-    for (const x of [-0.32, 0.32]) {
-      ctx.beginPath()
-      ctx.moveTo(px + size * x, py - size * 0.48)
-      ctx.lineTo(px + size * (x + Math.sign(x) * 0.16), py - size * 0.7)
-      ctx.lineTo(px + size * (x + Math.sign(x) * 0.02), py - size * 0.42)
-      ctx.closePath()
-      ctx.fill()
-      ctx.stroke()
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.28)'
-    ctx.beginPath()
-    ctx.moveTo(px - size * 0.38, py + size * 0.26)
-    ctx.lineTo(px + size * 0.38, py + size * 0.26)
-    ctx.stroke()
-  }
-
-  private _drawWizardSplitDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number, color: string): void {
-    this._drawWizardHat(ctx, px, py - size * 0.5, size, color)
-    this._drawStaff(ctx, px + size * 0.46, py - size * 0.06, size)
-    this._drawBat(ctx, px - size * 0.42, py + size * 0.17, size * 0.34, color)
-    this._drawBat(ctx, px + size * 0.22, py + size * 0.2, size * 0.3, color)
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.42)'
-    ctx.lineWidth = Math.max(1, size / 18)
-    ctx.beginPath()
-    ctx.moveTo(px, py - size * 0.32)
-    ctx.bezierCurveTo(px - size * 0.12, py - size * 0.04, px + size * 0.12, py + size * 0.12, px, py + size * 0.38)
-    ctx.stroke()
-  }
-
-  private _drawHelperDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    ctx.strokeStyle = '#dcfce7'
-    ctx.lineWidth = Math.max(1.2, size / 12)
-    ctx.beginPath()
-    ctx.moveTo(px, py - size * 0.46)
-    ctx.lineTo(px, py - size * 0.2)
-    ctx.moveTo(px - size * 0.13, py - size * 0.33)
-    ctx.lineTo(px + size * 0.13, py - size * 0.33)
-    ctx.stroke()
-    ctx.strokeStyle = 'rgba(220,252,231,0.45)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.arc(px, py, size * 0.34, 0, Math.PI * 2)
-    ctx.stroke()
-  }
-
   /**
    * Regenerator aura — deliberately a different visual language from the
-   * Helper's flat translucent disc: a rotating dashed ring plus rising "+"
-   * particles, so the two green enemies are never confused.
+   * Helper's flat translucent disc: a rotating dashed ring plus rising "+ε"
+   * glyph particles, so the two green enemies are never confused.
    */
   private _drawRegenAura(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
     const pulse = Math.sin(this._time * 3.4) * 0.5 + 0.5
@@ -552,243 +560,84 @@ export class EnemyRenderer {
     ctx.setLineDash([])
     ctx.restore()
 
+    // Phase 6d: rising "+ε" glyphs replace the prior plain cross particles so
+    // the regen motif stays in the math-error vocabulary established by the
+    // glyph body. Particles ascend and fade over a 1-cycle phase window.
     ctx.save()
-    ctx.strokeStyle = EnemyRenderer.REGEN_AURA
-    ctx.lineWidth = Math.max(1.2, size / 14)
-    ctx.lineCap = 'round'
     for (let i = 0; i < 3; i++) {
       const phase = (this._time * 0.6 + i / 3) % 1
       const cx = px + Math.sin(i * 2.1 + this._time) * size * 0.32
       const cy = py - size * 0.2 - phase * size * 0.9
-      const s = size * 0.13
-      ctx.globalAlpha = (1 - phase) * 0.7
-      ctx.beginPath()
-      ctx.moveTo(cx - s, cy)
-      ctx.lineTo(cx + s, cy)
-      ctx.moveTo(cx, cy - s)
-      ctx.lineTo(cx, cy + s)
-      ctx.stroke()
+      ctx.globalAlpha = (1 - phase) * 0.85
+      drawGlyphBody(ctx, cx, cy, size * 0.34, '+ε', EnemyRenderer.REGEN_AURA, {
+        fringe: false,
+        outline: false,
+      })
     }
     ctx.restore()
   }
 
-  private _drawRegeneratorDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    // Faint regenerating sheen — a soft inner glow that pulses.
-    const pulse = Math.sin(this._time * 4 + py * 0.05) * 0.5 + 0.5
+  /**
+   * Phase 6f: Boss B's lemniscate (figure-8) body. Two mirrored bezier lobes
+   * form a horizontal infinity loop; painted with the same chromatic-fringe
+   * recipe used by `drawGlyphBody` so the boss reads as part of the
+   * math-error vocabulary rather than an outlier shape.
+   */
+  private _drawLemniscate(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    size: number,
+    color: string,
+    options: { fringe?: boolean; outline?: boolean } = {},
+  ): void {
+    const { fringe = true, outline = true } = options
+    const a = size * 0.46
+    const b = size * 0.28
+    const lw = Math.max(2, size / 9)
+
+    const tracePath = (): void => {
+      ctx.beginPath()
+      ctx.moveTo(px, py)
+      ctx.bezierCurveTo(px + a * 0.3, py - b, px + a, py - b, px + a, py)
+      ctx.bezierCurveTo(px + a, py + b, px + a * 0.3, py + b, px, py)
+      ctx.bezierCurveTo(px - a * 0.3, py - b, px - a, py - b, px - a, py)
+      ctx.bezierCurveTo(px - a, py + b, px - a * 0.3, py + b, px, py)
+    }
+
+    if (fringe) {
+      ctx.save()
+      ctx.globalAlpha *= 0.55
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.lineWidth = lw
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#00d6ff'
+      ctx.save(); ctx.translate(-size * 0.07, 0); tracePath(); ctx.stroke(); ctx.restore()
+      ctx.strokeStyle = '#ff2bd6'
+      ctx.save(); ctx.translate(size * 0.07, 0); tracePath(); ctx.stroke(); ctx.restore()
+      ctx.restore()
+    }
+
+    if (outline) {
+      ctx.save()
+      ctx.lineWidth = lw + Math.max(1, size / 14)
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#15111d'
+      tracePath()
+      ctx.stroke()
+      ctx.restore()
+    }
+
     ctx.save()
-    ctx.globalAlpha = 0.18 + pulse * 0.16
-    const g = ctx.createRadialGradient(px, py, size * 0.06, px, py, size * 0.5)
-    g.addColorStop(0, '#e8ffe8')
-    g.addColorStop(1, 'rgba(232,255,232,0)')
-    ctx.fillStyle = g
-    ctx.beginPath()
-    ctx.arc(px, py, size * 0.5, 0, Math.PI * 2)
-    ctx.fill()
+    ctx.lineWidth = lw
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = color
+    tracePath()
+    ctx.stroke()
     ctx.restore()
-
-    // Medical cross — the "heal" motif, drawn as a single plus polygon.
-    const a = size * 0.2
-    const t = size * 0.075
-    ctx.fillStyle = 'rgba(255,255,255,0.92)'
-    ctx.strokeStyle = 'rgba(40,120,60,0.6)'
-    ctx.lineWidth = Math.max(1, size / 26)
-    ctx.beginPath()
-    ctx.moveTo(px - t, py - a)
-    ctx.lineTo(px + t, py - a)
-    ctx.lineTo(px + t, py - t)
-    ctx.lineTo(px + a, py - t)
-    ctx.lineTo(px + a, py + t)
-    ctx.lineTo(px + t, py + t)
-    ctx.lineTo(px + t, py + a)
-    ctx.lineTo(px - t, py + a)
-    ctx.lineTo(px - t, py + t)
-    ctx.lineTo(px - a, py + t)
-    ctx.lineTo(px - a, py - t)
-    ctx.lineTo(px - t, py - t)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
   }
 
-  private _drawBulwarkDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    const half = size / 2
-    ctx.strokeStyle = '#33383f'
-    ctx.lineWidth = Math.max(1.2, size / 16)
-    ctx.lineJoin = 'miter'
-
-    // Side pauldrons — heavy angular plates flanking the body, kept clear of
-    // the face so the eyes still read.
-    const pauldron = (dir: number): void => {
-      ctx.beginPath()
-      ctx.moveTo(px + dir * half * 0.46, py - half * 0.52)
-      ctx.lineTo(px + dir * half * 1.02, py - half * 0.28)
-      ctx.lineTo(px + dir * half * 0.98, py + half * 0.28)
-      ctx.lineTo(px + dir * half * 0.44, py + half * 0.16)
-      ctx.closePath()
-      ctx.fill()
-      ctx.stroke()
-    }
-    ctx.fillStyle = '#9aa3b0'
-    pauldron(-1)
-    pauldron(1)
-
-    // Jaw plate — angular chin guard below the mouth.
-    ctx.fillStyle = '#828b98'
-    ctx.beginPath()
-    ctx.moveTo(px - half * 0.4, py + half * 0.26)
-    ctx.lineTo(px + half * 0.4, py + half * 0.26)
-    ctx.lineTo(px + half * 0.24, py + half * 0.6)
-    ctx.lineTo(px - half * 0.24, py + half * 0.6)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-
-    // Rivets on the pauldrons.
-    ctx.fillStyle = '#d6dbe2'
-    for (const dir of [-1, 1]) {
-      ctx.beginPath()
-      ctx.arc(px + dir * half * 0.74, py - half * 0.04, Math.max(1, size * 0.045), 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
-
-  private _drawSwarmlingDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    // Tiny jittery satellite segments — a cluster reads as a swarm even though
-    // each Swarmling is one entity.
-    ctx.fillStyle = '#c8b85a'
-    ctx.strokeStyle = 'rgba(40,34,12,0.6)'
-    ctx.lineWidth = Math.max(1, size / 14)
-    for (let i = 0; i < 4; i++) {
-      const ang = (i / 4) * Math.PI * 2 + this._time * 2.2
-      const jitter = Math.sin(this._time * 18 + i * 5) * size * 0.08
-      const orbit = size * 0.46 + jitter
-      const bx = px + Math.cos(ang) * orbit
-      const by = py + Math.sin(ang) * orbit
-      ctx.beginPath()
-      ctx.arc(bx, by, size * 0.16, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.stroke()
-    }
-  }
-
-  private _drawBossADetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    this._drawCrown(ctx, px, py - size * 0.42, size, '#fbbf24')
-    ctx.strokeStyle = '#fee2e2'
-    ctx.lineWidth = Math.max(1.5, size / 18)
-    ctx.beginPath()
-    ctx.moveTo(px - size * 0.28, py + size * 0.28)
-    ctx.lineTo(px + size * 0.28, py + size * 0.28)
-    ctx.moveTo(px - size * 0.2, py + size * 0.36)
-    ctx.lineTo(px + size * 0.2, py + size * 0.36)
-    ctx.stroke()
-  }
-
-  private _drawBossBDetails(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    this._drawCrown(ctx, px, py - size * 0.42, size, '#f0abfc')
-    ctx.strokeStyle = '#fce7f3'
-    ctx.lineWidth = Math.max(1.4, size / 20)
-    ctx.beginPath()
-    ctx.arc(px, py, size * 0.34, -0.2, Math.PI * 1.2)
-    ctx.stroke()
-    ctx.fillStyle = '#fce7f3'
-    ctx.beginPath()
-    ctx.arc(px + size * 0.26, py - size * 0.22, size * 0.06, 0, Math.PI * 2)
-    ctx.fill()
-  }
-
-  private _drawCrown(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    color: string,
-  ): void {
-    ctx.fillStyle = color
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)'
-    ctx.lineWidth = Math.max(1, size / 30)
-    ctx.beginPath()
-    ctx.moveTo(px - size * 0.28, py + size * 0.1)
-    ctx.lineTo(px - size * 0.18, py - size * 0.16)
-    ctx.lineTo(px, py + size * 0.02)
-    ctx.lineTo(px + size * 0.18, py - size * 0.16)
-    ctx.lineTo(px + size * 0.28, py + size * 0.1)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-  }
-
-  private _drawWizardHat(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    color: string,
-  ): void {
-    ctx.fillStyle = '#2a1745'
-    ctx.strokeStyle = '#f5d0fe'
-    ctx.lineWidth = Math.max(1, size / 24)
-    ctx.beginPath()
-    ctx.moveTo(px - size * 0.24, py + size * 0.17)
-    ctx.quadraticCurveTo(px - size * 0.08, py - size * 0.42, px + size * 0.23, py - size * 0.2)
-    ctx.quadraticCurveTo(px + size * 0.08, py - size * 0.02, px + size * 0.3, py + size * 0.17)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-
-    ctx.fillStyle = `${color}dd`
-    ctx.beginPath()
-    ctx.ellipse(px, py + size * 0.18, size * 0.35, size * 0.08, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-
-    ctx.fillStyle = '#fde68a'
-    ctx.beginPath()
-    ctx.arc(px + size * 0.08, py - size * 0.13, size * 0.045, 0, Math.PI * 2)
-    ctx.fill()
-  }
-
-  private _drawStaff(ctx: CanvasRenderingContext2D, px: number, py: number, size: number): void {
-    ctx.strokeStyle = '#6b3f20'
-    ctx.lineWidth = Math.max(1.2, size / 16)
-    ctx.beginPath()
-    ctx.moveTo(px, py - size * 0.28)
-    ctx.lineTo(px, py + size * 0.42)
-    ctx.stroke()
-
-    ctx.fillStyle = '#f0abfc'
-    ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.arc(px, py - size * 0.33, size * 0.08, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-  }
-
-  private _drawBat(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    size: number,
-    color: string,
-  ): void {
-    ctx.fillStyle = '#21112f'
-    ctx.strokeStyle = `${color}dd`
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(px, py)
-    ctx.quadraticCurveTo(px - size * 0.35, py - size * 0.36, px - size * 0.68, py - size * 0.05)
-    ctx.quadraticCurveTo(px - size * 0.38, py - size * 0.02, px - size * 0.22, py + size * 0.18)
-    ctx.lineTo(px, py + size * 0.1)
-    ctx.quadraticCurveTo(px + size * 0.35, py - size * 0.36, px + size * 0.68, py - size * 0.05)
-    ctx.quadraticCurveTo(px + size * 0.38, py - size * 0.02, px + size * 0.22, py + size * 0.18)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-
-    ctx.fillStyle = '#f5d0fe'
-    ctx.beginPath()
-    ctx.arc(px - size * 0.08, py - size * 0.02, size * 0.04, 0, Math.PI * 2)
-    ctx.arc(px + size * 0.08, py - size * 0.02, size * 0.04, 0, Math.PI * 2)
-    ctx.fill()
-  }
 }

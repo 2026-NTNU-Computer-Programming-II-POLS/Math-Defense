@@ -134,26 +134,27 @@ function goToLeaderboard(): void {
 }
 
 .setup-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
   text-align: center;
 }
 
-.loading { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 12px; text-align: center; }
-.error-msg { font-size: 11px; color: var(--enemy-red); }
+.loading { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-xs); text-align: center; }
+.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
 
 .challenge-detail { display: flex; flex-direction: column; gap: 12px; }
 .title-row { display: flex; align-items: baseline; justify-content: space-between; }
-.ch-title { font-size: 14px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
-.ch-desc { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); margin: 0; line-height: 1.4; }
+.ch-title { font-size: var(--text-sm); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.ch-desc { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); margin: 0; line-height: 1.4; }
 
 .constraints {
   display: grid;
   grid-template-columns: 110px 1fr;
   gap: 6px 12px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin: 0;
 }
 .constraints dt { color: var(--gold); text-shadow: var(--gold-shadow); }
@@ -163,7 +164,7 @@ function goToLeaderboard(): void {
   display: inline-block;
   padding: 2px 6px;
   border: 1px solid var(--axis);
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }

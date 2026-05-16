@@ -1,6 +1,6 @@
 # Math Defense — Final Project Specification
 
-> **Status:** Reflects the live implementation as of **2026-05-16** (V2 Phase 5+). This document supersedes the earlier v3 design draft. Where the historical draft and current code disagree, **the implementation wins** and is described here.
+> **Status:** Reflects the live implementation as of **2026-05-16** (V2 Phase 5+). This document supersedes the earlier design draft. Where the historical draft and current code disagree, **the implementation wins** and is described here.
 >
 > Subsystem references:
 > - Frontend: [`frontend/README.md`](frontend/README.md)
@@ -114,6 +114,45 @@ Medieval-fantasy × pixel art.
 - Keyboard placement: arrow keys + Enter; no pointer required (WCAG 2.2 SC 2.1.1).
 - ARIA live region announces phase, wave, and result.
 - Reduced-motion mode honored.
+
+### 4.1 Visual Redesign delta (2026-05-16)
+
+The Track-B redesign tracked in [`docs/V3_surgicalPlan/Visual_Redesign_Plan.md`](docs/V3_surgicalPlan/Visual_Redesign_Plan.md) replaces the original "geometric tower vs. cartoon slime" split with a single math-themed vocabulary. Phases 0–6 have shipped; this delta supersedes the silhouette rows in the §4 table above where they disagree.
+
+**Towers — mathematical instruments.** All seven tower bodies fit a 22×22 px silhouette above a shared baseplate. Tier rings (T2 gold rim, T3 rotating sub-glyph ring) read tier at a glance.
+
+| Tower | Instrument body | Companion VFX aligned |
+|-------|-----------------|------------------------|
+| Magic | Parchment scroll with a breathing polynomial / sinusoid curve | `MagicZoneRenderer` zone curve |
+| Radar A | Sextant with a sweeping arm | `RadarRangeRenderer` sweep arc |
+| Radar B | Astrolabe with two counter-rotating rings | `RadarRangeRenderer` rotating ring |
+| Radar C | Brass telescope on tripod that tracks the nearest enemy | `RadarRangeRenderer` scope cone |
+| Matrix | Floating 2×2 bracket pair `[ ]` with scrolling digits; diagonal-cell flash on fire | `MatrixLaserRenderer` beam |
+| Limit | Dashed asymptote pair flanking an ascending point; bound-snap on fire | Range preview only |
+| Calculus | Rotating `∫` sigil shedding `dx` / `dy` particles toward target | Range preview only |
+
+**Enemies — math-error chaos constructs.** Slime bodies and kawaii faces are dropped wholesale. Every enemy is built from a glyph body + cyan/magenta chromatic-aberration fringe + a behaviour-tied motion modifier. Status auras (frost, regen, helper) and HP/shield bars are retained on the new bodies. Glyph mapping:
+
+| Enemy | Glyph | Motion / signal |
+|-------|-------|------------------|
+| General | `x` | Gait wobble |
+| Fast | `÷` | Lean + motion-blur streak |
+| Strong | `( + − = )` cluster | Chromatic fringe widens as HP drops |
+| Split | Fraction stack | On death, numerator drifts up / denominator down |
+| Helper | `Σ` | Breathes while helper aura active |
+| Regenerator | `lim` | Nested inside rotating dashed regen ring; `+ε` particles rise |
+| Bulwark | `∥` | Two thick parallel bars with rivets |
+| Swarmling | `ε` | Three smaller `ε` satellites orbit jittering |
+| Boss A | `∀x. f(x) ≠ 0` | Halo of flickering "QED" boxes |
+| Boss B | Möbius lemniscate | Orbiting `↻` paradox satellites |
+
+**Phase 6.5 — Pet visual alignment.** Decision: **6.5-A taken** (align). Pets are recast as math-helper glyphs sharing the construction recipe of enemies but with a **cyan-only fringe** so allied vs. hostile reads at a glance. Glyph mapping: `½` (slow) / `→` (fast) / `×` (heavy) / `+` (basic). The legacy allied aura ring + orbiting satellites are retained as the "friendly buff field" cue. Rationale: pets are visible on the same field as towers and enemies; leaving them on cartoon art creates a third visual style at odds with both. Cost was ~1 day; risk is zero (the fringe-color override is additive to `drawGlyphBody`, defaulting to the hostile cyan/magenta pair so no enemy callsite changed).
+
+**Spells — re-skin completed (Spell_Reskin_Plan Phases 0–2, 2026-05-16).** `SpellEffectRenderer` was migrated to extend `EffectLayer` (Phase 0) and each spell rebuilt as a glyph-centred composition (Phase 1, Option A): Fireball = `eˣ` rising from cast point with expanding shockwave rings; Frost Nova = `lim → 0` with concentric contour rings collapsing inward (load-bearing motion that distinguishes it from the Regenerator's static `lim`); Lightning = `δ` at the strike point with a chromatic vertical bolt; Haste = `d/dt` drifting upward over a green/gold aura with radiating speed lines. All four use the player-action **gold-only fringe** (`#ffd700` / `#c47206`) — distinct from enemies (cyan/magenta) and pets (cyan-only). The same glyph mapping appears on `SpellBar.vue` icons and in the `public/manual/*.md` spell tables. Reduced-motion contract (Phase 2) is documented in the **Reduced-motion contract** paragraph below.
+
+**Event surface added by the redesign.** `Events.TOWER_FIRED` (emitted by `CombatSystem` at projectile spawn) and `Events.ENEMY_DYING` (emitted by `SplitPolicy.killEnemy` for combat kills only — origin-breach removals stay instant). Both are registered in `EVENT_HANDLER_REGISTRY` and gated by `npm run event-registry-check`. The `Enemy.dying / dyingTimer / deathMaxTime` fields extend the entity lifecycle so corpses can play a ~0.35 s (regular) or ~1.20 s (boss) death animation without holding up the combat resolution — `alive` flips to `false` at t=0 exactly as before.
+
+**Reduced-motion contract.** `useReducedMotion` (`composables/useReducedMotion.ts`) and the engine-side `prefersReducedMotion()` helper provide a single source of truth. When the user opts in: `ShakeController` produces zero offset; `DeathParticleRenderer` halves both particle count and lifetime; `TowerLifecycleRenderer` collapses the upgrade pillar + rune sweep to a static colored flash; HUD value-pops drop the scale keyframe but keep the colour flash. `SpellEffectRenderer` drops each spell's motion-intensive layer — Fireball loses the expanding shockwave rings (heat bloom kept as static flash); Frost Nova drops the inward-collapsing contour rings (`→ 0` arrow inside the glyph carries the Regenerator differentiator per Spell_Reskin_Plan §2.4); Lightning drops the chromatic offset passes and renders a single white bolt; Haste drops the upward drift + radiating speed lines (aura halo + static glyph kept above the tower). Identity-bearing visuals (silhouette, colour, glyph) are never removed.
 
 ---
 

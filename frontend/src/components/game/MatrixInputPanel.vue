@@ -123,7 +123,7 @@ const fields = [
 }
 
 .matrix-label {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--axis);
   letter-spacing: 1px;
 }
@@ -135,7 +135,7 @@ const fields = [
 }
 
 .bracket {
-  font-size: 48px;
+  font-size: var(--text-3xl);
   color: #9068c8;
   font-weight: 100;
   line-height: 1;
@@ -157,7 +157,8 @@ const fields = [
 .matrix-input {
   width: 56px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--text-lg);
+  font-family: var(--font-mono);
 }
 
 .matrix-slider {
@@ -167,13 +168,13 @@ const fields = [
 }
 
 .cell-label {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--gold);
   font-style: italic;
 }
 
 .cell-value {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: #ffffff;
   font-family: var(--font-mono);
 }
@@ -186,9 +187,9 @@ const fields = [
 }
 
 .det {
-  font-size: 11px;
+  font-size: var(--text-lg);
   color: #9068c8;
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .det.zero {
@@ -196,7 +197,7 @@ const fields = [
 }
 
 .damage-hint {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--axis);
 }
 

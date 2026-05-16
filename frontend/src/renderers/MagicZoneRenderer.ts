@@ -17,23 +17,29 @@ export class MagicZoneRenderer {
 
   private _drawZone(ctx: CanvasRenderingContext2D, view: MagicZoneView): void {
     const fillColor = view.mode === 'debuff'
-      ? 'rgba(168, 85, 247, 0.25)'
-      : 'rgba(64, 184, 144, 0.25)'
+      ? 'rgba(168, 85, 247, 0.22)'
+      : 'rgba(64, 184, 144, 0.22)'
     const strokeColor = view.mode === 'debuff'
       ? 'rgba(168, 85, 247, 0.6)'
       : 'rgba(64, 184, 144, 0.6)'
+    // Visual Redesign Phase 5a: a brighter centerline traces the actual
+    // function curve so the band reads as "f(x) plotted on a parchment scroll"
+    // — matching the new Magic instrument body.
+    const centerColor = view.mode === 'debuff'
+      ? 'rgba(228, 192, 255, 0.95)'
+      : 'rgba(168, 240, 208, 0.95)'
 
     ctx.save()
-    ctx.strokeStyle = strokeColor
     ctx.lineWidth = 2
     ctx.fillStyle = fillColor
 
-    ctx.beginPath()
     const xMin = view.x - view.range
     const xMax = view.x + view.range
     const step = 0.2
     const halfWidthPx = view.zoneHalfWidth * UNIT_PX
 
+    // Filled band — dashed edge for a "function-on-paper" feel.
+    ctx.beginPath()
     for (let x = xMin; x <= xMax; x += step) {
       const y = view.curve(x)
       const px = gameToCanvasX(x)
@@ -49,6 +55,22 @@ export class MagicZoneRenderer {
     }
     ctx.closePath()
     ctx.fill()
+    ctx.strokeStyle = strokeColor
+    ctx.setLineDash([4, 3])
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // Centerline trace.
+    ctx.beginPath()
+    for (let x = xMin; x <= xMax; x += step) {
+      const y = view.curve(x)
+      const px = gameToCanvasX(x)
+      const py = gameToCanvasY(y)
+      if (x === xMin) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    }
+    ctx.strokeStyle = centerColor
+    ctx.lineWidth = 1.6
     ctx.stroke()
 
     ctx.restore()

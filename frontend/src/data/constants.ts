@@ -86,8 +86,15 @@ export const Events = Object.freeze({
   WAVE_END:             'waveEnd',
   ENEMY_SPAWNED:        'enemySpawned',
   ENEMY_KILLED:         'enemyKilled',
+  // Visual lifecycle event — fired the instant an enemy is killed in combat
+  // so death-particle / corpse renderers can spawn. The enemy's `alive` flag
+  // flips false at the same site; this event is purely a render hook.
+  ENEMY_DYING:          'enemyDying',
   ENEMY_REACHED_ORIGIN: 'enemyReachedOrigin',
   TOWER_ATTACK:         'towerAttack',
+  // Fired when a tower spawns a projectile. Consumed by muzzle-flash /
+  // projectile-trail renderers introduced by the Visual Redesign plan.
+  TOWER_FIRED:          'towerFired',
   // Rare feedback event: a discrete hit whose number a defensive trait
   // (Bulwark cap / Swarmling evasion) actually changed. Drives the floating
   // combat text. Never fires for unmodified or continuous (dt-scaled) damage.
@@ -154,6 +161,22 @@ export const Events = Object.freeze({
 
   // Pedagogy: post-wave principle-surfacing overlay (Backlog item #1)
   PRINCIPLE_SHOW:        'principleShow',
+} as const)
+
+// ── Animation timing (Visual Redesign plan Phase 0) ──
+// Single source of truth for every renderer's effect duration. Tune in
+// Phase 7. Renderers MUST read from this table — no inline numeric durations.
+export const ANIM = Object.freeze({
+  ENEMY_DEATH:        0.35,
+  BOSS_DEATH:         1.20,
+  PLACEMENT_POP:      0.45,
+  UPGRADE_BURST:      0.55,
+  HIT_FLASH:          0.10,
+  TOWER_FIRE_FLASH:   0.14,
+  HUD_VALUE_POP:      0.28,
+  SHAKE_HIT:          0.18,
+  SHAKE_BREACH:       0.55,
+  PROJECTILE_TRAIL:   0.25,
 } as const)
 
 // ── Color palette ──

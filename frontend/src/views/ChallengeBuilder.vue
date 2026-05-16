@@ -252,7 +252,8 @@ onMounted(async () => {
 }
 
 .setup-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
@@ -260,21 +261,22 @@ onMounted(async () => {
 }
 
 .subtitle {
-  font-size: 13px;
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 2px;
   margin-top: 16px;
 }
 
-.error-msg { font-size: 11px; color: var(--enemy-red); }
+.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field.row { flex-direction: row; gap: 12px; }
 .half { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.field-label { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); }
+.field-label { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .checkbox-grid {
   display: grid;
@@ -286,7 +288,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   cursor: pointer;
@@ -297,18 +299,18 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .coef-label {
   font-family: var(--font-mono, monospace);
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   min-width: 12px;
 }
 .num-input { width: 70px; }
 .dash { color: var(--axis); text-shadow: var(--gold-shadow); }
-.hint { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 9px; opacity: 0.7; }
+.hint { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-2xs); opacity: 0.7; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
@@ -319,11 +321,11 @@ onMounted(async () => {
 .ch-row {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 4px 6px;
   border: 1px solid var(--axis);
 }
 .ch-title { color: var(--gold); text-shadow: var(--gold-shadow); text-decoration: none; }
 .ch-title:hover { text-decoration: underline; }
-.ch-meta { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 10px; }
+.ch-meta { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-xs); }
 </style>

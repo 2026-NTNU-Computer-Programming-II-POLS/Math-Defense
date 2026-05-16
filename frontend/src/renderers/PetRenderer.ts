@@ -1,9 +1,20 @@
+/**
+ * PetRenderer — Visual Redesign Phase 6.5-A.
+ *
+ * Pets are recast as "math helper symbols" so they share the construction
+ * vocabulary of Phase 6 enemies but read clearly as allies:
+ *   - cyan-only chromatic fringe (vs hostile cyan/magenta);
+ *   - glyph-body silhouette: `½` (slow) / `→` (fast) / `×` (heavy) / `+` (basic);
+ *   - the legacy aura ring + orbiting satellites stay as the "allied buff
+ *     field" cue — they were already best-in-class and visually distinguish
+ *     pets from inert glyph bodies.
+ */
 import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import { projectPetScene } from '@/engine/projections/project-pets'
 import type { PetTrait } from '@/engine/projections/views'
-import { drawOrbitRing, drawDiamondCrystal } from './primitives'
+import { drawGlyphBody } from './primitives'
 
 const TRAIT_COLORS: Record<PetTrait, string> = {
   slow:  '#60a5fa',
@@ -11,6 +22,18 @@ const TRAIT_COLORS: Record<PetTrait, string> = {
   heavy: '#ef4444',
   basic: '#a3a3a3',
 }
+
+const TRAIT_GLYPHS: Record<PetTrait, string> = {
+  slow:  '½', // ½ — slow factor (divides enemy speed)
+  fast:  '→', // → — speed boost
+  heavy: '×', // × — damage multiplier
+  basic: '+',
+}
+
+/** Cyan-only fringe distinguishes allied pets from hostile cyan/magenta enemies. */
+const ALLIED_FRINGE: readonly [string, string] = ['#7df3ff', '#00d6ff']
+
+const PET_GLYPH_SIZE = 18
 
 export class PetRenderer {
   private _time = 0
@@ -27,40 +50,18 @@ export class PetRenderer {
       const px = gameToCanvasX(pet.x)
       const py = gameToCanvasY(pet.y)
       const color = TRAIT_COLORS[pet.trait]
+      const bob = Math.sin(this._time * 4 + px * 0.05) * 1.2
+      const y = py + bob
+      const pulse = Math.sin(this._time * 5) * 0.5 + 0.5
 
       ctx.save()
-      this._drawPet(ctx, px, py, color, pet.trait)
+      this._drawAura(ctx, px, y, color, pulse)
+      this._drawSatellites(ctx, px, y, color)
+      drawGlyphBody(ctx, px, y, PET_GLYPH_SIZE, TRAIT_GLYPHS[pet.trait], color, {
+        fringeColors: ALLIED_FRINGE,
+        fringeAlpha: 0.45,
+      })
       ctx.restore()
-    }
-  }
-
-  private _drawPet(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    color: string,
-    trait: PetTrait,
-  ): void {
-    const pulse = Math.sin(this._time * 5) * 0.5 + 0.5
-    const bob = Math.sin(this._time * 4 + px * 0.05) * 1.2
-    const y = py + bob
-
-    this._drawAura(ctx, px, y, color, pulse)
-    this._drawSatellites(ctx, px, y, color)
-
-    switch (trait) {
-      case 'slow':
-        this._drawSlowPet(ctx, px, y, color)
-        break
-      case 'fast':
-        this._drawFastPet(ctx, px, y, color)
-        break
-      case 'heavy':
-        this._drawHeavyPet(ctx, px, y, color)
-        break
-      default:
-        this._drawBasicPet(ctx, px, y, color)
-        break
     }
   }
 
@@ -100,93 +101,5 @@ export class PetRenderer {
       ctx.stroke()
     }
     ctx.restore()
-  }
-
-  private _drawSlowPet(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    drawOrbitRing(ctx, px, py, 10, -0.55 + this._time * 0.9, color, 0.45, 1.4, 'cc')
-    drawOrbitRing(ctx, px, py, 7,   0.85 + this._time * 0.9, color, 0.45, 1.4, 'cc')
-    drawDiamondCrystal(ctx, px, py, 6, color, 0.8, '#172033', 0.3, '#e0f2fe', 1.2)
-    this._drawRuneDot(ctx, px - 8, py - 3, color)
-    this._drawRuneDot(ctx, px + 8, py + 3, color)
-  }
-
-  private _drawFastPet(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    ctx.strokeStyle = `${color}99`
-    ctx.lineWidth = 2.4
-    ctx.beginPath()
-    ctx.moveTo(px - 15, py + 5)
-    ctx.lineTo(px - 4, py + 1)
-    ctx.moveTo(px - 14, py - 4)
-    ctx.lineTo(px - 3, py - 1)
-    ctx.moveTo(px - 10, py)
-    ctx.lineTo(px - 1, py)
-    ctx.stroke()
-
-    ctx.fillStyle = color
-    ctx.strokeStyle = '#fff8cf'
-    ctx.lineWidth = 1.4
-    ctx.beginPath()
-    ctx.moveTo(px + 10, py)
-    ctx.lineTo(px - 4, py - 8)
-    ctx.lineTo(px - 1, py)
-    ctx.lineTo(px - 4, py + 8)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-  }
-
-  private _drawHeavyPet(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    drawOrbitRing(ctx, px, py, 10, 0.2 + this._time * 0.9, color, 0.45, 1.4, 'cc')
-    ctx.fillStyle = '#241517'
-    ctx.strokeStyle = color
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    for (let i = 0; i < 6; i++) {
-      const a = -Math.PI / 2 + i * Math.PI / 3
-      const x = px + Math.cos(a) * 8
-      const y = py + Math.sin(a) * 8
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    }
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-
-    ctx.strokeStyle = '#ffd7d7'
-    ctx.lineWidth = 1.2
-    ctx.beginPath()
-    ctx.moveTo(px - 4, py)
-    ctx.lineTo(px + 4, py)
-    ctx.moveTo(px, py - 4)
-    ctx.lineTo(px, py + 4)
-    ctx.stroke()
-  }
-
-  private _drawBasicPet(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    drawOrbitRing(ctx, px, py, 9, 0.65 + this._time * 0.9, color, 0.45, 1.4, 'cc')
-    ctx.fillStyle = color
-    ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth = 1.2
-    ctx.beginPath()
-    ctx.arc(px, py, 6, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-
-    ctx.fillStyle = '#ffffff'
-    ctx.globalAlpha = 0.75
-    ctx.beginPath()
-    ctx.arc(px - 2, py - 2, 1.6, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.globalAlpha = 1
-  }
-
-  private _drawRuneDot(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-    ctx.fillStyle = color
-    ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.arc(px, py, 2, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
   }
 }

@@ -34,8 +34,11 @@ import { EnemyAbilitySystem } from '@/systems/EnemyAbilitySystem'
 import { SpellSystem } from '@/systems/SpellSystem'
 import { MontyHallSystem } from '@/systems/MontyHallSystem'
 import { EnemyRenderer } from '@/renderers/EnemyRenderer'
+import { DeathParticleRenderer } from '@/renderers/DeathParticleRenderer'
 import { TowerRenderer } from '@/renderers/TowerRenderer'
+import { TowerLifecycleRenderer } from '@/renderers/TowerLifecycleRenderer'
 import { ProjectileRenderer } from '@/renderers/ProjectileRenderer'
+import { ImpactEffectRenderer } from '@/renderers/ImpactEffectRenderer'
 import { MagicZoneRenderer } from '@/renderers/MagicZoneRenderer'
 import { RadarRangeRenderer } from '@/renderers/RadarRangeRenderer'
 import { MatrixLaserRenderer } from '@/renderers/MatrixLaserRenderer'
@@ -84,8 +87,11 @@ export function registerSystems(game: Game, opts: RegisterSystemsOptions): void 
     ['spell', new SpellSystem()],
     ['montyHall', new MontyHallSystem()],
     ['enemyRenderer', new EnemyRenderer()],
+    ['deathParticleRenderer', new DeathParticleRenderer()],
     ['towerRenderer', new TowerRenderer()],
+    ['towerLifecycleRenderer', new TowerLifecycleRenderer()],
     ['projectileRenderer', new ProjectileRenderer()],
+    ['impactEffectRenderer', new ImpactEffectRenderer()],
     ['magicZoneRenderer', new MagicZoneRenderer()],
     ['radarRangeRenderer', new RadarRangeRenderer()],
     ['matrixLaserRenderer', new MatrixLaserRenderer()],

@@ -1,19 +1,41 @@
-import { Events } from '@/data/constants'
+/**
+ * SpellEffectRenderer — glyph-centred spell VFX.
+ *
+ * Visual Redesign Spell Re-skin (Phase 1, Option A): each spell paints a
+ * math-symbol body (eˣ / lim→0 / δ / d/dt) on top of its own resolve
+ * geometry, with a gold-only chromatic fringe so spells read as the
+ * "player action" category — distinct from enemy (cyan/magenta) and pet
+ * (cyan-only) glyph bodies.
+ *
+ * Determinism: any per-cast jitter (e.g. lightning's bolt path) routes
+ * through seededUnit(seedFor(...)) so replays reproduce frame-for-frame.
+ *
+ * Reduced motion (Phase 2): each spell drops its motion-intensive branch
+ * (shockwave rings / collapsing contours / chromatic split / drift) and
+ * keeps the glyph + a static colour bloom. Identity silhouettes never
+ * disappear under reduced motion — see Math_Defense_Spec.md §4.1.
+ */
+import { Events, UNIT_PX } from '@/data/constants'
 import { SPELL_MAP } from '@/data/spell-defs'
-import { UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
-import type { Game, GameSystem } from '@/engine/Game'
+import { seededUnit, seedFor } from '@/math/seededRandom'
+import { prefersReducedMotion } from '@/utils/reducedMotion'
+import { EffectLayer, type Effect } from './effects/EffectLayer'
+import { drawGlyphBody } from './primitives'
+import type { Game } from '@/engine/Game'
 import type { Renderer } from '@/engine/Renderer'
 
 const TAU = Math.PI * 2
 
-interface SpellVfx {
+// Gold-only fringe for the "player action" signal — distinct from the
+// hostile (cyan/magenta) and allied (cyan-only) palettes used elsewhere.
+const SPELL_FRINGE: readonly [string, string] = ['#ffd700', '#c47206']
+
+interface SpellVfx extends Effect {
   spellId: string
   x: number
   y: number
   radius: number
-  age: number
-  maxAge: number
   color: string
   seed: number
 }
@@ -22,38 +44,23 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value))
 }
 
-function easeOutQuart(value: number): number {
-  const t = clamp01(value)
-  return 1 - (1 - t) ** 4
+function easeOutQuart(t: number): number {
+  const u = clamp01(t)
+  return 1 - (1 - u) ** 4
 }
 
-function easeInOut(value: number): number {
-  const t = clamp01(value)
-  return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2
+function easeInOut(t: number): number {
+  const u = clamp01(t)
+  return u < 0.5 ? 2 * u * u : 1 - ((-2 * u + 2) ** 2) / 2
 }
 
-function seededUnit(seed: number, index: number): number {
-  const n = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453
-  return n - Math.floor(n)
-}
-
-function seedFor(spellId: string, x: number, y: number): number {
-  let seed = Math.round(x * 97 + y * 193)
-  for (let i = 0; i < spellId.length; i++) seed += spellId.charCodeAt(i) * (i + 11)
-  return seed
-}
-
-
-export class SpellEffectRenderer implements GameSystem {
-  private _effects: SpellVfx[] = []
-  private _unsubs: (() => void)[] = []
-
+export class SpellEffectRenderer extends EffectLayer<SpellVfx> {
   init(game: Game): void {
-    this.destroy()
-    this._unsubs.push(
+    super.init(game)
+    this.unsubs.push(
       game.eventBus.on(Events.SPELL_EFFECT, ({ spellId, x, y, radius }) => {
         const def = SPELL_MAP.get(spellId)
-        this._effects.push({
+        this.spawn({
           spellId,
           x,
           y,
@@ -64,192 +71,257 @@ export class SpellEffectRenderer implements GameSystem {
           seed: seedFor(spellId, x, y),
         })
       }),
-
-      game.eventBus.on(Events.LEVEL_START, () => {
-        this._effects = []
-      }),
     )
-  }
-
-  destroy(): void {
-    this._unsubs.forEach((fn) => fn())
-    this._unsubs = []
-    this._effects = []
-  }
-
-  update(dt: number, _game: Game): void {
-    for (let i = this._effects.length - 1; i >= 0; i--) {
-      this._effects[i].age += dt
-      if (this._effects[i].age >= this._effects[i].maxAge) {
-        this._effects.splice(i, 1)
-      }
-    }
   }
 
   render(renderer: Renderer, _game: Game): void {
     const ctx = renderer.ctx
-    for (const vfx of this._effects) {
-      if (vfx.spellId === 'fireball') {
-        this._drawFireball(ctx, vfx)
-      } else if (vfx.spellId === 'lightning') {
-        this._drawLightning(ctx, vfx)
-      } else if (vfx.spellId === 'slow') {
-        this._drawFrostNova(ctx, vfx)
-      } else if (vfx.spellId === 'haste') {
-        this._drawHaste(ctx, vfx)
-      } else {
-        this._drawPulse(ctx, vfx)
-      }
+    const reduced = prefersReducedMotion()
+    for (const vfx of this.effects) {
+      if (vfx.spellId === 'fireball') this._drawFireball(ctx, vfx, reduced)
+      else if (vfx.spellId === 'slow') this._drawFrostNova(ctx, vfx, reduced)
+      else if (vfx.spellId === 'lightning') this._drawLightning(ctx, vfx, reduced)
+      else if (vfx.spellId === 'haste') this._drawHaste(ctx, vfx, reduced)
+      else this._drawFallback(ctx, vfx)
     }
   }
 
-  private _drawPulse(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
-    const p = clamp01(vfx.age / vfx.maxAge)
-    const alpha = 1 - p
-    const px = gameToCanvasX(vfx.x)
-    const py = gameToCanvasY(vfx.y)
-    const pr = vfx.radius * UNIT_PX * (0.5 + p * 0.5)
-
-    ctx.save()
-    ctx.globalAlpha = alpha * 0.6
-    ctx.beginPath()
-    ctx.arc(px, py, pr, 0, TAU)
-    ctx.fillStyle = vfx.color
-    ctx.fill()
-
-    ctx.globalAlpha = alpha
-    ctx.beginPath()
-    ctx.arc(px, py, pr * 0.3, 0, TAU)
-    ctx.fillStyle = '#ffffff'
-    ctx.fill()
-    ctx.restore()
-  }
-
-  private _drawFireball(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
+  // ── Fireball: eˣ glyph rising from cast point with an outward shockwave.
+  private _drawFireball(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
     const p = clamp01(vfx.age / vfx.maxAge)
     const out = easeOutQuart(p)
     const alpha = 1 - p
-    const ignition = 1 - easeInOut(p)
     const px = gameToCanvasX(vfx.x)
     const py = gameToCanvasY(vfx.y)
     const baseR = Math.max(UNIT_PX * 0.9, vfx.radius * UNIT_PX)
-    const waveR = baseR * (0.18 + out * 1.08)
-    const coreR = baseR * (0.12 + out * 0.24)
+    // Reduced motion holds the glyph at its full size from frame 1 so there
+    // is no scale animation; the identity silhouette stays static.
+    const glyphSize = reduced ? UNIT_PX * 1.25 : UNIT_PX * (0.9 + out * 0.55)
+    const rise = reduced ? 0 : UNIT_PX * 0.35 * out
 
     ctx.save()
-    ctx.globalCompositeOperation = 'lighter'
-
-    this._drawHeatBloom(ctx, px, py, waveR, alpha)
-    this._drawFireCircle(ctx, px, py, waveR * 0.72, p * 2.6, 0.62 * alpha)
-    this._drawFireCircle(ctx, px, py, waveR * 0.46, -p * 3.2, 0.42 * alpha)
-    this._drawShockwave(ctx, px, py, waveR, ignition, alpha)
-    this._drawFlamePetals(ctx, px, py, coreR, waveR, p, alpha, vfx.seed)
-    this._drawEmbers(ctx, px, py, waveR, out, alpha, vfx.seed)
-
-    const core = ctx.createRadialGradient(px, py, 0, px, py, coreR)
-    core.addColorStop(0, `rgba(255, 255, 236, ${0.92 * alpha})`)
-    core.addColorStop(0.36, `rgba(255, 213, 92, ${0.82 * alpha})`)
-    core.addColorStop(1, 'rgba(255, 88, 24, 0)')
-    ctx.fillStyle = core
+    // Heat bloom under the glyph — kept under reduced motion as the static
+    // colour flash the §4.1 contract calls for.
+    const bloomR = reduced ? baseR * 0.95 : baseR * (0.3 + out * 1.05)
+    const bloom = ctx.createRadialGradient(px, py, 0, px, py, bloomR)
+    bloom.addColorStop(0, `rgba(255, 230, 140, ${0.42 * alpha})`)
+    bloom.addColorStop(0.55, `rgba(255, 138, 60, ${0.22 * alpha})`)
+    bloom.addColorStop(1, 'rgba(60, 16, 6, 0)')
+    ctx.fillStyle = bloom
     ctx.beginPath()
-    ctx.arc(px, py, coreR, 0, TAU)
+    ctx.arc(px, py, bloomR, 0, TAU)
     ctx.fill()
 
-    ctx.globalCompositeOperation = 'source-over'
-    this._drawSmoke(ctx, px, py, waveR, out, alpha, vfx.seed)
+    if (!reduced) {
+      // Shockwave rings expanding outward; damage frame at p≈0.3.
+      const ignition = Math.max(0, 1 - Math.abs(p - 0.3) * 3.2)
+      for (let i = 0; i < 3; i++) {
+        const r = baseR * (0.4 + out * (0.7 + i * 0.18))
+        ctx.strokeStyle = i === 0
+          ? `rgba(255, 222, 130, ${0.55 * alpha})`
+          : `rgba(255, 138, 60, ${0.28 * alpha})`
+        ctx.lineWidth = 1.4 + ignition * (3 - i)
+        ctx.beginPath()
+        ctx.arc(px, py, r, 0, TAU)
+        ctx.stroke()
+      }
+    }
+
+    // Glyph body — rises slightly from the cast point.
+    ctx.globalAlpha = 0.4 + alpha * 0.6
+    drawGlyphBody(ctx, px, py - rise, glyphSize, 'eˣ', vfx.color, {
+      fringeColors: SPELL_FRINGE,
+      fringeOffset: glyphSize * 0.08,
+    })
     ctx.restore()
   }
 
-  private _drawLightning(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
+  // ── Frost Nova: lim → 0 glyph with concentric rings collapsing inward.
+  private _drawFrostNova(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
     const p = clamp01(vfx.age / vfx.maxAge)
-    const out = easeOutQuart(p)
+    const inward = easeInOut(p)
+    const alpha = 1 - p * 0.85
+    const px = gameToCanvasX(vfx.x)
+    const py = gameToCanvasY(vfx.y)
+    const baseR = Math.max(UNIT_PX * 1.2, vfx.radius * UNIT_PX)
+    const glyphSize = UNIT_PX * 0.95
+
+    ctx.save()
+    // Cold bloom centred on cast point.
+    const bloom = ctx.createRadialGradient(px, py, 0, px, py, baseR)
+    bloom.addColorStop(0, `rgba(220, 248, 255, ${0.42 * alpha})`)
+    bloom.addColorStop(0.6, `rgba(96, 192, 255, ${0.18 * alpha})`)
+    bloom.addColorStop(1, 'rgba(20, 60, 110, 0)')
+    ctx.fillStyle = bloom
+    ctx.beginPath()
+    ctx.arc(px, py, baseR, 0, TAU)
+    ctx.fill()
+
+    if (!reduced) {
+      // Four contour rings collapsing inward toward zero — the load-bearing
+      // motion that distinguishes this spell from the Regenerator's static
+      // `lim` glyph. Reduced motion drops this; the `→ 0` arrow inside the
+      // glyph carries the differentiator (Spell_Reskin_Plan §2.4).
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      for (let i = 0; i < 4; i++) {
+        const startR = baseR * (0.45 + i * 0.18)
+        const r = startR * (1 - inward * 0.88)
+        if (r < 2) continue
+        ctx.strokeStyle = i % 2 === 0
+          ? `rgba(230, 252, 255, ${0.48 * alpha})`
+          : `rgba(108, 208, 255, ${0.36 * alpha})`
+        ctx.lineWidth = 1.4 + (1 - inward) * 1.4
+        ctx.setLineDash([r * 0.12, r * 0.06])
+        ctx.beginPath()
+        ctx.arc(px, py, r, p * (1.4 + i * 0.25), TAU - i * 0.32)
+        ctx.stroke()
+      }
+      ctx.setLineDash([])
+    }
+
+    // Glyph body — `lim → 0` shows the arrow + target so the operator
+    // motivation is legible even if the contour-collapse animation is
+    // pruned by reduced motion (Phase 2).
+    ctx.globalAlpha = 0.45 + alpha * 0.55
+    drawGlyphBody(ctx, px, py, glyphSize, 'lim→0', vfx.color, {
+      fringeColors: SPELL_FRINGE,
+      fringeOffset: glyphSize * 0.06,
+    })
+    ctx.restore()
+  }
+
+  // ── Lightning: δ glyph at the target with a chromatic vertical bolt.
+  private _drawLightning(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
+    const p = clamp01(vfx.age / vfx.maxAge)
     const flash = 1 - easeInOut(p)
     const alpha = 1 - p
     const px = gameToCanvasX(vfx.x)
     const py = gameToCanvasY(vfx.y)
     const span = Math.max(UNIT_PX * 2.1, vfx.radius * UNIT_PX * 1.2)
-    const topY = py - span * 1.45
-    const impactR = span * (0.12 + out * 0.32)
-    const path = this._buildLightningPath(px, topY, py, span, vfx.seed, 0)
+    const topY = py - span * 1.6
+    const glyphSize = UNIT_PX * 1.1
 
     ctx.save()
-    ctx.globalCompositeOperation = 'lighter'
+    // Vertical polyline from above to the target. Reduced motion drops the
+    // chromatic gold/amber split passes and renders a single white core.
+    const path = this._buildBoltPath(px, topY, py, span, vfx.seed)
+    if (!reduced) {
+      this._strokeBolt(ctx, path, -span * 0.06, 0, 4.6, `rgba(255, 215, 0, ${0.55 * alpha})`)
+      this._strokeBolt(ctx, path, span * 0.06, 0, 4.6, `rgba(196, 114, 6, ${0.45 * alpha})`)
+    }
+    this._strokeBolt(ctx, path, 0, 0, reduced ? 3.2 : 1.8, `rgba(255, 255, 230, ${0.95 * alpha})`)
 
-    const column = ctx.createLinearGradient(px, topY, px, py + impactR)
-    column.addColorStop(0, `rgba(155, 218, 255, ${0.06 * alpha})`)
-    column.addColorStop(0.48, `rgba(248, 255, 220, ${0.18 * flash})`)
-    column.addColorStop(1, 'rgba(255, 240, 120, 0)')
-    ctx.fillStyle = column
+    // Impact flash under the glyph — peaks at half-life.
+    const flashR = span * 0.32
+    const glow = ctx.createRadialGradient(px, py, 0, px, py, flashR)
+    glow.addColorStop(0, `rgba(255, 255, 220, ${0.85 * flash})`)
+    glow.addColorStop(0.5, `rgba(255, 215, 0, ${0.4 * flash})`)
+    glow.addColorStop(1, 'rgba(40, 28, 6, 0)')
+    ctx.fillStyle = glow
     ctx.beginPath()
-    ctx.ellipse(px, (topY + py) * 0.5, span * 0.16, span * 0.82, 0, 0, TAU)
+    ctx.arc(px, py, flashR, 0, TAU)
     ctx.fill()
 
-    this._drawLightningBolt(ctx, path, 9.5, `rgba(76, 204, 255, ${0.14 * alpha})`)
-    this._drawLightningBolt(ctx, path, 4.8, `rgba(128, 230, 255, ${0.46 * alpha})`)
-    this._drawLightningBolt(ctx, path, 1.6, `rgba(255, 255, 226, ${0.95 * alpha})`)
-
-    for (let i = 0; i < 7; i++) {
-      const anchor = path[2 + (i % (path.length - 3))]
-      const branch = this._buildLightningBranch(anchor.x, anchor.y, span, vfx.seed, i)
-      this._drawLightningBolt(ctx, branch, 3.2, `rgba(92, 206, 255, ${0.28 * alpha})`)
-      this._drawLightningBolt(ctx, branch, 1.1, `rgba(255, 255, 228, ${0.72 * alpha})`)
-    }
-
-    this._drawImpactFlash(ctx, px, py, impactR, alpha, flash)
-    this._drawLightningSparks(ctx, px, py, span, out, alpha, vfx.seed)
-
-    ctx.globalCompositeOperation = 'source-over'
-    this._drawLightningAfterimage(ctx, px, py, span, out, alpha, vfx.seed)
+    // δ glyph at the strike point.
+    ctx.globalAlpha = 0.55 + alpha * 0.45
+    drawGlyphBody(ctx, px, py, glyphSize, 'δ', vfx.color, {
+      fringeColors: SPELL_FRINGE,
+      fringeOffset: glyphSize * 0.09,
+    })
     ctx.restore()
   }
 
-  private _buildLightningPath(
+  // ── Haste: d/dt glyph drifting upward above the cast point.
+  private _drawHaste(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
+    const p = clamp01(vfx.age / vfx.maxAge)
+    const out = easeOutQuart(p)
+    const alpha = 1 - p
+    const px = gameToCanvasX(vfx.x)
+    const py = gameToCanvasY(vfx.y)
+    const baseR = Math.max(UNIT_PX * 1.4, vfx.radius * UNIT_PX)
+    // Reduced motion: hold the glyph static (no drift / no scale-in pulse).
+    const glyphSize = reduced ? UNIT_PX * 1.0 : UNIT_PX * (0.85 + out * 0.2)
+    const drift = reduced ? 0 : UNIT_PX * 0.55 * out
+
+    ctx.save()
+    // Soft halo aura — kept under reduced motion as the static buff field.
+    const aura = ctx.createRadialGradient(px, py, 0, px, py, baseR)
+    aura.addColorStop(0, `rgba(255, 246, 196, ${0.4 * alpha})`)
+    aura.addColorStop(0.55, `rgba(124, 247, 181, ${0.22 * alpha})`)
+    aura.addColorStop(1, 'rgba(40, 90, 50, 0)')
+    ctx.fillStyle = aura
+    ctx.beginPath()
+    ctx.arc(px, py, baseR, 0, TAU)
+    ctx.fill()
+
+    if (!reduced) {
+      // Speed lines under the glyph — six short strokes radiating outward.
+      ctx.lineCap = 'round'
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + p * 1.2
+        const inner = baseR * 0.42
+        const outer = baseR * (0.62 + out * 0.18)
+        ctx.strokeStyle = i % 2 === 0
+          ? `rgba(255, 224, 112, ${0.42 * alpha})`
+          : `rgba(124, 247, 181, ${0.42 * alpha})`
+        ctx.lineWidth = 1.8
+        ctx.beginPath()
+        ctx.moveTo(px + Math.cos(a) * inner, py + Math.sin(a) * inner)
+        ctx.lineTo(px + Math.cos(a) * outer, py + Math.sin(a) * outer)
+        ctx.stroke()
+      }
+    }
+
+    // d/dt glyph drifts upward.
+    ctx.globalAlpha = 0.5 + alpha * 0.5
+    drawGlyphBody(ctx, px, py - drift, glyphSize, 'd/dt', vfx.color, {
+      fringeColors: SPELL_FRINGE,
+      fringeOffset: glyphSize * 0.08,
+    })
+    ctx.restore()
+  }
+
+  private _drawFallback(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
+    const p = clamp01(vfx.age / vfx.maxAge)
+    const alpha = 1 - p
+    const px = gameToCanvasX(vfx.x)
+    const py = gameToCanvasY(vfx.y)
+    ctx.save()
+    ctx.globalAlpha = alpha * 0.6
+    ctx.fillStyle = vfx.color
+    ctx.beginPath()
+    ctx.arc(px, py, UNIT_PX * 0.6, 0, TAU)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  private _buildBoltPath(
     px: number,
     topY: number,
     bottomY: number,
     span: number,
     seed: number,
-    salt: number,
   ): Array<{ x: number; y: number }> {
     const points: Array<{ x: number; y: number }> = []
-    const segments = 9
+    const segments = 8
     for (let i = 0; i <= segments; i++) {
       const t = i / segments
       const taper = Math.sin(t * Math.PI)
-      const jitter = (seededUnit(seed + salt, i + 400) - 0.5) * span * 0.34 * taper
-      const fork = Math.sin((t * 5.7 + seededUnit(seed, salt + 420)) * Math.PI) * span * 0.06 * taper
+      const jitter = (seededUnit(seed, i + 11) - 0.5) * span * 0.32 * taper
       points.push({
-        x: px + jitter + fork,
+        x: px + jitter,
         y: topY + (bottomY - topY) * t,
       })
     }
     return points
   }
 
-  private _buildLightningBranch(
-    startX: number,
-    startY: number,
-    span: number,
-    seed: number,
-    branchIndex: number,
-  ): Array<{ x: number; y: number }> {
-    const side = seededUnit(seed, branchIndex + 520) > 0.5 ? 1 : -1
-    const length = span * (0.16 + seededUnit(seed, branchIndex + 540) * 0.18)
-    const drop = span * (0.08 + seededUnit(seed, branchIndex + 560) * 0.14)
-    const points: Array<{ x: number; y: number }> = []
-    for (let i = 0; i <= 3; i++) {
-      const t = i / 3
-      points.push({
-        x: startX + side * length * t + (seededUnit(seed, branchIndex * 10 + i + 580) - 0.5) * span * 0.08,
-        y: startY + drop * t + (seededUnit(seed, branchIndex * 10 + i + 600) - 0.5) * span * 0.05,
-      })
-    }
-    return points
-  }
-
-  private _drawLightningBolt(
+  private _strokeBolt(
     ctx: CanvasRenderingContext2D,
     points: Array<{ x: number; y: number }>,
+    dx: number,
+    dy: number,
     width: number,
     stroke: string,
   ): void {
@@ -260,604 +332,11 @@ export class SpellEffectRenderer implements GameSystem {
     ctx.lineWidth = width
     ctx.strokeStyle = stroke
     ctx.beginPath()
-    ctx.moveTo(points[0].x, points[0].y)
+    ctx.moveTo(points[0].x + dx, points[0].y + dy)
     for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i].x, points[i].y)
+      ctx.lineTo(points[i].x + dx, points[i].y + dy)
     }
     ctx.stroke()
     ctx.restore()
-  }
-
-  private _drawImpactFlash(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    alpha: number,
-    flash: number,
-  ): void {
-    const glow = ctx.createRadialGradient(px, py, 0, px, py, radius * 2.6)
-    glow.addColorStop(0, `rgba(255, 255, 236, ${0.92 * alpha})`)
-    glow.addColorStop(0.24, `rgba(255, 239, 108, ${0.54 * alpha})`)
-    glow.addColorStop(0.62, `rgba(86, 203, 255, ${0.18 * alpha})`)
-    glow.addColorStop(1, 'rgba(16, 36, 70, 0)')
-    ctx.fillStyle = glow
-    ctx.beginPath()
-    ctx.arc(px, py, radius * 2.6, 0, TAU)
-    ctx.fill()
-
-    for (let i = 0; i < 3; i++) {
-      ctx.strokeStyle = `rgba(255, 249, 176, ${(0.46 - i * 0.11) * alpha})`
-      ctx.lineWidth = 1.2 + flash * (2.4 - i * 0.4)
-      ctx.beginPath()
-      ctx.arc(px, py, radius * (0.8 + i * 0.52), i * 0.9, TAU - i * 0.42)
-      ctx.stroke()
-    }
-  }
-
-  private _drawLightningSparks(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    span: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 34; i++) {
-      const a = seededUnit(seed, i + 640) * TAU
-      const d = span * (0.05 + seededUnit(seed, i + 660) * 0.38) * out
-      const size = 0.9 + seededUnit(seed, i + 680) * 2.4
-      ctx.fillStyle = i % 3 === 0
-        ? `rgba(255, 248, 176, ${0.8 * alpha})`
-        : `rgba(100, 216, 255, ${0.62 * alpha})`
-      ctx.beginPath()
-      ctx.arc(px + Math.cos(a) * d, py + Math.sin(a) * d, size, 0, TAU)
-      ctx.fill()
-    }
-  }
-
-  private _drawLightningAfterimage(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    span: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 6; i++) {
-      const sx = px + (seededUnit(seed, i + 700) - 0.5) * span * 0.46
-      const sy = py - span * (0.12 + seededUnit(seed, i + 720) * 0.52) * out
-      const r = span * (0.05 + seededUnit(seed, i + 740) * 0.1)
-      const haze = ctx.createRadialGradient(sx, sy, 0, sx, sy, r)
-      haze.addColorStop(0, `rgba(104, 178, 220, ${0.1 * alpha})`)
-      haze.addColorStop(1, 'rgba(12, 26, 42, 0)')
-      ctx.fillStyle = haze
-      ctx.beginPath()
-      ctx.arc(sx, sy, r, 0, TAU)
-      ctx.fill()
-    }
-  }
-
-  private _drawFrostNova(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
-    const p = clamp01(vfx.age / vfx.maxAge)
-    const out = easeOutQuart(p)
-    const alpha = 1 - p
-    const freeze = 1 - easeInOut(p)
-    const px = gameToCanvasX(vfx.x)
-    const py = gameToCanvasY(vfx.y)
-    const baseR = Math.max(UNIT_PX * 1.2, vfx.radius * UNIT_PX)
-    const waveR = baseR * (0.12 + out * 0.98)
-    const coreR = baseR * (0.08 + out * 0.22)
-
-    ctx.save()
-    ctx.globalCompositeOperation = 'lighter'
-
-    const bloom = ctx.createRadialGradient(px, py, 0, px, py, waveR)
-    bloom.addColorStop(0, `rgba(244, 255, 255, ${0.7 * alpha})`)
-    bloom.addColorStop(0.24, `rgba(142, 230, 255, ${0.42 * alpha})`)
-    bloom.addColorStop(0.58, `rgba(62, 166, 232, ${0.18 * alpha})`)
-    bloom.addColorStop(1, 'rgba(22, 72, 120, 0)')
-    ctx.fillStyle = bloom
-    ctx.beginPath()
-    ctx.arc(px, py, waveR, 0, TAU)
-    ctx.fill()
-
-    this._drawFrostRings(ctx, px, py, waveR, p, alpha, freeze)
-    this._drawFrostRunes(ctx, px, py, waveR, p, alpha, vfx.seed)
-    this._drawIceSpokes(ctx, px, py, coreR, waveR, p, alpha, vfx.seed)
-    this._drawIceFractures(ctx, px, py, waveR, out, alpha, vfx.seed)
-    this._drawIceShards(ctx, px, py, waveR, out, alpha, vfx.seed)
-    this._drawFrostMotes(ctx, px, py, waveR, out, alpha, vfx.seed)
-
-    const core = ctx.createRadialGradient(px, py, 0, px, py, coreR)
-    core.addColorStop(0, `rgba(255, 255, 255, ${0.9 * alpha})`)
-    core.addColorStop(0.5, `rgba(166, 241, 255, ${0.56 * alpha})`)
-    core.addColorStop(1, 'rgba(70, 178, 240, 0)')
-    ctx.fillStyle = core
-    ctx.beginPath()
-    ctx.arc(px, py, coreR, 0, TAU)
-    ctx.fill()
-
-    ctx.globalCompositeOperation = 'source-over'
-    this._drawColdMist(ctx, px, py, waveR, out, alpha, vfx.seed)
-    ctx.restore()
-  }
-
-  private _drawHaste(ctx: CanvasRenderingContext2D, vfx: SpellVfx): void {
-    const p = clamp01(vfx.age / vfx.maxAge)
-    const out = easeOutQuart(p)
-    const alpha = 1 - p
-    const pulse = 1 - Math.abs(p * 2 - 1)
-    const px = gameToCanvasX(vfx.x)
-    const py = gameToCanvasY(vfx.y)
-    const baseR = Math.max(UNIT_PX * 1.4, vfx.radius * UNIT_PX)
-    const waveR = baseR * (0.18 + out * 0.84)
-    const coreR = baseR * (0.12 + pulse * 0.12)
-
-    ctx.save()
-    ctx.globalCompositeOperation = 'lighter'
-
-    const aura = ctx.createRadialGradient(px, py, 0, px, py, waveR)
-    aura.addColorStop(0, `rgba(235, 255, 210, ${0.58 * alpha})`)
-    aura.addColorStop(0.28, `rgba(124, 247, 181, ${0.42 * alpha})`)
-    aura.addColorStop(0.62, `rgba(242, 208, 89, ${0.2 * alpha})`)
-    aura.addColorStop(1, 'rgba(62, 170, 96, 0)')
-    ctx.fillStyle = aura
-    ctx.beginPath()
-    ctx.arc(px, py, waveR, 0, TAU)
-    ctx.fill()
-
-    this._drawHasteArcs(ctx, px, py, waveR, p, alpha)
-    this._drawHasteChevrons(ctx, px, py, waveR, p, alpha)
-    this._drawHasteStreaks(ctx, px, py, waveR, out, alpha, vfx.seed)
-
-    const core = ctx.createRadialGradient(px, py, 0, px, py, coreR)
-    core.addColorStop(0, `rgba(255, 255, 224, ${0.82 * alpha})`)
-    core.addColorStop(0.44, `rgba(124, 247, 181, ${0.62 * alpha})`)
-    core.addColorStop(1, 'rgba(52, 206, 112, 0)')
-    ctx.fillStyle = core
-    ctx.beginPath()
-    ctx.arc(px, py, coreR, 0, TAU)
-    ctx.fill()
-
-    ctx.restore()
-  }
-
-  private _drawFrostRings(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    p: number,
-    alpha: number,
-    freeze: number,
-  ): void {
-    for (let i = 0; i < 4; i++) {
-      const r = radius * (0.36 + i * 0.18)
-      ctx.strokeStyle = i % 2 === 0
-        ? `rgba(230, 255, 255, ${0.5 * alpha})`
-        : `rgba(86, 208, 255, ${0.34 * alpha})`
-      ctx.lineWidth = 1.2 + freeze * (2.6 - i * 0.42)
-      ctx.setLineDash([r * 0.08, r * (0.04 + i * 0.015)])
-      ctx.beginPath()
-      ctx.arc(px, py, r, p * (1.6 + i * 0.3), TAU - i * 0.34)
-      ctx.stroke()
-    }
-    ctx.setLineDash([])
-  }
-
-  private _drawIceSpokes(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    coreR: number,
-    waveR: number,
-    p: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    ctx.save()
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    for (let i = 0; i < 18; i++) {
-      const a = (i / 18) * TAU + seededUnit(seed, i + 760) * 0.18 + p * 0.35
-      const inner = coreR * (0.75 + seededUnit(seed, i + 780) * 0.35)
-      const outer = waveR * (0.52 + seededUnit(seed, i + 800) * 0.36)
-      ctx.strokeStyle = i % 3 === 0
-        ? `rgba(244, 255, 255, ${0.62 * alpha})`
-        : `rgba(116, 226, 255, ${0.46 * alpha})`
-      ctx.lineWidth = i % 3 === 0 ? 2.1 : 1.2
-      ctx.beginPath()
-      ctx.moveTo(px + Math.cos(a) * inner, py + Math.sin(a) * inner)
-      ctx.lineTo(px + Math.cos(a) * outer, py + Math.sin(a) * outer)
-      ctx.stroke()
-
-      const forkR = outer * 0.82
-      for (const offset of [-0.34, 0.34]) {
-        ctx.lineWidth = 0.9
-        ctx.beginPath()
-        ctx.moveTo(px + Math.cos(a) * forkR, py + Math.sin(a) * forkR)
-        ctx.lineTo(
-          px + Math.cos(a + offset) * (forkR + waveR * 0.1),
-          py + Math.sin(a + offset) * (forkR + waveR * 0.1),
-        )
-        ctx.stroke()
-      }
-    }
-    ctx.restore()
-  }
-
-  private _drawFrostRunes(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    p: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    ctx.save()
-    ctx.globalCompositeOperation = 'lighter'
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * TAU + p * 0.55 + seededUnit(seed, i + 1140) * 0.18
-      const r = radius * (0.42 + seededUnit(seed, i + 1160) * 0.36)
-      const sx = px + Math.cos(a) * r
-      const sy = py + Math.sin(a) * r
-      const size = radius * (0.035 + seededUnit(seed, i + 1180) * 0.025)
-      ctx.save()
-      ctx.translate(sx, sy)
-      ctx.rotate(a + Math.PI / 2)
-      ctx.strokeStyle = i % 3 === 0
-        ? `rgba(248, 255, 255, ${0.72 * alpha})`
-        : `rgba(116, 226, 255, ${0.46 * alpha})`
-      ctx.lineWidth = Math.max(1, size * 0.2)
-      this._traceSnowflake(ctx, size)
-      ctx.stroke()
-      ctx.restore()
-    }
-
-    ctx.restore()
-  }
-
-  private _traceSnowflake(ctx: CanvasRenderingContext2D, size: number): void {
-    for (let arm = 0; arm < 6; arm++) {
-      const a = (arm / 6) * TAU
-      ctx.beginPath()
-      ctx.moveTo(0, 0)
-      ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size)
-      ctx.moveTo(Math.cos(a) * size * 0.56, Math.sin(a) * size * 0.56)
-      ctx.lineTo(Math.cos(a + 0.55) * size * 0.78, Math.sin(a + 0.55) * size * 0.78)
-      ctx.moveTo(Math.cos(a) * size * 0.56, Math.sin(a) * size * 0.56)
-      ctx.lineTo(Math.cos(a - 0.55) * size * 0.78, Math.sin(a - 0.55) * size * 0.78)
-      ctx.stroke()
-    }
-  }
-
-  private _drawIceFractures(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    ctx.save()
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    for (let i = 0; i < 14; i++) {
-      const a = seededUnit(seed, i + 1200) * TAU
-      const start = radius * (0.12 + seededUnit(seed, i + 1220) * 0.28) * out
-      const length = radius * (0.16 + seededUnit(seed, i + 1240) * 0.28) * out
-      const kinks = 2 + Math.floor(seededUnit(seed, i + 1260) * 3)
-      ctx.strokeStyle = i % 4 === 0
-        ? `rgba(250, 255, 255, ${0.54 * alpha})`
-        : `rgba(98, 206, 255, ${0.32 * alpha})`
-      ctx.lineWidth = i % 4 === 0 ? 1.7 : 1
-      ctx.beginPath()
-      for (let j = 0; j <= kinks; j++) {
-        const t = j / kinks
-        const jitter = (seededUnit(seed, i * 10 + j + 1280) - 0.5) * 0.24
-        const d = start + length * t
-        const x = px + Math.cos(a + jitter) * d
-        const y = py + Math.sin(a + jitter) * d
-        if (j === 0) ctx.moveTo(x, y)
-        else ctx.lineTo(x, y)
-      }
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  private _drawIceShards(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 24; i++) {
-      const a = seededUnit(seed, i + 820) * TAU
-      const d = radius * (0.18 + seededUnit(seed, i + 840) * 0.76) * out
-      const length = 5 + seededUnit(seed, i + 860) * 13
-      const width = 1.8 + seededUnit(seed, i + 880) * 3.2
-      const sx = px + Math.cos(a) * d
-      const sy = py + Math.sin(a) * d
-      ctx.fillStyle = i % 4 === 0
-        ? `rgba(246, 255, 255, ${0.72 * alpha})`
-        : `rgba(112, 218, 255, ${0.46 * alpha})`
-      ctx.beginPath()
-      ctx.moveTo(sx + Math.cos(a) * length, sy + Math.sin(a) * length)
-      ctx.lineTo(sx + Math.cos(a + 1.9) * width, sy + Math.sin(a + 1.9) * width)
-      ctx.lineTo(sx + Math.cos(a - 1.9) * width, sy + Math.sin(a - 1.9) * width)
-      ctx.closePath()
-      ctx.fill()
-    }
-  }
-
-  private _drawFrostMotes(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 36; i++) {
-      const a = seededUnit(seed, i + 900) * TAU
-      const d = radius * (0.08 + seededUnit(seed, i + 920) * 0.86) * out
-      const drift = (seededUnit(seed, i + 940) - 0.5) * 12 * out
-      const size = 0.8 + seededUnit(seed, i + 960) * 2.3
-      ctx.fillStyle = `rgba(226, 252, 255, ${0.64 * alpha})`
-      ctx.beginPath()
-      ctx.arc(px + Math.cos(a) * d + drift, py + Math.sin(a) * d - out * 8, size, 0, TAU)
-      ctx.fill()
-    }
-  }
-
-  private _drawColdMist(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 14; i++) {
-      const a = seededUnit(seed, i + 980) * TAU
-      const d = radius * (0.18 + seededUnit(seed, i + 1000) * 0.74) * out
-      const r = 10 + seededUnit(seed, i + 1020) * 18
-      const sx = px + Math.cos(a) * d
-      const sy = py + Math.sin(a) * d - out * (8 + seededUnit(seed, i + 1040) * 14)
-      const mist = ctx.createRadialGradient(sx, sy, 0, sx, sy, r)
-      mist.addColorStop(0, `rgba(170, 232, 255, ${0.16 * alpha})`)
-      mist.addColorStop(0.7, `rgba(210, 250, 255, ${0.06 * alpha})`)
-      mist.addColorStop(1, 'rgba(80, 180, 230, 0)')
-      ctx.fillStyle = mist
-      ctx.beginPath()
-      ctx.arc(sx, sy, r, 0, TAU)
-      ctx.fill()
-    }
-  }
-
-  private _drawHasteArcs(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, p: number, alpha: number): void {
-    ctx.save()
-    ctx.lineCap = 'round'
-    for (let i = 0; i < 5; i++) {
-      const r = radius * (0.34 + i * 0.14)
-      const start = p * TAU * (1.25 + i * 0.12) + i * 0.9
-      ctx.strokeStyle = i % 2 === 0
-        ? `rgba(124, 247, 181, ${0.46 * alpha})`
-        : `rgba(255, 224, 112, ${0.38 * alpha})`
-      ctx.lineWidth = 2.2 - i * 0.16
-      ctx.beginPath()
-      ctx.arc(px, py, r, start, start + TAU * (0.32 + i * 0.02))
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  private _drawHasteChevrons(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, p: number, alpha: number): void {
-    ctx.save()
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU + p * TAU * 0.72
-      const r = radius * (0.42 + (i % 3) * 0.16)
-      const size = radius * 0.055
-      const cx = px + Math.cos(a) * r
-      const cy = py + Math.sin(a) * r
-      ctx.strokeStyle = i % 2 === 0
-        ? `rgba(240, 255, 196, ${0.66 * alpha})`
-        : `rgba(94, 237, 148, ${0.5 * alpha})`
-      ctx.lineWidth = 1.8
-      ctx.beginPath()
-      ctx.moveTo(cx - Math.cos(a - 0.78) * size, cy - Math.sin(a - 0.78) * size)
-      ctx.lineTo(cx, cy)
-      ctx.lineTo(cx - Math.cos(a + 0.78) * size, cy - Math.sin(a + 0.78) * size)
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  private _drawHasteStreaks(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    ctx.save()
-    ctx.lineCap = 'round'
-    for (let i = 0; i < 30; i++) {
-      const a = seededUnit(seed, i + 1060) * TAU + out * 1.8
-      const d = radius * (0.2 + seededUnit(seed, i + 1080) * 0.78) * out
-      const len = 8 + seededUnit(seed, i + 1100) * 18
-      const sx = px + Math.cos(a) * d
-      const sy = py + Math.sin(a) * d
-      ctx.strokeStyle = i % 4 === 0
-        ? `rgba(255, 236, 135, ${0.52 * alpha})`
-        : `rgba(103, 247, 163, ${0.42 * alpha})`
-      ctx.lineWidth = 1 + seededUnit(seed, i + 1120) * 1.8
-      ctx.beginPath()
-      ctx.moveTo(sx, sy)
-      ctx.lineTo(sx - Math.cos(a) * len, sy - Math.sin(a) * len)
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  private _drawHeatBloom(ctx: CanvasRenderingContext2D, px: number, py: number, radius: number, alpha: number): void {
-    const glow = ctx.createRadialGradient(px, py, 0, px, py, radius)
-    glow.addColorStop(0, `rgba(255, 250, 205, ${0.84 * alpha})`)
-    glow.addColorStop(0.16, `rgba(255, 186, 42, ${0.62 * alpha})`)
-    glow.addColorStop(0.44, `rgba(232, 74, 24, ${0.3 * alpha})`)
-    glow.addColorStop(0.78, `rgba(92, 20, 8, ${0.11 * alpha})`)
-    glow.addColorStop(1, 'rgba(20, 8, 4, 0)')
-    ctx.fillStyle = glow
-    ctx.beginPath()
-    ctx.arc(px, py, radius, 0, TAU)
-    ctx.fill()
-  }
-
-  private _drawFireCircle(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    rotation: number,
-    alpha: number,
-  ): void {
-    if (radius <= 2 || alpha <= 0) return
-    ctx.save()
-    ctx.translate(px, py)
-    ctx.rotate(rotation)
-    ctx.strokeStyle = `rgba(255, 214, 109, ${alpha})`
-    ctx.lineWidth = 1.4
-    ctx.setLineDash([radius * 0.08, radius * 0.06])
-    ctx.beginPath()
-    ctx.arc(0, 0, radius, 0, TAU)
-    ctx.stroke()
-    ctx.setLineDash([])
-
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU
-      const inner = radius * (i % 3 === 0 ? 0.78 : 0.9)
-      const outer = radius * 1.08
-      ctx.lineWidth = i % 3 === 0 ? 2.1 : 1.1
-      ctx.beginPath()
-      ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner)
-      ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer)
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  private _drawShockwave(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    ignition: number,
-    alpha: number,
-  ): void {
-    for (let i = 0; i < 3; i++) {
-      const r = radius * (0.52 + i * 0.17)
-      ctx.strokeStyle = i === 0
-        ? `rgba(255, 238, 154, ${0.58 * alpha})`
-        : `rgba(255, 118, 40, ${0.34 * alpha})`
-      ctx.lineWidth = 1.6 + ignition * (4 - i)
-      ctx.beginPath()
-      ctx.arc(px, py, r, i * 0.8, TAU - i * 0.55)
-      ctx.stroke()
-    }
-  }
-
-  private _drawFlamePetals(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    coreR: number,
-    waveR: number,
-    p: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 28; i++) {
-      const a = (i / 28) * TAU + seededUnit(seed, i) * 0.42 + p * 1.4
-      const inner = coreR * (0.78 + seededUnit(seed, i + 20) * 0.4)
-      const outer = waveR * (0.45 + seededUnit(seed, i + 40) * 0.28)
-      const waist = inner * (0.82 + seededUnit(seed, i + 60) * 0.28)
-      const c1 = a - 0.18 - seededUnit(seed, i + 80) * 0.16
-      const c2 = a + 0.18 + seededUnit(seed, i + 100) * 0.16
-
-      ctx.fillStyle = i % 4 === 0
-        ? `rgba(255, 236, 145, ${0.58 * alpha})`
-        : `rgba(255, 96, 28, ${0.48 * alpha})`
-      ctx.beginPath()
-      ctx.moveTo(px + Math.cos(c1) * waist, py + Math.sin(c1) * waist)
-      ctx.quadraticCurveTo(px, py, px + Math.cos(c2) * waist, py + Math.sin(c2) * waist)
-      ctx.quadraticCurveTo(px + Math.cos(a) * inner, py + Math.sin(a) * inner, px + Math.cos(a) * outer, py + Math.sin(a) * outer)
-      ctx.closePath()
-      ctx.fill()
-    }
-  }
-
-  private _drawEmbers(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 42; i++) {
-      const a = seededUnit(seed, i + 140) * TAU
-      const d = radius * (0.18 + seededUnit(seed, i + 170) * 0.86) * out
-      const drift = (seededUnit(seed, i + 190) - 0.5) * 22 * out
-      const size = 1.2 + seededUnit(seed, i + 210) * 3.8
-      ctx.fillStyle = `rgba(255, ${128 + Math.floor(seededUnit(seed, i + 230) * 102)}, 34, ${0.78 * alpha})`
-      ctx.beginPath()
-      ctx.arc(px + Math.cos(a) * d + drift, py + Math.sin(a) * d - out * 18, size, 0, TAU)
-      ctx.fill()
-    }
-  }
-
-  private _drawSmoke(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    radius: number,
-    out: number,
-    alpha: number,
-    seed: number,
-  ): void {
-    for (let i = 0; i < 16; i++) {
-      const a = seededUnit(seed, i + 260) * TAU
-      const d = radius * (0.3 + seededUnit(seed, i + 280) * 0.68) * out
-      const r = 10 + seededUnit(seed, i + 300) * 22
-      const sx = px + Math.cos(a) * d + (seededUnit(seed, i + 320) - 0.5) * 18
-      const sy = py + Math.sin(a) * d - out * (12 + seededUnit(seed, i + 340) * 22)
-      const smoke = ctx.createRadialGradient(sx, sy, 0, sx, sy, r)
-      smoke.addColorStop(0, `rgba(72, 48, 42, ${0.17 * alpha})`)
-      smoke.addColorStop(0.62, `rgba(38, 28, 30, ${0.08 * alpha})`)
-      smoke.addColorStop(1, 'rgba(16, 12, 14, 0)')
-      ctx.fillStyle = smoke
-      ctx.beginPath()
-      ctx.arc(sx, sy, r, 0, TAU)
-      ctx.fill()
-    }
   }
 }

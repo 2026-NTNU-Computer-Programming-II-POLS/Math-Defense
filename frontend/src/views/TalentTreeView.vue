@@ -217,8 +217,8 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.talent-title { font-size: 20px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 4px; }
-.talent-points { font-size: 12px; }
+.talent-title { font-size: var(--text-lg); font-family: var(--font-mono); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 4px; }
+.talent-points { font-size: var(--text-xs); }
 .tp-available { color: var(--gold); text-shadow: var(--gold-shadow); font-weight: bold; }
 .tp-detail { color: var(--axis); text-shadow: var(--gold-shadow); margin-left: 8px; }
 .talent-actions { display: flex; gap: 8px; }
@@ -229,7 +229,7 @@ onMounted(async () => {
 
 .talent-loading, .talent-error { text-align: center; color: var(--axis); text-shadow: var(--gold-shadow); padding: 32px; }
 .talent-error { color: var(--enemy-red); }
-.talent-alloc-error { font-size: 11px; color: var(--enemy-red); text-align: center; }
+.talent-alloc-error { font-size: var(--text-xs); color: var(--enemy-red); text-align: center; }
 
 .talent-towers { display: flex; flex-direction: column; gap: 24px; }
 
@@ -240,7 +240,7 @@ onMounted(async () => {
 }
 
 .tower-name {
-  font-size: 14px;
+  font-size: var(--text-sm);
   letter-spacing: 2px;
   margin-bottom: 12px;
 }
@@ -291,7 +291,7 @@ onMounted(async () => {
   text-shadow: var(--gold-shadow);
   border-radius: 4px;
   padding: 0.5rem 0.8rem;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .rec-text strong { color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
@@ -300,7 +300,7 @@ onMounted(async () => {
   background: transparent;
   border: none;
   color: inherit;
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1;
   cursor: pointer;
   padding: 0 0.25rem;
@@ -308,9 +308,9 @@ onMounted(async () => {
 
 .rec-dismiss:hover { opacity: 0.7; }
 
-.node-name { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
-.node-level { font-size: 13px; color: var(--gold); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
-.node-desc { font-size: 9px; color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
-.node-effect { font-size: 9px; color: var(--gold); text-shadow: var(--gold-shadow); opacity: 0.8; }
-.node-cost { font-size: 9px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 2px; }
+.node-name { font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: 4px; }
+.node-level { font-size: var(--text-sm); color: var(--gold); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
+.node-desc { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
+.node-effect { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); opacity: 0.8; }
+.node-cost { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 2px; }
 </style>

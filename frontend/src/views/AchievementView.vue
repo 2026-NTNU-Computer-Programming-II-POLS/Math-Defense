@@ -161,7 +161,8 @@ onMounted(async () => {
 }
 
 .ach-title {
-  font-size: 20px;
+  font-size: var(--text-lg);
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
@@ -170,7 +171,7 @@ onMounted(async () => {
 .ach-summary {
   display: flex;
   gap: 16px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .ach-count { color: var(--gold); text-shadow: var(--gold-shadow); }
@@ -210,7 +211,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: var(--text-base);
   flex-shrink: 0;
 }
 
@@ -218,13 +219,13 @@ onMounted(async () => {
 .ach-card.locked .ach-icon { color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .ach-info { flex: 1; min-width: 0; }
-.ach-name { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
-.ach-desc { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 6px; }
+.ach-name { font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: 4px; }
+.ach-desc { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 6px; }
 
 .ach-meta {
   display: flex;
   gap: 12px;
-  font-size: 10px;
+  font-size: var(--text-2xs);
 }
 
 .ach-tp { color: var(--gold); text-shadow: var(--gold-shadow); }
@@ -237,7 +238,7 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.page-info { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); }
+.page-info { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); }
 
 .season-banner {
   display: flex;
@@ -248,7 +249,7 @@ onMounted(async () => {
   border: 1px solid var(--gold);
   background: var(--gold-tint);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .season-banner-title { color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
@@ -262,7 +263,7 @@ onMounted(async () => {
 .season-pill {
   margin-left: 6px;
   padding: 1px 6px;
-  font-size: 9px;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
   border: 1px solid var(--gold);
   color: var(--gold);

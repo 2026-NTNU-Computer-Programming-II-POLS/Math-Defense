@@ -17,6 +17,8 @@ import TowerBar from '@/components/game/TowerBar.vue'
 import BuildPanel from '@/components/game/BuildPanel.vue'
 import BuildHint from '@/components/game/BuildHint.vue'
 import WaveForecast from '@/components/game/WaveForecast.vue'
+import WaveBanner from '@/components/game/WaveBanner.vue'
+import PhaseFader from '@/components/game/PhaseFader.vue'
 import FirstEncounterCard from '@/components/game/FirstEncounterCard.vue'
 import BuffCardPanel from '@/components/game/BuffCardPanel.vue'
 import ShopPanel from '@/components/game/ShopPanel.vue'
@@ -393,6 +395,8 @@ onBeforeUnmount(() => {
       >Practice mode — leaderboard ineligible</div>
       <BuildHint />
       <WaveForecast />
+      <WaveBanner />
+      <PhaseFader />
       <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
         <ShopPanel v-if="gameStore.isBuilding" />
         <GameSpeedPanel />

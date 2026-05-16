@@ -161,15 +161,17 @@ onMounted(async () => {
 }
 
 .setup-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 3px;
   text-align: center;
 }
 
-.error-msg { font-size: 11px; color: var(--enemy-red); }
-.warn-msg { font-size: 10px; color: var(--gold); text-shadow: var(--gold-shadow); margin-top: 4px; }
+.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
+.warn-msg { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin-top: 4px; }
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
@@ -181,7 +183,7 @@ onMounted(async () => {
 }
 
 .field { display: flex; flex-direction: column; gap: 4px; }
-.field-label { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); }
+.field-label { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); }
 
 .slot-list { display: flex; flex-direction: column; gap: 6px; }
 
@@ -191,13 +193,13 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.slot-num { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); min-width: 24px; }
+.slot-num { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); min-width: 24px; }
 .star-select { flex: 1; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 .btn-sm {
-  font-size: 9px;
+  font-size: var(--text-xs);
   padding: 2px 6px;
   min-height: var(--min-touch-target);
   display: inline-flex;

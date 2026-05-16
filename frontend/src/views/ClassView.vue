@@ -371,17 +371,19 @@ onMounted(async () => {
 }
 
 .class-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
   text-align: center;
 }
 
-.class-error { font-size: 11px; color: var(--enemy-red); }
+.class-error { font-size: var(--text-xs); color: var(--enemy-red); }
 
 .section { display: flex; flex-direction: column; gap: 8px; }
-.section-title { font-size: 12px; color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.section-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
 
 .inline-form { display: flex; gap: 8px; }
 .inline-form .rune-input { flex: 1; }
@@ -391,7 +393,7 @@ onMounted(async () => {
 .class-item {
   border: 1px solid var(--axis);
   padding: 8px;
-  font-size: 11px;
+  font-size: var(--text-sm);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -410,7 +412,7 @@ onMounted(async () => {
 .class-name { color: var(--gold); text-shadow: var(--gold-shadow); flex: 1; }
 
 .teacher-name {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   opacity: 0.6;
@@ -421,7 +423,7 @@ onMounted(async () => {
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--text-xs);
   transition: color 0.15s;
   white-space: nowrap;
 }
@@ -429,7 +431,7 @@ onMounted(async () => {
 .join-code:hover { color: var(--gold); text-shadow: var(--gold-shadow); }
 .join-code.copied { color: var(--gold); text-shadow: var(--gold-shadow); }
 
-.rename-input { flex: 1; font-size: 11px; }
+.rename-input { flex: 1; font-size: var(--text-xs); }
 .rename-btns { display: flex; gap: 4px; }
 
 .class-actions { display: flex; gap: 4px; }
@@ -438,15 +440,15 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 .student-info { display: flex; flex-direction: column; gap: 2px; }
 .student-name { color: var(--gold); text-shadow: var(--gold-shadow); }
-.student-email { font-size: 9px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
+.student-email { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
 
 .btn-sm {
-  font-size: 9px;
+  font-size: var(--text-xs);
   padding: 2px 6px;
   min-height: 44px;
   display: inline-flex;
@@ -463,10 +465,10 @@ onMounted(async () => {
 .btn-sm.danger:hover { background: var(--enemy-red); color: var(--stone-dark); }
 .btn-sm:disabled { opacity: 0.4; cursor: default; }
 
-.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
+.loading, .empty { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
 
 .back-btn {
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);

@@ -224,7 +224,9 @@ watch(activeTab, loadData, { immediate: true })
 }
 
 .admin-title {
-  font-size: 16px;
+  font-size: var(--text-base);
+  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
+  font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
@@ -235,7 +237,7 @@ watch(activeTab, loadData, { immediate: true })
 
 .tab-btn {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 6px;
   min-height: 44px;
   background: none;
@@ -253,20 +255,20 @@ watch(activeTab, loadData, { immediate: true })
 .item-row {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--text-sm);
   padding: 6px;
   border: 1px solid var(--axis);
 }
 
 .item-name { color: var(--gold); text-shadow: var(--gold-shadow); }
-.item-detail { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; font-size: 10px; }
+.item-detail { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; font-size: var(--text-xs); }
 
-.search-input { font-size: 11px; }
-.error-msg { font-size: 11px; color: var(--enemy-red); }
-.loading, .empty { font-size: 11px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
+.search-input { font-size: var(--text-xs); }
+.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
+.loading, .empty { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
 
 .back-btn {
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
@@ -285,16 +287,16 @@ watch(activeTab, loadData, { immediate: true })
   border: 1px solid var(--axis);
 }
 
-.season-form-title { font-size: 11px; color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; margin: 0 0 4px; }
-.season-label { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); display: flex; flex-direction: column; gap: 2px; }
+.season-form-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; margin: 0 0 4px; }
+.season-label { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); display: flex; flex-direction: column; gap: 2px; }
 .season-row { flex-direction: column; gap: 4px; align-items: flex-start; }
 
-.season-id-hint { font-size: 10px; color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
+.season-id-hint { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
 
 .season-pill {
   margin-left: 6px;
   padding: 1px 6px;
-  font-size: 9px;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
   border: 1px solid var(--gold);
   color: var(--gold);

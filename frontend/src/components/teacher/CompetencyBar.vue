@@ -95,14 +95,14 @@ const bars = computed<BarRow[]>(() =>
 
 .bar-value {
   font-family: monospace;
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
 }
 
 .bar-label {
   font-family: monospace;
-  font-size: 9px;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
 }
 

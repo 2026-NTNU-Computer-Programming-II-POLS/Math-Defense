@@ -232,12 +232,12 @@ function toggleMode(mode: MagicMode) {
 
 <style scoped>
 .magic-panel { display: flex; flex-direction: column; gap: 8px; }
-.section-label { font-size: 11px; color: var(--axis); margin: 0; }
+.section-label { font-size: var(--text-xs); color: var(--axis); margin: 0; }
 .fn-input { display: flex; flex-direction: column; gap: 4px; }
 .input-row { display: flex; gap: 4px; }
 .fn-field {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 6px 8px;
   background: var(--stone-dark);
   color: #ffffff;
@@ -247,8 +247,8 @@ function toggleMode(mode: MagicMode) {
 }
 .fn-field::placeholder {color: rgba(255, 255, 255, 0.5); }
 .fn-field:focus { border-color: #ffffff; box-shadow: 0 0 5px rgba(255, 215, 0, 0.4); }
-.apply-btn { font-size: 11px; padding: 6px 10px; }
-.hint { font-size: 10px; color: var(--text-primary); margin: 0; opacity: 0.7; }
+.apply-btn { font-size: var(--text-xs); padding: 6px 10px; }
+.hint { font-size: var(--text-2xs); color: var(--text-primary); margin: 0; opacity: 0.7; }
 .origin-hint code {
   font-family: var(--font-mono, monospace);
   color: var(--gold, #d4a840);
@@ -257,19 +257,19 @@ function toggleMode(mode: MagicMode) {
   border-radius: 2px;
 }
 .fn-locked { color: var(--hp-red); opacity: 0.85; text-decoration: line-through; }
-.error-msg { font-size: 10px; color: #ff8888; margin: 0; }
+.error-msg { font-size: var(--text-xs); color: #ff8888; margin: 0; }
 .mode-btns { display: flex; gap: 6px; }
-.mode-btns .btn { flex: 1; font-size: 10px; padding: 6px; }
+.mode-btns .btn { flex: 1; font-size: var(--text-xs); padding: 6px; }
 .mode-btns .btn.active { background: var(--gold); color: var(--stone-dark); }
 .slider-fn-input { gap: 6px; }
 .slider-row { display: flex; flex-direction: column; gap: 4px; }
 .slider-cell { display: grid; grid-template-columns: 14px 1fr 28px; align-items: center; gap: 6px; }
-.slider-name { font-size: 11px; color: var(--gold); font-style: italic; }
+.slider-name { font-size: var(--text-xs); color: var(--gold); font-style: italic; }
 .slider-ctrl { accent-color: var(--gold); cursor: pointer; }
-.slider-val { font-size: 11px; color: #ffffff; font-family: var(--font-mono); text-align: right; }
+.slider-val { font-size: var(--text-xs); color: #ffffff; font-family: var(--font-mono); text-align: right; }
 .formula-readout {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--gold);
   background: var(--stone-dark);
   padding: 4px 6px;

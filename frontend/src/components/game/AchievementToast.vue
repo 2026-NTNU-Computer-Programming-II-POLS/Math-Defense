@@ -64,15 +64,15 @@ watch(() => props.achievements, (newVal) => {
   background: var(--overlay-panel-bg);
   border: 1px solid var(--gold);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   animation: slideIn 0.3s ease-out;
 }
 
-.toast-icon { color: var(--gold); font-size: 14px; }
+.toast-icon { color: var(--gold); font-size: var(--text-sm); }
 .toast-body { display: flex; flex-direction: column; gap: 2px; }
 .toast-name { color: var(--overlay-text); font-weight: 600; }
-.toast-desc { color: #b8a98c; font-size: 11px; }
-.toast-tp { color: var(--gold); font-size: 10px; margin-left: auto; }
+.toast-desc { color: #b8a98c; font-size: var(--text-xs); }
+.toast-tp { color: var(--gold); font-size: var(--text-xs); margin-left: auto; }
 
 .toast-enter-active { animation: slideIn 0.3s ease-out; }
 .toast-leave-active { animation: slideIn 0.3s ease-in reverse; }

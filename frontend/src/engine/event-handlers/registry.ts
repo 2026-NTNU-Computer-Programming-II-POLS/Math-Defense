@@ -49,7 +49,6 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'composables/usePrincipleOverlay',    handler: 'anonymous', purpose: 'Reset principle overlay state per level' },
     { module: 'composables/useKeyboardPlacement',   handler: 'anonymous', purpose: 'Recompute LegalPositionSet + reset cursor (§19)' },
     { module: 'stores/gameStore',                   handler: 'anonymous', purpose: 'Reset level-scoped UI state' },
-    { module: 'renderers/SpellEffectRenderer',      handler: 'anonymous', purpose: 'Clear active spell effects on level start' },
     { module: 'views/ReplayView',                   handler: 'anonymous', purpose: 'Reset replay UI state on level start' },
     { module: 'systems/BuffSystem',                 handler: 'anonymous', purpose: 'Reset buff tracking + revert tower-scoped buffs' },
     { module: 'systems/MontyHallSystem',            handler: 'anonymous', purpose: 'Reset Monty Hall trigger state per level' },
@@ -60,6 +59,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/TowerPlacementSystem',       handler: 'anonymous', purpose: 'Recompute placement constraints per level' },
     { module: 'systems/EconomySystem',              handler: 'anonymous', purpose: 'Reset per-level economy counters' },
     { module: 'renderers/CombatFeedbackRenderer',   handler: 'anonymous', purpose: 'Clear floating combat text on level start' },
+    { module: 'renderers/effects/EffectLayer',      handler: 'clear',     purpose: 'Shared base: drop active effects on level restart so replays do not leave stale particles' },
   ],
   LEVEL_END: [
     { module: 'composables/useSessionSync', handler: 'endSession',  purpose: 'Finalize backend session' },
@@ -78,6 +78,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'composables/useEngineAudio',         handler: 'anonymous', purpose: 'Trigger tower-place SFX' },
     { module: 'systems/MatrixTowerSystem',          handler: 'anonymous', purpose: 'Auto-pair newly placed Matrix towers' },
     { module: 'systems/TowerInterferenceSystem',    handler: 'anonymous', purpose: 'Recompute same-type interference factors so the BUILD preview is correct' },
+    { module: 'renderers/TowerLifecycleRenderer',   handler: 'anonymous', purpose: 'Spawn placement land effect (Visual Redesign Phase 3)' },
   ],
   TOWER_SELECTED: [
     { module: 'composables/useEngineUiBridges', handler: 'anonymous', purpose: 'Open build/inspect panel' },
@@ -113,16 +114,27 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/EconomySystem',      handler: 'anonymous', purpose: 'Award gold + score on kill' },
     { module: 'systems/EnemyAbilitySystem', handler: 'anonymous', purpose: 'Trigger on-kill ability effects (split, etc.)' },
   ],
+  // Visual Redesign Phase 0: emitted alongside ENEMY_KILLED so death-particle
+  // / corpse renderers can spawn. Phase 2 wires the consumer.
+  ENEMY_DYING: [
+    { module: 'renderers/DeathParticleRenderer', handler: 'anonymous', purpose: 'Spawn death particles (and boss cinematic) on enemy death (Visual Redesign Phase 2)' },
+  ],
   ENEMY_REACHED_ORIGIN: [
     { module: 'stores/gameStore',          handler: 'anonymous', purpose: 'Mirror leak count for UI' },
     { module: 'systems/EconomySystem',     handler: 'anonymous', purpose: 'Apply HP damage unless shielded' },
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger enemy-reached SFX' },
+    { module: 'systems/CombatSystem',       handler: 'anonymous', purpose: 'Trigger origin-breach screen shake (Visual Redesign Phase 1)' },
   ],
   TOWER_ATTACK: [
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger heavy or light attack SFX based on tower type' },
   ],
+  // Visual Redesign Phase 0: emitted at projectile-spawn sites
+  // (RadarTowerSystem._fireProjectile). Broadcast-only until Phase 1 wires
+  // the muzzle-flash / projectile-trail renderers.
+  TOWER_FIRED: [],
   DAMAGE_RESOLVED: [
     { module: 'renderers/CombatFeedbackRenderer', handler: 'anonymous', purpose: 'Spawn floating combat text for a defensively-modified hit' },
+    { module: 'renderers/ImpactEffectRenderer',   handler: 'anonymous', purpose: 'Spawn spark particles at the impact site (Visual Redesign Phase 1)' },
   ],
 
   // ── Buff phase ──
@@ -190,6 +202,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'stores/gameStore',           handler: 'anonymous', purpose: 'Increment towerUpgradeTick to force TowerInfoPanel re-render' },
     { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Respawn Calculus pets so upgrade extras and stat bonuses propagate' },
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger tower-upgrade SFX' },
+    { module: 'renderers/TowerLifecycleRenderer', handler: 'anonymous', purpose: 'Spawn upgrade burst (pillar + radial + rune sweep) (Visual Redesign Phase 3)' },
   ],
   TOWER_REFUND: [
     { module: 'systems/TowerUpgradeSystem', handler: 'anonymous', purpose: 'Refund tower cost and remove it' },

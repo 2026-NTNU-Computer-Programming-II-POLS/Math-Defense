@@ -14,6 +14,10 @@
   --hp-green: #048634;
   --hp-yellow: #c89848;
   --hp-red: #a31f1f;
+  /* Visual Redesign Phase 4: HUD value-down pop flash. Distinct from --hp-red
+     (which is reserved for HP-critical state) — slightly brighter so a brief
+     flash reads on dark HUD chrome without bleeding into the static red. */
+  --alert-red: #ff4d4d;
 
   --panel-bg: rgba(235, 242, 250, 0.96);
   --panel-border: var(--gold);
@@ -40,7 +44,35 @@
   --error-red: #d32f2f;
 
   --font-mono: 'Courier New', Courier, monospace;
-  --font-main: var(--font-mono);
+  --font-main: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Typography scale (rem-based; resolves against the 17px html root).
+     See docs/V3_surgicalPlan/UI_Typography_Refresh_Plan.md §4. */
+  --text-2xs:  0.6875rem; /* 11.69px — captions, tertiary hints only */
+  --text-xs:   0.75rem;   /* 12.75px — small labels, dense tables */
+  --text-sm:   0.875rem;  /* 14.88px — default body in dense panels */
+  --text-base: 1rem;      /* 17.00px — default body, form fields */
+  --text-md:   1.125rem;  /* 19.13px — emphasised body */
+  --text-lg:   1.25rem;   /* 21.25px — sub-headings, HUD values */
+  --text-xl:   1.5rem;    /* 25.50px — panel titles */
+  --text-2xl:  1.875rem;  /* 31.88px — view titles */
+  --text-3xl:  2.25rem;   /* 38.25px — hero / login title */
+
+  /* Line-height tokens (unit-less) */
+  --leading-tight:  1.2;
+  --leading-normal: 1.45;
+  --leading-loose:  1.65;
+
+  /* Spacing scale (rem-based) */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
 
   /* Z-index ladder — single source of truth. Higher value = on top.
      hints      : passive in-canvas helpers (FunctionPanel, BuildHint)

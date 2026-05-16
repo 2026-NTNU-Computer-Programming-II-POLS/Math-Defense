@@ -72,7 +72,7 @@ const info = computed(() => (props.type ? COUNTER_ENEMY_INFO[props.type] ?? null
 
 .fe-kicker {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--hp-red);
@@ -80,7 +80,7 @@ const info = computed(() => (props.type ? COUNTER_ENEMY_INFO[props.type] ?? null
 
 .fe-title {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--text-lg);
   letter-spacing: 3px;
   color: var(--gold-bright);
   text-shadow: var(--gold-shadow);
@@ -88,14 +88,14 @@ const info = computed(() => (props.type ? COUNTER_ENEMY_INFO[props.type] ?? null
 
 .fe-body {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--text-primary);
 }
 
 .fe-counter {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--axis);
 }
 
@@ -111,7 +111,7 @@ const info = computed(() => (props.type ? COUNTER_ENEMY_INFO[props.type] ?? null
   background: rgba(212, 160, 23, 0.3);
   color: var(--text-on-accent);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
   transition: background 120ms;

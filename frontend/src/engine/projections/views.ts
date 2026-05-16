@@ -37,6 +37,47 @@ export interface TowerView {
   readonly disabled: boolean
   /** Cached glyph from TOWER_DEFS — projection saves the renderer one lookup. */
   readonly glyph: string
+  /**
+   * Muzzle-flash age in seconds since the last TOWER_FIRED for this tower.
+   * 0 at the instant of firing; renderer paints a fade while value is
+   * below ANIM.TOWER_FIRE_FLASH. Defaults to a large number (no flash).
+   */
+  readonly firingFlashAge: number
+  /**
+   * Upgrade tier. Mirrors `tower.level` (1, 2, 3+). Renderer draws T2 gold rim
+   * on the baseplate at >= 2 and a rotating outer rune ring at >= 3.
+   * Visual Redesign Phase 3.
+   */
+  readonly level: number
+  /**
+   * Stable per-tower seed for idle-animation phase, so adjacent towers do not
+   * pulse in unison. Derived once in the projection from `seedFor(tower.id)`.
+   */
+  readonly idleSeed: number
+  /**
+   * Radar arc bounds in radians. 0 / π/2 default for non-radar towers; the
+   * RadarRangeRenderer / instrument body reads these to draw the player's
+   * configured arc. Visual Redesign Phase 5b.
+   */
+  readonly arcStart: number
+  readonly arcEnd: number
+  /**
+   * Angle (radians) to the nearest in-range enemy. Populated for Radar B
+   * (rapid) and Radar C (sniper) so the brass-telescope body can visibly
+   * track its target, and for the Calculus tower so its `dx`/`dy` shed
+   * particles fly along the aim vector on fire. Null when no enemy is in
+   * range or for tower types whose silhouette does not rotate / aim.
+   * Visual Redesign Phase 5b, extended in 5e.
+   */
+  readonly aimAngle: number | null
+  /**
+   * Four scrolling-digit values (0..9) for the Matrix tower's 2×2 bracket
+   * cells, laid out [NW, NE, SW, SE]. Populated only for MATRIX towers;
+   * null for all other types. Derived deterministically from game.time and
+   * seedFor(tower.id) inside the projection — no system tick needed.
+   * Visual Redesign Phase 5c.
+   */
+  readonly matrixCells: readonly number[] | null
 }
 
 // ── Enemy views ──────────────────────────────────────────────────────────────
@@ -57,6 +98,16 @@ export interface EnemyView {
   readonly helperRadius: number
   /** True while a Regenerator is below max HP and actively healing. */
   readonly regenerating: boolean
+  /**
+   * Death-animation progress in [0, 1]. 0 means the enemy is alive and being
+   * rendered normally; > 0 means the enemy is in the post-kill display
+   * window and the renderer should paint it as a fading corpse. The
+   * EnemyView still includes dying enemies so the corpse is drawn until the
+   * window expires (Visual Redesign Phase 0).
+   */
+  readonly dyingProgress: number
+  /** 0..1 hit-flash intensity (1 at the moment of impact). 0 when idle. */
+  readonly hitFlashAge: number
 }
 
 // ── Pet views ────────────────────────────────────────────────────────────────

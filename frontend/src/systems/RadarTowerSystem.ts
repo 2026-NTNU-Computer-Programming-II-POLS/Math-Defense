@@ -11,7 +11,7 @@ function makeProjectile(
   vx: number, vy: number,
   damage: number, color: string, ownerId: string,
 ): Projectile {
-  return { id: `rproj_${++_projId}`, x, y, vx, vy, damage, color, active: true, ownerId, age: 0 }
+  return { id: `rproj_${++_projId}`, x, y, vx, vy, damage, color, active: true, ownerId, age: 0, history: [] }
 }
 
 export class RadarTowerSystem {
@@ -152,6 +152,17 @@ export class RadarTowerSystem {
       (dx / len) * speed, (dy / len) * speed,
       damage, tower.color, tower.id,
     ))
+    // Visual Redesign Phase 1: arm muzzle flash. Same system that emits the
+    // event owns the cosmetic state, so no extra subscriber is needed.
+    tower.firingFlashAge = 0
+    // Visual Redesign Phase 0: notify renderers that a tower fired. Consumed
+    // by the muzzle-flash / projectile-trail renderers added in Phase 1.
+    game.eventBus.emit(Events.TOWER_FIRED, {
+      towerId: tower.id,
+      x: tower.x,
+      y: tower.y,
+      type: tower.type,
+    })
   }
 
   private _getArcBonus(tower: Tower, angle: number): number {

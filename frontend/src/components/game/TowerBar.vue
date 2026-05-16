@@ -186,7 +186,93 @@ function canAfford(cost: number): boolean {
         :aria-disabled="!canAfford(def.cost)"
         @click="selectTower(def.type, def)"
       >
-        <span class="tower-icon" :style="{ color: def.color }">⬡</span>
+        <!-- Visual Redesign Phase 5a/5b: each tower type shows a miniature
+             of its in-canvas instrument silhouette. Magic = parchment
+             sinusoid; Radar A = sextant; Radar B = astrolabe rings;
+             Radar C = brass telescope on tripod. Other tower types keep
+             the hexagon until their own 5c–5e sub-phases land. -->
+        <span class="tower-icon" :style="{ color: def.color }">
+          <svg
+            v-if="def.type === TowerType.MAGIC"
+            class="tower-icon-svg"
+            viewBox="0 0 24 16"
+            aria-hidden="true"
+          >
+            <path
+              d="M2 8 Q 5 2 8 8 T 14 8 T 20 8 T 22 8"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+          <svg
+            v-else-if="def.type === TowerType.RADAR_A"
+            class="tower-icon-svg"
+            viewBox="0 0 24 16"
+            aria-hidden="true"
+          >
+            <path d="M3 13 A 10 10 0 0 1 21 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 13 L 19 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <circle cx="12" cy="13" r="1.4" fill="currentColor"/>
+          </svg>
+          <svg
+            v-else-if="def.type === TowerType.RADAR_B"
+            class="tower-icon-svg"
+            viewBox="0 0 24 16"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.75"/>
+            <circle cx="12" cy="8" r="1.6" fill="currentColor"/>
+          </svg>
+          <svg
+            v-else-if="def.type === TowerType.MATRIX"
+            class="tower-icon-svg"
+            viewBox="0 0 24 16"
+            aria-hidden="true"
+          >
+            <path d="M5 3 L 3 3 L 3 13 L 5 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M19 3 L 21 3 L 21 13 L 19 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="8" y="8.5" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">3</text>
+            <text x="14" y="8.5" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">7</text>
+            <text x="8" y="13" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">1</text>
+            <text x="14" y="13" font-family="monospace" font-size="5" font-weight="bold" fill="currentColor">4</text>
+          </svg>
+          <svg
+            v-else-if="def.type === TowerType.RADAR_C"
+            class="tower-icon-svg"
+            viewBox="0 0 24 16"
+            aria-hidden="true"
+          >
+            <line x1="6" y1="14" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+            <line x1="12" y1="14" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+            <line x1="18" y1="14" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+            <line x1="4" y1="6" x2="20" y2="3" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+            <circle cx="20.5" cy="2.8" r="2" fill="currentColor"/>
+          </svg>
+          <svg
+            v-else-if="def.type === TowerType.LIMIT"
+            class="tower-icon-svg"
+            viewBox="0 0 24 16"
+            aria-hidden="true"
+          >
+            <line x1="6" y1="14" x2="6" y2="3" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>
+            <line x1="18" y1="14" x2="18" y2="3" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>
+            <line x1="6" y1="4" x2="18" y2="4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="12" cy="6.5" r="1.8" fill="currentColor"/>
+          </svg>
+          <svg
+            v-else-if="def.type === TowerType.CALCULUS"
+            class="tower-icon-svg"
+            viewBox="0 0 24 16"
+            aria-hidden="true"
+          >
+            <path d="M3 14 Q 12 4 21 14" fill="currentColor" opacity="0.25" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+            <text x="12" y="12" font-family="serif" font-size="14" font-weight="bold" text-anchor="middle" fill="currentColor">∫</text>
+          </svg>
+          <template v-else>⬡</template>
+        </span>
         <span class="tower-name">
           <span class="tower-glyph" aria-hidden="true">{{ def.glyph }}</span>
           {{ def.nameEn }}
@@ -216,7 +302,7 @@ function canAfford(cost: number): boolean {
 }
 
 .bar-label {
-  font-size: 11px; color: var(--axis);
+  font-size: var(--text-xs); color: var(--axis);
   letter-spacing: 2px; text-transform: uppercase; white-space: nowrap;
 }
 
@@ -231,7 +317,7 @@ function canAfford(cost: number): boolean {
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 12px;
   padding: 4px 10px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: #ffffff;
   cursor: pointer;
   white-space: nowrap;
@@ -257,7 +343,7 @@ function canAfford(cost: number): boolean {
   color: var(--text-on-accent);
 }
 .chip-count {
-  font-size: 9px;
+  font-size: var(--text-xs);
   color: var(--axis);
   background: rgba(0, 0, 0, 0.3);
   padding: 1px 5px;
@@ -270,7 +356,7 @@ function canAfford(cost: number): boolean {
 }
 
 .empty-msg {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--axis);
   margin: 0;
   padding: 0 12px;
@@ -353,19 +439,27 @@ function canAfford(cost: number): boolean {
   cursor: not-allowed;
 }
 
-.tower-icon { font-size: 18px; }
-.tower-name { font-size: 12px; color: #ffffff; letter-spacing: 1px; }
+.tower-icon {
+  font-size: var(--text-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 16px;
+}
+.tower-icon-svg { width: 100%; height: 100%; }
+.tower-name { font-size: var(--text-xs); color: #ffffff; letter-spacing: 1px; }
 /* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
    colour-blind players can identify tower type without relying on the
    colour of .tower-icon. Lives inline with the label. */
 .tower-glyph {
   display: inline-block;
   margin-right: 4px;
-  font-size: 13px;
+  font-size: var(--text-xs);
   color: var(--gold-bright);
   font-weight: bold;
 }
-.tower-cost { font-size: 12px; color: var(--gold); }
+.tower-cost { font-size: var(--text-xs); color: var(--gold); font-family: var(--font-mono); }
 .cost-red   { color: var(--hp-red); }
 
 /* Custom tooltip replacing native title (FE-11) */
@@ -383,7 +477,7 @@ function canAfford(cost: number): boolean {
   border: 1px solid var(--gold);
   border-radius: 6px;
   color: #ffffff;
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.4;
   white-space: pre-line;
   pointer-events: none;
