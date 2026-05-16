@@ -351,7 +351,7 @@ async function selectAvatar(url: string): Promise<void> {
           <div v-if="pwSuccess" class="pw-success">Password changed!</div>
           <div class="pw-actions">
             <button class="btn pw-save-btn" type="submit" :disabled="pwChanging">{{ pwChanging ? 'Saving…' : 'Save' }}</button>
-            <button class="btn pw-cancel-btn" type="button" :disabled="pwChanging" @click="pwVisible = false; pwError = ''">取消</button>
+            <button class="btn pw-cancel-btn" type="button" :disabled="pwChanging" @click="pwVisible = false; pwError = ''">Cancel</button>
           </div>
         </form>
       </div>

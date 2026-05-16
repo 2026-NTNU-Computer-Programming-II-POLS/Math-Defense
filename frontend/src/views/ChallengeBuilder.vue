@@ -216,7 +216,7 @@ onMounted(async () => {
           <button class="btn" type="submit" :disabled="!canSubmit">
             {{ submitting ? 'Creating…' : 'Create Challenge' }}
           </button>
-          <button class="btn back-btn" type="button" @click="router.push('/teacher')">CANCEL</button>
+          <button class="btn back-btn" type="button" @click="router.push('/teacher')">Cancel</button>
         </div>
       </form>
 

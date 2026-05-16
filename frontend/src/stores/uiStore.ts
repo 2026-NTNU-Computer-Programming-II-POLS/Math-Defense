@@ -122,7 +122,7 @@ export const useUiStore = defineStore('ui', () => {
   // by closeModal()/cancelModal().
   const modalConfirmMode = ref(false)
   const modalConfirmLabel = ref('OK')
-  const modalCancelLabel = ref('CANCEL')
+  const modalCancelLabel = ref('Cancel')
   let modalConfirmResolver: ((ok: boolean) => void) | null = null
 
   // Tutorial
@@ -298,7 +298,7 @@ export const useUiStore = defineStore('ui', () => {
     modalSticky.value = false
     modalConfirmMode.value = true
     modalConfirmLabel.value = opts.confirmLabel ?? 'OK'
-    modalCancelLabel.value = opts.cancelLabel ?? '取消'
+    modalCancelLabel.value = opts.cancelLabel ?? 'Cancel'
     modalVisible.value = true
     return new Promise<boolean>((resolve) => {
       modalConfirmResolver = resolve

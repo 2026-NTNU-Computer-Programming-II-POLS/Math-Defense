@@ -106,8 +106,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="leaderboard-view">
     <header class="lb-header">
-      <h1 class="lb-title">HEROES RANKING</h1>
-      <button class="btn" @click="router.push('/')">← BACK TO MENU</button>
+      <h1 class="lb-title">Heroes Ranking</h1>
+      <button class="btn" @click="router.push('/')">← Back to Menu</button>
     </header>
 
     <div class="lb-tabs">
@@ -124,38 +124,38 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="lb-filters">
-      <span class="filter-label">LEVEL FILTER：</span>
+      <span class="filter-label">Level filter:</span>
       <button
         v-for="lv in [undefined, 1, 2, 3, 4]"
         :key="lv ?? 'all'"
         :class="['btn', 'filter-btn', { active: selectedLevel === lv }]"
         @click="selectLevel(lv)"
       >
-        {{ lv === undefined ? 'ALL' : `Level ${lv}` }}
+        {{ lv === undefined ? 'All' : `Level ${lv}` }}
       </button>
     </div>
 
     <!-- Personal tab -->
     <template v-if="activeTab === 'personal'">
-      <div v-if="personalLoading" class="lb-loading">LOADING…</div>
+      <div v-if="personalLoading" class="lb-loading">Loading…</div>
       <div v-else-if="personalError" class="lb-error">{{ personalError }}</div>
       <PersonalTimeline v-else :entries="personalEntries" />
     </template>
 
     <!-- Global tab -->
     <template v-else>
-      <div v-if="loading" class="lb-loading">LOADING…</div>
+      <div v-if="loading" class="lb-loading">Loading…</div>
       <div v-else-if="error" class="lb-error">{{ error }}</div>
       <div v-else class="lb-table-wrap">
         <table class="lb-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>PLAYER</th>
-              <th>LEVEL</th>
-              <th>SCORE</th>
-              <th>KILLS</th>
-              <th>WAVES SURVIVED</th>
+              <th>Player</th>
+              <th>Level</th>
+              <th>Score</th>
+              <th>Kills</th>
+              <th>Waves Survived</th>
             </tr>
           </thead>
           <tbody>
@@ -168,7 +168,7 @@ onBeforeUnmount(() => {
               <td>{{ e.waves_survived }}</td>
             </tr>
             <tr v-if="entries.length === 0">
-              <td colspan="6" class="empty">NO RECORDS</td>
+              <td colspan="6" class="empty">No records</td>
             </tr>
           </tbody>
         </table>

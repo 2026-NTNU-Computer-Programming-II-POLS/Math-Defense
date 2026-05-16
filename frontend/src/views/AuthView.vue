@@ -16,7 +16,7 @@ const playerName = ref('')
 const role = ref('student')
 const mfaCode = ref('')
 
-const title = computed(() => isLogin.value ? 'LOGIN' : 'REGISTER')
+const title = computed(() => isLogin.value ? 'Log In' : 'Register')
 
 const PASSWORD_MIN = 8
 const PASSWORD_MAX = 128
@@ -120,13 +120,13 @@ async function submit(): Promise<void> {
 <template>
   <div class="auth-view">
     <div class="auth-panel rune-panel">
-      <h2 class="auth-title">{{ mfaRequired ? 'TWO-FACTOR AUTHENTICATION' : title }}</h2>
+      <h2 class="auth-title">{{ mfaRequired ? 'Two-Factor Authentication' : title }}</h2>
 
       <form class="auth-form" @submit.prevent="submit">
         <template v-if="mfaRequired">
-          <p class="mfa-hint">Please enter a 6-digit verification code</p>
+          <p class="mfa-hint">Please enter the 6-digit code from your authenticator app</p>
           <label class="auth-field">
-            <span>驗證碼</span>
+            <span>Verification Code</span>
             <input
               v-model="mfaCode"
               class="rune-input"
@@ -144,7 +144,7 @@ async function submit(): Promise<void> {
 
         <template v-else>
           <label class="auth-field">
-            <span>EMAIL</span>
+            <span>Email</span>
             <input
               v-model="email"
               class="rune-input"
@@ -157,7 +157,7 @@ async function submit(): Promise<void> {
 
           <template v-if="!isLogin">
             <label class="auth-field">
-              <span>PLAYER NAME</span>
+              <span>Player Name</span>
               <input
                 v-model="playerName"
                 class="rune-input"
@@ -169,16 +169,16 @@ async function submit(): Promise<void> {
             </label>
 
             <label class="auth-field">
-              <span>ROLE</span>
+              <span>Role</span>
               <select v-model="role" class="rune-input">
-                <option value="student">STUDENT</option>
-                <option value="teacher">TEACHER</option>
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
               </select>
             </label>
           </template>
 
           <label class="auth-field">
-            <span>PASSWORD</span>
+            <span>Password</span>
             <input
               :value="password"
               class="rune-input"
@@ -199,16 +199,16 @@ async function submit(): Promise<void> {
         <div v-if="error" class="auth-error">{{ error }}</div>
 
         <button class="btn" type="submit" :disabled="loading">
-          {{ loading ? 'LOADING…' : (mfaRequired ? 'VERIFY' : title) }}
+          {{ loading ? 'Loading…' : (mfaRequired ? 'Verify' : title) }}
         </button>
       </form>
 
       <template v-if="mfaRequired">
-        <button class="btn toggle-btn" @click="handleCancelMfa">← BACK TO LOGIN</button>
+        <button class="btn toggle-btn" @click="handleCancelMfa">← Back to Login</button>
       </template>
       <template v-else>
         <button class="btn toggle-btn" @click="toggleMode">
-          {{ isLogin ? 'No Account? Register' : 'Already have an account? Log in' }}
+          {{ isLogin ? 'No account? Register' : 'Already have an account? Log in' }}
         </button>
       </template>
 
@@ -216,7 +216,7 @@ async function submit(): Promise<void> {
         Demo Account: <code>demo@mathdefense.local</code> / <code>Demo1234</code>
       </p>
 
-      <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← BACK TO MENU</button>
+      <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← Back to Menu</button>
     </div>
   </div>
 </template>
