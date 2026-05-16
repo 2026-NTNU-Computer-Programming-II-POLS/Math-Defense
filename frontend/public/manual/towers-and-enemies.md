@@ -6,7 +6,7 @@ Quick-lookup tables for towers, enemies, spells, buffs, and Monty Hall rewards. 
 
 ## Towers
 
-Seven tower types, each tied to a real math concept. Stats below are the **base** tier; Tier 2 adds +25% damage, +10% range, +0% speed at 60% of base cost, and Tier 3 adds +50% damage, +20% range, +15% speed at 100% of base cost — plus type-specific bonuses noted in their row.
+Seven tower types, each tied to a real math concept. Stats below are the **base** tier; Tier 2 adds +25% damage and +10% range at 60% of base cost, and Tier 3 adds +50% damage and +20% range at 100% of base cost. Speed changes, if any, are tower-specific bonuses noted in each row.
 
 ### Magic Tower — ✦
 
