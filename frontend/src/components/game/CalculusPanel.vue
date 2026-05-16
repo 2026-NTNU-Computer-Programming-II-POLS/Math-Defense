@@ -280,7 +280,7 @@ function pendingLabel(op: CalcOp): string {
             :disabled="!canAffordOp"
             @click="clickOp(pendingOp)"
           >Confirm{{ canAffordOp ? '' : ' (need gold)' }}</button>
-          <button class="btn confirm-no" @click="cancelPending">取消</button>
+          <button class="btn confirm-no" @click="cancelPending">Cancel</button>
         </div>
       </div>
     </template>

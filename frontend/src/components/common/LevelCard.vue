@@ -9,15 +9,14 @@ const emit = defineEmits<{
 interface LevelInfo {
   id: number
   name: string
-  nameEn: string
   description: string
 }
 
 const LEVELS: LevelInfo[] = [
-  { id: 1, name: '草原',   nameEn: 'Grassland',  description: '教學關，引導 y = mx + b' },
-  { id: 2, name: '峽谷',   nameEn: 'Canyon',     description: '三角函數 + 拋物線路徑'   },
-  { id: 3, name: '堡壘',   nameEn: 'Fortress',   description: '矩陣連結 + 積分砲'       },
-  { id: 4, name: '魔王巢', nameEn: 'Dragon Lair',description: 'Boss + 傅立葉破盾'     },
+  { id: 1, name: 'Grassland',   description: 'Tutorial — learn y = mx + b' },
+  { id: 2, name: 'Canyon',      description: 'Trig functions + parabolic paths' },
+  { id: 3, name: 'Fortress',    description: 'Matrix links + integral cannons' },
+  { id: 4, name: 'Dragon Lair', description: 'Boss + Fourier shield-break' },
 ]
 
 const dialogRef = ref<HTMLElement | null>(null)
@@ -62,7 +61,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
       aria-labelledby="level-select-title"
     >
       <div class="dialog-header">
-        <h2 id="level-select-title" class="select-title">選擇關卡</h2>
+        <h2 id="level-select-title" class="select-title">Select Level</h2>
         <button class="close-btn" aria-label="Close level select" @click="emit('close')">
           <span aria-hidden="true">✕</span>
         </button>
@@ -76,7 +75,6 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
         >
           <div class="lv-num">Level {{ lv.id }}</div>
           <div class="lv-name">{{ lv.name }}</div>
-          <div class="lv-name-en">{{ lv.nameEn }}</div>
           <div class="lv-desc">{{ lv.description }}</div>
         </button>
       </div>
@@ -162,6 +160,5 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .lv-num  { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
 .lv-name { font-size: var(--text-md); color: var(--gold-bright); }
-.lv-name-en { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
 .lv-desc { font-size: var(--text-xs); color: #9a8a70; margin-top: 4px; }
 </style>
