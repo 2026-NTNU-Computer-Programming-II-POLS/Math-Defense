@@ -10,7 +10,7 @@
  * every connect is owned by `EnemyRenderer._drawHitFlash`; this layer is
  * the extra "something special happened" cue.
  */
-import { Events, ANIM } from '@/data/constants'
+import { Events } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import { seededUnit, seedFor } from '@/math/seededRandom'
 import { EffectLayer, type Effect } from './effects/EffectLayer'
