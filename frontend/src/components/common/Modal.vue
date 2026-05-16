@@ -100,7 +100,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .modal-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.7);
   display: flex;
@@ -119,14 +119,15 @@ onBeforeUnmount(() => {
 }
 
 .modal-title {
-  font-size: 16px;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   letter-spacing: 4px;
 }
 
 .modal-message {
-  font-size: 13px;
+  font-size: var(--text-base);
   color: var(--text-primary);
   line-height: 1.8;
 }

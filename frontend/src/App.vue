@@ -2,8 +2,11 @@
 import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useUiStore } from '@/stores/uiStore'
+import Modal from '@/components/common/Modal.vue'
 
 const router = useRouter()
+const uiStore = useUiStore()
 const navigating = ref(false)
 
 router.beforeEach(() => { navigating.value = true })
@@ -22,6 +25,7 @@ onUnmounted(() => {
         <component :is="Component" />
       </Transition>
     </RouterView>
+    <Modal v-if="uiStore.modalVisible" />
   </div>
 </template>
 

@@ -25,7 +25,6 @@ import MontyHallPanel from '@/components/game/MontyHallPanel.vue'
 import ScoreResultView from '@/views/ScoreResultView.vue'
 import ChainRulePanel from '@/components/game/ChainRulePanel.vue'
 import StartWaveButton from '@/components/game/StartWaveButton.vue'
-import Modal from '@/components/common/Modal.vue'
 import AchievementToast from '@/components/game/AchievementToast.vue'
 import PrincipleOverlay from '@/components/game/PrincipleOverlay.vue'
 import ManualModal from '@/components/common/ManualModal.vue'
@@ -279,7 +278,7 @@ const shellRef = ref<HTMLDivElement | null>(null)
 // MAX_SCALE caps upscaling so the pixel-art canvas stays legible without
 // becoming excessively blocky on very large / 4K displays. Screens smaller
 // than the world still scale down freely.
-const MAX_SCALE = 2
+const MAX_SCALE = 2.5
 
 function calcScale(W: number, H: number) {
   const pad = 2
@@ -451,9 +450,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Modal -->
-      <Modal v-if="uiStore.modalVisible" />
-
       <!-- V3 Phase 6 §6.2: first-encounter card (soft-pauses via the composable) -->
       <FirstEncounterCard :type="firstEncounterCard" @dismiss="dismissFirstEncounter" />
 
@@ -536,7 +532,7 @@ onBeforeUnmount(() => {
   background: rgba(44, 62, 80, 0.82);
   color: var(--gold-bright);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
@@ -567,7 +563,7 @@ onBeforeUnmount(() => {
   background: rgba(44, 62, 80, 0.82);
   color: var(--gold-bright);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
@@ -609,8 +605,8 @@ onBeforeUnmount(() => {
   z-index: var(--z-modal);
 }
 .boot-state.error { color: var(--hp-red); }
-.boot-title { font-size: 16px; letter-spacing: 2px; color: var(--gold); text-shadow: var(--gold-shadow); }
-.boot-msg   { font-size: 12px; text-align: center; max-width: 480px; padding: 0 16px; }
+.boot-title { font-size: var(--text-base); letter-spacing: 2px; color: var(--gold); text-shadow: var(--gold-shadow); }
+.boot-msg   { font-size: var(--text-xs); text-align: center; max-width: 480px; padding: 0 16px; }
 .boot-spinner {
   width: 32px; height: 32px;
   border: 3px solid var(--gold-dim);
@@ -642,11 +638,11 @@ onBeforeUnmount(() => {
   box-shadow: var(--panel-shadow);
 }
 .pause-title {
-  font-size: 22px;
+  font-size: var(--text-xl);
   color: var(--gold-bright);
   letter-spacing: 6px;
 }
-.pause-hint { font-size: 12px; color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
+.pause-hint { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
 .pause-hint kbd {
   display: inline-block;
   padding: 2px 6px;
@@ -654,7 +650,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--gold-dim);
   border-radius: 3px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
 }
@@ -684,18 +680,18 @@ onBeforeUnmount(() => {
 }
 .checkpoint-title {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--text-lg);
   color: var(--gold-bright);
   letter-spacing: 4px;
 }
 .checkpoint-stat {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
 }
 .checkpoint-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   line-height: 1.5;
@@ -703,7 +699,7 @@ onBeforeUnmount(() => {
 .checkpoint-practice {
   display: inline-block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--gold-dim);
   font-style: italic;
 }
@@ -719,7 +715,7 @@ onBeforeUnmount(() => {
   background: rgba(212, 160, 23, 0.1);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   cursor: pointer;
   transition: background 120ms;
 }
@@ -747,7 +743,7 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   color: #c8a4ff;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 0.5px;
   z-index: var(--z-overlay);
   pointer-events: none;
