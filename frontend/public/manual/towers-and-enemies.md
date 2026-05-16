@@ -133,7 +133,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 
 | Threat | Why standard towers struggle | What to do |
 |---|---|---|
-| Regenerator | constant HP regen | Burst damage (Radar C, Lightning spell). DoT alone is unreliable. |
+| Regenerator | constant HP regen | Burst damage (Radar C, Lightning spell). Damage over Time (DoT) alone is unreliable. |
 | Bulwark | 14-damage hit cap | Many small hits — Radar B, Magic curve zone, Matrix laser tick |
 | Swarmling | -65% tower damage; bursty | Calculus pets ignore the modifier. Frost Nova to slow the cluster. |
 | Helper | buffs nearby allies | Kill the Helper *first*. Radar C or a Lightning spell are reliable openers. |
