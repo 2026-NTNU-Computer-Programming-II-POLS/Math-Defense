@@ -28,7 +28,7 @@ export function useLeaderboard() {
       if (thisId !== fetchId) return
       // Our own abort — a newer fetch already took over; swallow silently.
       if (e instanceof DOMException && e.name === 'AbortError') return
-      error.value = e instanceof Error ? e.message : '無法載入排行榜'
+      error.value = e instanceof Error ? e.message : 'Failed to load Leaderboard.'
     } finally {
       if (thisId === fetchId) {
         loading.value = false

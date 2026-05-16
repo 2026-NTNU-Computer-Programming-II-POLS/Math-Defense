@@ -135,7 +135,7 @@ onMounted(async () => {
           <button class="btn" type="submit" :disabled="submitting || !title.trim() || !deadline">
             {{ submitting ? 'Creating…' : 'Create Activity' }}
           </button>
-          <button class="btn back-btn" type="button" @click="router.push('/territory')">取消</button>
+          <button class="btn back-btn" type="button" @click="router.push('/territory')">CANCEL</button>
         </div>
       </form>
     </div>

@@ -14,7 +14,7 @@ const auth = useAuthStore()
 // (mastery goals) is the healthier default for novice / anxious learners than
 // social ranking. Logged-out visitors fall back to Global.
 type Tab = 'personal' | 'global'
-const TAB_LABELS: Record<Tab, string> = { personal: '個人歷程', global: '全球排行' }
+const TAB_LABELS: Record<Tab, string> = { personal: 'Personal History', global: 'Global Ranking' }
 const TAB_ORDER: Tab[] = ['personal', 'global']
 
 const activeTab = ref<Tab>(auth.isLoggedIn ? 'personal' : 'global')
@@ -48,7 +48,7 @@ async function fetchPersonal(level: number | undefined): Promise<void> {
   } catch (e) {
     if (thisId !== personalFetchId) return
     if (e instanceof DOMException && e.name === 'AbortError') return
-    personalError.value = e instanceof Error ? e.message : '無法載入個人歷程'
+    personalError.value = e instanceof Error ? e.message : 'Unable to load personal history'
   } finally {
     if (thisId === personalFetchId) {
       personalLoading.value = false
@@ -106,8 +106,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="leaderboard-view">
     <header class="lb-header">
-      <h1 class="lb-title">英雄排行榜</h1>
-      <button class="btn" @click="router.push('/')">← 返回</button>
+      <h1 class="lb-title">HEROES RANKING</h1>
+      <button class="btn" @click="router.push('/')">← BACK TO MENU</button>
     </header>
 
     <div class="lb-tabs">
@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
         :key="tab"
         :class="['btn', 'tab-btn', { active: activeTab === tab }]"
         :disabled="tab === 'personal' && !auth.isLoggedIn"
-        :title="tab === 'personal' && !auth.isLoggedIn ? '登入後可查看個人歷程' : ''"
+        :title="tab === 'personal' && !auth.isLoggedIn ? 'Please log in to view personal history' : ''"
         @click="switchTab(tab)"
       >
         {{ TAB_LABELS[tab] }}
@@ -124,38 +124,38 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="lb-filters">
-      <span class="filter-label">關卡篩選：</span>
+      <span class="filter-label">LEVEL FILTER：</span>
       <button
         v-for="lv in [undefined, 1, 2, 3, 4]"
         :key="lv ?? 'all'"
         :class="['btn', 'filter-btn', { active: selectedLevel === lv }]"
         @click="selectLevel(lv)"
       >
-        {{ lv === undefined ? '全部' : `Level ${lv}` }}
+        {{ lv === undefined ? 'ALL' : `Level ${lv}` }}
       </button>
     </div>
 
     <!-- Personal tab -->
     <template v-if="activeTab === 'personal'">
-      <div v-if="personalLoading" class="lb-loading">載入中…</div>
+      <div v-if="personalLoading" class="lb-loading">LOADING…</div>
       <div v-else-if="personalError" class="lb-error">{{ personalError }}</div>
       <PersonalTimeline v-else :entries="personalEntries" />
     </template>
 
     <!-- Global tab -->
     <template v-else>
-      <div v-if="loading" class="lb-loading">載入中…</div>
+      <div v-if="loading" class="lb-loading">LOADING…</div>
       <div v-else-if="error" class="lb-error">{{ error }}</div>
       <div v-else class="lb-table-wrap">
         <table class="lb-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>玩家</th>
-              <th>關卡</th>
-              <th>分數</th>
-              <th>擊殺</th>
-              <th>存活波數</th>
+              <th>PLAYER</th>
+              <th>LEVEL</th>
+              <th>SCORE</th>
+              <th>KILLS</th>
+              <th>WAVES SURVIVED</th>
             </tr>
           </thead>
           <tbody>
@@ -168,7 +168,7 @@ onBeforeUnmount(() => {
               <td>{{ e.waves_survived }}</td>
             </tr>
             <tr v-if="entries.length === 0">
-              <td colspan="6" class="empty">尚無紀錄</td>
+              <td colspan="6" class="empty">NO RECORDS</td>
             </tr>
           </tbody>
         </table>
