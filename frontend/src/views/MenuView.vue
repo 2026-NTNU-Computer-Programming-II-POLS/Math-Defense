@@ -57,43 +57,43 @@ const mathGlyphs = [
 
     <nav class="menu-nav">
       <button v-if="auth.isStudent || auth.isTeacher || !auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'level-select' })">
-        ▶ 開始遊戲
+        ▶ START GAME
       </button>
       <button class="btn menu-btn" @click="router.push({ name: 'leaderboard' })">
-        ◈ 排行榜
+        ◈ RANKING
       </button>
       <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'territory-list' })">
-        ⚔ 搶佔領地
+        ⚔ GRABBING TERRITORY
       </button>
       <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'rankings' })">
-        ◈ 完整排名
+        ◈ FULL RANKING
       </button>
       <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'classes' })">
-        ◆ 班級管理
+        ◆ CLASS MANAGEMENT
       </button>
       <button v-if="auth.isTeacher || auth.isAdmin" class="btn menu-btn" @click="router.push({ name: 'teacher-dashboard' })">
-        ⬡ 教師面板
+        ⬡ TEACHER DASHBOARD
       </button>
       <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'profile' })">
         ⬡ {{ auth.user?.player_name }}
       </button>
       <button v-if="auth.isAdmin" class="btn menu-btn" @click="router.push({ name: 'admin-teachers' })">
-        ✦ 管理面板
+        ✦ ADMIN PANEL
       </button>
       <button class="btn menu-btn" @click="manualOpen = true">
-        ◇ 遊戲手冊
+        ◇ MANUAL
       </button>
       <button class="btn menu-btn" @click="auth.isLoggedIn ? auth.logout() : router.push({ name: 'auth' })">
-        {{ auth.isLoggedIn ? '⏻ 登出' : '⬡ 登入 / 註冊' }}
+        {{ auth.isLoggedIn ? '⏻ LOG OUT' : '⬡ LOGIN / REGISTER' }}
       </button>
     </nav>
 
     <ManualModal :open="manualOpen" mode="full" @close="manualOpen = false" />
 
     <footer class="menu-footer">
-      <span>程式設計（二）期末專題 · 2026</span>
+      <span>Computer Programming (II) Final Project · 2026</span>
       <span class="menu-footer-sep">·</span>
-      <a class="menu-footer-link" href="#" @click.prevent="router.push({ name: 'about' })">無障礙聲明</a>
+      <a class="menu-footer-link" href="#" @click.prevent="router.push({ name: 'about' })">Accessibility Statement</a>
     </footer>
   </div>
 </template>

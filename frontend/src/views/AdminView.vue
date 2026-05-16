@@ -107,7 +107,7 @@ watch(activeTab, loadData, { immediate: true })
 <template>
   <div class="admin-view">
     <div class="admin-panel rune-panel">
-      <h2 class="admin-title">管理面板</h2>
+      <h2 class="admin-title">ADMIN PANEL</h2>
 
       <div class="tab-bar">
         <button
@@ -118,7 +118,7 @@ watch(activeTab, loadData, { immediate: true })
           :disabled="loading"
           @click="switchTab(tab)"
         >
-          {{ { teachers: '教師', classes: '班級', students: '學生', seasons: '賽季' }[tab] }}
+          {{ { teachers: 'TEACHERS', classes: 'CLASSES', students: 'STUDENTS', seasons: 'SEASONS' }[tab] }}
         </button>
       </div>
 
@@ -131,7 +131,7 @@ watch(activeTab, loadData, { immediate: true })
       />
 
       <div v-if="error" class="error-msg">{{ error }}</div>
-      <div v-if="loading" class="loading">載入中…</div>
+      <div v-if="loading" class="loading">LOADING…</div>
 
       <!-- Teachers -->
       <ul v-if="activeTab === 'teachers' && !loading" class="item-list">
@@ -140,7 +140,7 @@ watch(activeTab, loadData, { immediate: true })
           <span class="item-detail">{{ t.email }}</span>
         </li>
         <li v-if="filteredTeachers.length === 0" class="empty">
-          {{ searchQuery ? 'No results' : '尚無教師' }}
+          {{ searchQuery ? 'No results' : 'NO TEACHERS' }}
         </li>
       </ul>
 
@@ -151,7 +151,7 @@ watch(activeTab, loadData, { immediate: true })
           <span class="item-detail">{{ c.join_code }}</span>
         </li>
         <li v-if="filteredClasses.length === 0" class="empty">
-          {{ searchQuery ? 'No results' : '尚無班級' }}
+          {{ searchQuery ? 'No results' : 'NO CLASSES' }}
         </li>
       </ul>
 
@@ -162,21 +162,21 @@ watch(activeTab, loadData, { immediate: true })
           <span class="item-detail">{{ s.email }}</span>
         </li>
         <li v-if="filteredStudents.length === 0" class="empty">
-          {{ searchQuery ? 'No results' : '尚無學生' }}
+          {{ searchQuery ? 'No results' : 'NO STUDENTS' }}
         </li>
       </ul>
 
       <!-- Seasons -->
       <section v-if="activeTab === 'seasons' && !loading" class="seasons-section">
         <form class="season-form" @submit.prevent="submitSeason">
-          <h3 class="season-form-title">建立 / 更新賽季</h3>
+          <h3 class="season-form-title">CREATE/UPDATE SEASON</h3>
           <input v-model="seasonForm.season_id" class="rune-input" placeholder="season_id (e.g. spring_2026)" />
           <input v-model="seasonForm.name" class="rune-input" placeholder="display name" />
-          <label class="season-label">起始 <input v-model="seasonForm.starts_at" class="rune-input" type="datetime-local" /></label>
-          <label class="season-label">結束 <input v-model="seasonForm.ends_at" class="rune-input" type="datetime-local" /></label>
+          <label class="season-label">START <input v-model="seasonForm.starts_at" class="rune-input" type="datetime-local" /></label>
+          <label class="season-label">END <input v-model="seasonForm.ends_at" class="rune-input" type="datetime-local" /></label>
           <div v-if="seasonFormError" class="error-msg">{{ seasonFormError }}</div>
           <button class="btn" type="submit" :disabled="seasonFormSubmitting">
-            {{ seasonFormSubmitting ? '儲存中…' : '儲存賽季' }}
+            {{ seasonFormSubmitting ? 'SAVING…' : 'SAVE SEASON' }}
           </button>
         </form>
 
@@ -196,11 +196,11 @@ watch(activeTab, loadData, { immediate: true })
               <span v-if="s.achievement_ids.length"> · {{ s.achievement_ids.length }} achievements</span>
             </div>
           </li>
-          <li v-if="seasons.length === 0" class="empty">尚無賽季</li>
+          <li v-if="seasons.length === 0" class="empty">NO SEASONS</li>
         </ul>
       </section>
 
-      <button class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
+      <button class="btn back-btn" @click="router.push('/')">← BACK TO MENU</button>
     </div>
   </div>
 </template>

@@ -122,7 +122,7 @@ export const useUiStore = defineStore('ui', () => {
   // by closeModal()/cancelModal().
   const modalConfirmMode = ref(false)
   const modalConfirmLabel = ref('OK')
-  const modalCancelLabel = ref('取消')
+  const modalCancelLabel = ref('CANCEL')
   let modalConfirmResolver: ((ok: boolean) => void) | null = null
 
   // Tutorial

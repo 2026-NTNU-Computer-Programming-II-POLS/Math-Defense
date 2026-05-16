@@ -16,7 +16,7 @@ const playerName = ref('')
 const role = ref('student')
 const mfaCode = ref('')
 
-const title = computed(() => isLogin.value ? '登入' : '註冊')
+const title = computed(() => isLogin.value ? 'LOGIN' : 'REGISTER')
 
 const PASSWORD_MIN = 8
 const PASSWORD_MAX = 128
@@ -56,17 +56,17 @@ function handleCancelMfa(): void {
 }
 
 function validate(): string {
-  if (!email.value) return '請輸入電子信箱'
-  if (!password.value) return '請輸入密碼'
+  if (!email.value) return 'Please enter your email'
+  if (!password.value) return 'Please enter your password'
   if (isLogin.value) return ''
-  if (!playerName.value.trim()) return '請輸入玩家名稱'
-  if (playerName.value.trim().length > 50) return '玩家名稱不可超過 50 字'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) return '請輸入有效的電子信箱'
+  if (!playerName.value.trim()) return 'Please enter your player name'
+  if (playerName.value.trim().length > 50) return 'Player name cannot exceed 50 characters'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) return 'Please enter a valid email address'
   if (password.value.length < PASSWORD_MIN || password.value.length > PASSWORD_MAX) {
-    return `密碼需 ${PASSWORD_MIN}-${PASSWORD_MAX} 字`
+    return `Password must be ${PASSWORD_MIN}-${PASSWORD_MAX} characters long`
   }
   if (!/[a-zA-Z]/.test(password.value) || !/[0-9]/.test(password.value)) {
-    return '密碼需同時包含英文字母與數字'
+    return 'Password must contain both letters and numbers'
   }
   return ''
 }
@@ -94,7 +94,7 @@ function getNextPath(): string {
 async function submit(): Promise<void> {
   if (mfaRequired.value) {
     if (!mfaCode.value || !/^\d{6}$/.test(mfaCode.value)) {
-      error.value = '請輸入 6 位數驗證碼'
+      error.value = 'Please enter a 6-digit verification code'
       return
     }
     const ok = await verifyMfa(mfaCode.value)
@@ -120,11 +120,11 @@ async function submit(): Promise<void> {
 <template>
   <div class="auth-view">
     <div class="auth-panel rune-panel">
-      <h2 class="auth-title">{{ mfaRequired ? '雙重驗證' : title }}</h2>
+      <h2 class="auth-title">{{ mfaRequired ? 'TWO-FACTOR AUTHENTICATION' : title }}</h2>
 
       <form class="auth-form" @submit.prevent="submit">
         <template v-if="mfaRequired">
-          <p class="mfa-hint">請輸入驗證器 App 中的 6 位數驗證碼</p>
+          <p class="mfa-hint">Please enter a 6-digit verification code</p>
           <label class="auth-field">
             <span>驗證碼</span>
             <input
@@ -144,7 +144,7 @@ async function submit(): Promise<void> {
 
         <template v-else>
           <label class="auth-field">
-            <span>電子信箱</span>
+            <span>EMAIL</span>
             <input
               v-model="email"
               class="rune-input"
@@ -157,7 +157,7 @@ async function submit(): Promise<void> {
 
           <template v-if="!isLogin">
             <label class="auth-field">
-              <span>玩家名稱</span>
+              <span>PLAYER NAME</span>
               <input
                 v-model="playerName"
                 class="rune-input"
@@ -169,16 +169,16 @@ async function submit(): Promise<void> {
             </label>
 
             <label class="auth-field">
-              <span>身份</span>
+              <span>ROLE</span>
               <select v-model="role" class="rune-input">
-                <option value="student">學生</option>
-                <option value="teacher">教師</option>
+                <option value="student">STUDENT</option>
+                <option value="teacher">TEACHER</option>
               </select>
             </label>
           </template>
 
           <label class="auth-field">
-            <span>密碼</span>
+            <span>PASSWORD</span>
             <input
               :value="password"
               class="rune-input"
@@ -190,33 +190,33 @@ async function submit(): Promise<void> {
           </label>
 
           <ul v-if="!isLogin" class="password-rules">
-            <li :class="{ met: passwordRules.length }">至少 8 個字元</li>
-            <li :class="{ met: passwordRules.hasLetter }">包含英文字母</li>
-            <li :class="{ met: passwordRules.hasDigit }">包含數字</li>
+            <li :class="{ met: passwordRules.length }">At least 8 characters</li>
+            <li :class="{ met: passwordRules.hasLetter }">Contains letters</li>
+            <li :class="{ met: passwordRules.hasDigit }">Contains numbers</li>
           </ul>
         </template>
 
         <div v-if="error" class="auth-error">{{ error }}</div>
 
         <button class="btn" type="submit" :disabled="loading">
-          {{ loading ? '請稍候…' : (mfaRequired ? '驗證' : title) }}
+          {{ loading ? 'LOADING…' : (mfaRequired ? 'VERIFY' : title) }}
         </button>
       </form>
 
       <template v-if="mfaRequired">
-        <button class="btn toggle-btn" @click="handleCancelMfa">← 返回登入</button>
+        <button class="btn toggle-btn" @click="handleCancelMfa">← BACK TO LOGIN</button>
       </template>
       <template v-else>
         <button class="btn toggle-btn" @click="toggleMode">
-          {{ isLogin ? '沒有帳號？前往註冊' : '已有帳號？前往登入' }}
+          {{ isLogin ? 'No Account? Register' : 'Already have an account? Log in' }}
         </button>
       </template>
 
       <p v-if="isLogin && !mfaRequired" class="demo-hint">
-        體驗帳號：<code>demo@mathdefense.local</code> / <code>Demo1234</code>
+        Demo Account: <code>demo@mathdefense.local</code> / <code>Demo1234</code>
       </p>
 
-      <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← 返回主選單</button>
+      <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← BACK TO MENU</button>
     </div>
   </div>
 </template>
