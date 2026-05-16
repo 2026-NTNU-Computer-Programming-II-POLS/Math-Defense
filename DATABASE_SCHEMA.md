@@ -83,7 +83,7 @@ erDiagram
         int     kills
         int     waves_survived
         string  session_id     FK  "→ game_sessions.id SET NULL, UNIQUE"
-        string  challenge_id   FK  "→ challenges.id SET NULL, nullable"
+        string  challenge_id   FK  "→ challenges.id CASCADE, nullable"
         datetime created_at
     }
 
@@ -133,7 +133,16 @@ erDiagram
     }
 
     territory_session_uses {
-        string  session_id  PK  "durable replay-guard (no FK)"
+        string  session_id  PK,FK  "→ game_sessions.id RESTRICT — durable replay-guard"
+    }
+
+    territory_rankings_snapshot {
+        string  id              PK  "UUID"
+        string  activity_id     FK  "→ grabbing_territory_activities.id CASCADE"
+        string  student_id      FK  "→ users.id CASCADE"
+        float   territory_value
+        int     rank
+        datetime snapshot_at
     }
 
     removed_class_memberships {
@@ -289,6 +298,9 @@ erDiagram
     %% ── Territory hierarchy ─────────────────────────────────────────────────
     grabbing_territory_activities   ||--|{ territory_slots                 : "has (activity_id)"
     territory_slots                 ||--o| territory_occupations           : "occupied_by (slot_id)"
+    grabbing_territory_activities   ||--o{ territory_rankings_snapshot     : "snapshots (activity_id)"
+    users                           ||--o{ territory_rankings_snapshot     : "ranked (student_id)"
+    game_sessions                   ||--o{ territory_session_uses          : "consumed_by (session_id)"
 ```
 
 ---
@@ -396,7 +408,7 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 
 ### `leaderboard_entries`
 
-Top scores per user per difficulty level. FKs are `SET NULL` so history survives account or session deletion.
+Top scores per user per difficulty level. `user_id` and `session_id` use `SET NULL` so history survives account or session deletion. `challenge_id` uses **CASCADE** (audit B-BUG-4, migration `w7f8a9b0c1d2`): when a challenge is deleted, its leaderboard rows are removed rather than leaking into the global/per-level board, since those rows were scored under challenge-specific wave/score caps.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -407,7 +419,7 @@ Top scores per user per difficulty level. FKs are `SET NULL` so history survives
 | `kills` | `Integer` | NO | — |
 | `waves_survived` | `Integer` | NO | — |
 | `session_id` | `String` (FK) | YES | → `game_sessions.id` ON DELETE **SET NULL**; UNIQUE |
-| `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **SET NULL**; non-NULL when the originating session was launched from a challenge. Per-challenge ranks are served by `query_ranked_by_challenge` so global / per-level boards still work |
+| `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **CASCADE**; non-NULL when the originating session was launched from a challenge. Per-challenge ranks are served by `query_ranked_by_challenge` so global / per-level boards still work. Cascade ensures deleted challenges do not leak score-capped rows back into the global leaderboard (migration `w7f8a9b0c1d2`) |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `CHECK(1 ≤ level ≤ 5)` (`ck_leaderboard_level_range`), `UNIQUE(session_id)` (`uq_leaderboard_session_id`)  
@@ -500,17 +512,34 @@ Records which student currently holds each slot, and via which game session. Bot
 | `occupied_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `UNIQUE(slot_id)` (`uq_territory_occupation_slot`), `UNIQUE(session_id)` (`uq_territory_occupation_session`)  
-**Indexes:** `ix_territory_occupations_student_id`, `ix_territory_occupations_slot_id`
+**Indexes:** `ix_territory_occupations_student_id`, `ix_territory_occupations_slot_id`, `ix_territory_occupations_student_slot (student_id, slot_id)` (added in `x8a9b0c1d2e3f` to support per-student per-slot lookups during ranking aggregation)
 
 ---
 
 ### `territory_session_uses`
 
-**Session replay guard.** A durable record of every `session_id` ever used for a territory capture. Has no FK so it is never cascade-deleted with sessions or occupations. If a student is counter-seized and the `territory_occupations` row is deleted, this table still prevents the same session being replayed.
+**Session replay guard.** A durable record of every `session_id` ever used for a territory capture. Kept separate from `territory_occupations` so displaced occupations (deleted on counter-seize) cannot un-mark a session as used. Migration `y9b0c1d2e3f4` (BD-8) adds a **RESTRICT** FK to `game_sessions.id` — this blocks deleting a `game_session` whose id is in the uses table (CASCADE would re-open the replay window, SET NULL is impossible since `session_id` is the primary key).
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
-| `session_id` | `String` | NO | PK (`pk_territory_session_uses`) |
+| `session_id` | `String` (FK) | NO | PK (`pk_territory_session_uses`); → `game_sessions.id` ON DELETE **RESTRICT** (`fk_territory_session_uses_session_id`) |
+
+---
+
+### `territory_rankings_snapshot`
+
+Point-in-time ranking snapshot per `(activity, student)`. Written at settle time so the rankings endpoint can compute rank deltas against the most recent prior snapshot without a periodic worker. Older snapshots are retained for historical queries. Introduced in migration `x8a9b0c1d2e3f`.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `String` (UUID) | NO | PK |
+| `activity_id` | `String` (FK) | NO | → `grabbing_territory_activities.id` ON DELETE **CASCADE** |
+| `student_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
+| `territory_value` | `Float` | NO | — |
+| `rank` | `Integer` | NO | — |
+| `snapshot_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
+
+**Indexes:** `ix_snap_activity_time (activity_id, snapshot_at)`, `ix_snap_activity_student_time (activity_id, student_id, snapshot_at)`
 
 ---
 
@@ -778,6 +807,9 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `ix_territory_slots_activity_id` | `territory_slots` | `activity_id` | BTREE |
 | `ix_territory_occupations_slot_id` | `territory_occupations` | `slot_id` | BTREE |
 | `ix_territory_occupations_student_id` | `territory_occupations` | `student_id` | BTREE |
+| `ix_territory_occupations_student_slot` | `territory_occupations` | `(student_id, slot_id)` | BTREE |
+| `ix_snap_activity_time` | `territory_rankings_snapshot` | `(activity_id, snapshot_at)` | BTREE |
+| `ix_snap_activity_student_time` | `territory_rankings_snapshot` | `(activity_id, student_id, snapshot_at)` | BTREE |
 | `ix_removed_memberships_student_id` | `removed_class_memberships` | `student_id` | BTREE |
 | `ix_login_attempts_locked_until` | `login_attempts` | `locked_until` | BTREE |
 | `ix_denied_tokens_expires_at` | `denied_tokens` | `expires_at` | BTREE |
@@ -796,10 +828,10 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 
 | Policy | Used for | Rationale |
 |---|---|---|
-| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id` | Deleting a parent cleans up all child rows automatically |
-| **SET NULL** | `leaderboard_entries.user_id`, `leaderboard_entries.session_id`, `leaderboard_entries.challenge_id`, `game_sessions.challenge_id`, `territory_occupations.session_id`, `grabbing_territory_activities.settled_by` | Preserve history / audit trail when the referenced entity is removed |
-| **RESTRICT** | `classes.teacher_id` | Prevents teacher deletion while they own active classes |
-| *(none / soft)* | `audit_logs.user_id`, `territory_session_uses.session_id` | Intentionally unlinked — must survive all referent deletions |
+| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id`; `leaderboard_entries.challenge_id`; `territory_rankings_snapshot.activity_id` / `.student_id` | Deleting a parent cleans up all child rows automatically. `leaderboard_entries.challenge_id` was changed from SET NULL to CASCADE in `w7f8a9b0c1d2` (B-BUG-4) to stop score-capped rows leaking into the global board |
+| **SET NULL** | `leaderboard_entries.user_id`, `leaderboard_entries.session_id`, `game_sessions.challenge_id`, `territory_occupations.session_id`, `grabbing_territory_activities.settled_by` | Preserve history / audit trail when the referenced entity is removed |
+| **RESTRICT** | `classes.teacher_id`, `territory_session_uses.session_id` | Prevents deleting a parent that has dependent durable records. For `territory_session_uses` (added in `y9b0c1d2e3f4`), RESTRICT keeps the replay-prevention record intact — CASCADE would re-open the replay window |
+| *(none / soft)* | `audit_logs.user_id` | Intentionally unlinked — must survive user deletion |
 
 ---
 
@@ -864,7 +896,10 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `s3b4c5d6e7f8` | `challenges` table + `challenge_id` columns on `game_sessions` and `leaderboard_entries` |
 | `t4c5d6e7f8a9` | Replay foundation — `game_sessions.rng_seed` + append-only `session_events` table |
 | `u5d6e7f8a9b0` | Empirical Validity Probe — `study_enrollments` / `study_probe_attempts` / `study_affect_responses` |
-| `v6e7f8a9b0c1` | Replay protocol versioning — `game_sessions.replay_version SMALLINT NOT NULL DEFAULT 1` (current head). Splits sessions into v1 (mulberry32+JS Math, ε=5e-4) vs v2 (PCG+WASM, bit-exact). Phase 4 of the construction plan; FU-A server-side recompute rejects v2 mismatches with HTTP 422 |
+| `v6e7f8a9b0c1` | Replay protocol versioning — `game_sessions.replay_version SMALLINT NOT NULL DEFAULT 1`. Splits sessions into v1 (mulberry32+JS Math, ε=5e-4) vs v2 (PCG+WASM, bit-exact). Phase 4 of the construction plan; FU-A server-side recompute rejects v2 mismatches with HTTP 422 |
+| `w7f8a9b0c1d2` | Leaderboard challenge-cascade (B-BUG-4) — change `leaderboard_entries.challenge_id` FK from `SET NULL` to `CASCADE` so deleted challenges drop their (capped-scoring) rows instead of leaking them into the global/per-level board |
+| `x8a9b0c1d2e3f` | Territory ranking aggregation support — add composite index `ix_territory_occupations_student_slot (student_id, slot_id)` and new `territory_rankings_snapshot` table (+ `ix_snap_activity_time`, `ix_snap_activity_student_time`) so rankings endpoint computes rank deltas without a periodic worker |
+| `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK (BD-8, current head) — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
 
 > **Branched history**: After `q1f2a3b4c5d6` (gameplay branch — practice mode) and `a3b4c5d6e7f8` (auth branch — lockout backoff) shipped on parallel branches, `r2a3b4c5d6e7` is a merge migration whose `down_revision` is the tuple `(q1f2a3b4c5d6, a3b4c5d6e7f8)`. It also creates the `seasons` table in the same revision. Subsequent revisions (`s3b4c5d6e7f8`, `t4c5d6e7f8a9`, `u5d6e7f8a9b0`) form a linear chain on top.
 

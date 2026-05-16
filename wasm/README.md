@@ -16,10 +16,12 @@ The frontend always calls the bridge (`WasmBridge.*`); it never imports `math_en
 
 ```
 wasm/
-├── math_engine.c    Tower mechanics — matrix, sector, integrate (C99)
-├── prng.c           PCG XSL-RR 64/32 PRNG used by replay v2
-├── curve.c          Curve evaluator/derivative/in-domain for the 3 families
-├── level_gen.c      Level generation: intersection solver, spawn calculator,
+├── math_engine.c    Tower mechanics — matrix, sector, integrate, score (C99)
+├── prng.c / prng.h  PCG XSL-RR 64/32 PRNG used by replay v2
+├── curve.c / curve.h
+│                    Curve evaluator/derivative/in-domain for the 3 families
+├── level_gen.c / level_gen.h
+│                    Level generation: intersection solver, spawn calculator,
 │                    full generate_level rejection-sampling loop
 ├── Makefile         Emscripten build configuration
 └── README.md        This file
@@ -152,7 +154,38 @@ float numerical_integrate(
 );
 ```
 
-Approximates `∫[lo,hi] (ax² + bx + c) dx` using the trapezoid rule with `n` subdivisions. Used by the **Calculus** tower to compute damage from the player's chosen function.
+Trapezoid-rule approximation of `∫[lo,hi] |a·x² + b·x + c| dx` with `n` subdivisions (defaulted to 100 if non-positive). Each sample's `|y|` is taken before the sum, so the result is the area between the curve and the x-axis rather than the signed integral. Used by the **Calculus** tower to compute damage from the player's chosen function.
+
+---
+
+### `compute_total_score`
+
+```c
+double compute_total_score(
+    double kill_value,
+    double time_total,
+    double prep_sum,
+    double cost_total,
+    double health_origin,
+    double health_final,
+    int    initial_answer        /* 0 or 1 */
+);
+```
+
+**Canonical V2 score formula** — single source of truth for both the
+frontend display (`score-calculator.ts`) and the backend anti-cheat
+verifier (`score_calculator.py` via `app/infrastructure/wasm_runtime.py`,
+which mounts this same `.wasm`). The s1/s2/k/exponent breakdown shown in
+`ScoreResultView` is derived locally, but `totalScore` always comes out
+of this function so server and client agree to the last ULP.
+
+`prep_sum` is pre-summed by the caller so the ABI stays a flat scalar
+list and the parity fixtures in `shared/score_parity_fixtures.json` don't
+need to encode variable-length prep arrays. A v2 session whose submitted
+`total_score` diverges from the server recompute by more than `1e-4` is
+rejected with HTTP 422 + `replay_mismatch`. Any change to this function
+MUST be mirrored in both fallbacks (TS / Python) and the parity fixtures
+regenerated.
 
 ---
 
@@ -163,16 +196,11 @@ double power_f64(double base, double exp);
 ```
 
 Bit-deterministic `pow` via musl's `pow` compiled into WASM bytecode.
-Frontend `score-calculator.ts` uses this for `totalScore = max(0,k)^exponent`
-so the displayed score agrees with the server-side wasmtime-py recomputation
-(construction plan §8 FU-A). Backend mounts the same `.wasm` and calls this
-function from `app/infrastructure/wasm_runtime.py` to recompute v2 scores.
+Exposed for callers that need a determinism-guaranteed `pow` outside the
+fixed `compute_total_score` shape — and used internally by it.
 
 The cross-engine determinism guarantee comes from §`Determinism rationale`
 above: `pow` is musl in WASM bytecode, byte-identical regardless of host.
-A v2 session whose submitted `total_score` diverges from the server
-recompute by more than rounding (`1e-4`) is rejected with HTTP 422 +
-`replay_mismatch`.
 
 ---
 
@@ -366,8 +394,9 @@ Every WASM function has a pure-TypeScript equivalent in `WasmBridge.ts`. `initWa
 The level generator (`generate_level`, `find_pair_intersections`,
 `find_all_curves_common_point`, `count_common_intersections_in_interval`,
 `compute_spawn_points`) is shared infrastructure — not bound to a single
-tower. Score recomputation (`power_f64`) backs the FU-A backend recompute
-path; replay-v2 PRNG (`prng_seed`/`prng_next_u32`/`prng_next_f64`) is the
-gameplay random stream.
+tower. Score recomputation (`compute_total_score`, with `power_f64` as
+the underlying determinism-pinned primitive) backs the FU-A backend
+recompute path; replay-v2 PRNG (`prng_seed` / `prng_next_u32` /
+`prng_next_f64`) is the gameplay random stream.
 
 > **Historical note**: Earlier V1 versions included Function Cannon, Integral Cannon, Fourier Shield, and Probability Shrine, which carried four extra C exports (`calculate_trajectory`, `fourier_composite`, `fourier_match`, `line_circle_intersect`). The V2 redesign (Phase 5, April 2026) unified them into 7 concept-based towers, and those exports were dropped from the binary in May 2026 once V2 was confirmed not to need them.

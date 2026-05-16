@@ -213,7 +213,7 @@ Switch via the small targeting toggle on the tower panel.
 
 ## Talent Tree (Persistent)
 
-Twenty-one nodes across the seven tower types. Each allocated node multiplies one of `damage / range / speed / petCount` for towers of its type. Prerequisites are linear chains within each tower's branch. Free reset is available from the Talent Tree view. Effects apply at *tower placement* — re-build a tower to refresh its modifier snapshot after reallocating.
+Nineteen nodes across the seven tower types (Magic 3, Radar A 2, Radar B 3, Radar C 3, Matrix 3, Limit 2, Calculus 3). Each node has a `maxLevel` of 2 or 3 and multiplies a per-tower attribute — `damage`, `range`, `attack_speed` / `sweep_speed`, `target_count`, Magic's `zone_strength` / `zone_width` / `duration`, Matrix's `damage_ramp`, or Calculus's `pet_damage` / `pet_attack_speed` / `pet_hp`. Prerequisites are linear chains within each tower's branch. Free reset is available from the Talent Tree view. Effects apply at *tower placement* — re-build a tower to refresh its modifier snapshot after reallocating.
 
 ---
 

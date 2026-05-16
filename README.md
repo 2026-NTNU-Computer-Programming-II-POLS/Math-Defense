@@ -4,21 +4,112 @@ An educational tower defense game that teaches mathematics through gameplay. Pla
 
 ## Concept
 
-Each tower type corresponds to a real math topic:
+An educational tower defense where **math is the mechanic, not the gate**. The world is a coordinate plane; the **origin (0, 0)** is the rune you must defend. Enemies spawn at the grid edge and walk along procedurally generated polynomial curves toward the origin. Each tower type corresponds to a real math topic — the functions you choose, the angles you sweep, the limits you evaluate *are* the attacks.
 
-| Tower | Math Concept | How It Works |
-|---|---|---|
-| Magic | Function Curves (polynomial/trig/log) | Places a function curve as a zone that debuffs enemies or buffs nearby towers |
-| Radar A | Trigonometry & Sectors | Continuous AoE sweep; damage applied to all enemies inside the arc |
-| Radar B | Polar Coordinates | Fast single-target projectile launcher |
-| Radar C | Angular Momentum | Slow, powerful projectile shots with high per-hit damage |
-| Matrix | Linear Transforms / Dot Product | Paired tower system; dot-product damage; continuous laser beam between pair |
-| Limit | Limits (lim x→c) | Presents a multiple-choice limit question; outcome (±∞ / ±C / 0) sets effective range |
-| Calculus | Derivatives & Integrals | Player picks a function then derivative/integral; generates autonomous Pet projectiles |
+| Tower | Glyph | Math Concept | How It Works | Unlocked |
+|---|---|---|---|---|
+| Magic | ✦ | Function curves (polynomial / trig / log) | Draws a curve as a band-shaped zone; toggle between **Debuff** (damages enemies in band) and **Buff** (boosts towers in band) | Star 1 |
+| Radar A — Sweep | ◐ | Radian arcs, sector area | Continuous AoE sweep; damage applied to all enemies inside the arc on every tick | Star 1 |
+| Radar B — Rapid | ◑ | Radian arcs | Fast single-target projectiles within a restricted arc; shortest cooldown in the roster | Star 2 |
+| Radar C — Sniper | ◒ | Radian arcs | Slow, heavy single-target shots at long range; highest base damage | Star 2 |
+| Matrix | ⊞ | Vectors & dot product | **Paired** tower system — fires nothing alone; base damage = dot product of the pair's grid-coordinate vectors; laser ramps damage the longer it locks on | Star 2 |
+| Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; the answer drives the effect — `±∞` gives max damage / heal, `±C` scales, `0` removes the tower (no refund), any non-limit constant disables it | Star 3 |
+| Calculus | ∫ | Derivatives & integrals (power rule) | Player picks a polynomial and applies `d/dx` or `∫`; the resulting `C·xⁿ` spawns **C autonomous pets** whose behaviour is determined by `n` (homing, lifetime, AoE) | Star 3 |
+
+Each tower has Tier 2 / Tier 3 upgrades (+25%/+50% damage, +10%/+20% range, plus type-specific bonuses).
+
+---
+
+## Game Mechanics
+
+### Run flow
+
+```
+Menu → Level Select (★ 1–5) → Initial Answer → [ Build → Wave ] × N → Score
+                                                  ↑              ↓
+                                            (refunds, shop)  Monty Hall, Chain Rule
+```
+
+- **Initial Answer (IA)** — before the run, the engine shows the level's curves and a disclosure rectangle containing their single common intersection. Enter exact `(x, y)` (fractions / integers / exact decimals). A correct answer sets `IA = 1`, sharpening the score's exponent. Wrong / Skip (50 gold) / "Proceed (Paths Hidden)" all set `IA = 0`; the last option additionally **hides the path overlay during gameplay**.
+- **Build Phase** — no enemies; place / upgrade / refund towers, configure each tower's math (curve, arc, pair, `lim` answer, derivative/integral), open the shop, set targeting (closest / strongest / first / last). Time spent here is *prep time* and is excluded from the score's active-time term.
+- **Wave Phase** — towers fire automatically; the player retains control of spells and pause (Space / Esc). Tower configuration is locked until the wave ends.
+- **Special events** — the engine may inject Monty Hall (kill-value threshold crossed) or Chain Rule (Boss Type-B at ~50% HP) modals mid-run.
+
+### Enemies
+
+Ten enemy types with distinct counter-play. `killValue` (not gold reward) drives Monty Hall thresholds and the score formula.
+
+| Enemy | HP | Spd | Reward | Dmg | KV | Special |
+|---|---|---|---|---|---|---|
+| General | 30 | 2.0 | 15 | 1 | 10 | Baseline |
+| Fast | 15 | 4.0 | 10 | 1 | 5 | 2× speed, thin HP |
+| Strong | 120 | 1.0 | 40 | 2 | 25 | Tanky |
+| Split | 40 | 2.0 | 15 | 1 | 5 | On death splits into 2 smaller Generals |
+| Helper | 35 | 2.0 | 30 | 1 | 15 | Aura: +5 HP/s and +20% speed to allies in r=3 — **kill first** |
+| Regenerator | 80 | 1.5 | 35 | 2 | 20 | Regens 18 HP/s — needs burst damage |
+| Bulwark | 220 | 0.9 | 50 | 3 | 30 | **Hard cap of 14 damage per single hit** — favours fast/weak shots or DoT |
+| Swarmling | 12 | 3.2 | 6 | 1 | 4 | Takes only **35%** of tower damage; pets bypass the modifier |
+| Boss Type-A | 500 | 0.8 | 200 | 99 | 100 | 200-HP shield; spawns a General every 8 s |
+| Boss Type-B | 600 | 0.7 | 300 | 99 | 150 | 250-HP shield; spawns a Fast every 8 s; triggers **Chain Rule challenge** at ~50% HP — correct answer = massive bonus damage + 100 gold; wrong = boss heals |
+
+### Score formula
+
+Computed in WASM (`compute_total_score` in `wasm/math_engine.c`) so the server can re-verify bit-deterministically; the frontend mirrors it for display.
+
+```
+activeTime = max(0.001, timeTotal − Σ(time spent in Build Phase))
+S1         = killValue / activeTime                  (kill rate)
+S2         = killValue / costTotal       if costTotal > 0 else 0
+K          = 0.7·S1 + 0.3·S2   if S1 ≥ S2            (efficiency-weighted)
+             0.5·S1 + 0.5·S2   otherwise             (balanced)
+exponent   = 1 / max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer))
+TotalScore = max(0, K)^exponent                      (killValue = 0 → K = 0 → score = 0)
+```
+
+Edge cases: no towers built (`costTotal = 0`) → `S2 = 0` and a 30% penalty (`K = 0.7·S1`); sitting in Build forever does not pad the timer.
+
+### Monty Hall event
+
+When cumulative kill-value crosses a star-specific threshold, the wave pauses. Pick a door → system reveals a losing door → stay or **switch**. Switching wins `(doors−1)/doors` (2/3 at 3 doors, 4/5 at 5 doors). The game never tells you this — it's the lesson. Rewards include Power Surge (double damage), Eagle Eye (+50% range), Time Warp (-40% enemy speed), Gold Rush (3× gold), Divine Blessing (full HP), Master Builder (next 2 towers free).
+
+### Shop buffs & spells
+
+Shop (Build Phase, time-based, stack independently): Sharpen Blades (+20% damage), Overclock (+15% attack speed), Far Sight (+15% range), Quagmire (-15% enemy speed), Corrode Armor (+10% enemy damage taken), Heal 5/10, Ward Shield (absorb next 3 damage), Prospector (2× gold).
+
+Spells (cast any time, gold-cost, cooldown-gated): **Fireball** (60 AoE r=3, 80g/12s), **Frost Nova** (slow to 40% in r=4 for 5s, 60g/15s), **Lightning** (150 single-target, 100g/18s), **Haste** (+tower attack speed 8s, 120g/25s).
+
+### Difficulty (star rating)
+
+| Star | Path multisets | Waves | Enemy mix |
+|---|---|---|---|
+| 1 | degrees 1–2, 2–4 curves | 3 | General only |
+| 2 | adds degree 3, longer multisets | 4 | General, Fast, Bulwark |
+| 3 | denser mix of degrees 1–3 | 5 (last wave: Boss Type-A) | Strong, Split, Regenerator, Swarmling, boss |
+| 4 | denser multisets | 5 (last wave: Boss Type-B) | Helper-heavy + chain-rule boss |
+| 5 | hardest multisets, longest curves | 5 (last wave: Boss-B + Swarmling bursts) | Everything; **only ★5 grants checkpoint retry** (run flagged practice → leaderboard-ineligible) |
+
+Path generation is polynomial-only; the trig / log evaluator is used by the Magic tower and the curve LaTeX renderer. The whole run is replay-deterministic from `rng_seed`.
+
+### Progression (carries between runs)
+
+- **Achievements** — 33 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
+- **Talent Tree** — 19 nodes across the 7 tower types with linear prerequisite chains. Each node has a `maxLevel` (2 or 3) and grants a per-tower attribute multiplier — including damage, range, attack/sweep speed, target count, zone width/strength, Magic zone duration, Matrix damage-ramp rate, and Calculus pet damage/speed/HP. Modifiers are snapshotted at tower placement, so re-build to refresh after reallocating. Free reset is supported.
+- **Avatar & profile** — unlocked along the way.
+- **Class & Territory** — students join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global.
+- **Leaderboard** — every completed non-practice run posts its TotalScore by star rating.
+
+### Accessibility
+
+Every tower has a unique Unicode glyph in addition to colour (WCAG 1.4.1); a polite ARIA live region announces phase transitions and HP warnings; `prefers-reduced-motion` tones down ambient animation; **full keyboard placement** (arrow keys + Enter, WCAG 2.2 SC 2.1.1); path labels fade based on the player's recent IA accuracy.
+
+For the full design rationale, see [`frontend/public/manual/game-mechanics.md`](frontend/public/manual/game-mechanics.md) and the field reference at [`frontend/public/manual/towers-and-enemies.md`](frontend/public/manual/towers-and-enemies.md) — both are surfaced in-game through the Manual modal.
 
 ---
 
 ## Architecture
+
+> For the full system architecture (topology diagrams, DDD layering, ECS systems, build/deploy pipeline), see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+> For the complete database ERD, column constraints, indexes, and migration history, see **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)**.
 
 ```
 Math Game/
@@ -77,8 +168,8 @@ Browser
 |---|---|
 | Frontend | Vue 3 (Composition API, `<script setup>`), TypeScript 5.9 strict, Pinia, Vue Router, Vite 8, Vitest |
 | Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
-| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 16 exported functions |
-| Database | PostgreSQL 16 (Alembic migrations) |
+| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 17 exported math functions (plus `_malloc`/`_free`) |
+| Database | PostgreSQL 16 (Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
 | Container | Docker, Docker Compose |
 | Replay | Versioned (`replay_version` 1=mulberry32+JS Math, 2=PCG+WASM bit-exact); server-side score recompute via `wasmtime-py` |
 
@@ -196,8 +287,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # ~325 tests across 25 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute)
-cd frontend && npm test            # 50 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
+cd backend  && pytest              # ~331 tests across 26 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute)
+cd frontend && npm test            # ~68 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
@@ -214,8 +305,24 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 ---
 
-## Sub-project READMEs
+## Documentation
+
+### System references
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — System topology, DDD layering, ECS engine, WASM bridge, deployment, and testing in one place
+- **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** — ERD for 30+ tables, constraints, indexes, and Alembic migration history
+- **[SECURITY.md](SECURITY.md)** — Threat model, auth flow (JWT/bcrypt/MFA), lockout, CSRF, CSP, audit logging
+- **[Math_Defense_Spec.md](Math_Defense_Spec.md)** — Original game-design specification
+- **[docs/Educational_Theory_Analysis.md](docs/Educational_Theory_Analysis.md)** — Theory-driven design audit mapping each game mechanic to authoritative learning theories (APA 7 citations)
+- [docs/](docs/) — Additional design analysis, audit notes, and educational-theory background
+
+### Sub-project READMEs
 
 - [frontend/README.md](frontend/README.md) — Vue 3 app, ECS game engine, systems, stores, WASM bridge
 - [backend/README.md](backend/README.md) — FastAPI DDD layers, REST API, domain events, rate limits
 - [wasm/README.md](wasm/README.md) — C math engine, Emscripten build, exported functions
+
+### In-game manual (also surfaced in the Manual modal)
+
+- [frontend/public/manual/game-mechanics.md](frontend/public/manual/game-mechanics.md) — Full design rationale
+- [frontend/public/manual/towers-and-enemies.md](frontend/public/manual/towers-and-enemies.md) — Tower and enemy field reference

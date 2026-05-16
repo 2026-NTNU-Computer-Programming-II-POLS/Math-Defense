@@ -189,20 +189,20 @@ The leaderboard score is computed in WASM (`compute_total_score` in `wasm/math_e
 Let:
 
 ```
-activeTime  = timeTotal − Σ(time spent in Build Phase)
+activeTime  = max(0.001, timeTotal − Σ(time spent in Build Phase))
 S1          = killValue / activeTime                    (kill rate)
-S2          = killValue / costTotal                     (kill per gold)
+S2          = killValue / costTotal       if costTotal > 0 else 0
 K           = 0.7·S1 + 0.3·S2     if S1 ≥ S2            (efficiency-weighted)
               0.5·S1 + 0.5·S2     otherwise             (balanced)
 
-exponent    = 1 / (1 + (2 + healthOrigin − healthFinal − initialAnswer))
-TotalScore  = killValue^exponent · K        (with killValue=0 → score=0)
+exponent    = 1 / max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer))
+TotalScore  = max(0, K)^exponent           (killValue=0 → K=0 → score=0)
 ```
 
 In English:
 
 - More kills, faster, with cheaper towers → higher S1, S2, K.
-- Less HP lost and a correct IA → smaller exponent denominator → larger exponent → score grows faster with killValue.
+- Less HP lost and a correct IA → smaller exponent denominator → larger exponent → K is raised to a larger power.
 - Sitting in Build Phase forever does not pad the timer — only active wave time counts toward S1.
 - Building no towers (`costTotal = 0`) zeroes S2 and applies a 30% penalty (`K = 0.7·S1`).
 
@@ -226,8 +226,8 @@ The "multiset" is the polynomial-degree multiset used by `level-generator` to dr
 
 What carries between runs:
 
-- **Achievements** — 20 entries across 5 categories; some scale with seasonal multipliers.
-- **Talents** — 21-node tree across the 7 tower types, with prerequisite chains. Allocating talents grants persistent multipliers (damage, range, attack speed, pet count) that are injected into towers at placement time. Reset is supported.
+- **Achievements** — 33 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
+- **Talents** — 19-node tree across the 7 tower types, with linear prerequisite chains. Each node has a `maxLevel` of 2 or 3 and grants a per-tower attribute multiplier — including damage, range, attack/sweep speed, target count, zone width/strength, Magic zone duration, Matrix damage-ramp rate, and Calculus pet damage/speed/HP. Modifiers are snapshotted at tower placement, so re-build to refresh after reallocating. Free reset is supported.
 - **Avatar & profile** — picked from the unlocks earned along the way.
 - **Class & territory** — students can join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global.
 - **Leaderboard** — every completed (non-practice) run posts its TotalScore by star rating.

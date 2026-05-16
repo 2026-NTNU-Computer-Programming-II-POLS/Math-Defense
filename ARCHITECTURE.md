@@ -1,7 +1,7 @@
 # Math Defense — System Architecture
 
 > Comprehensive architecture reference for the Math Defense educational tower-defense game.
-> Generated 2026-05-08 from a full audit of source, schema, and deployment configuration.
+> Generated 2026-05-08, refreshed 2026-05-16 from a full audit of source, schema, and deployment configuration.
 
 This document describes the system from four complementary angles:
 
@@ -18,9 +18,9 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 
 | Path | Role |
 |---|---|
-| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~50 Vitest files (~329 cases). |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic migrations, ~25 pytest files (~325 cases). |
-| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (16 exported functions: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). |
+| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~68 Vitest files. |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (34 migrations), ~26 pytest files. |
+| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). |
 | `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
 | `shared/` | `game-constants.json` — single source of truth for canvas/grid/economy values. |
 | `assets/` | Sprites, audio, fonts (referenced as `frontend/public/`). |
@@ -63,7 +63,7 @@ flowchart TB
         Infra --> Domain
     end
 
-    DB[("PostgreSQL 16<br/>Alembic migrations<br/>30+ tables")]
+    DB[("PostgreSQL 16<br/>Alembic: 34 migrations<br/>25 tables")]
     Shared[/"shared/game-constants.json<br/>(parity-tested)"/]
 
     Client -- HTTPS --> Nginx
@@ -101,13 +101,17 @@ flowchart LR
         AchSvc[AchievementApplicationService]
         TalentSvc[TalentApplicationService]
         ClassSvc[ClassApplicationService]
+        AdminSvc[AdminApplicationService]
         TerrSvc[TerritoryApplicationService]
+        TerrRecSvc[TerritoryRecommendationService]
         AssessSvc[AssessmentApplicationService]
         RecSvc[RecommenderApplicationService]
         ChalSvc[ChallengeApplicationService]
         ReplaySvc[ReplayApplicationService]
         StudySvc[StudyApplicationService]
         SeasonSvc[SeasonApplicationService]
+        EvtHandlers[session_event_handlers.py]
+        Ports[ports.py<br/>outbound protocols]
         Mappers[mappers.py<br/>Aggregate → DTO]
     end
 
@@ -323,42 +327,32 @@ flowchart TB
         UIs[uiStore]
     end
 
-    subgraph Views["Views (route targets)"]
-        MV[MenuView]
-        AV[AuthView]
-        LSV[LevelSelectView]
-        IAV[InitialAnswerView]
-        GV[GameView]
-        SRV[ScoreResultView]
-        LV[LeaderboardView]
-        PV[ProfileView]
-        AchV[AchievementView]
-        TTV[TalentTreeView]
-        CV[ClassView]
-        AdV[AdminView]
-        TDV[TeacherDashboard]
-        TLV[TerritoryListView]
-        CBV[ChallengeBuilder]
-        RV[ReplayView]
-        SV[SpectateView]
-        Probe[StudyProbeView / AffectSurveyView]
+    subgraph Views["Views (26 .vue route targets)"]
+        Menu["Menu / About / Auth / Profile"]
+        Play["LevelSelect / InitialAnswer / Game / ScoreResult"]
+        Lb["Leaderboard / Rankings"]
+        Progression["Achievement / TalentTree"]
+        Classroom["Class / Admin / TeacherDashboard"]
+        Terr["TerritoryList / TerritoryDetail / TerritoryResult / TeacherTerritorySetup"]
+        Chal["Challenge / ChallengeBuilder / ChallengeLeaderboard"]
+        Replay["Replay / Spectate"]
+        StudyV["StudyProbe / AffectSurvey"]
     end
 
-    subgraph Components["Reusable Components"]
-        Common[common/<br/>Modal · MathDisplay · LevelCard]
-        GameCmp[game/<br/>HUD · TowerBar · StartWaveButton ·<br/>BuildPanel · ShopPanel · SpellBar ·<br/>MagicModePanel · RadarConfigPanel ·<br/>MatrixPairPanel · LimitQuestionPanel ·<br/>CalculusPanel · ChainRulePanel ·<br/>MontyHallPanel · TargetingModePanel ·<br/>AchievementToast · PrincipleOverlay]
+    subgraph Components["Reusable Components (6 subdirs)"]
+        Common[common/<br/>Modal · MathDisplay · markdown helpers]
+        Layout[layout/<br/>app chrome]
+        GameCmp["game/ (26 .vue files)<br/>HUD · TowerBar · BuildPanel · BuildHint · ShopPanel ·<br/>SpellBar · SpellIcon · StartWaveButton · GameSpeedPanel ·<br/>MagicModePanel · RadarConfigPanel · MatrixPairPanel ·<br/>MatrixInputPanel · LimitQuestionPanel · CalculusPanel ·<br/>IntegralPanel · FunctionPanel · ChainRulePanel ·<br/>MontyHallPanel · TargetingModePanel · TowerInfoPanel ·<br/>BuffCardPanel · WaveForecast · FirstEncounterCard ·<br/>AchievementToast · PrincipleOverlay"]
         Teacher[teacher/CompetencyBar]
         TerritoryCmp[territory/TerritorySlotCard]
         LbCmp[leaderboard/PersonalTimeline]
     end
 
-    subgraph Composables["Composables"]
-        UGL[useGameLoop]
-        USS[useSessionSync]
-        UA[useAuth]
-        UCP[useCanvasPlot]
-        UKP[useKeyboardPlacement]
-        ULB[useLeaderboard]
+    subgraph Composables["Composables (~16 .ts)"]
+        Lifecycle["useGameLoop · useSessionSync · useStartRun · useEngineUiBridges · useEngineAudio · useUiAudio"]
+        Auth["useAuth · useTokenProbe"]
+        UI["useCanvasPlot · useKeyboardPlacement · useCountdown · useFirstEncounterCards · usePrincipleOverlay · useChallengePreviewPreference"]
+        Data["useLeaderboard · usePolling · useTerritoryRecommendation"]
     end
 
     Main --> App --> Router --> Views
@@ -373,7 +367,7 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    subgraph Core["Engine Core (frontend/src/engine/)"]
+    subgraph Core["Engine Core (frontend/src/engine/)<br/>systems/ · renderers/ · domain/ are sibling top-level dirs"]
         Game["Game.ts<br/>fixed-timestep 60 FPS loop<br/>owns GameState"]
         State["GameState.ts<br/>(phase · level · gold · hp ·<br/>score · kills · waves_survived ·<br/>kill_value · cost_total · time_total)"]
         FSM["PhaseStateMachine<br/>transition table"]
@@ -398,6 +392,7 @@ flowchart TB
         LTS[LimitTowerSystem]
         CTS[CalculusTowerSystem]
         PCS[PetCombatSystem]
+        TIS[TowerInterferenceSystem]
         MS[MovementSystem]
         WS[WaveSystem]
         BS[BuffSystem]
@@ -431,6 +426,7 @@ flowchart TB
         MLR[MatrixLaserRenderer]
         PetR[PetRenderer]
         SER[SpellEffectRenderer]
+        CFR[CombatFeedbackRenderer]
     end
 
     subgraph Replay["replay/"]
@@ -448,16 +444,20 @@ flowchart TB
     Game --> Replay
 ```
 
-**Engine isolation**: `engine/` and `domain/` directories have **zero Vue imports**. They are pure TS, drive a `Game` instance, and expose hooks. The Vue shell binds them via `useGameLoop` (mount/unmount, talent modifier injection) and `useSessionSync` (lifecycle ↔ backend session API).
+**Engine isolation**: `engine/`, `systems/`, `renderers/`, and `domain/` directories have **zero Vue imports**. They are pure TS, drive a `Game` instance, and expose hooks. The Vue shell binds them via `useGameLoop` (mount/unmount, talent modifier injection) and `useSessionSync` (lifecycle ↔ backend session API).
 
 ### 4.3 Service Layer
 
-| Service | Endpoint family |
+| Service | Role |
 |---|---|
 | `api.ts` | base fetch wrapper, Bearer auto-attach, throws `ApiError` |
 | `authService` | `/api/auth/*` |
-| `sessionService` | `/api/sessions/*` |
-| `leaderboardService` | `/api/leaderboard/*` |
+| `sessionService` | `/api/sessions/*` raw HTTP |
+| `sessionLifecycleService` | create/end/abandon orchestration on top of `sessionService` |
+| `gameCommandService` | dispatches in-game commands (replay queue + spectate fan-out) |
+| `levelGenerationService` | WASM-vs-JS level generation glue (replay-v1/v2 routing) |
+| `waveService` | wave-spec lookup / preview |
+| `leaderboardService`, `rankingService` | `/api/leaderboard/*`, global / personal rankings |
 | `achievementService`, `seasonService` | `/api/achievements/*`, `/api/seasons/*` |
 | `talentService` | `/api/talents/*` |
 | `classService`, `adminService` | `/api/classes/*`, `/api/admin/*` |
@@ -486,6 +486,8 @@ C99 sources in `wasm/`, compiled by Emscripten (`wasm/Makefile`) to `frontend/sr
 | `find_pair_intersections`, `find_all_curves_common_point`, `count_common_intersections_in_interval` | Level-generator intersection solver |
 | `compute_spawn_points` | Boundary-crossing bisection for the 2-spawn-per-curve rule |
 | `generate_level` | Full rejection-sampling loop (8 batches × 50 attempts) |
+| `power_f64` | musl-backed `pow(base, exp)` shared with backend score recompute (FU-A) |
+| `compute_total_score` | C-side mirror of the canonical scoring formula |
 | `malloc`, `free` | Bridge memory plumbing |
 
 `ALLOW_MEMORY_GROWTH=1`, `MAXIMUM_MEMORY=256MiB`. Single linear heap. The
@@ -723,8 +725,8 @@ Normal · Fast · Tank · Split · Invisible · Boss-A (airborne, spawns minions
 
 | System | Mechanism | Persistence |
 |---|---|---|
-| Achievements | 20 definitions across 5 categories | `user_achievements` (talent points awarded) |
-| Talent Tree | 21 nodes / 7 tower types / prereq chains | `talent_allocations` |
+| Achievements | 27 definitions across 6 categories (combat, scoring, survival, efficiency, exploration, territory) | `user_achievements` (talent points awarded) |
+| Talent Tree | 19 nodes / 7 tower types / prereq chains | `talent_allocations` |
 | Seasons | Time-windowed multipliers on talent points | `seasons` |
 | Leaderboard | Per-star DENSE_RANK + global rank | `leaderboard_entries` |
 | Grabbing Territory | Teacher activity, students seize slots by score | `territory_*` (optimistic locking) |
@@ -765,7 +767,7 @@ sequenceDiagram
         else OK
             App->>LG: clear(email)
             App->>DB: INSERT refresh_tokens (hashed)
-            App-->>R: JWT (HS256, 30m, jti) + refresh
+            App-->>R: JWT (HS256, 15m, jti) + refresh
             R-->>FE: HTTP-only cookie + body
         end
     end
@@ -833,24 +835,24 @@ flowchart LR
 
 ### 9.3 Background workers
 
-- **Territory settlement** — 5-second poll job calls `TerritoryApplicationService.settle_activity(...)` for activities past their deadline.
-- **Auth-store janitor** — 10-minute purge of expired denylist / refresh tokens.
+- **Territory settlement** — 5-minute (300 s) poll job calls `TerritoryApplicationService.settle_expired()` for activities past their deadline (`backend/app/infrastructure/scheduler.py`).
+- **Auth-store janitor** — 10-minute (600 s) purge of expired denylist rows and stale login-attempt rows (defined inline in `backend/app/main.py::_auth_store_janitor`).
 - **Spectate hub** — in-process pub/sub for `/api/sessions/{id}/spectate` WebSocket fan-out (bounded queue per subscriber).
 
-All scheduled inside the FastAPI lifespan as asyncio tasks (`backend/app/infrastructure/scheduler.py`).
+All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::lifespan`).
 
 ---
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~325 tests across 25 files)
+### Backend (pytest, ~26 test files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
 - **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
 
-### Frontend (Vitest + happy-dom, ~50 files)
+### Frontend (Vitest + happy-dom, ~68 test files)
 
 - Engine systems, GameState and PhaseStateMachine.
 - Domain policies (split, level-generator, path-validator, placement-policy).
@@ -889,40 +891,56 @@ All scheduled inside the FastAPI lifespan as asyncio tasks (`backend/app/infrast
 ```
 backend/
   app/
-    main.py                      # FastAPI app + lifespan (alembic, scheduler)
+    main.py                      # FastAPI app + lifespan (alembic, scheduler, auth janitor)
     factories.py                 # ServiceContainer DI wiring
+    config.py                    # pydantic-settings (NOT under app/core/)
+    limiter.py                   # slowapi limiter singleton
+    http_status_map.py           # domain error → HTTP status
+    shared_constants.py          # loader for shared/game-constants.json
+    seed.py                      # demo-user seeding
+    db/                          # engine, SessionLocal
+    middleware/                  # auth.py, csrf.py
+    utils/                       # security.py (JWT, bcrypt), totp.py, integrity.py
     domain/                      # aggregates, value objects, errors, policies
       session/   user/   leaderboard/   achievement/   talent/   class_/
       territory/   challenge/   season/   assessment/   study/   scoring/   auth/
       value_objects.py   constraints.py   errors.py
-    application/                 # use-case services + mappers.py
+    application/                 # use-case services + ports.py + mappers.py
+                                 # session_event_handlers.py wires SessionCompleted consumers
     infrastructure/
-      persistence/               # SqlAlchemy*Repository
+      persistence/               # SqlAlchemy*Repository (15 files)
       unit_of_work.py
       login_guard.py   token_denylist.py   audit_logger.py
       email_service.py   scheduler.py   spectate_hub.py
       wasm_runtime.py            # wasmtime-py singleton, hosts math_engine.wasm
-    models/                      # SQLAlchemy ORM models (20)
-    routers/                     # FastAPI routers (thin adapters)
+    models/                      # SQLAlchemy ORM models (19 files / 25 tables)
+    routers/                     # FastAPI routers (13 thin adapters)
     schemas/                     # Pydantic DTOs
-  alembic/                       # migrations
-  tests/                         # ~325 pytest tests
+  alembic/                       # 34 migrations
+  tests/                         # ~26 pytest files
 
 frontend/
   src/
     main.ts   App.vue
     router/                      # RBAC-aware routes
     stores/                      # Pinia: auth, game, talent, territory, ui
-    views/                       # page-level components
-    components/                  # common, game, teacher, territory, leaderboard
-    composables/                 # useGameLoop, useSessionSync, useAuth, ...
-    services/                    # api.ts + per-domain clients
-    engine/                      # Game.ts, GameState, PhaseStateMachine,
-                                 # systems/, renderers/, replay/, domain/
+    views/                       # 26 page-level .vue files
+    components/                  # common, layout, game (26), teacher, territory, leaderboard
+    composables/                 # ~16 use*.ts (lifecycle, auth, UI, data)
+    services/                    # api.ts + ~18 per-domain clients
+    engine/                      # Game.ts, GameState, PhaseStateMachine, EventBus,
+                                 # Renderer, InputManager, register-systems,
+                                 # audio/, event-handlers/, projections/,
+                                 # render-helpers/, replay/
+    systems/                     # 17 ECS-style systems (sibling of engine/)
+    renderers/                   # 9 canvas renderers + primitives.ts
+    domain/                      # pure rules: combat, level, movement, path, placement,
+                                 # scoring, study, tower, wave
     math/                        # WasmBridge, MathUtils, evaluators, wasm/
     entities/                    # Tower/Enemy/Projectile/Pet types + factories
-    data/                        # tower-defs, enemy-defs, achievement-defs, ...
-  tests/                         # Vitest suites
+    data/                        # tower-defs, enemy-defs, achievement-defs, talent-defs, ...
+    lib/   utils/   styles/      # misc helpers, shared utilities, global CSS
+  tests/                         # Vitest suites (~68 files including in-tree *.test.ts)
 
 wasm/                            # C99 sources + Makefile (Emscripten)
 emsdk/                           # vendored toolchain

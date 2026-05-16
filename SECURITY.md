@@ -24,9 +24,9 @@ The application is a Vue 3 single-page application backed by a FastAPI REST API 
 
 ## Authentication
 
-### Tokens and Cookies
+### Access Tokens and Cookies
 
-Authentication uses short-lived JWT tokens (15-minute expiry by default, configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). Tokens are delivered as `HttpOnly`, `SameSite=Lax` cookies. The `Secure` flag is enforced at startup: attempting to disable it outside of the CI/test harness causes the application to refuse to start.
+Authentication uses short-lived JWT access tokens (15-minute expiry by default, configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). Tokens are delivered as `HttpOnly`, `SameSite=Lax` cookies. The `Secure` flag is enforced at startup: attempting to disable it outside of the CI/test harness causes the application to refuse to start.
 
 Tokens carry the following claims, all of which are validated at decode time:
 
@@ -39,6 +39,10 @@ Tokens carry the following claims, all of which are validated at decode time:
 | `pv` | Password version; incremented on password change to invalidate old tokens |
 
 The signing algorithm is pinned to `HS256` in the decode call; the library's default of accepting any algorithm advertised in the token header is explicitly overridden.
+
+### Refresh Tokens
+
+A separate long-lived refresh token (30-day expiry by default, configurable via `REFRESH_TOKEN_EXPIRE_DAYS`) is issued on login, registration, and MFA challenge completion. The raw token is delivered as a second `HttpOnly`, `Secure`, `SameSite=Lax` cookie; only a SHA-256 hash of the token is stored server-side in the `refresh_tokens` table. Refresh tokens are rotated on every successful `/api/auth/refresh` call: the previous hash is invalidated and a new raw token replaces the cookie. On logout, both the access-token `jti` and the active refresh token hash are revoked.
 
 ### Token Revocation
 
@@ -62,10 +66,12 @@ All request bodies are parsed through Pydantic v2 models with `extra="forbid"`, 
 
 Key field-level validations:
 
-- **Password**: minimum 8 characters, maximum 72 bytes, must contain at least one letter and one digit, rejects patterns with five or more repeated characters, and rejects a small list of common passwords.
-- **Email**: validated against a standard email pattern, normalized to lowercase, and checked for uniqueness at registration.
+- **Password (schema)**: minimum 8 characters, maximum 72 bytes, must contain at least one letter and one digit.
+- **Password (application layer)**: after passing the cheap schema checks and the per-route rate limiter, the registration and password-change flows run a `zxcvbn` strength check and reject any password whose score is below 2. This catches common passwords, dictionary words, keyboard walks, and trivial repetition patterns. The expensive `zxcvbn` call is deliberately placed after the rate limiter so it cannot be used as a CPU-amplification lever against unauthenticated POSTs.
+- **Email**: validated and normalized by the `Email` value object (lowercase, format and length checks) and checked for uniqueness at registration.
 - **Player name**: trimmed of whitespace, 1–50 characters.
-- **Avatar URL**: validated against a strict whitelist of six known paths; arbitrary URLs are rejected.
+- **Avatar URL**: validated against a strict whitelist of six known SVG paths under `/avatars/`; arbitrary URLs are rejected.
+- **TOTP code**: must match `^\d{6}$` (exactly six digits) on every MFA enrolment, challenge, and disable request.
 
 These validations are applied at the schema boundary, not only in the database layer.
 
@@ -159,11 +165,11 @@ The following are areas where this project makes deliberate trade-offs given its
 
 **Inline styles in CSP**: The Content Security Policy includes `unsafe-inline` for styles. Removing this would require a nonce-based approach or elimination of inline styles across the Vue components, which has not been done.
 
-**Password dictionary size**: The common-password blocklist contains a small number of well-known weak passwords. It is not a comprehensive dictionary. A determined user can still choose a weak but technically valid password.
+**Password strength is gated only by zxcvbn score ≥ 2**: The application relies on `zxcvbn` to reject weak passwords rather than a hand-maintained dictionary. Score 2 ("somewhat guessable") is the minimum bar, which is enough to block the obvious cases but still admits passwords a motivated attacker with targeted wordlists could break offline. Raising the bar to 3+ would improve safety at the cost of usability and has not been done.
 
-**No password reset flow**: There is no email-based password recovery mechanism. A user who forgets their password cannot recover access without administrator intervention.
+**No password reset flow**: There is no self-service email-based password recovery mechanism. A user who forgets their password cannot recover access without administrator intervention.
 
-**No email verification**: Registration does not verify email ownership. Any email address that passes format validation can be used to create an account.
+**Email verification is implemented but not enforced**: The `/api/auth/verify-email` endpoint, `email_verification_tokens` table, and `is_email_verified` flag are wired up, and verification emails are sent on registration. However, the application does not block unverified users from logging in or playing — the flag is currently informational. Operators who want strict verification must add a gate themselves.
 
 **MFA is optional and not enforced at registration**: TOTP-based MFA is implemented (`totp_secret`, `mfa_enabled`, `totp_last_used_at` columns; step-replay guard active). However, enabling MFA is the user's choice — registration does not require it. Accounts that have not enrolled TOTP rely entirely on password strength and account lockout.
 
