@@ -172,7 +172,7 @@ function startGame() {
 }
 
 h1 {
-  font-size: 1.8rem;
+  font-size: var(--text-2xl);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
@@ -211,7 +211,7 @@ h1 {
 
 .region {
   margin-bottom: 1.5rem;
-  font-size: 1.1rem;
+  font-size: var(--text-md);
 }
 
 .answer-inputs {
@@ -240,7 +240,7 @@ h1 {
   border: 2px solid var(--card-border);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: var(--text-base);
   width: 160px;
 }
 
@@ -255,13 +255,13 @@ h1 {
 
 .parse-error {
   color: var(--hp-red);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .validation-msg {
   margin-top: 0.8rem;
   color: var(--hp-red);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .actions {
@@ -320,7 +320,7 @@ h1 {
 .start-btn {
   margin-top: 1rem;
   padding: 0.8rem 2rem;
-  font-size: 1.1rem;
+  font-size: var(--text-md);
   background: var(--tower-cannon);
   color: #fff;
   border: none;
