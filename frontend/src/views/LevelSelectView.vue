@@ -162,9 +162,9 @@ h1 {
 .star-grid {
   display: flex;
   gap: 1rem;
-  flex-wrap: wrap;
   justify-content: center;
-  max-width: 800px;
+  width: 100%;
+  max-width: 960px;
   margin-bottom: 2rem;
 }
 
@@ -172,9 +172,10 @@ h1 {
   background: var(--panel-bg);
   border: 2px solid var(--card-border);
   border-radius: 8px;
-  padding: 1.5rem 1rem;
+  padding: 1.2rem 0.5rem;
   cursor: pointer;
-  min-width: 140px;
+  flex: 1;
+  min-width: 0;
   text-align: center;
   transition: all 0.2s;
   color: var(--text-primary);
@@ -208,14 +209,14 @@ h1 {
 }
 
 .star-icons {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
 }
 
 .star-label {
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
 }
 
 .start-btn {

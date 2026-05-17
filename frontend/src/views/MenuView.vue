@@ -120,7 +120,7 @@ const manualOpen = ref(false)
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: 320px;
+  width: 380px;
   padding: 32px;
   background: var(--card-surface);
   backdrop-filter: blur(20px);
@@ -131,7 +131,7 @@ const manualOpen = ref(false)
 }
 
 .menu-btn {
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   padding: 14px 24px;
   letter-spacing: 4px;
   width: 100%;
