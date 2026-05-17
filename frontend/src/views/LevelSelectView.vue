@@ -164,7 +164,6 @@ h1 {
 .star-grid {
   display: flex;
   gap: 1rem;
-  flex-wrap: wrap;
   justify-content: center;
   width: 100%;
   max-width: 960px;
@@ -177,7 +176,7 @@ h1 {
   border-radius: 8px;
   padding: 1.2rem 0.5rem;
   cursor: pointer;
-  flex: 1 1 140px;
+  flex: 1;
   min-width: 0;
   text-align: center;
   transition: all 0.2s;
