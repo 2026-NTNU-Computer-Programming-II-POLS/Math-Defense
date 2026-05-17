@@ -252,7 +252,7 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--divider);
 }
 .replay-header h1 {
-  font-size: 1.1rem;
+  font-size: var(--text-md);
   margin: 0;
   color: var(--gold);
   text-shadow: var(--gold-shadow);
@@ -291,7 +291,7 @@ onBeforeUnmount(() => {
 .meta {
   display: flex;
   gap: 0.5rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }
