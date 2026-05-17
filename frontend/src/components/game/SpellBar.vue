@@ -2,10 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { SPELL_DEFS } from '@/data/spell-defs'
-import { Events } from '@/data/constants'
+import { Events, GamePhase } from '@/data/constants'
+import { useUiAudio } from '@/composables/useUiAudio'
 import SpellIcon from './SpellIcon.vue'
 
 const g = useGameStore()
+const uiAudio = useUiAudio()
 const castingSpell = ref<string | null>(null)
 let _unsubClick: (() => void) | null = null
 let _lastCastAt = 0
@@ -41,6 +43,12 @@ const spells = computed(() =>
 )
 
 function selectSpell(spellId: string): void {
+  if (g.phase !== GamePhase.WAVE) {
+    castingSpell.value = null
+    uiAudio.cancel()
+    return
+  }
+
   const spell = SPELL_DEFS.find((s) => s.id === spellId)
   if (spell?.targetMode === 'self') {
     castingSpell.value = spellId
@@ -58,6 +66,11 @@ function selectSpell(spellId: string): void {
 
 function castAtPosition(x: number, y: number): void {
   if (!castingSpell.value) return
+  if (g.phase !== GamePhase.WAVE) {
+    castingSpell.value = null
+    uiAudio.cancel()
+    return
+  }
   const now = Date.now()
   if (now - _lastCastAt < 150) return
   const engine = g.getEngine()
@@ -79,6 +92,7 @@ defineExpose({ castingSpell, castAtPosition })
       v-for="spell in spells"
       :key="spell.id"
       class="spell-btn"
+      :data-testid="`spell-${spell.id}`"
       :class="{
         'on-cooldown': spell.onCooldown,
         unaffordable: !spell.affordable && !spell.onCooldown,
