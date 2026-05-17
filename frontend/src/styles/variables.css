@@ -1,123 +1,114 @@
 /* CSS variables — medieval fantasy pixel art theme */
 :root {
-   --bg-base: #a4b9d4;
-   --stone-dark: #5b718f;
-   --stone-light: #7a8da8;
-   --grid-line: rgba(255, 255, 255, 0.2);
-   --axis: #c79d50;
-   --gold: #c79d50;
-   --gold-bright: #ffd54f;
-   --gold-dim: #a07526f3;
-   --tower-cannon: #5a82b3c7;
+  --bg-base: #a4b9d4;
+  --stone-dark: #5b718f;
+  --stone-light: #7a8da8;
+  --grid-line: rgba(255, 255, 255, 0.2);
+  --axis: #c79d50;
+  --gold: #c79d50;
+  --gold-bright: #ffd54f;
+  --gold-dim: #a07526f3;
+  --tower-cannon: #5a82b3c7;
 
-   --enemy-red: #b84040;
-   --hp-green: #048634;
-   --hp-yellow: #b99d6df1;
-   --hp-red: #a31f1f;
-   /* Visual Redesign Phase 4: HUD value-down pop flash. Distinct from --hp-red
+  --enemy-red: #b84040;
+  --hp-green: #048634;
+  --hp-yellow: #b99d6df1;
+  --hp-red: #a31f1f;
+  /* Visual Redesign Phase 4: HUD value-down pop flash. Distinct from --hp-red
      (which is reserved for HP-critical state) — slightly brighter so a brief
      flash reads on dark HUD chrome without bleeding into the static red. */
-   --alert-red: #ff4d4d;
+  --alert-red: #ff4d4d;
 
-   --panel-bg: rgba(235, 242, 250, 0.96);
-   --panel-border: var(--gold);
-   --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
-   --bar-bg: rgba(80, 100, 130, 0.96);
-   --overlay-bg: rgba(91, 113, 143, 0.92);
-   --text-on-accent: #1a2a3a;
+  --panel-bg: rgba(235, 242, 250, 0.96);
+  --panel-border: var(--gold);
+  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  --bar-bg: rgba(80, 100, 130, 0.96);
+  --overlay-bg: rgba(91, 113, 143, 0.92);
+  --text-on-accent: #1a2a3a;
 
-   /* In-game dark overlay surfaces — HUD/Shop/Spell/etc. panels that sit over
+  /* In-game dark overlay surfaces — HUD/Shop/Spell/etc. panels that sit over
      the game canvas. Kept dark on purpose (see V3 UI plan); these tokens are
      the single source of truth so the alpha values stop fragmenting. */
-   --overlay-panel-bg: rgba(26, 21, 32, 0.95);
-   --overlay-text: #e8dcc8;
-   --overlay-cell-bg: rgba(255, 255, 255, 0.04);
-   --overlay-cell-hover: rgba(255, 255, 255, 0.1);
-   --overlay-cell-active: rgba(255, 215, 0, 0.15);
+  --overlay-panel-bg:    rgba(26, 21, 32, 0.95);
+  --overlay-text:        #e8dcc8;
+  --overlay-cell-bg:     rgba(255, 255, 255, 0.04);
+  --overlay-cell-hover:  rgba(255, 255, 255, 0.1);
+  --overlay-cell-active: rgba(255, 215, 0, 0.15);
 
-   --text-primary: #2c3e50;
-   --text-secondary: #5d6d7e;
-   --stone-selected: #b1c4de;
-   --option-selected: #e1e8f0;
-   --correct-bg: #e8f5e9;
-   --wrong-bg: #ffebee;
-   --error-red: #d32f2f;
+  --text-primary: #2c3e50;
+  --text-secondary: #5d6d7e;
+  --stone-selected: #b1c4de;
+  --option-selected: #e1e8f0;
+  --correct-bg: #e8f5e9;
+  --wrong-bg: #ffebee;
+  --error-red: #d32f2f;
 
-   --font-mono: 'Courier New', Courier, monospace;
-   --font-main: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Courier New', Courier, monospace;
+  --font-main: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-   /* Typography scale (rem-based; resolves against the 17px html root).
+  /* Typography scale (rem-based; resolves against the 17px html root).
      See docs/V3_surgicalPlan/UI_Typography_Refresh_Plan.md §4. */
-   --text-2xs: 0.6875rem;
-   /* 11.69px — captions, tertiary hints only */
-   --text-xs: 0.75rem;
-   /* 12.75px — small labels, dense tables */
-   --text-sm: 0.875rem;
-   /* 14.88px — default body in dense panels */
-   --text-base: 1rem;
-   /* 17.00px — default body, form fields */
-   --text-md: 1.125rem;
-   /* 19.13px — emphasised body */
-   --text-lg: 1.25rem;
-   /* 21.25px — sub-headings, HUD values */
-   --text-xl: 1.5rem;
-   /* 25.50px — panel titles */
-   --text-2xl: 1.875rem;
-   /* 31.88px — view titles */
-   --text-3xl: 2.25rem;
-   /* 38.25px — hero / login title */
+  --text-2xs:  0.6875rem; /* 11.69px — captions, tertiary hints only */
+  --text-xs:   0.75rem;   /* 12.75px — small labels, dense tables */
+  --text-sm:   0.875rem;  /* 14.88px — default body in dense panels */
+  --text-base: 1rem;      /* 17.00px — default body, form fields */
+  --text-md:   1.125rem;  /* 19.13px — emphasised body */
+  --text-lg:   1.25rem;   /* 21.25px — sub-headings, HUD values */
+  --text-xl:   1.5rem;    /* 25.50px — panel titles */
+  --text-2xl:  1.875rem;  /* 31.88px — view titles */
+  --text-3xl:  2.25rem;   /* 38.25px — hero / login title */
 
-   /* Line-height tokens (unit-less) */
-   --leading-tight: 1.2;
-   --leading-normal: 1.45;
-   --leading-loose: 1.65;
+  /* Line-height tokens (unit-less) */
+  --leading-tight:  1.2;
+  --leading-normal: 1.45;
+  --leading-loose:  1.65;
 
-   /* Spacing scale (rem-based) */
-   --space-1: 0.25rem;
-   --space-2: 0.5rem;
-   --space-3: 0.75rem;
-   --space-4: 1rem;
-   --space-5: 1.25rem;
-   --space-6: 1.5rem;
-   --space-8: 2rem;
-   --space-10: 2.5rem;
-   --space-12: 3rem;
+  /* Spacing scale (rem-based) */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
 
-   /* Z-index ladder — single source of truth. Higher value = on top.
+  /* Z-index ladder — single source of truth. Higher value = on top.
      hints      : passive in-canvas helpers (FunctionPanel, BuildHint)
      chrome     : persistent HUD surfaces (HUD bar, TowerBar)
      action     : primary action buttons above chrome (Start Wave)
      floating   : transient per-interaction panels (BuildPanel)
      overlay    : full-screen dimmers for modal states (Buff, LevelSelect)
      modal      : the dialog itself, always on top of its overlay (Modal) */
-   --z-hints: 15;
-   --z-chrome: 20;
-   --z-action: 25;
-   --z-floating: 30;
-   --z-overlay: 40;
-   --z-modal: 50;
-   --z-toast: 100;
+  --z-hints: 15;
+  --z-chrome: 20;
+  --z-action: 25;
+  --z-floating: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 100;
 
-   --live-green: #6cc44a;
-   --formula-blue: #60c0ff;
-   --scope-border: #7a6fa0;
-   --scope-text: #a08fc0;
+  --live-green:   #6cc44a;
+  --formula-blue: #60c0ff;
+  --scope-border: #7a6fa0;
+  --scope-text:   #a08fc0;
 
-   --card-border: rgba(164, 185, 212, 0.5);
-   --divider: rgba(164, 185, 212, 0.4);
-   --card-surface: rgba(255, 255, 255, 0.72);
-   --gold-tint: rgba(212, 160, 23, 0.10);
-   --gold-tint-hover: rgba(212, 160, 23, 0.06);
-   --gold-tint-select: rgba(212, 160, 23, 0.12);
-   --gold-tint-faint: rgba(212, 160, 23, 0.05);
-   --gold-tint-soft: rgba(212, 160, 23, 0.08);
-   --gold-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-   --gold-border: rgb(142, 122, 71);
+  --card-border:      rgba(164, 185, 212, 0.5);
+  --divider:          rgba(164, 185, 212, 0.4);
+  --card-surface:     rgba(255, 255, 255, 0.72);
+  --gold-tint:        rgba(212, 160, 23, 0.10);
+  --gold-tint-hover:  rgba(212, 160, 23, 0.06);
+  --gold-tint-select: rgba(212, 160, 23, 0.12);
+  --gold-tint-faint:  rgba(212, 160, 23, 0.05);
+  --gold-tint-soft:   rgba(212, 160, 23, 0.08);
+  --gold-shadow:      0 1px 4px rgba(0, 0, 0, 0.45);
+  --gold-border:      rgba(142, 122, 71, 0.65);
 
-   /* MenuView light-theme navy palette */
-   --menu-navy: #0f2a4a;
-   --menu-btn-color: #1a3a6a;
+  /* MenuView light-theme navy palette */
+  --menu-navy:        #0f2a4a;
+  --menu-btn-color:   #1a3a6a;
 
-   /* Input text on dark backgrounds */
-   --input-text: #ffffff;
+  /* Input text on dark backgrounds */
+  --input-text:       #ffffff;
 }
