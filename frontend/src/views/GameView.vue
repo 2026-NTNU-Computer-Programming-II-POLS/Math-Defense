@@ -554,7 +554,7 @@ onBeforeUnmount(() => {
 
 .manual-btn {
   position: absolute;
-  top: calc(var(--hud-height, 48px) + 12px);
+  top: calc(var(--hud-height, 48px) + 5px);
   right: 12px;
   z-index: var(--z-action);
   display: inline-flex;
