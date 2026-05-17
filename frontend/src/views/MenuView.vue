@@ -71,6 +71,7 @@ const manualOpen = ref(false)
   min-height: 100vh;
   min-height: 100dvh;
   gap: 48px;
+  padding: 80px 20px;
 }
 
 .menu-title {
