@@ -140,8 +140,10 @@ function startGame() {
 
     <div v-if="!answered" class="actions">
       <button class="submit-btn" @click="submitAnswer">Submit Answer</button>
-      <button class="pay-btn" @click="payToSkip">Pay 50 Gold to Skip</button>
-      <button class="ignore-btn" @click="ignoreAndProceed">Proceed (Paths Hidden)</button>
+      <div class="secondary-actions">
+        <button class="pay-btn" @click="payToSkip">Pay 50 Gold to Skip</button>
+        <button class="ignore-btn" @click="ignoreAndProceed">Proceed (Paths Hidden)</button>
+      </div>
     </div>
     <p v-if="!answered && validationMsg" class="validation-msg">{{ validationMsg }}</p>
 
@@ -178,7 +180,6 @@ h1 {
 
 .subtitle {
   color: var(--axis);
-  text-shadow: var(--gold-shadow);
   margin-bottom: 1.5rem;
 }
 
@@ -206,7 +207,6 @@ h1 {
   font-weight: bold;
   min-width: 60px;
   color: var(--axis);
-  text-shadow: var(--gold-shadow);
 }
 
 .region {
@@ -266,13 +266,21 @@ h1 {
 
 .actions {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 1rem;
-  flex-wrap: wrap;
+}
+
+.secondary-actions {
+  display: flex;
+  gap: 1rem;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .submit-btn {
-  padding: 0.7rem 1.5rem;
+  padding: 0.9rem 2.5rem;
+  font-size: 1.15rem;
   background: var(--tower-cannon);
   color: #fff;
   border: none;
@@ -281,20 +289,21 @@ h1 {
 }
 
 .pay-btn {
-  padding: 0.7rem 1.5rem;
-  background: var(--hp-yellow);
-  color: var(--text-on-accent);
-  border: none;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background: transparent;
+  color: var(--gold-dim);
+  border: 1px solid var(--gold-dim);
   border-radius: 6px;
   cursor: pointer;
 }
 
 .ignore-btn {
-  padding: 0.7rem 1.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
   background: transparent;
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  border: 1px solid var(--panel-border);
+  color: var(--scope-border);
+  border: 1px solid var(--scope-border);
   border-radius: 6px;
   cursor: pointer;
 }
@@ -305,8 +314,8 @@ h1 {
 
 .result-correct { color: var(--hp-green); font-size: 1.1rem; }
 .result-wrong { color: var(--hp-red); font-size: 1.1rem; }
-.result-paid { color: var(--hp-yellow); font-size: 1.1rem; }
-.result-ignored { color: var(--axis); text-shadow: var(--gold-shadow); font-size: 1.1rem; }
+.result-paid { color: var(--gold-dim); font-size: 1.1rem; }
+.result-ignored { color: var(--scope-border); font-size: 1.1rem; }
 
 .start-btn {
   margin-top: 1rem;

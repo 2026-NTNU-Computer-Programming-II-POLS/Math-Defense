@@ -186,7 +186,7 @@ h1 {
 }
 
 .star-card.selected {
-  border-color: var(--gold-bright);
+  border-color: var(--gold);
   background: var(--stone-selected);
   box-shadow: 0 0 12px rgba(212, 160, 23, 0.3);
 }
@@ -261,7 +261,6 @@ h1 {
   background: var(--gold-tint-select);
   border: 1px solid var(--gold);
   color: var(--gold);
-  text-shadow: var(--gold-shadow);
   border-radius: 999px;
   padding: 0.4rem 0.9rem;
   margin-bottom: 1rem;
@@ -270,7 +269,6 @@ h1 {
 
 .suggestion-text strong {
   color: var(--gold);
-  text-shadow: var(--gold-shadow);
 }
 
 .suggestion-dismiss {
