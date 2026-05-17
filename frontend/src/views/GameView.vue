@@ -23,6 +23,7 @@ import FirstEncounterCard from '@/components/game/FirstEncounterCard.vue'
 import BuffCardPanel from '@/components/game/BuffCardPanel.vue'
 import ShopPanel from '@/components/game/ShopPanel.vue'
 import GameSpeedPanel from '@/components/game/GameSpeedPanel.vue'
+import BuffStatusStack from '@/components/game/BuffStatusStack.vue'
 import MontyHallPanel from '@/components/game/MontyHallPanel.vue'
 import ScoreResultView from '@/views/ScoreResultView.vue'
 import ChainRulePanel from '@/components/game/ChainRulePanel.vue'
@@ -400,6 +401,7 @@ onBeforeUnmount(() => {
       <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
         <ShopPanel v-if="gameStore.isBuilding" />
         <GameSpeedPanel />
+        <BuffStatusStack />
       </div>
 
       <!-- Build Phase -->

@@ -30,16 +30,19 @@ function toggleSpeed(): void {
     >
       {{ isFast ? '2x' : '1x' }}
     </button>
-    <span v-if="!isLive" class="speed-hint">wave only</span>
+    <span class="speed-hint">wave only</span>
   </div>
 </template>
 
 <style scoped>
 .speed-panel {
+  box-sizing: border-box;
+  width: 50px;
+  height: 50px;
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
   padding: 4px;
   background: var(--overlay-panel-bg);
   border: 1px solid var(--panel-border);
@@ -49,7 +52,8 @@ function toggleSpeed(): void {
 
 .speed-cell {
   width: 40px;
-  height: 40px;
+  height: 30px;
+  align-self: flex-start;
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   background: var(--overlay-cell-bg);
@@ -81,10 +85,16 @@ function toggleSpeed(): void {
 }
 
 .speed-hint {
-  font-size: var(--text-2xs);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  font-size: 8px;
   line-height: 1;
   color: var(--overlay-text);
   opacity: 0.75;
+  text-align: center;
   white-space: nowrap;
+  pointer-events: none;
 }
 </style>
