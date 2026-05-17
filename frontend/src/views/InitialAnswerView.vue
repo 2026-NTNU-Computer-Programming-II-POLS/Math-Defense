@@ -145,7 +145,7 @@ function startGame() {
     </div>
     <p v-if="!answered && validationMsg" class="validation-msg">{{ validationMsg }}</p>
 
-    <div v-else class="result">
+    <div v-if="answered" class="result">
       <p v-if="iaResult === 'correct'" class="result-correct">Correct! Paths will be visible.</p>
       <p v-else-if="iaResult === 'wrong'" class="result-wrong">
         Wrong! The correct point was <MathDisplay :latex="endpointLatex" />. Paths will still be visible.
