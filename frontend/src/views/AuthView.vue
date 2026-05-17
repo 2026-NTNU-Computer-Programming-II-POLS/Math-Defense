@@ -231,7 +231,7 @@ async function submit(): Promise<void> {
 }
 
 .auth-panel {
-  width: 360px;
+  width: 380px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
@@ -259,7 +259,7 @@ async function submit(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }
@@ -321,7 +321,7 @@ async function submit(): Promise<void> {
 }
 
 .toggle-btn, .back-btn {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   letter-spacing: 1px;
   border-color: var(--axis);
   color: var(--axis);
