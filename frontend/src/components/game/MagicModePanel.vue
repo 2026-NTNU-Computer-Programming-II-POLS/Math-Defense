@@ -32,6 +32,8 @@ const tower = computed(() => {
 
 const inputExpr = ref('')
 const error = ref('')
+const isConfigured = ref(false)
+const currentMode = ref<MagicMode>('debuff')
 
 // Curve-family gating (Pedagogical_Backlog_Spec.md §6) — new players see only
 // polynomial expressions; trig and log functions unlock via achievements
@@ -103,6 +105,8 @@ const translatedExample = computed(() => {
 watch(tower, (t) => {
   inputExpr.value = t?.magicExpression ?? ''
   error.value = ''
+  isConfigured.value = !!t?.configured
+  currentMode.value = t?.magicMode ?? 'debuff'
   // Reset sliders when switching towers so a previous tower's coefficients
   // don't bleed into a freshly-opened panel. The defaults match the
   // identity polynomial f(x) = x², which is a sensible starting curve.
@@ -139,6 +143,7 @@ function applyFunction() {
     towerId: props.towerId,
     expression: inputExpr.value,
   })
+  isConfigured.value = true
 }
 
 function applySliderFunction() {
@@ -151,9 +156,11 @@ function applySliderFunction() {
     towerId: props.towerId,
     expression: sliderExpression.value,
   })
+  isConfigured.value = true
 }
 
 function toggleMode(mode: MagicMode) {
+  currentMode.value = mode
   const engine = gameStore.getEngine()
   if (!engine) return
   engine.eventBus.emit(Events.MAGIC_MODE_CHANGED, { towerId: props.towerId, mode })
@@ -212,17 +219,19 @@ function toggleMode(mode: MagicMode) {
       <p v-if="error" class="error-msg">{{ error }}</p>
     </div>
 
-    <div v-if="tower?.configured" class="mode-select">
+    <div v-if="isConfigured" class="mode-select">
       <p class="section-label">Zone Mode:</p>
       <div class="mode-btns">
         <button
           class="btn"
-          :class="{ active: tower.magicMode === 'debuff' }"
+          data-testid="magic-mode-debuff"
+          :class="{ active: currentMode === 'debuff' }"
           @click="toggleMode('debuff')"
         >Debuff Enemies</button>
         <button
           class="btn"
-          :class="{ active: tower.magicMode === 'buff' }"
+          data-testid="magic-mode-buff"
+          :class="{ active: currentMode === 'buff' }"
           @click="toggleMode('buff')"
         >Buff Towers</button>
       </div>
