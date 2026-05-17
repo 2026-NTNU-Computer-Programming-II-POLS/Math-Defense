@@ -1,0 +1,105 @@
+<script setup lang="ts">
+const mathGlyphs = [
+  { text: '7', left: '7%', top: '78%', size: '34px', duration: '20s', delay: '-4s', drift: '18px', rotate: '-8deg' },
+  { text: '+', left: '14%', top: '42%', size: '26px', duration: '24s', delay: '-16s', drift: '-24px', rotate: '12deg' },
+  { text: 'x', left: '20%', top: '88%', size: '22px', duration: '18s', delay: '-9s', drift: '16px', rotate: '18deg' },
+  { text: '12', left: '26%', top: '62%', size: '30px', duration: '28s', delay: '-20s', drift: '-18px', rotate: '-14deg' },
+  { text: '=', left: '32%', top: '22%', size: '24px', duration: '22s', delay: '-5s', drift: '28px', rotate: '8deg' },
+  { text: 'f(x)', left: '39%', top: '83%', size: '28px', duration: '26s', delay: '-14s', drift: '-22px', rotate: '-10deg' },
+  { text: '3.14', left: '46%', top: '48%', size: '22px', duration: '19s', delay: '-11s', drift: '20px', rotate: '16deg' },
+  { text: '-', left: '54%', top: '72%', size: '30px', duration: '25s', delay: '-7s', drift: '-26px', rotate: '-18deg' },
+  { text: '9', left: '62%', top: '30%', size: '36px', duration: '21s', delay: '-17s', drift: '18px', rotate: '10deg' },
+  { text: '/', left: '69%', top: '87%', size: '28px', duration: '27s', delay: '-12s', drift: '-20px', rotate: '20deg' },
+  { text: '2^n', left: '76%', top: '55%', size: '24px', duration: '23s', delay: '-18s', drift: '26px', rotate: '-12deg' },
+  { text: '0', left: '84%', top: '76%', size: '32px', duration: '18s', delay: '-3s', drift: '-18px', rotate: '14deg' },
+  { text: '42', left: '90%', top: '36%', size: '26px', duration: '29s', delay: '-21s', drift: '22px', rotate: '-16deg' },
+  { text: '*', left: '11%', top: '18%', size: '32px', duration: '20s', delay: '-13s', drift: '20px', rotate: '-20deg' },
+  { text: '8', left: '57%', top: '12%', size: '24px', duration: '24s', delay: '-8s', drift: '-24px', rotate: '14deg' },
+  { text: '<', left: '88%', top: '12%', size: '22px', duration: '26s', delay: '-15s', drift: '16px', rotate: '9deg' },
+]
+</script>
+
+<template>
+  <div class="global-bg" aria-hidden="true">
+    <div class="math-field">
+      <span
+        v-for="(glyph, index) in mathGlyphs"
+        :key="`${glyph.text}-${index}`"
+        class="math-glyph"
+        :style="{
+          '--glyph-left': glyph.left,
+          '--glyph-top': glyph.top,
+          '--glyph-size': glyph.size,
+          '--glyph-duration': glyph.duration,
+          '--glyph-delay': glyph.delay,
+          '--glyph-drift': glyph.drift,
+          '--glyph-rotate': glyph.rotate,
+        }"
+      >{{ glyph.text }}</span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.global-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255,255,255,0.55) 0%, transparent 70%),
+    linear-gradient(160deg, #8aaecb 0%, #a4b9d4 45%, #b8cfe0 100%);
+}
+
+.math-field {
+  position: absolute;
+  inset: 0;
+}
+
+.math-glyph {
+  position: absolute;
+  left: var(--glyph-left);
+  top: var(--glyph-top);
+  color: rgba(15, 42, 88, 0.22);
+  font-family: var(--font-mono);
+  font-size: var(--glyph-size);
+  font-weight: 700;
+  line-height: 1;
+  transform: translate3d(-50%, 0, 0) rotate(var(--glyph-rotate));
+  animation: glyph-float var(--glyph-duration) linear infinite;
+  animation-delay: var(--glyph-delay);
+}
+
+.math-glyph:nth-child(3n) {
+  color: rgba(25, 65, 140, 0.17);
+}
+
+.math-glyph:nth-child(4n) {
+  color: rgba(50, 90, 165, 0.14);
+}
+
+@keyframes glyph-float {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, 38px, 0) rotate(var(--glyph-rotate));
+  }
+  12% {
+    opacity: 1;
+  }
+  76% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(-50% + var(--glyph-drift)), -118vh, 0) rotate(calc(var(--glyph-rotate) + 34deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .math-glyph {
+    animation: none;
+    opacity: 0.42;
+  }
+}
+</style>

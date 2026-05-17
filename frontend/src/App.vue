@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
 import Modal from '@/components/common/Modal.vue'
+import AppShell from '@/components/layout/AppShell.vue'
+import GlobalBackground from '@/components/layout/GlobalBackground.vue'
 
 const router = useRouter()
 const uiStore = useUiStore()
@@ -20,9 +22,13 @@ onUnmounted(() => {
 <template>
   <div class="app-root" :aria-busy="navigating">
     <div v-if="navigating" class="nav-progress" aria-hidden="true" />
-    <RouterView v-slot="{ Component }">
+    <RouterView v-slot="{ Component, route }">
+      <GlobalBackground v-if="!route.meta.hideGlobalBg" />
       <Transition name="fade" mode="out-in">
-        <component :is="Component" />
+        <AppShell v-if="!route.meta.hideShell" :key="`shell-${route.name as string}`">
+          <component :is="Component" />
+        </AppShell>
+        <component :is="Component" v-else :key="`bare-${route.name as string}`" />
       </Transition>
     </RouterView>
     <Modal v-if="uiStore.modalVisible" />
@@ -31,6 +37,8 @@ onUnmounted(() => {
 
 <style>
 .app-root {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   min-height: 100dvh;
 }

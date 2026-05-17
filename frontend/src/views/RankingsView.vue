@@ -499,17 +499,15 @@ onBeforeUnmount(cancelInflight)
 
 <style scoped>
 .rankings-view {
-  width: 800px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 32px;
+  padding: 32px 0;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: var(--bg-base);
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-y: auto;
 }
 
 .rk-header { display: flex; justify-content: space-between; align-items: center; }

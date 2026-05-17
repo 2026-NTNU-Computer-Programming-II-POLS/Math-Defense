@@ -145,11 +145,10 @@ async function startLevel() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem;
+  padding: 2rem 0;
   color: var(--text-primary);
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--bg-base);
 }
 
 h1 {

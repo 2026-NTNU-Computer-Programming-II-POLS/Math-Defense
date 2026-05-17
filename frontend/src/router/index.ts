@@ -8,6 +8,8 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
     requiresRole?: 'admin' | 'teacher' | 'student'
+    hideShell?: boolean
+    hideGlobalBg?: boolean
   }
 }
 
@@ -27,13 +29,13 @@ const routes: RouteRecordRaw[] = [
     path: '/initial-answer',
     name: 'initial-answer',
     component: () => import('@/views/InitialAnswerView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideShell: true, hideGlobalBg: true },
   },
   {
     path: '/game',
     name: 'game',
     component: () => import('@/views/GameView.vue'),
-    meta: { requiresAuth: true},
+    meta: { requiresAuth: true, hideShell: true, hideGlobalBg: true },
     beforeEnter: () => {
       if (!parseLevelJson(history.state?.level)) {
         return { name: 'level-select', replace: true }
@@ -53,7 +55,7 @@ const routes: RouteRecordRaw[] = [
     path: '/replay/:sessionId',
     name: 'replay',
     component: () => import('@/views/ReplayView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideShell: true, hideGlobalBg: true },
   },
   {
     // Backlog §24 Phase D — live spectate. WebSocket-driven; receives a
@@ -62,7 +64,7 @@ const routes: RouteRecordRaw[] = [
     path: '/spectate/:sessionId',
     name: 'spectate',
     component: () => import('@/views/SpectateView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideShell: true, hideGlobalBg: true },
   },
   {
     path: '/auth',
@@ -73,6 +75,7 @@ const routes: RouteRecordRaw[] = [
     path: '/about',
     name: 'about',
     component: () => import('@/views/AboutView.vue'),
+    meta: { hideGlobalBg: true },
   },
   {
     path: '/profile',
