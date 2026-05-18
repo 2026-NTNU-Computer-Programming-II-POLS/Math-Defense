@@ -11,7 +11,7 @@ slowapi==0.1.9
 bcrypt==4.2.0
 python-multipart==0.0.27
 httpx==0.27.2
-zxcvbn==4.4.28
+zxcvbn==4.5.0
 pyotp==2.9.0
 # FU-A — server-side replay validation. Hosts the same math_engine.wasm the
 # frontend ships so v2 score recomputation uses the identical musl pow and
