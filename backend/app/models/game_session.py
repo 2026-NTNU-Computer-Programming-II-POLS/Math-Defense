@@ -38,7 +38,7 @@ class GameSession(Base):
     )
     star_rating: Mapped[int] = mapped_column(Integer, nullable=False)
     path_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    initial_answer: Mapped[bool] = mapped_column(Boolean, nullable=True, default=False, server_default="false")
+    initial_answer: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False, server_default="false")
     # Backlog §20 — slider-fallback / practice mode flag. Server filters these
     # out of the global leaderboard but still awards achievements & talent points.
     practice_mode: Mapped[bool] = mapped_column(

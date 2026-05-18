@@ -452,7 +452,7 @@ onBeforeUnmount(cancelInflight)
           <tbody>
             <tr
               v-for="r in sortedInternalEntries"
-              :key="r.student_id"
+              :key="r.student_id ?? r.rank"
               :class="{ 'is-user': internalMeta && r.student_id === auth.user?.id }"
             >
               <td class="rank">{{ r.rank }}</td>
