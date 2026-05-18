@@ -68,8 +68,10 @@ class LeaderboardApplicationService:
         it falls on page 3. The repo returns the full list (one user's
         sessions); we paginate in Python after PB detection.
         """
-        history = self._leaderboard_repo.get_user_history(user_id, level)
-        total = len(history)
+        # `history` is bounded by the repository's PB window; `total` is the
+        # untruncated COUNT(*) so the client's page count stays accurate even
+        # for users whose history exceeds the safety cap.
+        history, total = self._leaderboard_repo.get_user_history(user_id, level)
         # Walk chronologically (ASC) to compute the rolling-max PB set.
         chronological = list(reversed(history))
         running_best = -1

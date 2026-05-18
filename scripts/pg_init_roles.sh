@@ -18,6 +18,7 @@ set -e
 # via ALTER ROLE using psql's :'var' safe-quoting to avoid injection.
 psql -v ON_ERROR_STOP=1 \
      -v app_pw="$POSTGRES_APP_PASSWORD" \
+     -v db_name="$POSTGRES_DB" \
      --username "$POSTGRES_USER" \
      --dbname "$POSTGRES_DB" \
 <<-'EOSQL'
@@ -31,7 +32,10 @@ psql -v ON_ERROR_STOP=1 \
 
     ALTER ROLE mathdefense_app PASSWORD :'app_pw';
 
-    GRANT CONNECT ON DATABASE math_defense TO mathdefense_app;
+    -- Use the identifier-quoted form :"db_name" so the DB granted CONNECT on
+    -- always matches the DB this script is targeting. Hard-coding the name
+    -- would break any deployment where POSTGRES_DB is overridden.
+    GRANT CONNECT ON DATABASE :"db_name" TO mathdefense_app;
     GRANT USAGE ON SCHEMA public TO mathdefense_app;
 
     ALTER DEFAULT PRIVILEGES IN SCHEMA public

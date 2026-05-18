@@ -310,22 +310,30 @@ class SqlAlchemyLeaderboardRepository:
         ]
         return entries, total
 
+    # Safety cap on the row list returned to the service. The accompanying
+    # COUNT(*) is unaffected so `total` stays accurate even past this cap;
+    # only the PB-detection window is bounded (a user with >10k sessions
+    # whose all-time best is older than the 10k-th most recent will have
+    # that very old entry omitted from PB flagging, but the rest of the
+    # page metadata remains correct).
+    _USER_HISTORY_PB_WINDOW = 10000
+
     def get_user_history(
         self,
         user_id: str,
         level: int | None = None,
-        limit: int = 10000,
-    ) -> list[LeaderboardEntry]:
+    ) -> tuple[list[LeaderboardEntry], int]:
         q = self._db.query(LeaderboardEntryModel).filter(
             LeaderboardEntryModel.user_id == user_id
         )
         if level is not None:
             q = q.filter(LeaderboardEntryModel.level == level)
+        total = q.with_entities(func.count(LeaderboardEntryModel.id)).scalar() or 0
         rows = q.order_by(
             LeaderboardEntryModel.created_at.desc(),
             LeaderboardEntryModel.id.desc(),
-        ).limit(limit).all()
-        return [self._to_domain(row) for row in rows]
+        ).limit(self._USER_HISTORY_PB_WINDOW).all()
+        return [self._to_domain(row) for row in rows], int(total)
 
     @staticmethod
     def _to_domain(row: LeaderboardEntryModel) -> LeaderboardEntry:
