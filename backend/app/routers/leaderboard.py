@@ -55,6 +55,8 @@ def get_leaderboard(
         if current_user is not None:
             return r.player_name
         name = r.player_name
+        if not name:
+            return "*"
         if len(name) <= 2:
             return name[0] + "*"
         return name[0] + "*" * (len(name) - 2) + name[-1]
@@ -66,6 +68,7 @@ def get_leaderboard(
             player_name=_display_name(r),
             level=r.level,
             score=r.score,
+            total_score=r.total_score,
             kills=r.kills,
             waves_survived=r.waves_survived,
             created_at=r.created_at,

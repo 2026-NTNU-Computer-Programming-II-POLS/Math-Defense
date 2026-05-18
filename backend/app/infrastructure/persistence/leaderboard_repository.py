@@ -1,7 +1,7 @@
 """SQLAlchemy implementation of LeaderboardRepository"""
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import Float, cast, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession, aliased
 
@@ -13,6 +13,12 @@ from app.models.class_membership import ClassMembership as MembershipModel
 from app.models.leaderboard import LeaderboardEntry as LeaderboardEntryModel
 from app.models.user import User
 from app.utils.integrity import extract_constraint_name
+
+
+def _effective_score(model):
+    """COALESCE(total_score, CAST(score AS FLOAT)) — V2 sessions carry a
+    floating-point total_score; V1 rows fall back to the integer score."""
+    return func.coalesce(model.total_score, cast(model.score, Float))
 
 
 class SqlAlchemyLeaderboardRepository:
@@ -36,6 +42,7 @@ class SqlAlchemyLeaderboardRepository:
             waves_survived=entry.waves_survived,
             session_id=entry.session_id,
             challenge_id=entry.challenge_id,
+            total_score=entry.total_score,
             created_at=entry.created_at,
         )
         self._db.add(row)
@@ -93,8 +100,10 @@ class SqlAlchemyLeaderboardRepository:
             return [], 0
 
         L2 = aliased(LeaderboardEntryModel)
-        higher_distinct = select(func.count(func.distinct(L2.score))).where(
-            L2.score > LeaderboardEntryModel.score,
+        eff_l2 = _effective_score(L2)
+        eff_main = _effective_score(LeaderboardEntryModel)
+        higher_distinct = select(func.count(func.distinct(eff_l2))).where(
+            eff_l2 > eff_main,
             L2.user_id.isnot(None),
             L2.challenge_id.is_(None),
         )
@@ -106,6 +115,7 @@ class SqlAlchemyLeaderboardRepository:
             LeaderboardEntryModel.id.label("id"),
             LeaderboardEntryModel.level.label("level"),
             LeaderboardEntryModel.score.label("score"),
+            LeaderboardEntryModel.total_score.label("total_score"),
             LeaderboardEntryModel.kills.label("kills"),
             LeaderboardEntryModel.waves_survived.label("waves_survived"),
             LeaderboardEntryModel.created_at.label("created_at"),
@@ -119,7 +129,7 @@ class SqlAlchemyLeaderboardRepository:
 
         rows = (
             q.order_by(
-                LeaderboardEntryModel.score.desc(),
+                eff_main.desc(),
                 LeaderboardEntryModel.created_at.asc(),
                 LeaderboardEntryModel.id.asc(),
             )
@@ -135,6 +145,7 @@ class SqlAlchemyLeaderboardRepository:
                 player_name=row.player_name,
                 level=row.level,
                 score=row.score,
+                total_score=row.total_score,
                 kills=row.kills,
                 waves_survived=row.waves_survived,
                 created_at=row.created_at,
@@ -165,10 +176,12 @@ class SqlAlchemyLeaderboardRepository:
             return [], 0
 
         L2 = aliased(LeaderboardEntryModel)
+        eff_l2 = _effective_score(L2)
+        eff_main = _effective_score(LeaderboardEntryModel)
         higher_distinct = (
-            select(func.count(func.distinct(L2.score)))
+            select(func.count(func.distinct(eff_l2)))
             .where(
-                L2.score > LeaderboardEntryModel.score,
+                eff_l2 > eff_main,
                 L2.user_id.isnot(None),
                 L2.challenge_id == challenge_id,
             )
@@ -182,6 +195,7 @@ class SqlAlchemyLeaderboardRepository:
                 LeaderboardEntryModel.id.label("id"),
                 LeaderboardEntryModel.level.label("level"),
                 LeaderboardEntryModel.score.label("score"),
+                LeaderboardEntryModel.total_score.label("total_score"),
                 LeaderboardEntryModel.kills.label("kills"),
                 LeaderboardEntryModel.waves_survived.label("waves_survived"),
                 LeaderboardEntryModel.created_at.label("created_at"),
@@ -194,7 +208,7 @@ class SqlAlchemyLeaderboardRepository:
 
         rows = (
             q.order_by(
-                LeaderboardEntryModel.score.desc(),
+                eff_main.desc(),
                 LeaderboardEntryModel.created_at.asc(),
                 LeaderboardEntryModel.id.asc(),
             )
@@ -210,6 +224,7 @@ class SqlAlchemyLeaderboardRepository:
                 player_name=row.player_name,
                 level=row.level,
                 score=row.score,
+                total_score=row.total_score,
                 kills=row.kills,
                 waves_survived=row.waves_survived,
                 created_at=row.created_at,
@@ -240,9 +255,11 @@ class SqlAlchemyLeaderboardRepository:
             return [], 0
 
         L2 = aliased(LeaderboardEntryModel)
+        eff_l2 = _effective_score(L2)
+        eff_main = _effective_score(LeaderboardEntryModel)
         higher_distinct = (
-            select(func.count(func.distinct(L2.score)))
-            .where(L2.score > LeaderboardEntryModel.score)
+            select(func.count(func.distinct(eff_l2)))
+            .where(eff_l2 > eff_main)
             .where(L2.user_id.isnot(None))
             .where(L2.user_id.in_(student_ids_q))
             .where(L2.challenge_id.is_(None))
@@ -254,6 +271,7 @@ class SqlAlchemyLeaderboardRepository:
                 LeaderboardEntryModel.id.label("id"),
                 LeaderboardEntryModel.level.label("level"),
                 LeaderboardEntryModel.score.label("score"),
+                LeaderboardEntryModel.total_score.label("total_score"),
                 LeaderboardEntryModel.kills.label("kills"),
                 LeaderboardEntryModel.waves_survived.label("waves_survived"),
                 LeaderboardEntryModel.created_at.label("created_at"),
@@ -267,7 +285,7 @@ class SqlAlchemyLeaderboardRepository:
 
         rows = (
             q.order_by(
-                LeaderboardEntryModel.score.desc(),
+                eff_main.desc(),
                 LeaderboardEntryModel.created_at.asc(),
                 LeaderboardEntryModel.id.asc(),
             )
@@ -283,6 +301,7 @@ class SqlAlchemyLeaderboardRepository:
                 player_name=row.player_name,
                 level=row.level,
                 score=row.score,
+                total_score=row.total_score,
                 kills=row.kills,
                 waves_survived=row.waves_survived,
                 created_at=row.created_at,
