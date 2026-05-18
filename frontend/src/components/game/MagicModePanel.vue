@@ -26,6 +26,9 @@ function fmtCoeff(v: number): string {
 const sliderExpression = computed(() => `${coeffA.value}*x^2 + ${coeffB.value}*x + ${coeffC.value}`)
 
 const tower = computed(() => {
+  // Engine towers are plain objects; depend on towerUpgradeTick so this
+  // computed re-runs when magic mode / configured flips (see gameStore).
+  void gameStore.towerUpgradeTick
   const engine = gameStore.getEngine()
   return engine?.towers.find((t) => t.id === props.towerId) ?? null
 })

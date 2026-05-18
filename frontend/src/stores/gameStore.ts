@@ -244,6 +244,11 @@ export const useGameStore = defineStore('game', () => {
         activeBuffsSnapshotTime.value = game.state.timeTotal
       }),
       game.eventBus.on(Events.TOWER_UPGRADED, () => { towerUpgradeTick.value++ }),
+      // Magic-tower configuration (curve + zone mode) mutates plain engine
+      // objects, so Vue can't observe it. Piggy-back on towerUpgradeTick so
+      // panels reading `tower.magicMode` / `tower.configured` re-render.
+      game.eventBus.on(Events.MAGIC_MODE_CHANGED, () => { towerUpgradeTick.value++ }),
+      game.eventBus.on(Events.MAGIC_FUNCTION_SELECTED, () => { towerUpgradeTick.value++ }),
       game.eventBus.on(Events.CALCULUS_STATE_CHANGED, ({ towerId, state }) => {
         const next = { ...calculusStates.value }
         if (state === null) {
