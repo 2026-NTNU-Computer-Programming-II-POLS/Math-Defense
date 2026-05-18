@@ -174,10 +174,11 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
     # past revocation.
     from app.domain.errors import DomainError
 
-    # Re-auth fires every _SPECTATE_REAUTH_INTERVAL seconds even when the
-    # session is idle and no events arrive (wall-clock gate). This closes the
-    # gap where a banned/password-rotated user could keep streaming indefinitely
-    # on a quiet session that never accumulated N events.
+    # M-07: WS cookies are captured at handshake and never refreshed by the
+    # browser mid-connection.  A revoked user can therefore spectate for up to
+    # _SPECTATE_REAUTH_INTERVAL more seconds until the next re-auth cycle
+    # below detects the stale/invalid token.  Acceptable for an educational
+    # context; stricter environments should pass fresh tokens in WS messages.
     _SPECTATE_REAUTH_INTERVAL = 60
 
     queue = await spectate_hub.subscribe(str(session_id))

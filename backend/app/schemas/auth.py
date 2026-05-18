@@ -36,8 +36,9 @@ class RegisterRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def role_valid(cls, v: str) -> str:
-        if v not in ("student", "teacher"):
-            raise ValueError("Role must be 'student' or 'teacher'")
+        # M-04: self-service registration only permits student accounts.
+        if v != "student":
+            raise ValueError("Self-service registration is limited to the 'student' role")
         return v
 
     @field_validator("email")
