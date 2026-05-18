@@ -487,9 +487,10 @@ export class TowerRenderer {
   }
 
   // Visual Redesign Phase 5b — Radar C as a brass telescope on a tripod.
-  // The tube rotates to track the nearest in-range enemy (tower.aimAngle).
-  // When idle (no target) the tube rests at the arc midpoint so it visibly
-  // points where the player aimed the radar arc.
+  // The tube rotates to track the enemy RadarTowerSystem would actually fire
+  // at (tower.aimAngle, sourced from selectRadarTargets so barrel + dashed
+  // bore-sight + projectile all agree). When idle (no target) the tube rests
+  // at the arc midpoint so it visibly points where the player aimed the arc.
   private _drawSniperRadar(ctx: CanvasRenderingContext2D, px: number, py: number, tower: TowerView): void {
     const color = tower.color
 

@@ -123,11 +123,12 @@ describe('TowerRenderer — smoke tests', () => {
   })
 
   // Visual Redesign Phase 5b — Radar instruments. The brass telescope (RADAR_C)
-  // rotates its tube toward the nearest in-range enemy; we want a no-throw
-  // assertion on both the tracking branch (enemy present, finite aimAngle)
-  // and the idle branch (no enemies, aimAngle === null falls back to arc
-  // midpoint). RADAR_B shares the aim-tracking projection path even though
-  // its astrolabe body is rotation-static.
+  // rotates its tube toward the enemy RadarTowerSystem would fire at next
+  // (selectRadarTargets); we want a no-throw assertion on both the tracking
+  // branch (enemy present, finite aimAngle) and the idle branch (no enemies,
+  // aimAngle === null falls back to arc midpoint). RADAR_B shares the
+  // aim-tracking projection path even though its astrolabe body is
+  // rotation-static.
   // Visual Redesign Phase 5c — Matrix tower paints two diagonal cells on
   // fire. The smoke test asserts the firing branch runs without throwing;
   // the parameterized loop above already covers the idle (no-fire) branch.

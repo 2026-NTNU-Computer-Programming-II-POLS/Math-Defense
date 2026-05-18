@@ -6,6 +6,7 @@
 import { GamePhase, ANIM, TowerType } from '@/data/constants'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { seedFor } from '@/math/seededRandom'
+import { selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 import type { TowerSceneView, TowerView } from './views'
@@ -28,6 +29,16 @@ function nearestEnemyAngle(tower: Tower, enemies: ReadonlyArray<Enemy>): number 
   return Math.atan2(best.y - tower.y, best.x - tower.x)
 }
 
+// Radar B/C barrels must point at the enemy RadarTowerSystem would actually
+// shoot — same selector, so the barrel cannot diverge from the projectile
+// (matches the dashed bore-sight line in RadarRangeRenderer).
+function radarPrimaryTargetAngle(tower: Tower, enemies: ReadonlyArray<Enemy>): number | null {
+  const targets = selectRadarTargets(tower, enemies as Enemy[], radarTargetCount(tower))
+  if (targets.length === 0) return null
+  const t = targets[0]
+  return Math.atan2(t.y - tower.y, t.x - tower.x)
+}
+
 // Matrix bracket cells scroll at a steady cosmetic rate; per-cell phase
 // offset comes from seedFor so adjacent Matrix towers never tick in unison.
 const MATRIX_CELL_RATE = 2.5
@@ -46,7 +57,8 @@ export function projectTowerScene(game: Game): TowerSceneView {
     // Visual Redesign Phase 5b/5e — aim tracking is consumed by the Radar B
     // / Radar C telescope rotation and by the Calculus tower's `dx`/`dy`
     // shed-particle aim vector. Cosmetic only.
-    const tracks = t.type === TowerType.RADAR_B || t.type === TowerType.RADAR_C || t.type === TowerType.CALCULUS
+    const isRadar = t.type === TowerType.RADAR_B || t.type === TowerType.RADAR_C
+    const tracks = isRadar || t.type === TowerType.CALCULUS
     return {
       x: t.x,
       y: t.y,
@@ -63,7 +75,9 @@ export function projectTowerScene(game: Game): TowerSceneView {
       idleSeed: seedFor(`tower-idle-${t.id}`, t.x, t.y),
       arcStart: t.arcStart ?? 0,
       arcEnd: t.arcEnd ?? Math.PI / 2,
-      aimAngle: tracks ? nearestEnemyAngle(t, game.enemies) : null,
+      aimAngle: tracks
+        ? (isRadar ? radarPrimaryTargetAngle(t, game.enemies) : nearestEnemyAngle(t, game.enemies))
+        : null,
       matrixCells: t.type === TowerType.MATRIX ? matrixCells(t, game.time) : null,
     }
   })
