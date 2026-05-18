@@ -436,7 +436,7 @@ class SessionApplicationService:
         caller so an audit-log entry can be emitted.
         """
         with self._uow:
-            session = self._session_repo.find_by_id(session_id, user_id)
+            session = self._session_repo.find_by_id_for_update(session_id, user_id)
             if not session:
                 raise SessionNotFoundError("Session not found")
             previous = session.reflection_text
@@ -603,6 +603,9 @@ class SessionApplicationService:
         time_exclude_prepare = session.time_exclude_prepare
 
         derived = self._derive_timing_from_events(session.id, events=events)
+        if derived is None and session.waves_survived == 0:
+            session.override_total_score(0.0)
+            return
         if derived is not None:
             derived_time_total_min, derived_prepare = derived
             # Floor time_total: a submitted value below the event-log proof is

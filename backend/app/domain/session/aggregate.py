@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import threading
 import uuid
 from datetime import datetime, timedelta, UTC
 
@@ -22,6 +23,8 @@ from app.shared_constants import INITIAL_GOLD, INITIAL_HP
 
 DEFAULT_STALE_CUTOFF_HOURS = 2.0
 
+_stale_cutoff_lock = threading.Lock()
+
 
 def set_stale_cutoff_hours(hours: float) -> None:
     """Override the stale-session cutoff for the GameSession aggregate.
@@ -31,7 +34,8 @@ def set_stale_cutoff_hours(hours: float) -> None:
     class itself rather than as a free module-level global (B-ARCH-15) so it
     is namespaced with the rule that consumes it.
     """
-    GameSession._stale_cutoff_hours = hours
+    with _stale_cutoff_lock:
+        GameSession._stale_cutoff_hours = hours
 
 # Bounds live in domain.constraints; the aggregate enforces game rules
 # (hp can't exceed maxHp, score can't decrease, wave can't jump past the max).
@@ -55,10 +59,10 @@ class GameSession:
     4. Completing a session emits the SessionCompleted domain event
     """
 
-    # Class-level knob (B-ARCH-15). Bootstrap rebinds via
-    # ``set_stale_cutoff_hours``; tests mutate ``GameSession._stale_cutoff_hours``
-    # directly. Kept on the class so the value is namespaced with the rule
-    # that reads it rather than living as a free module global.
+    # Class-level knob (B-ARCH-15). Bootstrap and tests rebind via
+    # ``set_stale_cutoff_hours`` (lock-protected). Kept on the class so
+    # the value is namespaced with the rule that reads it rather than
+    # living as a free module global.
     _stale_cutoff_hours: float = DEFAULT_STALE_CUTOFF_HOURS
 
     def __init__(
@@ -334,6 +338,8 @@ class GameSession:
         Bypasses record_scoring_context so the recomputed value is never clamped
         against the client-submitted one.
         """
+        if value is not None:
+            value = min(max(0.0, value), TOTAL_SCORE_MAX)
         self.total_score = value
 
     REFLECTION_MAX_LENGTH = 2000
