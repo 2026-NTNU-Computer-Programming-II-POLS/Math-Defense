@@ -21,6 +21,7 @@ from app.schemas.auth import (
     LoginRequest,
     MFAChallengeRequest,
     MFAConfirmRequest,
+    MFASetupRequest,
     MFASetupResponse,
     RegisterRequest,
     TokenResponse,
@@ -338,10 +339,11 @@ def resend_verification(
 @limiter.limit("5/minute")
 def mfa_setup(
     request: Request,
+    req: MFASetupRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _secret, provisioning_uri = build_auth_service(db).setup_mfa(current_user.id)
+    _secret, provisioning_uri = build_auth_service(db).setup_mfa(current_user.id, req.current_password)
     record_audit_event(request, "MFA_SETUP_INITIATED", current_user.id)
     return MFASetupResponse(provisioning_uri=provisioning_uri)
 
@@ -354,7 +356,7 @@ def mfa_confirm(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    build_auth_service(db).confirm_mfa(current_user.id, req.code)
+    build_auth_service(db).confirm_mfa(current_user.id, req.current_password, req.code)
     logger.info("MFA enabled: id=%s", current_user.id)
     record_audit_event(request, "MFA_ENABLED", current_user.id)
 

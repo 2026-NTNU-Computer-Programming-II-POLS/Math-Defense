@@ -171,6 +171,19 @@ class AvatarUpdateRequest(BaseModel):
         return v
 
 
+class MFASetupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str
+
+    @field_validator("current_password")
+    @classmethod
+    def current_password_max_length(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
+            raise ValueError("Password is too long")
+        return v
+
+
 class MFASetupResponse(BaseModel):
     provisioning_uri: str
 
@@ -178,7 +191,15 @@ class MFASetupResponse(BaseModel):
 class MFAConfirmRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    current_password: str
     code: str
+
+    @field_validator("current_password")
+    @classmethod
+    def current_password_max_length(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
+            raise ValueError("Password is too long")
+        return v
 
     @field_validator("code")
     @classmethod

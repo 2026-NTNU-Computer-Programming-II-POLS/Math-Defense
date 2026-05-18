@@ -388,7 +388,7 @@ class AuthApplicationService:
 
     # ── MFA (TOTP) ──────────────────────────────────────────────────────────
 
-    def setup_mfa(self, user_id: str) -> tuple[str, str]:
+    def setup_mfa(self, user_id: str, current_password: str) -> tuple[str, str]:
         """Generate and store a TOTP secret. Returns (secret, provisioning_uri).
 
         The user must call confirm_mfa() with a valid code before MFA is active.
@@ -397,6 +397,8 @@ class AuthApplicationService:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
                 raise UserNotFoundError("User not found")
+            if not verify_password(current_password, user.password_hash):
+                raise InvalidCredentialsError("Current password is incorrect")
             if user.mfa_enabled:
                 raise MFAAlreadyEnabledError("MFA is already enabled for this account")
             secret = totp_utils.generate_secret()
@@ -407,12 +409,14 @@ class AuthApplicationService:
         uri = totp_utils.get_provisioning_uri(secret, user.email, issuer="MathDefense")
         return secret, uri
 
-    def confirm_mfa(self, user_id: str, code: str) -> None:
+    def confirm_mfa(self, user_id: str, current_password: str, code: str) -> None:
         """Verify a TOTP code and activate MFA for the account."""
         with self._uow:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
                 raise UserNotFoundError("User not found")
+            if not verify_password(current_password, user.password_hash):
+                raise InvalidCredentialsError("Current password is incorrect")
             if not user.totp_secret:
                 raise MFANotSetupError("MFA setup has not been started — call /mfa/setup first")
             if user.mfa_enabled:

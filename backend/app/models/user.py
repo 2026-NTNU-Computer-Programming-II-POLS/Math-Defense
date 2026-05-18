@@ -22,7 +22,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     password_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     totp_last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Rolling fraction of the last 10 completed sessions whose Initial-Answer

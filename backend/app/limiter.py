@@ -103,6 +103,7 @@ limiter = Limiter(key_func=_get_real_client_ip)
 # per-IP rate limit, this is defence-in-depth, not the primary control.
 LOGIN_EMAIL_WINDOW = 60.0
 LOGIN_EMAIL_LIMIT = 10
+_LOGIN_EMAIL_MAX_KEYS = 100_000
 _login_email_history: dict[str, deque[float]] = {}
 _login_email_lock = Lock()
 
@@ -123,8 +124,13 @@ def login_email_throttle_exceeded(email: str) -> bool:
             bucket = deque()
             _login_email_history[key] = bucket
         bucket.append(now)
-        # Sweep empty buckets on every write; prevents unbounded growth when
-        # an attacker sprays unique addresses and lets their windows expire.
+        # Sweep empty buckets first.
         for k in [k for k, v in _login_email_history.items() if not v]:
             del _login_email_history[k]
+        # LRU eviction: if the dict still exceeds the cap after sweeping
+        # empties, drop the oldest-inserted entries until we're under budget.
+        if len(_login_email_history) > _LOGIN_EMAIL_MAX_KEYS:
+            overflow = len(_login_email_history) - _LOGIN_EMAIL_MAX_KEYS
+            for evict_key in list(_login_email_history)[:overflow]:
+                del _login_email_history[evict_key]
         return False

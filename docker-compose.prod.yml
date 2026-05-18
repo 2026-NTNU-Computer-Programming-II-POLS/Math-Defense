@@ -42,6 +42,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       CORS_ORIGINS: ${CORS_ORIGINS}
       FRONTEND_URL: ${FRONTEND_URL}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
       # C-02: enable per-IP rate limiting behind the nginx reverse proxy.
       # TRUSTED_PROXY_IPS uses the RFC-1918 range that Docker Compose assigns
       # to containers in user-defined networks; adjust to match your subnet if
@@ -119,5 +120,33 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
+  db-backup:
+    image: postgres:16-alpine
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: mathdefense
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: math_defense
+      BACKUP_DIR: /backups
+      RETENTION_DAYS: "7"
+    volumes:
+      - ./scripts/pg_backup.sh:/usr/local/bin/pg_backup.sh:ro
+      - pg_backups:/backups
+    # Run daily at 02:00 UTC via a lightweight cron loop. The container
+    # sleeps until the next 02:00, runs the backup, then sleeps again.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        chmod +x /usr/local/bin/pg_backup.sh
+        echo "0 2 * * * /usr/local/bin/pg_backup.sh" | crontab -
+        crond -f -l 2
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
 volumes:
   postgres_data:
+  pg_backups:

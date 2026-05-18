@@ -5,7 +5,9 @@ export interface UserSummary {
   email: string
   player_name: string
   role: string
+  is_active: boolean
   created_at: string | null
+  classes_joined_count: number
 }
 
 export interface ClassSummary {
@@ -14,16 +16,25 @@ export interface ClassSummary {
   teacher_id: string
   join_code: string
   created_at: string
+  student_count: number
+}
+
+interface Paginated<T> {
+  items: T[]
+  total: number
 }
 
 export const adminService = {
-  getTeachers(signal?: AbortSignal) {
-    return api.get<UserSummary[]>('/api/admin/teachers', { signal })
+  async getTeachers(signal?: AbortSignal): Promise<UserSummary[]> {
+    const res = await api.get<Paginated<UserSummary>>('/api/admin/teachers', { signal })
+    return res.items
   },
-  getClasses(signal?: AbortSignal) {
-    return api.get<ClassSummary[]>('/api/admin/classes', { signal })
+  async getClasses(signal?: AbortSignal): Promise<ClassSummary[]> {
+    const res = await api.get<Paginated<ClassSummary>>('/api/admin/classes', { signal })
+    return res.items
   },
-  getStudents(signal?: AbortSignal) {
-    return api.get<UserSummary[]>('/api/admin/students', { signal })
+  async getStudents(signal?: AbortSignal): Promise<UserSummary[]> {
+    const res = await api.get<Paginated<UserSummary>>('/api/admin/students', { signal })
+    return res.items
   },
 }
