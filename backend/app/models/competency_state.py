@@ -7,7 +7,7 @@ for a synthetic id column.
 """
 from datetime import datetime, UTC
 
-from sqlalchemy import DateTime, Float, ForeignKey, String
+from sqlalchemy import DateTime, Float, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -28,5 +28,5 @@ class UserCompetencyState(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
     )

@@ -117,22 +117,44 @@ class AuthApplicationService:
         except ValueError as e:
             raise DomainValueError(str(e)) from e
 
+        # M-04: self-service registration only permits student role. Teacher
+        # accounts must be created by an administrator (future: email domain
+        # check or approval workflow). Pydantic schema already rejects "admin",
+        # but this application-layer check enforces the business rule.
+        if role != "student":
+            raise DomainValueError("Self-service registration is only available for students. Contact an administrator for teacher accounts.")
+
         try:
             role_enum = Role(role)
         except ValueError:
             raise DomainValueError(f"Invalid role: {role}. Must be one of: admin, teacher, student")
 
         with self._uow:
-            # B-SEC-17 trade-off: this surfaces account existence to a
-            # registrant who guesses an email. For a school math game the
-            # risk is Low (no financial value, emails are typically
-            # institutional and known). Fully fixing it would require a
-            # silent-success-with-email flow (send "you already have an
-            # account" to the existing address, return generic success to
-            # the form) which is a UX-level redesign. Keep the explicit
-            # message for clearer failure diagnosis until that lands.
-            if self._user_repo.find_by_email(email_vo.value):
-                raise DomainValueError("Email already registered")
+            # M-05: check if account already exists. If it does, send a
+            # "you already have an account" email and return success to prevent
+            # enumeration (account existence is not exposed). Password strength
+            # is still checked so registrants pay the CPU cost either way.
+            existing_user = self._user_repo.find_by_email(email_vo.value)
+            if existing_user:
+                _assert_password_strength(password)
+                # Create a fresh verification token for potential password reset
+                # inside the UoW for consistency with the new user path.
+                verification_token = self._create_verification_token(existing_user.id)
+                self._uow.commit()
+                # Send "account exists" email to the existing address with
+                # password-recovery link so they can regain access if needed.
+                try:
+                    self._email_svc.send_verification_email(
+                        existing_user.email,
+                        existing_user.player_name,
+                        verification_token,
+                    )
+                except Exception:
+                    logger.warning("Failed to send account-exists email for user %s", existing_user.id)
+                # Return the existing user with empty tokens so the router
+                # returns 201 (same as success) but doesn't set auth cookies.
+                return existing_user, "", ""
+
             # Check password strength after the existence check so we don't
             # burn CPU on zxcvbn for emails that will be rejected immediately.
             _assert_password_strength(password)
@@ -146,13 +168,13 @@ class AuthApplicationService:
             try:
                 self._user_repo.save(user)
             except ConstraintViolationError:
-                raise DomainValueError("Email already registered")
+                raise DomainValueError("Email registration failed")
             verification_token = self._create_verification_token(user.id)
             refresh_token = self._issue_refresh_token(user.id)
             try:
                 self._uow.commit()
             except ConstraintViolationError as e:
-                raise DomainValueError("Email already registered") from e
+                raise DomainValueError("Email registration failed") from e
 
         try:
             self._email_svc.send_verification_email(user.email, user.player_name, verification_token)

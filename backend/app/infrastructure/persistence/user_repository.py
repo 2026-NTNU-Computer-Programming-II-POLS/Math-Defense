@@ -33,8 +33,8 @@ class SqlAlchemyUserRepository:
         rows = self._db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()
         return [self._to_domain(r) for r in rows]
 
-    def find_by_role(self, role: Role) -> list[User]:
-        rows = self._db.query(UserModel).filter(UserModel.role == role.value).all()
+    def find_by_role(self, role: Role, limit: int = 10000) -> list[User]:
+        rows = self._db.query(UserModel).filter(UserModel.role == role.value).limit(limit).all()
         return [self._to_domain(r) for r in rows]
 
     def find_by_role_paginated(self, role: Role, offset: int, limit: int) -> tuple[list[User], int]:

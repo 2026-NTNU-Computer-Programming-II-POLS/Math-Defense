@@ -28,6 +28,7 @@ class LeaderboardEntry:
         waves_survived: int,
         session_id: str | None = None,
         challenge_id: str | None = None,
+        total_score: float | None = None,
         created_at: datetime | None = None,
     ) -> None:
         if not isinstance(level, Level):
@@ -45,6 +46,8 @@ class LeaderboardEntry:
         self.session_id = session_id
         # Backlog §23 — non-NULL when entry comes from a challenge run.
         self.challenge_id = challenge_id
+        # M-02: V2 floating-point total_score; None for v1 sessions or missing context.
+        self.total_score = total_score
         self.created_at = created_at or datetime.now(UTC)
 
     @classmethod
@@ -57,6 +60,7 @@ class LeaderboardEntry:
         waves_survived: int,
         session_id: str,
         challenge_id: str | None = None,
+        total_score: float | None = None,
     ) -> LeaderboardEntry:
         """Build a leaderboard entry from a completed session."""
         return cls(
@@ -68,4 +72,5 @@ class LeaderboardEntry:
             waves_survived=waves_survived,
             session_id=session_id,
             challenge_id=challenge_id,
+            total_score=total_score,
         )

@@ -295,6 +295,7 @@ class SqlAlchemyLeaderboardRepository:
         self,
         user_id: str,
         level: int | None = None,
+        limit: int = 10000,
     ) -> list[LeaderboardEntry]:
         q = self._db.query(LeaderboardEntryModel).filter(
             LeaderboardEntryModel.user_id == user_id
@@ -304,7 +305,7 @@ class SqlAlchemyLeaderboardRepository:
         rows = q.order_by(
             LeaderboardEntryModel.created_at.desc(),
             LeaderboardEntryModel.id.desc(),
-        ).all()
+        ).limit(limit).all()
         return [self._to_domain(row) for row in rows]
 
     @staticmethod
@@ -318,5 +319,7 @@ class SqlAlchemyLeaderboardRepository:
             waves_survived=row.waves_survived,
             session_id=row.session_id,
             challenge_id=row.challenge_id,
+            # M-02: map total_score from the database model
+            total_score=row.total_score,
             created_at=row.created_at,
         )

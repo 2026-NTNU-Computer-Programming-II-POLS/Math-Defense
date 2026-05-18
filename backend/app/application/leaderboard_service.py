@@ -142,6 +142,8 @@ class LeaderboardApplicationService:
                 waves_survived=session.waves_survived,
                 session_id=session_id,
                 challenge_id=session.challenge_id,
+                # M-02: include total_score if available on the session
+                total_score=getattr(session, 'total_score', None),
             )
             try:
                 self._leaderboard_repo.save(entry)

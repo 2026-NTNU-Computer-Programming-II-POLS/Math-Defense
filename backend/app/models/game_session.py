@@ -12,6 +12,7 @@ class GameSession(Base):
     __tablename__ = "game_sessions"
     __table_args__ = (
         Index("ix_game_session_user_id", "user_id"),
+        Index("ix_game_sessions_challenge_id", "challenge_id"),
         Index(
             "uq_one_active_per_user",
             "user_id",
@@ -41,11 +42,12 @@ class GameSession(Base):
     status: Mapped[str] = mapped_column(
         SAEnum(SessionStatus, values_callable=lambda e: [m.value for m in e]),
         default=SessionStatus.ACTIVE.value,
+        nullable=False,
     )
-    current_wave: Mapped[int] = mapped_column(Integer, default=0)
-    gold: Mapped[int] = mapped_column(Integer, default=INITIAL_GOLD)
-    hp: Mapped[int] = mapped_column(Integer, default=20)
-    score: Mapped[int] = mapped_column(Integer, default=0)
+    current_wave: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    gold: Mapped[int] = mapped_column(Integer, default=INITIAL_GOLD, nullable=False)
+    hp: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     kills: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     waves_survived: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     kill_value: Mapped[int | None] = mapped_column(Integer, nullable=True)

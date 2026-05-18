@@ -95,8 +95,6 @@ export function pushWaveSnapshot(
 ): Promise<SessionOut> {
   return sessionService.update(sessionId, {
     current_wave: snapshot.wave,
-    gold: snapshot.gold,
-    hp: snapshot.hp,
     score: snapshot.score,
     kill_value: snapshot.killValue,
     cost_total: snapshot.costTotal,

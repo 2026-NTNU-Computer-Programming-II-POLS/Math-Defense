@@ -62,6 +62,9 @@ class LeaderboardInsertHandler:
                         waves_survived=event.waves_survived,
                         session_id=event.session_id,
                         challenge_id=event.challenge_id,
+                        # M-02: pass through the V2 total_score so rankings use
+                        # the canonical floating-point value instead of raw score.
+                        total_score=event.total_score,
                     )
                     self._leaderboard_repo.save(entry)
                 self._uow.commit()

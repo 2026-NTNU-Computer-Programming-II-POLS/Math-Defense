@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import Boolean, String, Integer, Float, DateTime, Enum
+from sqlalchemy import Boolean, String, Integer, Float, DateTime, Enum, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
@@ -36,5 +36,5 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
     )

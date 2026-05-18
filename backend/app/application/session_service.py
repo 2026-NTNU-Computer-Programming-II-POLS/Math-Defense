@@ -212,7 +212,14 @@ class SessionApplicationService:
         # server-side derivation from the replay event log, but the client
         # cannot drive them.
         with self._uow:
-            session = self._get_session(session_id, user_id)
+            # M-01: acquire FOR UPDATE lock to serialize concurrent score
+            # updates and prevent TOCTOU race on monotonicity check (score
+            # must not decrease). Without the lock, two PATCHes can both read
+            # stale snapshots and both pass the check.
+            session = self._session_repo.find_by_id_for_update(session_id, user_id)
+            if not session:
+                raise SessionNotFoundError("Session not found")
+            self._ensure_not_stale_or_abandon(session)
             session.update_progress(
                 current_wave=current_wave,
                 score=score,

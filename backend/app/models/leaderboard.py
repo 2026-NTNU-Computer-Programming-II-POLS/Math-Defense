@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, DateTime, ForeignKey, UniqueConstraint, Index, CheckConstraint
+from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, UniqueConstraint, Index, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
@@ -25,6 +25,9 @@ class LeaderboardEntry(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     kills: Mapped[int] = mapped_column(Integer, nullable=False)
     waves_survived: Mapped[int] = mapped_column(Integer, nullable=False)
+    # M-02: V2 floating-point total_score (kill_value/time/efficiency/health factors).
+    # Rankings prefer this when available, falling back to raw score for older entries.
+    total_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String, ForeignKey("game_sessions.id", ondelete="SET NULL"), nullable=True)
     # Backlog §23 — non-NULL when entry comes from a challenge run; queried via
     # query_ranked_by_challenge so global / per-level leaderboards still work.

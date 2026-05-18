@@ -168,12 +168,11 @@ async function submit(): Promise<void> {
               />
             </label>
 
+            <!-- M-04: self-service registration only allows student role.
+                 Teacher accounts require administrator setup. -->
             <label class="auth-field">
               <span>Role</span>
-              <select v-model="role" class="rune-input">
-                <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
-              </select>
+              <div class="role-display">Student</div>
             </label>
           </template>
 
@@ -331,5 +330,13 @@ async function submit(): Promise<void> {
 .toggle-btn:hover, .back-btn:hover {
   background: var(--axis);
   color: var(--stone-dark);
+}
+
+.role-display {
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  color: var(--axis);
+  font-size: var(--text-xs);
 }
 </style>

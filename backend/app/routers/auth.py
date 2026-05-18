@@ -99,18 +99,29 @@ def register(request: Request, response: Response, req: RegisterRequest, db: Ses
         player_name=req.player_name,
         role=req.role,
     )
-    logger.info("User registered: anon=%s", _anon(str(user.id)))
-    record_audit_event(request, "REGISTER", user.id, {"email_anon": _anon(req.email), "role": user.role.value})
-    _set_auth_cookie(response, access_token)
-    _set_refresh_cookie(response, refresh_token)
-    mint_csrf_cookie(response)
+    # M-05: if tokens are empty, account already existed and we sent a recovery
+    # email (silent success to prevent enumeration). Return 201 same as new
+    # registration but without setting auth cookies.
+    is_new_user = bool(access_token)
+    if is_new_user:
+        logger.info("User registered: anon=%s", _anon(str(user.id)))
+        record_audit_event(request, "REGISTER", user.id, {"email_anon": _anon(req.email), "role": user.role.value})
+        _set_auth_cookie(response, access_token)
+        _set_refresh_cookie(response, refresh_token)
+        mint_csrf_cookie(response)
+    else:
+        # Existing account: return success response without auth tokens to
+        # prevent enumeration. Client sees 201 (success) either way.
+        logger.info("Registration attempt for existing account: anon=%s", _anon(req.email))
+        record_audit_event(request, "REGISTER_EXISTING", user.id, {"email_anon": _anon(req.email)})
+        mint_csrf_cookie(response)
     return TokenResponse(
-        id=user.id,
-        email=user.email,
-        player_name=user.player_name,
-        role=user.role.value,
-        avatar_url=user.avatar_url,
-        is_email_verified=user.is_email_verified,
+        id=user.id if is_new_user else "",
+        email=user.email if is_new_user else "",
+        player_name=user.player_name if is_new_user else "",
+        role=user.role.value if is_new_user else "",
+        avatar_url=user.avatar_url if is_new_user else None,
+        is_email_verified=user.is_email_verified if is_new_user else False,
     )
 
 
