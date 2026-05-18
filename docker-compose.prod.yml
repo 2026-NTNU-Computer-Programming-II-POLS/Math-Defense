@@ -122,7 +122,7 @@ services:
 
   db-backup:
     image: postgres:16-alpine
-    restart: "no"
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -136,13 +136,12 @@ services:
     volumes:
       - ./scripts/pg_backup.sh:/usr/local/bin/pg_backup.sh:ro
       - pg_backups:/backups
-    # Run daily at 02:00 UTC via a lightweight cron loop. The container
-    # sleeps until the next 02:00, runs the backup, then sleeps again.
+    # Run daily at 02:00 UTC via a lightweight cron loop.
+    # Script is mounted :ro so chmod is impossible — invoke via /bin/sh.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        chmod +x /usr/local/bin/pg_backup.sh
-        echo "0 2 * * * /usr/local/bin/pg_backup.sh" | crontab -
+        echo "0 2 * * * /bin/sh /usr/local/bin/pg_backup.sh" | crontab -
         crond -f -l 2
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
