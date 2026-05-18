@@ -11,6 +11,10 @@ export interface TokenResponse {
   mfa_token?: string | null
 }
 
+export interface RegisterAcceptedResponse {
+  detail: string
+}
+
 export interface MeResponse {
   id: string
   email: string
@@ -25,7 +29,10 @@ export interface MeResponse {
 
 export const authService = {
   register(email: string, password: string, playerName: string, role: string = 'student') {
-    return api.post<TokenResponse>('/api/auth/register', {
+    // M-05: register no longer auto-logs in. A successful response is a 202
+    // acknowledgement (generic body, no auth cookies); the user must verify
+    // their email and then sign in via /login.
+    return api.post<RegisterAcceptedResponse>('/api/auth/register', {
       email,
       password,
       player_name: playerName,

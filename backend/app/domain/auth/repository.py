@@ -89,3 +89,9 @@ class RefreshTokenRepository(Protocol):
 @runtime_checkable
 class EmailService(Protocol):
     def send_verification_email(self, to: str, player_name: str, token: str) -> None: ...
+
+    def send_account_exists_notice(self, to: str, player_name: str) -> None:
+        """Notify the holder of an existing account that someone tried to register
+        with their email. Carries no token: it is purely informational so the
+        existing user knows to sign in (or change password if it wasn't them)."""
+        ...

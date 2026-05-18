@@ -5,7 +5,7 @@ import pytest
 
 from app.domain.errors import DomainValueError
 from app.domain.study import StudyGroup, assign_group, is_valid_study_id
-from app.factories import build_auth_service
+from tests.conftest import register_test_user
 
 
 # ── Domain: deterministic group assignment ──────────────────────────────────
@@ -70,19 +70,19 @@ def _auth(token: str) -> dict[str, str]:
 
 
 def _register_student(client, name: str) -> str:
-    res = client.post(
+    email = f"{name}@test.local"
+    password = "xQ7!aPm2#vKz9"
+    client.post(
         "/api/auth/register",
-        json={
-            "email": f"{name}@test.local",
-            "password": "xQ7!aPm2#vKz9",
-            "player_name": name,
-        },
+        json={"email": email, "password": password, "player_name": name},
     )
+    res = client.post("/api/auth/login", json={"email": email, "password": password})
     return res.cookies.get("access_token")
 
 
 def _register_admin(db_session, name: str) -> str:
-    _u, token, _r = build_auth_service(db_session).register(
+    _u, token, _r = register_test_user(
+        db_session,
         email=f"{name}@test.local",
         password="xQ7!aPm2#vKz9",
         player_name=name,
@@ -98,7 +98,8 @@ def _register_student_via_service(db_session, name: str) -> str:
     middleware prefers the cookie over the Bearer header, so HTTP-based
     registration of two students would silently mis-attribute later
     requests."""
-    _u, token, _r = build_auth_service(db_session).register(
+    _u, token, _r = register_test_user(
+        db_session,
         email=f"{name}@test.local",
         password="xQ7!aPm2#vKz9",
         player_name=name,

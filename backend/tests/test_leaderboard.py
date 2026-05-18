@@ -1,8 +1,11 @@
 def _register_and_token(client, name="player1"):
-    res = client.post("/api/auth/register", json={
-        "email": f"{name}@test.local", "password": "xQ7!aPm2#vKz9",
+    email = f"{name}@test.local"
+    password = "xQ7!aPm2#vKz9"
+    client.post("/api/auth/register", json={
+        "email": email, "password": password,
         "player_name": name,
     })
+    res = client.post("/api/auth/login", json={"email": email, "password": password})
     return res.cookies.get("access_token")
 
 
@@ -104,8 +107,9 @@ def test_leaderboard_filter_by_level(client):
 # ── class_id parameter (D-3) ─────────────────────────────────────────────────
 
 def _register_teacher(db_session, name):
-    from app.factories import build_auth_service
-    _user, token, _refresh = build_auth_service(db_session).register(
+    from tests.conftest import register_test_user
+    _user, token, _refresh = register_test_user(
+        db_session,
         email=f"{name}@test.local",
         password="xQ7!aPm2#vKz9",
         player_name=name,

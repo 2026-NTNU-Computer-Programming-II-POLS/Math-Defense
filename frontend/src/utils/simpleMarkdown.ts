@@ -31,7 +31,14 @@ function inline(s: string): string {
   out = out.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
   // Single-asterisk italic — exclude leading-space-no-content edge cases.
   out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-  out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text, url) => {
+  // Disallow `"`, `'`, `<`, `>` in the URL capture — none of them belong in
+  // a real URL and permitting them lets a crafted link like
+  // `[x](https://a/"onmouseover=...)` break out of the href attribute and
+  // inject JS. `&`, `<`, `>` are already encoded by escapeHtml() upstream,
+  // and `"` is excluded by this character class, so the captured URL is safe
+  // to splice into `href="…"` verbatim without further attribute-encoding —
+  // re-encoding `&` here would double-escape query strings (`&amp;amp;`).
+  out = out.replace(/\[([^\]]+)\]\(([^)\s"'<>]+)\)/g, (_m, text, url) => {
     const safe = /^https?:\/\/|^\/|^#|^mailto:/i.test(url)
     return safe
       ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`

@@ -23,6 +23,7 @@ from app.schemas.auth import (
     MFAConfirmRequest,
     MFASetupRequest,
     MFASetupResponse,
+    RegisterAcceptedResponse,
     RegisterRequest,
     TokenResponse,
     UpdatePlayerNameRequest,
@@ -90,39 +91,27 @@ def _clear_refresh_cookie(response: Response) -> None:
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterAcceptedResponse, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("5/minute")
-def register(request: Request, response: Response, req: RegisterRequest, db: Session = Depends(get_db)):
-    user, access_token, refresh_token = build_auth_service(db).register(
+def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
+    # M-05: registration is enumeration-safe. The service performs the same
+    # observable work in both branches; this router returns one fixed 202
+    # body with no cookies. New users complete the flow by clicking the
+    # verification link in their inbox and then signing in via /login.
+    user, is_new_user = build_auth_service(db).register(
         email=req.email,
         password=req.password,
         player_name=req.player_name,
         role=req.role,
     )
-    # M-05: if tokens are empty, account already existed and we sent a recovery
-    # email (silent success to prevent enumeration). Return 201 same as new
-    # registration but without setting auth cookies.
-    is_new_user = bool(access_token)
+    # Distinguish only server-side via audit log; the HTTP response is identical.
     if is_new_user:
         logger.info("User registered: anon=%s", _anon(str(user.id)))
         record_audit_event(request, "REGISTER", user.id, {"email_anon": _anon(req.email), "role": user.role.value})
-        _set_auth_cookie(response, access_token)
-        _set_refresh_cookie(response, refresh_token)
-        mint_csrf_cookie(response)
     else:
-        # Existing account: return success response without auth tokens to
-        # prevent enumeration. Client sees 201 (success) either way.
         logger.info("Registration attempt for existing account: anon=%s", _anon(req.email))
         record_audit_event(request, "REGISTER_EXISTING", user.id, {"email_anon": _anon(req.email)})
-        mint_csrf_cookie(response)
-    return TokenResponse(
-        id=user.id if is_new_user else "",
-        email=user.email if is_new_user else "",
-        player_name=user.player_name if is_new_user else "",
-        role=user.role.value if is_new_user else "",
-        avatar_url=user.avatar_url if is_new_user else None,
-        is_email_verified=user.is_email_verified if is_new_user else False,
-    )
+    return RegisterAcceptedResponse()
 
 
 @router.post("/login", response_model=TokenResponse)

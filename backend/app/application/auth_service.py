@@ -110,54 +110,53 @@ class AuthApplicationService:
         password: str,
         player_name: str,
         role: str = "student",
-    ) -> tuple[User, str, str]:
-        """Create a new user and issue tokens. Returns (user, access_token, refresh_token)."""
+    ) -> tuple[User, bool]:
+        """Submit a registration request. Returns (user, is_new_user).
+
+        Under M-05 the caller MUST NOT expose `is_new_user` in the HTTP
+        response — it exists only so the router can write an accurate audit
+        log row. The HTTP response is identical regardless of branch.
+        """
         try:
             email_vo = Email(email)
         except ValueError as e:
             raise DomainValueError(str(e)) from e
 
-        # M-04: self-service registration only permits student role. Teacher
-        # accounts must be created by an administrator (future: email domain
-        # check or approval workflow). Pydantic schema already rejects "admin",
-        # but this application-layer check enforces the business rule.
-        if role != "student":
-            raise DomainValueError("Self-service registration is only available for students. Contact an administrator for teacher accounts.")
-
+        # M-04 (self-service registration is student-only) is enforced at the
+        # HTTP boundary in RegisterRequest. The application service stays
+        # role-agnostic so administrative flows and tests can seed teachers
+        # and admins without going through the public /register route.
         try:
             role_enum = Role(role)
         except ValueError:
             raise DomainValueError(f"Invalid role: {role}. Must be one of: admin, teacher, student")
 
+        # M-05: registration is enumeration-safe. Both branches do the same
+        # observable work (zxcvbn strength check, single email send, identical
+        # HTTP response). The verification token is only minted for genuinely
+        # new accounts — reusing it for existing users would mutate their
+        # verification state and the email is the wrong template anyway.
+        _assert_password_strength(password)
+
         with self._uow:
-            # M-05: check if account already exists. If it does, send a
-            # "you already have an account" email and return success to prevent
-            # enumeration (account existence is not exposed). Password strength
-            # is still checked so registrants pay the CPU cost either way.
             existing_user = self._user_repo.find_by_email(email_vo.value)
             if existing_user:
-                _assert_password_strength(password)
-                # Create a fresh verification token for potential password reset
-                # inside the UoW for consistency with the new user path.
-                verification_token = self._create_verification_token(existing_user.id)
+                # Mask the dominant timing cost (bcrypt ~50–150ms) so the
+                # existing-user branch isn't observably faster than the new-
+                # user branch. Without this, response-time analysis defeats
+                # M-05 even though the body/cookies are identical. The hash
+                # is discarded — we just need the CPU work to happen.
+                _ = hash_password(password)
                 self._uow.commit()
-                # Send "account exists" email to the existing address with
-                # password-recovery link so they can regain access if needed.
                 try:
-                    self._email_svc.send_verification_email(
+                    self._email_svc.send_account_exists_notice(
                         existing_user.email,
                         existing_user.player_name,
-                        verification_token,
                     )
                 except Exception:
-                    logger.warning("Failed to send account-exists email for user %s", existing_user.id)
-                # Return the existing user with empty tokens so the router
-                # returns 201 (same as success) but doesn't set auth cookies.
-                return existing_user, "", ""
+                    logger.warning("Failed to send account-exists notice for user %s", existing_user.id)
+                return existing_user, False
 
-            # Check password strength after the existence check so we don't
-            # burn CPU on zxcvbn for emails that will be rejected immediately.
-            _assert_password_strength(password)
             password_hash = hash_password(password)
             user = User.create(
                 email=email_vo.value,
@@ -165,24 +164,43 @@ class AuthApplicationService:
                 role=role_enum,
                 password_hash=password_hash,
             )
+            raced_user: User | None = None
             try:
                 self._user_repo.save(user)
-            except ConstraintViolationError:
-                raise DomainValueError("Email registration failed")
-            verification_token = self._create_verification_token(user.id)
-            refresh_token = self._issue_refresh_token(user.id)
-            try:
+                verification_token = self._create_verification_token(user.id)
                 self._uow.commit()
-            except ConstraintViolationError as e:
-                raise DomainValueError("Email registration failed") from e
+            except ConstraintViolationError:
+                # A concurrent request committed the same email between our
+                # find_by_email and our INSERT. Fall through to the "existing
+                # user" path so the response stays 202 and M-05's
+                # indistinguishability holds across the race window. The
+                # rollback issued by the failed flush leaves the session
+                # usable for a fresh SELECT.
+                self._uow.rollback()
+                raced_user = self._user_repo.find_by_email(email_vo.value)
+                if raced_user is None:
+                    # The unique-violation wasn't on email after all — bubble
+                    # up a generic error. This branch cannot leak enumeration
+                    # because it does not depend on whether the email exists.
+                    raise DomainValueError("Email registration failed")
+        if raced_user is not None:
+            try:
+                self._email_svc.send_account_exists_notice(
+                    raced_user.email,
+                    raced_user.player_name,
+                )
+            except Exception:
+                logger.warning("Failed to send account-exists notice for user %s", raced_user.id)
+            return raced_user, False
 
         try:
             self._email_svc.send_verification_email(user.email, user.player_name, verification_token)
         except Exception:
             logger.warning("Failed to send verification email for user %s", user.id)
 
-        access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
-        return user, access_token, refresh_token
+        # No auto-login: registration is now a submit-then-verify flow so the
+        # HTTP response is indistinguishable from the existing-account branch.
+        return user, True
 
     def _create_verification_token(self, user_id: str) -> str:
         """Generate a fresh token; invalidates any pending tokens for this user first."""

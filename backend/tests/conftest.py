@@ -118,3 +118,27 @@ def db_session(session_factory):
         yield db
     finally:
         db.close()
+
+
+def register_test_user(
+    db_session,
+    email: str,
+    password: str,
+    player_name: str,
+    role: str = "student",
+):
+    """Create a user and immediately issue tokens.
+
+    The public AuthApplicationService.register() now follows a submit-and-
+    verify flow (no auto-login) so it cannot return tokens — this helper
+    is the test-only equivalent that registers, then logs in, returning
+    (user, access_token, refresh_token).
+    """
+    from app.factories import build_auth_service
+
+    svc = build_auth_service(db_session)
+    svc.register(email=email, password=password, player_name=player_name, role=role)
+    user, token, mfa_required, refresh = svc.login(email, password)
+    assert not mfa_required, "register_test_user does not support MFA-enabled accounts"
+    assert refresh is not None
+    return user, token, refresh

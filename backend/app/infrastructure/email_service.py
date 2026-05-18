@@ -54,3 +54,19 @@ class SmtpEmailService:
         <p>If you did not create an account, you can ignore this message.</p>
         """
         self._send(to, "Verify your Math Defense email", body)
+
+    def send_account_exists_notice(self, to: str, player_name: str) -> None:
+        safe_name = html_lib.escape(player_name)
+        safe_login = html_lib.escape(f"{self._settings.frontend_url}/auth")
+        body = f"""
+        <p>Hi {safe_name},</p>
+        <p>Someone (possibly you) just tried to create a Math Defense account
+        with this email address. An account already exists, so no new account
+        was created.</p>
+        <p>If it was you, please sign in instead:
+        <a href="{safe_login}">Sign in</a></p>
+        <p>If it was not you, you can safely ignore this email — your account
+        has not changed. Consider updating your password if you suspect
+        someone else knows it.</p>
+        """
+        self._send(to, "A Math Defense account already exists for this email", body)

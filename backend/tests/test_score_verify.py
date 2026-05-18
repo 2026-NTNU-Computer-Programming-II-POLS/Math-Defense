@@ -27,10 +27,13 @@ _V2 = dict(
 
 
 def _register_and_token(client, name: str) -> str:
-    res = client.post(
+    email = f"{name}@test.local"
+    password = "xQ7!aPm2#vKz9"
+    client.post(
         "/api/auth/register",
-        json={"email": f"{name}@test.local", "password": "xQ7!aPm2#vKz9", "player_name": name},
+        json={"email": email, "password": password, "player_name": name},
     )
+    res = client.post("/api/auth/login", json={"email": email, "password": password})
     return res.cookies.get("access_token")
 
 

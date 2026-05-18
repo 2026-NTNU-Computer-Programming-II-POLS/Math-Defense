@@ -95,6 +95,17 @@ class TokenResponse(BaseModel):
     mfa_token: str | None = None
 
 
+class RegisterAcceptedResponse(BaseModel):
+    """Generic 202 response for /register.
+
+    Carries no user fields so the response is byte-identical regardless of
+    whether the email was previously registered (M-05 anti-enumeration).
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    detail: str = "If the email is available, an account was created. Check your inbox to verify the address before signing in."
+
+
 class ChangePasswordRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

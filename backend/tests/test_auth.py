@@ -7,17 +7,27 @@ def _reg(email, password="xQ7!aPm2#vKz9", player_name=None):
 
 
 def test_register(client):
+    # M-05: registration returns a fixed 202 acknowledgement with no identity
+    # fields or auth cookies. A genuine sign-in requires POST /login.
     res = client.post("/api/auth/register", json=_reg("testuser@test.local"))
-    assert res.status_code == 201
-    data = res.json()
-    assert data["email"] == "testuser@test.local"
-    assert data["role"] == "student"
+    assert res.status_code == 202
+    body = res.json()
+    assert "detail" in body
+    assert body.keys() == {"detail"}
+    assert "access_token" not in res.cookies
+    assert "refresh_token" not in res.cookies
 
 
-def test_register_duplicate(client):
-    client.post("/api/auth/register", json=_reg("dupuser@test.local"))
-    res = client.post("/api/auth/register", json=_reg("dupuser@test.local"))
-    assert res.status_code == 422
+def test_register_duplicate_is_indistinguishable(client):
+    # M-05 anti-enumeration: the new-user and existing-user responses must be
+    # byte-identical so an attacker cannot probe which emails are registered.
+    first = client.post("/api/auth/register", json=_reg("dupuser@test.local"))
+    second = client.post("/api/auth/register", json=_reg("dupuser@test.local"))
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.json() == second.json()
+    assert "access_token" not in first.cookies
+    assert "access_token" not in second.cookies
 
 
 def test_login(client):
@@ -34,8 +44,13 @@ def test_login_wrong_password(client):
 
 
 def test_get_me(client):
-    reg = client.post("/api/auth/register", json=_reg("meuser@test.local"))
-    token = reg.cookies.get("access_token")
+    client.post("/api/auth/register", json=_reg("meuser@test.local"))
+    # Register no longer auto-issues an access token — sign in to obtain one.
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "meuser@test.local", "password": "xQ7!aPm2#vKz9"},
+    )
+    token = login.cookies.get("access_token")
     res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     assert res.json()["email"] == "meuser@test.local"

@@ -18,7 +18,7 @@ def _register(client, email: str = "lockme@test.local", password: str = "xQ7!aPm
     res = client.post("/api/auth/register", json={
         "email": email, "password": password, "player_name": "lockme",
     })
-    assert res.status_code == 201
+    assert res.status_code == 202
 
 
 def test_five_failed_logins_lock_account(client):
