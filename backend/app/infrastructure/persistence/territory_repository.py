@@ -69,7 +69,17 @@ class SqlAlchemyTerritoryRepository:
         return [self._activity_to_domain(r) for r in rows]
 
     def find_all_activities(self) -> list[GrabbingTerritoryActivity]:
-        rows = self._db.query(ActivityModel).order_by(ActivityModel.created_at.desc()).all()
+        rows = self._db.query(ActivityModel).order_by(ActivityModel.created_at.desc()).limit(500).all()
+        return [self._activity_to_domain(r) for r in rows]
+
+    def find_inter_class_activities(self) -> list[GrabbingTerritoryActivity]:
+        rows = (
+            self._db.query(ActivityModel)
+            .filter(ActivityModel.class_id.is_(None))
+            .order_by(ActivityModel.created_at.desc())
+            .limit(500)
+            .all()
+        )
         return [self._activity_to_domain(r) for r in rows]
 
     def find_unsettled_expired_activities(self) -> list[GrabbingTerritoryActivity]:

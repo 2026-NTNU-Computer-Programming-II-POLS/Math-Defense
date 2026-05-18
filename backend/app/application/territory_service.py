@@ -159,8 +159,8 @@ class TerritoryApplicationService:
             owned = self._territory_repo.find_activities_by_teacher(user_id)
             seen = {a.id for a in owned}
             result = list(owned)
-            for a in self._territory_repo.find_all_activities():
-                if a.class_id is None and a.id not in seen:
+            for a in self._territory_repo.find_inter_class_activities():
+                if a.id not in seen:
                     seen.add(a.id)
                     result.append(a)
             return result
@@ -172,8 +172,8 @@ class TerritoryApplicationService:
             if a.id not in seen:
                 seen.add(a.id)
                 activities.append(a)
-        for a in self._territory_repo.find_all_activities():
-            if a.class_id is None and a.id not in seen:
+        for a in self._territory_repo.find_inter_class_activities():
+            if a.id not in seen:
                 seen.add(a.id)
                 activities.append(a)
         return activities

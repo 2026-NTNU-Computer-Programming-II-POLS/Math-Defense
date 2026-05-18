@@ -27,6 +27,8 @@ class TerritoryRepository(Protocol):
 
     def find_all_activities(self) -> list[GrabbingTerritoryActivity]: pass
 
+    def find_inter_class_activities(self) -> list[GrabbingTerritoryActivity]: pass
+
     def find_unsettled_expired_activities(self) -> list[GrabbingTerritoryActivity]: pass
 
     def save_activity(self, activity: GrabbingTerritoryActivity) -> None: pass

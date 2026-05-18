@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session as DbSession
 
-from app.domain.session.events_log import ReplayEvent
+from app.domain.session.events_log import MAX_EVENTS_PER_SESSION, ReplayEvent
 from app.models.session_event import SessionEvent
 
 
@@ -67,6 +67,7 @@ class SqlAlchemySessionEventRepository:
             select(SessionEvent)
             .where(SessionEvent.session_id == session_id)
             .order_by(SessionEvent.seq.asc())
+            .limit(MAX_EVENTS_PER_SESSION)
         ).scalars().all()
         return [
             ReplayEvent(

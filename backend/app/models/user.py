@@ -1,12 +1,18 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import Boolean, String, Integer, Float, DateTime, Enum, text
+from sqlalchemy import Boolean, CheckConstraint, String, Integer, Float, DateTime, Enum, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "ia_recent_accuracy BETWEEN 0.0 AND 1.0",
+            name="ck_user_ia_accuracy_range",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)

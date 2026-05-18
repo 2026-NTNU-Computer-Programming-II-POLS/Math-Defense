@@ -20,6 +20,11 @@ class GameSession(Base):
             postgresql_where=text("status = 'active'"),
         ),
         CheckConstraint("star_rating BETWEEN 1 AND 5", name="ck_game_session_star_range"),
+        CheckConstraint("score >= 0", name="ck_game_session_score_nonneg"),
+        CheckConstraint("kills >= 0", name="ck_game_session_kills_nonneg"),
+        CheckConstraint("waves_survived >= 0", name="ck_game_session_waves_nonneg"),
+        CheckConstraint("hp >= 0", name="ck_game_session_hp_nonneg"),
+        CheckConstraint("gold >= 0", name="ck_game_session_gold_nonneg"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
