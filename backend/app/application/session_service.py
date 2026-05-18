@@ -286,7 +286,14 @@ class SessionApplicationService:
                 authoritative_waves = self._derive_waves_from_events(
                     session.id, events=replay_events
                 )
-                if authoritative_waves is not None:
+                # Gated on a NON-EMPTY log for the same reason the BD-1 score
+                # bound below is gated: an empty log means "no replay evidence",
+                # not "0 waves cleared", and overwriting the submitted count
+                # with 0 would (a) bypass the design comment 8 lines down and
+                # (b) downstream trip _verify_score's "no evidence" early
+                # return, clobbering total_score to 0.0 on every legitimate
+                # session whose event upload raced or was never wired.
+                if authoritative_waves is not None and replay_events:
                     if waves_survived > authoritative_waves:
                         logger.warning(
                             "waves_survived inflated session=%s submitted=%d derived=%d",
