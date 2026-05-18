@@ -746,7 +746,7 @@ Likert affect surveys (anxiety + intrinsic motivation, IMI subscale). Two phases
 
 Append-only security event log written by `app.infrastructure.audit_logger.record_audit_event` in its own isolated SQLAlchemy session so audit rows commit independently of the surrounding business transaction. `user_id` is a plain string with **no FK constraint** so audit records survive user deletion.
 
-> **Schema gap (known)**: no Alembic migration creates this table. The ORM model (`app/models/audit_log.py`) and writer infrastructure exist, but the writer swallows insertion errors as warnings — meaning audit events are silently dropped on databases that have not been pre-provisioned with the table out-of-band. To bring this fully online, add a migration that creates `audit_logs` with the columns/indexes below.
+Created by migration `z0c1d2e3f4a5_create_audit_logs_table`.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -758,7 +758,7 @@ Append-only security event log written by `app.infrastructure.audit_logger.recor
 | `details` | `Text` | YES | — |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
-**Indexes:** `ix_audit_logs_user_id` (on `user_id`), `ix_audit_logs_event_type` (on `event_type`)
+**Indexes:** `ix_audit_logs_user_id_created_at` (on `user_id, created_at`), `ix_audit_logs_event_type_created_at` (on `event_type, created_at`)
 
 ---
 
@@ -819,8 +819,8 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `ix_challenges_teacher_id` | `challenges` | `teacher_id` | BTREE |
 | `ix_challenges_created_at` | `challenges` | `created_at` | BTREE |
 | `ix_session_event_session_id` | `session_events` | `session_id` | BTREE |
-| `ix_audit_logs_user_id` | `audit_logs` | `user_id` | BTREE |
-| `ix_audit_logs_event_type` | `audit_logs` | `event_type` | BTREE |
+| `ix_audit_logs_user_id_created_at` | `audit_logs` | `user_id, created_at` | BTREE |
+| `ix_audit_logs_event_type_created_at` | `audit_logs` | `event_type, created_at` | BTREE |
 
 ---
 
@@ -899,10 +899,9 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `v6e7f8a9b0c1` | Replay protocol versioning — `game_sessions.replay_version SMALLINT NOT NULL DEFAULT 1`. Splits sessions into v1 (mulberry32+JS Math, ε=5e-4) vs v2 (PCG+WASM, bit-exact). Phase 4 of the construction plan; FU-A server-side recompute rejects v2 mismatches with HTTP 422 |
 | `w7f8a9b0c1d2` | Leaderboard challenge-cascade (B-BUG-4) — change `leaderboard_entries.challenge_id` FK from `SET NULL` to `CASCADE` so deleted challenges drop their (capped-scoring) rows instead of leaking them into the global/per-level board |
 | `x8a9b0c1d2e3f` | Territory ranking aggregation support — add composite index `ix_territory_occupations_student_slot (student_id, slot_id)` and new `territory_rankings_snapshot` table (+ `ix_snap_activity_time`, `ix_snap_activity_student_time`) so rankings endpoint computes rank deltas without a periodic worker |
-| `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK (BD-8, current head) — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
+| `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK (BD-8) — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
+| `z0c1d2e3f4a5` | Create `audit_logs` table (C-01, current head) — the ORM model and `audit_logger` existed since early development but no migration ever created the table; all audit events were silently dropped. Adds composite indexes `(user_id, created_at)` and `(event_type, created_at)` |
 
 > **Branched history**: After `q1f2a3b4c5d6` (gameplay branch — practice mode) and `a3b4c5d6e7f8` (auth branch — lockout backoff) shipped on parallel branches, `r2a3b4c5d6e7` is a merge migration whose `down_revision` is the tuple `(q1f2a3b4c5d6, a3b4c5d6e7f8)`. It also creates the `seasons` table in the same revision. Subsequent revisions (`s3b4c5d6e7f8`, `t4c5d6e7f8a9`, `u5d6e7f8a9b0`) form a linear chain on top.
 
 > **Earlier history**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create.
-
-> **`audit_logs`**: see the per-table note above — the model and writer exist but no Alembic migration creates the table.
