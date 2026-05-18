@@ -387,6 +387,10 @@ export function prngNextF64(handle: PrngHandle): number {
 // and tiny so the cost is negligible.
 
 const CURVE_STRUCT_BYTES = 24
+
+// L-08: scratch buffers are module-scoped singletons — safe in the main thread
+// but would race under Web Workers. If Workers are introduced, move these into
+// a per-worker context or use a pool.
 let _curveScratchPtr: number | null = null
 
 function curveScratch(m: WasmModule): number {

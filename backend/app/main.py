@@ -224,5 +224,6 @@ def root():
 
 
 @app.get("/health")
-def health():
+@limiter.limit("60/minute")
+def health(request: Request):
     return {"status": "ok"}

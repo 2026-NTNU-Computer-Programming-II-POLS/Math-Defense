@@ -1,6 +1,7 @@
 export type CurveFunction = (x: number) => number
 
 const MAX_EXPR_LEN = 200
+const MAX_EVAL_DEPTH = 64
 
 type Token =
   | { kind: 'num'; value: number }
@@ -209,15 +210,16 @@ function parse(tokens: Token[]): Node | null {
   return out[0]
 }
 
-function evalNode(n: Node, x: number): number {
+function evalNode(n: Node, x: number, depth = 0): number {
+  if (depth > MAX_EVAL_DEPTH) throw new RangeError('expression too deeply nested')
   switch (n.kind) {
     case 'num': return n.value
     case 'var': return x
-    case 'neg': return -evalNode(n.v, x)
-    case 'fn': return FUNCTIONS[n.name](evalNode(n.arg, x))
+    case 'neg': return -evalNode(n.v, x, depth + 1)
+    case 'fn': return FUNCTIONS[n.name](evalNode(n.arg, x, depth + 1))
     case 'bin': {
-      const a = evalNode(n.l, x)
-      const b = evalNode(n.r, x)
+      const a = evalNode(n.l, x, depth + 1)
+      const b = evalNode(n.r, x, depth + 1)
       switch (n.op) {
         case '+': return a + b
         case '-': return a - b

@@ -21,6 +21,14 @@ __pycache__
 *.swp
 *.swo
 
+# Postgres data (dev-only volume)
+backend/postgres
+
+# Docs / metadata
+*.md
+.github
+docs/
+
 # Build artifacts
 dist
 *.egg-info

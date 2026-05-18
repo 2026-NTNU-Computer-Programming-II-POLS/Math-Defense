@@ -7,6 +7,8 @@ export interface ActivityInfo {
   title: string
   deadline: string
   settled: boolean
+  settled_at: string | null
+  settled_by: string | null
   created_at: string
 }
 
@@ -41,7 +43,7 @@ export interface PlayResult {
 
 export interface RankingEntry {
   rank: number
-  student_id: string
+  student_id: string | null
   player_name: string | null
   territory_value: number
 }
@@ -53,7 +55,7 @@ export interface CompositionBucket {
 
 export interface RankingEntryWithMeta {
   rank: number
-  student_id: string
+  student_id: string | null
   player_name: string | null
   territory_value: number
   rank_change: number | null

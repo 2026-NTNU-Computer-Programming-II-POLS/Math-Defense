@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "noreply@math-defense.app"
     smtp_tls: bool = True
+    # Connection pool tuning
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_recycle: int = 3600
     # Base URL for constructing email verification links. Required — no default
     # so production can't silently emit verification links pointing at localhost.
     frontend_url: str
