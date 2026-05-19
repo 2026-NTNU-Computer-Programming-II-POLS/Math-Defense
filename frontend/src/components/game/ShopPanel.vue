@@ -172,14 +172,17 @@ function purchase(itemId: string, cost: number): void {
 </template>
 
 <style scoped>
+/* Shop — anchored dropdown popover (mockup .shop-dd). Open/close logic
+   (collapsed state) is unchanged; this is the Morandi surface only. */
 .shop-panel {
   position: relative;
-  width: 200px;
-  background: var(--overlay-panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  padding: 8px;
-  z-index: var(--z-chrome);
+  width: 296px;
+  background: var(--cream-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 12px 14px;
+  z-index: var(--z-floating);
   max-height: 500px;
   overflow-y: auto;
   transition:
@@ -188,10 +191,24 @@ function purchase(itemId: string, cost: number): void {
     background 200ms ease-out;
 }
 
+/* Triangular arrow pointing back at the Shop tool button in the left bar. */
+.shop-panel:not(.collapsed)::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 24px;
+  width: 0;
+  height: 0;
+  border: 7px solid transparent;
+  border-right-color: var(--cream-soft);
+}
+
 .shop-panel.collapsed {
   width: auto;
   padding: 4px;
-  background: var(--overlay-panel-bg);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .shop-icon-btn {
@@ -199,22 +216,23 @@ function purchase(itemId: string, cost: number): void {
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: rgba(245, 250, 254, 0.86);
   font-size: var(--text-xl);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: var(--shadow-sm);
   transition:
     background 120ms,
     border-color 120ms;
 }
 
 .shop-icon-btn:hover {
-  background: rgba(255, 215, 0, 0.2);
-  border-color: var(--gold);
+  background: #fff;
+  border-color: var(--terracotta);
 }
 
 .notice-dot {
@@ -224,8 +242,8 @@ function purchase(itemId: string, cost: number): void {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--gold-bright);
-  box-shadow: 0 0 4px var(--gold-bright);
+  background: var(--gold-deep);
+  box-shadow: 0 0 4px var(--gold);
   animation: notice-pulse 1.4s ease-in-out infinite;
 }
 
@@ -235,11 +253,12 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .shop-title {
-  font-size: var(--text-xs);
-  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  color: var(--charcoal);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 0 0 8px;
+  letter-spacing: 1.5px;
+  margin: 0 0 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -247,37 +266,41 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .collapse-icon {
-  padding: 0 4px;
-  border: none;
-  background: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(245, 250, 254, 0.7);
   font: inherit;
   font-size: var(--text-xs);
   line-height: 1;
-  color: var(--axis);
+  color: var(--charcoal-soft);
   cursor: pointer;
 }
 
 .collapse-icon:hover {
-  color: var(--gold);
+  background: var(--clay);
+  color: #fff;
+  border-color: var(--clay-deep);
 }
 
 .category-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .chip {
-  background: var(--overlay-cell-bg);
-  border: 1px solid var(--grid-line);
-  border-radius: 12px;
-  padding: 3px 8px;
-  font-size: var(--text-xs);
-  color: #c8b894;
+  background: rgba(245, 250, 254, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.68rem;
+  color: var(--charcoal-soft);
   cursor: pointer;
   white-space: nowrap;
   font-family: var(--font-mono);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.7px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -288,34 +311,34 @@ function purchase(itemId: string, cost: number): void {
 }
 .chip:hover {
   border-color: var(--gold);
-  color: var(--overlay-text);
+  color: var(--gold-deep);
 }
 .chip:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--terracotta-deep);
   outline-offset: 1px;
 }
 .chip--active {
-  border-color: var(--gold-bright);
-  background: var(--overlay-cell-active);
-  color: var(--gold-bright);
+  border-color: var(--gold-deep);
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
 }
 .chip-count {
-  font-size: var(--text-xs);
-  color: var(--axis);
-  background: rgba(0, 0, 0, 0.3);
-  padding: 0 4px;
+  font-size: 0.6rem;
+  color: var(--charcoal-soft);
+  background: rgba(79, 74, 72, 0.08);
+  padding: 0 5px;
   border-radius: 8px;
-  font-weight: bold;
+  font-weight: 700;
 }
 .chip--active .chip-count {
-  color: var(--gold-bright);
-  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .shop-grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .shop-item {
@@ -323,52 +346,53 @@ function purchase(itemId: string, cost: number): void {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 8px;
-  padding: 6px 8px;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  background: var(--overlay-cell-bg);
-  color: var(--overlay-text);
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(245, 250, 254, 0.86);
+  color: var(--charcoal);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   text-align: left;
   overflow: hidden;
-  transition: background 120ms;
+  transition: background 120ms, border-color 120ms;
 }
 
 .shop-item:hover:not(:disabled) {
-  background: var(--overlay-cell-hover);
+  background: #fff;
+  border-color: var(--gold);
 }
 
 .shop-item.unaffordable {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .shop-item.active {
-  border-color: var(--gold);
+  border-color: var(--sage-deep);
   opacity: 0.85;
 }
 
 .item-name {
-  font-weight: bold;
+  font-weight: 700;
   flex: 1;
 }
 
 .item-cost {
-  color: var(--gold-bright);
-  font-weight: bold;
+  color: var(--gold-deep);
+  font-weight: 700;
 }
 
 .item-timer {
-  color: var(--gold-bright);
-  font-weight: bold;
+  color: var(--sage-deep);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .item-desc {
   flex-basis: 100%;
-  color: var(--axis);
+  color: var(--charcoal-soft);
   font-size: var(--text-xs);
 }
 
@@ -380,14 +404,14 @@ function purchase(itemId: string, cost: number): void {
   left: 0;
   bottom: 0;
   height: 2px;
-  background: var(--gold-bright);
+  background: var(--sage-deep);
   transition: width 200ms linear;
   pointer-events: none;
 }
 
 .empty-msg {
   font-size: var(--text-xs);
-  color: var(--axis);
+  color: var(--charcoal-soft);
   margin: 0;
   padding: 4px 0;
   font-style: italic;
