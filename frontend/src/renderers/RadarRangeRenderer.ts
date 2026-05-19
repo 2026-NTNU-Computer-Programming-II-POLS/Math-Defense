@@ -2,7 +2,12 @@ import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { TowerType, GamePhase, UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
-import { selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
+import {
+  interceptPoint,
+  radarProjectileSpeed,
+  radarTargetCount,
+  selectRadarTargets,
+} from '@/domain/combat/RadarTargeting'
 import type { Tower } from '@/entities/types'
 
 export class RadarRangeRenderer {
@@ -77,7 +82,10 @@ export class RadarRangeRenderer {
       // Telescope C — dashed bore-sight(s) to the same enemies RadarTowerSystem
       // would actually fire at this tick (honors targetingMode, arc restrict,
       // and target_count), so the aim line cannot diverge from the projectile.
+      // Both fire-side and aim-line share `interceptPoint` + `radarProjectileSpeed`,
+      // so the dashed line ends exactly where the projectile would land.
       const targets = selectRadarTargets(tower, game.enemies, radarTargetCount(tower))
+      const projSpeed = radarProjectileSpeed(tower.type)
       ctx.strokeStyle = `${color}aa`
       ctx.lineWidth = 1.4
       ctx.setLineDash([4, 4])
@@ -89,7 +97,8 @@ export class RadarRangeRenderer {
         ctx.stroke()
       } else {
         for (const t of targets) {
-          const aimAngle = -Math.atan2(t.y - tower.y, t.x - tower.x)
+          const aim = interceptPoint(tower.x, tower.y, t, projSpeed)
+          const aimAngle = -Math.atan2(aim.y - tower.y, aim.x - tower.x)
           ctx.beginPath()
           ctx.moveTo(px, py)
           ctx.lineTo(px + Math.cos(aimAngle) * radiusPx, py + Math.sin(aimAngle) * radiusPx)

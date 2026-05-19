@@ -107,6 +107,8 @@ export function createMockEnemy(overrides?: Partial<Enemy>): Enemy {
     _pathX: 10,
     _targetX: 0,
     _direction: -1 as const,
+    vx: 0,
+    vy: 0,
     killValue: 10,
     shield: 0,
     shieldMax: 0,

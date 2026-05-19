@@ -27,6 +27,8 @@ function makeEnemy(over?: Partial<Enemy>): Enemy {
     _pathX: 0,
     _targetX: 0,
     _direction: -1,
+    vx: 0,
+    vy: 0,
     killValue: 10,
     shield: 0,
     shieldMax: 0,

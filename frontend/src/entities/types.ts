@@ -122,6 +122,13 @@ export interface Enemy {
   _targetX: number
   _direction: 1 | -1
 
+  // Measured per-tick velocity in game units / sec. Written by MovementSystem
+  // after each advance from `(next - prev) / dt`, so it reflects the *actual*
+  // displacement (auto-handles vertical segments, slow debuffs, segment
+  // crossings). Read by RadarTargeting.interceptPoint for lead aim.
+  vx: number
+  vy: number
+
   killValue: number
 
   shield: number
