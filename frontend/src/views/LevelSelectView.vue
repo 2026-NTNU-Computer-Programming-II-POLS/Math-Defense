@@ -95,100 +95,187 @@ async function startLevel() {
 
 <template>
   <div class="level-select">
-    <h1>Select Difficulty</h1>
-    <div
-      v-if="showSuggestion"
-      class="suggestion-badge"
-      role="status"
-      aria-live="polite"
-    >
-      <span class="suggestion-text">
-        Suggested for you: <strong>Star {{ suggestedStar }}</strong>
-      </span>
-      <button
-        type="button"
-        class="suggestion-dismiss"
-        aria-label="Dismiss suggestion"
-        @click="dismissSuggestion"
-      >×</button>
-    </div>
-    <div class="star-grid">
-      <button
-        v-for="star in stars"
-        :key="star"
-        class="star-card"
-        :class="{ selected: selectedStar === star, locked: isStarLocked(star) }"
-        :disabled="isStarLocked(star)"
-        :title="isStarLocked(star) ? STAR_5_LOCK_TOOLTIP : undefined"
-        :aria-disabled="isStarLocked(star) || undefined"
-        @click="selectStar(star)"
+    <div class="card ls-card">
+      <div class="ls-head">
+        <h1 class="title-main">Choose Your Difficulty</h1>
+        <p class="motto">Higher stars yield richer rewards — and harsher enemies.</p>
+      </div>
+
+      <div
+        v-if="showSuggestion"
+        class="ls-suggestion"
+        role="status"
+        aria-live="polite"
       >
-        <div class="star-icons">
-          <span v-for="s in star" :key="s" class="star-icon">&#9733;</span>
-        </div>
-        <div class="star-label">{{ starLabels[star] }}</div>
-        <div v-if="isStarLocked(star)" class="lock-badge" aria-hidden="true">
-          &#128274;
-        </div>
-      </button>
+        <span class="pill pill-info">
+          Suggested: {{ '★'.repeat(suggestedStar || 0) }} — based on your recent
+          performance ·
+          <a
+            href="#"
+            class="pill-dismiss"
+            aria-label="Dismiss suggestion"
+            @click.prevent="dismissSuggestion"
+          >dismiss</a>
+        </span>
+      </div>
+
+      <div class="star-grid">
+        <button
+          v-for="star in stars"
+          :key="star"
+          class="star-card"
+          :class="{ selected: selectedStar === star, locked: isStarLocked(star) }"
+          :disabled="isStarLocked(star)"
+          :title="isStarLocked(star) ? STAR_5_LOCK_TOOLTIP : undefined"
+          :aria-disabled="isStarLocked(star) || undefined"
+          @click="selectStar(star)"
+        >
+          <div class="stars">{{ '★'.repeat(star) }}</div>
+          <div class="name">{{ starLabels[star] }}</div>
+          <div class="desc">
+            {{ ({
+              1: 'Learn the ropes',
+              2: 'Steady waves',
+              3: 'Real pressure',
+              4: 'Few mistakes',
+              5: 'Solve Initial Answer first',
+            })[star] }}
+          </div>
+        </button>
+      </div>
+
+      <p v-if="error" class="error">{{ error }}</p>
+
+      <div class="ls-actions">
+        <button class="btn btn-ghost" @click="router.push({ name: 'menu' })">
+          ← Back
+        </button>
+        <button
+          class="btn btn-primary"
+          :disabled="generating"
+          @click="startLevel"
+        >
+          <span class="icon">▶</span>
+          <span class="label">{{ generating ? 'Generating…' : 'Generate Level' }}</span>
+        </button>
+      </div>
     </div>
-    <p v-if="error" class="error">{{ error }}</p>
-    <button class="start-btn" :disabled="generating" @click="startLevel">
-      {{ generating ? 'Generating...' : 'Generate Level' }}
-    </button>
-    <button class="back-btn" @click="router.push({ name: 'menu' })">Back</button>
   </div>
 </template>
 
 <style scoped>
 .level-select {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 0;
-  color: var(--text-primary);
+  justify-content: center;
   min-height: 100vh;
   min-height: 100dvh;
+  padding: 48px 20px;
 }
 
-h1 {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xl);
-  margin-bottom: 2rem;
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+/* ── Card ── */
+.card {
+  background: rgba(220, 229, 237, 0.86);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-.star-grid {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
+.ls-card {
   width: 100%;
-  max-width: 960px;
-  margin-bottom: 2rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.ls-head {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.title-main {
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--charcoal);
+  letter-spacing: 3px;
+  line-height: 1.1;
+}
+
+.motto {
+  font-size: 0.98rem;
+  color: var(--charcoal-soft);
+  letter-spacing: 0.5px;
+  font-style: italic;
+  margin-top: 6px;
+}
+
+/* ── Suggestion pill ── */
+.ls-suggestion {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(111, 138, 161, 0.18);
+  color: var(--terracotta-deep);
+  border: 1px solid rgba(111, 138, 161, 0.35);
+}
+
+.pill-info {
+  background: rgba(107, 127, 148, 0.18);
+  color: var(--slate-deep);
+  border-color: rgba(107, 127, 148, 0.32);
+}
+
+.pill-dismiss {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── Star grid ── */
+.star-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
 }
 
 .star-card {
-  background: var(--panel-bg);
-  border: 2px solid var(--card-border);
-  border-radius: 8px;
-  padding: 1.2rem 0.5rem;
-  cursor: pointer;
-  flex: 1 1 140px;
-  min-width: 0;
+  width: 100%;
   text-align: center;
-  transition: all 0.2s;
-  color: var(--text-primary);
+  padding: 18px 8px;
+  background: rgba(245, 250, 254, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--charcoal);
+  transition: all 0.16s ease;
 }
 
 .star-card:hover {
-  border-color: var(--axis);
+  border-color: var(--gold);
+  background: #fff;
 }
 
 .star-card.selected {
   border-color: var(--gold);
-  background: var(--stone-selected);
-  box-shadow: 0 0 12px rgba(212, 160, 23, 0.3);
+  background: #fff;
+  box-shadow: 0 8px 22px #ADA28452;
 }
 
 .star-card.locked,
@@ -198,90 +285,127 @@ h1 {
 }
 
 .star-card.locked:hover {
-  border-color: var(--card-border);
+  border-color: var(--line);
+  background: rgba(245, 250, 254, 0.7);
 }
 
-.lock-badge {
-  margin-top: 0.4rem;
-  font-size: var(--text-base);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-}
-
-.star-icons {
-  font-size: var(--text-lg);
+.star-card .stars {
+  font-size: 1.4rem;
   color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  margin-bottom: 0.5rem;
+  margin-bottom: 6px;
+  line-height: 1;
 }
 
-.star-label {
-  font-size: var(--text-md);
+.star-card .name {
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
-.start-btn {
-  padding: 0.8rem 2rem;
-  font-size: var(--text-md);
-  background: var(--tower-cannon);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
+.star-card .desc {
+  font-size: 0.7rem;
+  color: var(--charcoal-soft);
+  margin-top: 4px;
+}
+
+/* ── Actions ── */
+.error {
+  color: var(--clay-deep);
+  font-size: 0.85rem;
+  margin: 18px 0 0;
+  text-align: center;
+}
+
+.ls-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-main);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  min-height: 44px;
+  border: 1px solid rgba(111, 138, 161, 0.4);
+  border-radius: 10px;
+  background: rgba(245, 250, 254, 0.78);
+  color: var(--charcoal);
   cursor: pointer;
-  margin-bottom: 1rem;
+  letter-spacing: 0.4px;
+  transition: all 0.16s ease;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  text-transform: none;
 }
 
-.start-btn:disabled {
+.btn:hover {
+  background: #fff;
+  border-color: var(--terracotta);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.start-btn:hover:not(:disabled) {
-  filter: brightness(1.15);
+.btn .icon {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  color: var(--terracotta-deep);
+  flex-shrink: 0;
 }
 
-.back-btn {
-  padding: 0.5rem 1.5rem;
+.btn .label {
+  flex: 0 0 auto;
+}
+
+.btn-ghost {
+  flex: 0 0 auto;
   background: transparent;
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  cursor: pointer;
+  border: 1px solid var(--line);
+  color: var(--charcoal-soft);
+  font-size: 0.88rem;
+  min-height: 38px;
+  padding: 7px 14px;
 }
 
-.error {
-  color: var(--hp-red);
-  margin-bottom: 1rem;
+.btn-ghost:hover {
+  background: rgba(245, 250, 254, 0.6);
+  color: var(--charcoal);
 }
 
-.suggestion-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: var(--gold-tint-select);
-  border: 1px solid var(--gold);
-  color: var(--gold);
-  border-radius: 999px;
-  padding: 0.4rem 0.9rem;
-  margin-bottom: 1rem;
-  font-size: var(--text-sm);
+.btn-primary {
+  flex: 1;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  border: 1px solid var(--gold-deep);
+  font-size: 1rem;
+  letter-spacing: 1.2px;
+  min-height: 50px;
+  padding: 12px 22px;
+  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 
-.suggestion-text strong {
-  color: var(--gold);
+.btn-primary .icon {
+  color: #fff;
+  font-size: 1.1rem;
 }
 
-.suggestion-dismiss {
-  background: transparent;
-  border: none;
-  color: inherit;
-  font-size: var(--text-lg);
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 0.2rem;
-}
-
-.suggestion-dismiss:hover {
-  opacity: 0.7;
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
+  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
 }
 </style>
