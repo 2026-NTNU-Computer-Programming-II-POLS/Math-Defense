@@ -82,20 +82,20 @@ function apply() {
 
 <style scoped>
 .radar-panel { display: flex; flex-direction: column; gap: 8px; }
-.param-row { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: #ffffff; }
+.param-row { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--charcoal); }
 .param-label { flex: 1; }
-.param-val { width: 16px; text-align: left; color: var(--gold); }
+.param-val { width: 16px; text-align: left; color: var(--terracotta-deep); font-weight: 700; }
 .num-input {
   width: 64px;
-  padding: 3px 6px;
+  padding: 6px 8px;
   font-size: var(--text-xs);
   font-family: var(--font-mono);
-  background: var(--stone-dark);
-  color: #ffffff;
-  border: 1px solid var(--gold);
-  border-radius: 4px;
+  background: rgba(245, 250, 254, 0.85);
+  color: var(--charcoal);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
   text-align: right;
 }
-.num-input:focus { outline: 1px solid var(--gold); }
+.num-input:focus { outline: none; border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28); }
 .cast-btn { font-size: var(--text-xs); padding: 6px 12px; align-self: flex-end; }
 </style>

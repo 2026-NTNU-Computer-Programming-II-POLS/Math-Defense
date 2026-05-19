@@ -253,32 +253,32 @@ function toggleMode(mode: MagicMode) {
 
 <style scoped>
 .magic-panel { display: flex; flex-direction: column; gap: 8px; }
-.section-label { font-size: var(--text-xs); color: var(--axis); margin: 0; }
+.section-label { font-size: var(--text-xs); color: var(--charcoal-soft); margin: 0; }
 .fn-input { display: flex; flex-direction: column; gap: 4px; }
 .input-row { display: flex; gap: 4px; }
 .fn-field {
   flex: 1;
   font-size: var(--text-xs);
-  padding: 6px 8px;
-  background: var(--stone-dark);
-  color: #ffffff;
-  border: 1px solid var(--gold);
-  border-radius: 4px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--charcoal);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
   outline: none;
 }
-.fn-field::placeholder {color: rgba(255, 255, 255, 0.5); }
-.fn-field:focus { border-color: #ffffff; box-shadow: 0 0 5px rgba(255, 215, 0, 0.4); }
+.fn-field::placeholder { color: var(--muted); }
+.fn-field:focus { border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28); }
 .apply-btn { font-size: var(--text-xs); padding: 6px 10px; }
-.hint { font-size: var(--text-2xs); color: var(--text-primary); margin: 0; opacity: 0.7; }
+.hint { font-size: var(--text-2xs); color: var(--charcoal-soft); margin: 0; }
 .origin-hint code {
   font-family: var(--font-mono, monospace);
-  color: var(--gold, #d4a840);
-  background: rgba(0, 0, 0, 0.25);
+  color: var(--terracotta-deep);
+  background: rgba(111, 138, 161, 0.14);
   padding: 0 3px;
-  border-radius: 2px;
+  border-radius: 3px;
 }
-.fn-locked { color: var(--hp-red); opacity: 0.85; text-decoration: line-through; }
-.error-msg { font-size: var(--text-xs); color: #ff8888; margin: 0; }
+.fn-locked { color: var(--clay-deep); opacity: 0.85; text-decoration: line-through; }
+.error-msg { font-size: var(--text-xs); color: var(--clay-deep); margin: 0; }
 /* Magic mode toggle — Debuff = dark purple, Buff = light purple. Pure text
    labels; the inactive option fades to 0.55, the active one gains a purple
    glow ring. Layout/padding identical so only the purple shade differs. */
@@ -326,17 +326,17 @@ function toggleMode(mode: MagicMode) {
 .slider-fn-input { gap: 6px; }
 .slider-row { display: flex; flex-direction: column; gap: 4px; }
 .slider-cell { display: grid; grid-template-columns: 14px 1fr 28px; align-items: center; gap: 6px; }
-.slider-name { font-size: var(--text-xs); color: var(--gold); font-style: italic; }
-.slider-ctrl { accent-color: var(--gold); cursor: pointer; }
-.slider-val { font-size: var(--text-xs); color: #ffffff; font-family: var(--font-mono); text-align: right; }
+.slider-name { font-size: var(--text-xs); color: var(--terracotta-deep); font-style: italic; }
+.slider-ctrl { accent-color: var(--terracotta); cursor: pointer; }
+.slider-val { font-size: var(--text-xs); color: var(--charcoal); font-family: var(--font-mono); text-align: right; }
 .formula-readout {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--gold);
-  background: var(--stone-dark);
-  padding: 4px 6px;
-  border: 1px solid var(--axis);
-  border-radius: 3px;
+  color: var(--terracotta-deep);
+  background: rgba(245, 250, 254, 0.85);
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   margin: 0;
 }
 </style>
