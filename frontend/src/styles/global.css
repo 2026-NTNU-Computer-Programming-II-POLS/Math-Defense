@@ -27,10 +27,13 @@ html, body {
 }
 
 body {
-  background: var(--bg-base);
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 35%, rgba(248, 252, 255, 0.55) 0%, transparent 70%),
+    linear-gradient(165deg, #B8C8D5 0%, #CDD9E2 50%, #ACBDCC 100%);
   color: var(--text-primary);
   font-family: var(--font-main);
   margin: 0;
+  overflow-x: hidden;
 }
 
 /* ── Buttons ── */
