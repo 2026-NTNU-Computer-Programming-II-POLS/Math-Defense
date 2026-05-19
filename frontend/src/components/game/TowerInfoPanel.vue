@@ -343,11 +343,14 @@ const showTargetingMode = computed(() => {
 </template>
 
 <style scoped>
+/* Build Panel drawer — single light-blue surface for every tower type
+   (mockup .gh-drawer / §4.5). Floating position kept (conservative: the
+   app's overlay model, not the mockup's side-rail). */
 .tower-info-panel {
   position: absolute;
   right: 16px;
   bottom: calc(var(--tower-bar-height, 64px) + 12px);
-  width: 280px;
+  width: 320px;
   max-width: calc(100vw - 32px);
   max-height: calc(100% - var(--tower-bar-height, 64px) - 96px);
   overflow-y: auto;
@@ -355,6 +358,11 @@ const showTargetingMode = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: #C5D9E8;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
   animation: panel-pop 0.22s ease-out;
   transform-origin: bottom right;
 }
@@ -365,10 +373,19 @@ const showTargetingMode = computed(() => {
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.panel-header { display: flex; justify-content: space-between; align-items: center; }
+/* Drawer header — plain content row, no box (mockup .drawer-head) */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 4px 4px 10px;
+}
 .panel-title {
-  font-size: var(--text-xs);
-  letter-spacing: 2px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 1px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -379,17 +396,30 @@ const showTargetingMode = computed(() => {
   flex-shrink: 0;
 }
 .close-btn {
-  background: none; border: none; color: var(--axis); cursor: pointer;
+  background: none; border: none; color: var(--charcoal-soft); cursor: pointer;
   font-size: var(--text-sm); min-width: 44px; min-height: 44px;
   display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px;
 }
+.close-btn:hover { background: rgba(79, 74, 72, 0.08); color: var(--charcoal); }
 
-.stats { display: flex; flex-direction: column; gap: 2px; }
-.stat-row {
-  display: flex; justify-content: space-between;
-  font-size: var(--text-xs); color: var(--text-primary);
+/* Stats block — pale rounded card (mockup .stats-block) */
+.stats {
+  display: flex; flex-direction: column;
+  width: 100%; box-sizing: border-box;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
 }
-.stat-row > span:last-child { color: var(--gold); font-weight: bold; }
+.stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 0;
+  font-size: var(--text-xs); color: var(--charcoal-soft);
+  border-bottom: 1px dashed var(--line);
+}
+.stat-row:last-of-type { border-bottom: none; }
+.stat-row > span:last-child { color: var(--charcoal); font-weight: 700; font-family: var(--font-mono); }
 
 /* Click-to-expand breakdown for Damage / Range / Cooldown rows. Using
    <details>/<summary> instead of an absolute-positioned tooltip avoids
@@ -399,8 +429,11 @@ details.stat-row--breakdown {
   display: flex;
   flex-direction: column;
   font-size: var(--text-xs);
-  color: var(--text-primary);
+  color: var(--charcoal-soft);
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--line);
 }
+details.stat-row--breakdown:last-of-type { border-bottom: none; }
 details.stat-row--breakdown > summary {
   display: flex;
   justify-content: space-between;
@@ -411,19 +444,21 @@ details.stat-row--breakdown > summary {
 }
 details.stat-row--breakdown > summary::-webkit-details-marker { display: none; }
 details.stat-row--breakdown > summary:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--terracotta-deep);
   outline-offset: 2px;
   border-radius: 2px;
 }
 details.stat-row--breakdown > summary > .stat-value {
-  color: var(--gold);
+  color: var(--charcoal);
+  font-family: var(--font-mono);
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 .bd-chevron {
   font-size: var(--text-2xs);
-  color: var(--axis);
+  color: var(--charcoal-soft);
   transition: transform 0.15s;
 }
 details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
@@ -431,11 +466,11 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
 }
 
 .breakdown-body {
-  margin-top: 4px;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.4);
-  border-left: 2px solid var(--gold);
-  border-radius: 0 4px 4px 0;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(245, 250, 254, 0.85);
+  border-left: 2px solid var(--terracotta);
+  border-radius: 0 6px 6px 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -447,30 +482,32 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
   gap: 16px;
   letter-spacing: 0.5px;
 }
-.bd-row > span:first-child { color: var(--text-secondary); }
-.bd-row > span:last-child { color: var(--gold); }
+.bd-row > span:first-child { color: var(--charcoal-soft); }
+.bd-row > span:last-child { color: var(--charcoal); }
 /* Specificity must beat ".bd-row > span:last-child" (0,2,1); use a chained
    class on the same element so this wins by source order at (0,2,1). */
-.bd-row > span.bd-zero { color: #6a6052; }
-.bd-row--magic > span:last-child { color: #c8a4ff; }
+.bd-row > span.bd-zero { color: var(--muted); }
+.bd-row--magic > span:last-child { color: var(--plum-deep); }
 .bd-total {
   margin-top: 3px;
   padding-top: 3px;
-  border-top: 1px solid rgba(139, 115, 66, 0.3);
+  border-top: 1px solid var(--line-strong);
 }
-.bd-total > span:first-child { color: var(--text-primary); }
-.bd-total > span:last-child { color: var(--gold); font-weight: bold; }
+.bd-total > span:first-child { color: var(--charcoal); }
+.bd-total > span:last-child { color: var(--terracotta-deep); font-weight: 700; }
 
-.math-concept { font-size: var(--text-xs); color: var(--axis); letter-spacing: 1px; margin: 0; }
+.math-concept { font-size: var(--text-xs); color: var(--charcoal-soft); letter-spacing: 1px; margin: 0; }
+
+/* Exam tip — slate left-border callout (mockup .exam-tip) */
 .exam-relevance {
   font-size: var(--text-xs);
-  color: var(--text-primary);
+  color: var(--slate-deep);
   line-height: 1.45;
   margin: 0;
   padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.05);
-  border-left: 2px solid var(--gold);
-  border-radius: 0 4px 4px 0;
+  background: rgba(107, 127, 148, 0.1);
+  border-left: 3px solid var(--slate);
+  border-radius: 6px;
 }
 .exam-label {
   display: inline-block;
@@ -478,24 +515,46 @@ details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
   font-size: var(--text-2xs);
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--gold);
-  font-weight: bold;
+  color: var(--slate-deep);
+  font-weight: 700;
 }
 
-.panel-actions { display: flex; gap: 8px; }
+/* Drawer actions — Refund (ghost) + Upgrade (gold primary) */
+.panel-actions { display: flex; gap: 8px; margin-top: 4px; }
 .refund-btn {
-  flex: 0 0 auto; font-size: var(--text-xs); padding: 8px 12px;
-  border-color: var(--hp-red); color: var(--hp-red);
+  flex: 0 0 auto; font-size: var(--text-xs); padding: 8px 14px;
+  border-radius: 10px; background: transparent;
+  border: 1px solid var(--line); color: var(--charcoal-soft);
+  text-transform: none; font-family: var(--font-main); font-weight: 600;
 }
-.refund-btn:hover { background: var(--hp-red); color: #ffffff; }
+.refund-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 .refund-confirm {
   display: flex; align-items: center; gap: 6px; flex: 1;
 }
-.refund-prompt { font-size: var(--text-xs); color: var(--hp-red); white-space: nowrap; }
-.refund-yes { font-size: var(--text-xs); padding: 6px 10px; min-height: 32px; border-color: var(--hp-red); color: var(--hp-red); }
-.refund-yes:hover { background: var(--hp-red); color: var(--stone-dark); }
-.refund-no { font-size: var(--text-xs); padding: 6px 10px; min-height: 32px; }
-.upgrade-btn { flex: 1; font-size: var(--text-xs); padding: 8px 12px; }
+.refund-prompt { font-size: var(--text-xs); color: var(--clay-deep); white-space: nowrap; }
+.refund-yes {
+  font-size: var(--text-xs); padding: 6px 10px; min-height: 32px;
+  border-radius: 10px; background: var(--clay);
+  border: 1px solid var(--clay-deep); color: #fff; text-transform: none;
+}
+.refund-yes:hover { filter: brightness(1.06); }
+.refund-no {
+  font-size: var(--text-xs); padding: 6px 10px; min-height: 32px;
+  border-radius: 10px; text-transform: none; background: transparent;
+  border: 1px solid var(--line); color: var(--charcoal-soft);
+}
+.refund-no:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
+.upgrade-btn {
+  flex: 1; font-size: var(--text-xs); padding: 8px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  border: 1px solid var(--gold-deep); color: #fff;
+  font-weight: 700; text-transform: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+.upgrade-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
+}
 .upgrade-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {
