@@ -12,51 +12,116 @@ const manualOpen = ref(false)
 
 <template>
   <div class="menu-view">
-    <div class="menu-title">
+    <div class="menu-hero">
+      <span class="title-eyebrow">FINAL PROJECT · 2026</span>
       <h1 class="title-main">Math Defense</h1>
       <div class="title-divider"></div>
-      <p class="title-motto">Math is magic — defend the origin.</p>
+      <p class="motto">Math is magic — defend the origin.</p>
     </div>
 
-    <nav class="menu-nav">
-      <button v-if="auth.isStudent || auth.isTeacher || !auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'level-select' })">
-        ▶ Start Game
+    <div class="card menu-card">
+      <button
+        v-if="auth.isStudent || auth.isTeacher || !auth.isLoggedIn"
+        class="btn btn-primary"
+        @click="router.push({ name: 'level-select' })"
+      >
+        <span class="icon">▶</span><span class="label">Start Game</span>
       </button>
-      <button class="btn menu-btn" @click="router.push({ name: 'leaderboard' })">
-        ◈ Leaderboard
-      </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'territory-list' })">
-        ⚔ Claim Territory
-      </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'rankings' })">
-        ◈ Full Rankings
-      </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'classes' })">
-        ◆ Class Management
-      </button>
-      <button v-if="auth.isTeacher || auth.isAdmin" class="btn menu-btn" @click="router.push({ name: 'teacher-dashboard' })">
-        ⬡ Teacher Dashboard
-      </button>
-      <button v-if="auth.isLoggedIn" class="btn menu-btn" @click="router.push({ name: 'profile' })">
-        ⬡ {{ auth.user?.player_name }}
-      </button>
-      <button v-if="auth.isAdmin" class="btn menu-btn" @click="router.push({ name: 'admin-teachers' })">
-        ✦ Admin Panel
-      </button>
-      <button class="btn menu-btn" @click="manualOpen = true">
-        ◇ Manual
-      </button>
-      <button class="btn menu-btn" @click="auth.isLoggedIn ? auth.logout() : router.push({ name: 'auth' })">
-        {{ auth.isLoggedIn ? '⏻ Log Out' : '⬡ Log In / Register' }}
-      </button>
-    </nav>
+
+      <div class="menu-section">
+        <div class="section-label">Compete</div>
+        <div class="btn-stack">
+          <button class="btn" @click="router.push({ name: 'leaderboard' })">
+            <span class="icon">◈</span><span class="label">Leaderboard</span>
+          </button>
+          <button
+            v-if="auth.isLoggedIn"
+            class="btn"
+            @click="router.push({ name: 'rankings' })"
+          >
+            <span class="icon">◈</span><span class="label">Full Rankings</span>
+          </button>
+          <button
+            v-if="auth.isLoggedIn"
+            class="btn"
+            @click="router.push({ name: 'territory-list' })"
+          >
+            <span class="icon">⚔</span><span class="label">Claim Territory</span>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="auth.isLoggedIn" class="menu-section">
+        <div class="section-label">Classroom</div>
+        <div class="btn-stack">
+          <button class="btn" @click="router.push({ name: 'classes' })">
+            <span class="icon">◆</span><span class="label">Class Management</span>
+          </button>
+          <button
+            v-if="auth.isTeacher || auth.isAdmin"
+            class="btn"
+            @click="router.push({ name: 'teacher-dashboard' })"
+          >
+            <span class="icon">⬡</span><span class="label">Teacher Dashboard</span>
+          </button>
+          <button
+            v-if="auth.isAdmin"
+            class="btn"
+            @click="router.push({ name: 'admin-teachers' })"
+          >
+            <span class="icon">✦</span><span class="label">Admin Panel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="section-label">Help</div>
+        <div class="btn-stack">
+          <button class="btn" @click="manualOpen = true">
+            <span class="icon">◇</span><span class="label">Manual</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="section-label">Account</div>
+        <template v-if="auth.isLoggedIn">
+          <div class="account-row">
+            <div class="avatar-sm">
+              {{ (auth.user?.player_name || '?').slice(0, 2).toUpperCase() }}
+            </div>
+            <div class="account-meta">
+              <div class="account-name">{{ auth.user?.player_name }}</div>
+              <div class="account-sub">Player Profile</div>
+            </div>
+            <button class="btn btn-ghost" @click="router.push({ name: 'profile' })">
+              Open
+            </button>
+          </div>
+          <button class="btn" @click="auth.logout()">
+            <span class="icon">⏻</span><span class="label">Log Out</span>
+          </button>
+        </template>
+        <button
+          v-else
+          class="btn"
+          @click="router.push({ name: 'auth' })"
+        >
+          <span class="icon">⬡</span><span class="label">Log In / Register</span>
+        </button>
+      </div>
+    </div>
 
     <ManualModal :open="manualOpen" mode="full" @close="manualOpen = false" />
 
-    <footer class="menu-footer">
+    <footer class="footer menu-footer">
       <span>Computer Programming (II) Final Project · 2026</span>
       <span class="menu-footer-sep">·</span>
-      <a class="menu-footer-link" href="#" @click.prevent="router.push({ name: 'about' })">Accessibility Statement</a>
+      <a
+        class="menu-footer-link"
+        href="#"
+        @click.prevent="router.push({ name: 'about' })"
+      >Accessibility Statement</a>
     </footer>
   </div>
 </template>
@@ -64,88 +129,242 @@ const manualOpen = ref(false)
 <style scoped>
 .menu-view {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   min-height: 100dvh;
-  gap: 48px;
-  padding: 80px 20px;
+  padding: 48px 20px;
 }
 
-.menu-title {
-  position: relative;
-  z-index: 1;
+/* ── Title block ── */
+.menu-hero {
   text-align: center;
+  margin-bottom: 28px;
+}
+
+.title-eyebrow {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 5px;
+  color: var(--terracotta-deep);
+  padding: 5px 12px;
+  border: 1px solid rgba(111, 138, 161, 0.5);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .title-main {
-  /* Display hero — explicitly monospace to preserve "rune" feel after
-     --font-main moved to system-ui in Phase 1. */
   font-family: var(--font-mono);
-  font-size: var(--text-3xl);
-  color: var(--menu-navy);
-  text-shadow: 0 2px 20px rgba(255,255,255,0.8), 0 4px 12px rgba(164,185,212,0.4);
-  letter-spacing: 12px;
-  margin-bottom: 4px;
+  font-size: clamp(2.1rem, 4.5vw, 3rem);
   font-weight: 800;
+  color: var(--charcoal);
+  letter-spacing: 5px;
+  line-height: 1.1;
+  margin-top: 14px;
 }
 
 .title-divider {
-  width: 60px;
-  height: 4px;
-  background: var(--gold);
-  margin: 0 auto 24px;
+  width: 64px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--terracotta), transparent);
+  margin: 14px auto;
   border-radius: 2px;
 }
 
-@media (max-width: 480px) {
-  .title-main {
-    font-size: var(--text-2xl);
-    letter-spacing: 4px;
-  }
+.motto {
+  font-size: 0.98rem;
+  color: var(--charcoal-soft);
+  letter-spacing: 0.5px;
+  font-style: italic;
 }
 
-.title-motto {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 3px;
-}
-
-.menu-nav {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 380px;
-  padding: 32px;
-  background: var(--card-surface);
+/* ── Card ── */
+.card {
+  background: rgba(220, 229, 237, 0.86);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow);
+  padding: 26px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 20px 60px rgba(30, 60, 120, 0.12), 0 4px 16px rgba(30, 60, 120, 0.08);
 }
 
-.menu-btn {
-  font-size: var(--text-sm);
-  padding: 14px 24px;
-  letter-spacing: 4px;
+.menu-card {
+  max-width: 480px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.55);
-  color: var(--menu-btn-color);
+  margin: 0 auto;
 }
 
-.menu-footer {
-  position: relative;
-  z-index: 1;
-  font-size: var(--text-xs);
-  color: rgba(15, 42, 88, 0.5);
+/* ── Sections ── */
+.menu-section + .menu-section {
+  border-top: 1px dashed var(--line-strong);
+  padding-top: 14px;
+  margin-top: 18px;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 4px;
+  color: var(--charcoal-soft);
+  text-transform: uppercase;
+  margin: 22px 0 12px;
+}
+
+.section-label::after {
+  content: "";
+  flex: 1;
+  height: 0;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.section-label:first-child {
+  margin-top: 0;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-main);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  min-height: 44px;
+  border: 1px solid rgba(111, 138, 161, 0.4);
+  border-radius: 10px;
+  background: rgba(245, 250, 254, 0.78);
+  color: var(--charcoal);
+  cursor: pointer;
+  letter-spacing: 0.4px;
+  transition: all 0.16s ease;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  text-transform: none;
+}
+
+.btn:hover {
+  background: #fff;
+  border-color: var(--terracotta);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: 2px;
+}
+
+.btn .icon {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  color: var(--terracotta-deep);
+  flex-shrink: 0;
+}
+
+.btn .label {
+  flex: 0 0 auto;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  border: 1px solid var(--gold-deep);
+  font-size: 1rem;
+  letter-spacing: 1.2px;
+  min-height: 50px;
+  padding: 12px 22px;
+  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+
+.btn-primary .icon {
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
+  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--charcoal-soft);
+  font-size: 0.88rem;
+  min-height: 38px;
+  padding: 7px 14px;
+}
+
+.btn-ghost:hover {
+  background: rgba(245, 250, 254, 0.6);
+  color: var(--charcoal);
+}
+
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-stack > .btn {
+  width: 100%;
+}
+
+/* ── Account row ── */
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.avatar-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-soft));
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.account-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name {
+  font-weight: 600;
+}
+
+.account-sub {
+  font-size: 0.78rem;
+  color: var(--charcoal-soft);
+}
+
+/* ── Footer ── */
+.footer {
+  margin-top: 40px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
   letter-spacing: 2px;
+  text-align: center;
 }
 
 .menu-footer-sep {
@@ -153,14 +372,13 @@ const manualOpen = ref(false)
 }
 
 .menu-footer-link {
-  color: rgba(15, 42, 88, 0.5);
+  color: var(--charcoal-soft);
   text-decoration: underline;
   cursor: pointer;
 }
 
 .menu-footer-link:hover,
 .menu-footer-link:focus-visible {
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  color: var(--terracotta-deep);
 }
 </style>
