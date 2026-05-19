@@ -363,27 +363,33 @@ onMounted(async () => {
 }
 
 .class-panel {
-  width: 420px;
+  width: 720px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .class-title {
-  font-size: var(--text-base);
-  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
+  font-size: 1.35rem;
+  /* Mono title kept after Phase 1 swapped --font-main to system-ui. */
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 4px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
   text-align: center;
 }
 
-.class-error { font-size: var(--text-xs); color: var(--enemy-red); }
+.class-error { font-size: var(--text-xs); color: var(--clay-deep); }
 
 .section { display: flex; flex-direction: column; gap: 8px; }
-.section-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.section-title { font-size: var(--text-xs); color: var(--charcoal-soft); font-family: var(--font-mono); letter-spacing: 2px; text-transform: uppercase; margin: 0; }
 
 .inline-form { display: flex; gap: 8px; }
 .inline-form .rune-input { flex: 1; }
@@ -391,15 +397,17 @@ onMounted(async () => {
 .class-list, .student-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 
 .class-item {
-  border: 1px solid var(--axis);
-  padding: 8px;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
   font-size: var(--text-sm);
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.class-item.selected { border-color: var(--gold); }
+.class-item.selected { border-color: var(--terracotta); }
 
 .class-item-header {
   display: flex;
@@ -409,27 +417,30 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.class-name { color: var(--gold); text-shadow: var(--gold-shadow); flex: 1; }
+.class-name { color: var(--charcoal); font-weight: 700; flex: 1; }
 
 .teacher-name {
   font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  opacity: 0.6;
+  color: var(--charcoal-soft);
+  opacity: 0.8;
 }
 
 .join-code {
-  font-family: monospace;
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  font-family: var(--font-mono);
+  color: var(--terracotta-deep);
+  background: rgba(168, 188, 203, 0.24);
+  padding: 4px 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 1px;
   transition: color 0.15s;
   white-space: nowrap;
 }
 
-.join-code:hover { color: var(--gold); text-shadow: var(--gold-shadow); }
-.join-code.copied { color: var(--gold); text-shadow: var(--gold-shadow); }
+.join-code:hover { color: var(--charcoal); }
+.join-code.copied { color: var(--sage-deep); }
 
 .rename-input { flex: 1; font-size: var(--text-xs); }
 .rename-btns { display: flex; gap: 4px; }
@@ -441,39 +452,41 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   font-size: var(--text-sm);
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line-strong);
 }
 
 .student-info { display: flex; flex-direction: column; gap: 2px; }
-.student-name { color: var(--gold); text-shadow: var(--gold-shadow); }
-.student-email { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
+.student-name { color: var(--charcoal); font-weight: 600; }
+.student-email { font-size: var(--text-2xs); color: var(--charcoal-soft); opacity: 0.8; }
 
 .btn-sm {
   font-size: var(--text-xs);
-  padding: 2px 6px;
+  padding: 2px 12px;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  background: none;
-  border: 1px solid var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--charcoal-soft);
   cursor: pointer;
+  transition: all 0.16s ease;
 }
 
-.btn-sm:hover:not(:disabled) { background: var(--axis); color: var(--stone-dark); }
-.btn-sm.danger { border-color: var(--enemy-red); color: var(--enemy-red); }
-.btn-sm.danger:hover { background: var(--enemy-red); color: var(--stone-dark); }
+.btn-sm:hover:not(:disabled) { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); border-color: var(--terracotta); }
+.btn-sm.danger { border-color: rgba(185, 134, 116, 0.5); color: var(--clay-deep); }
+.btn-sm.danger:hover { background: var(--clay); color: #fff; }
 .btn-sm:disabled { opacity: 0.4; cursor: default; }
 
-.loading, .empty { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
+.loading, .empty { font-size: var(--text-sm); color: var(--charcoal-soft); font-style: italic; }
 
 .back-btn {
   font-size: var(--text-xs);
   letter-spacing: 1px;
-  border-color: var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border-color: var(--line);
+  color: var(--charcoal-soft);
 }
 
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 </style>
