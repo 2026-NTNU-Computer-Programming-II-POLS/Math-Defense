@@ -130,22 +130,19 @@ async function submit(): Promise<void> {
 
 <template>
   <div class="auth-view">
-    <div class="auth-panel rune-panel">
-      <h2 class="auth-title">{{ mfaRequired ? 'Two-Factor Authentication' : title }}</h2>
+    <div class="card auth-card">
+      <!-- Two-factor verification (no mockup design — themed to palette) -->
+      <template v-if="mfaRequired">
+        <h2 class="auth-title">Two-Factor Authentication</h2>
 
-      <div v-if="registrationSubmitted" class="auth-notice">
-        If the email is available, an account was created. Please check your
-        inbox to verify the address, then sign in below.
-      </div>
-
-      <form class="auth-form" @submit.prevent="submit">
-        <template v-if="mfaRequired">
-          <p class="mfa-hint">Please enter the 6-digit code from your authenticator app</p>
-          <label class="auth-field">
-            <span>Verification Code</span>
+        <form class="auth-form" @submit.prevent="submit">
+          <p class="mfa-hint">
+            Please enter the 6-digit code from your authenticator app
+          </p>
+          <div class="field">
+            <label>Verification Code</label>
             <input
               v-model="mfaCode"
-              class="rune-input"
               type="text"
               inputmode="numeric"
               pattern="\d{6}"
@@ -155,213 +152,403 @@ async function submit(): Promise<void> {
               required
               @input="clearError"
             />
-          </label>
-        </template>
+          </div>
 
-        <template v-else>
-          <label class="auth-field">
-            <span>Email</span>
+          <div v-if="error" class="auth-error">{{ error }}</div>
+
+          <button class="btn btn-primary" type="submit" :disabled="loading">
+            <span class="label">{{ loading ? 'Loading…' : 'Verify' }}</span>
+          </button>
+        </form>
+
+        <div class="auth-foot">
+          <button class="btn btn-ghost auth-block" @click="handleCancelMfa">
+            ← Back to Login
+          </button>
+        </div>
+      </template>
+
+      <!-- Login / Register -->
+      <template v-else>
+        <div class="tabs">
+          <button
+            class="tab"
+            :class="{ active: isLogin }"
+            type="button"
+            @click="!isLogin && toggleMode()"
+          >Login</button>
+          <button
+            class="tab"
+            :class="{ active: !isLogin }"
+            type="button"
+            @click="isLogin && toggleMode()"
+          >Register</button>
+        </div>
+
+        <div v-if="registrationSubmitted" class="auth-notice">
+          If the email is available, an account was created. Please check your
+          inbox to verify the address, then sign in below.
+        </div>
+
+        <form class="auth-form" @submit.prevent="submit">
+          <div class="field">
+            <label>Email</label>
             <input
               v-model="email"
-              class="rune-input"
               type="email"
               autocomplete="email"
               required
               @input="clearError"
             />
-          </label>
+          </div>
 
           <template v-if="!isLogin">
-            <label class="auth-field">
-              <span>Player Name</span>
+            <div class="field">
+              <label>Player Name</label>
               <input
                 v-model="playerName"
-                class="rune-input"
                 type="text"
                 autocomplete="nickname"
                 required
                 @input="clearError"
               />
-            </label>
+            </div>
 
             <!-- M-04: self-service registration only allows student role.
                  Teacher accounts require administrator setup. -->
-            <label class="auth-field">
-              <span>Role</span>
+            <div class="field">
+              <label>Role</label>
               <div class="role-display">Student</div>
-            </label>
+            </div>
           </template>
 
-          <label class="auth-field">
-            <span>Password</span>
+          <div class="field">
+            <label>Password</label>
             <input
               :value="password"
-              class="rune-input"
               type="password"
               :autocomplete="isLogin ? 'current-password' : 'new-password'"
               required
               @input="onPasswordInput"
             />
-          </label>
+          </div>
 
-          <ul v-if="!isLogin" class="password-rules">
-            <li :class="{ met: passwordRules.length }">At least 8 characters</li>
-            <li :class="{ met: passwordRules.hasLetter }">Contains letters</li>
-            <li :class="{ met: passwordRules.hasDigit }">Contains numbers</li>
+          <ul v-if="!isLogin" class="checklist">
+            <li :class="{ ok: passwordRules.length }">At least 8 characters</li>
+            <li :class="{ ok: passwordRules.hasLetter }">Contains a letter</li>
+            <li :class="{ ok: passwordRules.hasDigit }">Contains a digit</li>
           </ul>
-        </template>
 
-        <div v-if="error" class="auth-error">{{ error }}</div>
+          <div v-if="error" class="auth-error">{{ error }}</div>
 
-        <button class="btn" type="submit" :disabled="loading">
-          {{ loading ? 'Loading…' : (mfaRequired ? 'Verify' : title) }}
-        </button>
-      </form>
+          <button class="btn btn-primary" type="submit" :disabled="loading">
+            <span class="label">{{ loading ? 'Loading…' : title }}</span>
+          </button>
+        </form>
 
-      <template v-if="mfaRequired">
-        <button class="btn toggle-btn" @click="handleCancelMfa">← Back to Login</button>
+        <div class="auth-switch">
+          <template v-if="isLogin">
+            New here?
+            <a href="#" @click.prevent="toggleMode">Create a student account</a>
+          </template>
+          <template v-else>
+            Already have an account?
+            <a href="#" @click.prevent="toggleMode">Log in</a>
+          </template>
+        </div>
+
+        <p v-if="isLogin" class="demo-hint">
+          Demo Account: <code>demo@mathdefense.local</code> / <code>Demo1234</code>
+        </p>
+
+        <div class="auth-foot">
+          <button class="btn btn-ghost auth-block" @click="router.push('/')">
+            ← Back to Menu
+          </button>
+        </div>
       </template>
-      <template v-else>
-        <button class="btn toggle-btn" @click="toggleMode">
-          {{ isLogin ? 'No account? Register' : 'Already have an account? Log in' }}
-        </button>
-      </template>
-
-      <p v-if="isLogin && !mfaRequired" class="demo-hint">
-        Demo Account: <code>demo@mathdefense.local</code> / <code>Demo1234</code>
-      </p>
-
-      <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← Back to Menu</button>
     </div>
   </div>
 </template>
 
 <style scoped>
 .auth-view {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   min-height: 100dvh;
+  padding: 48px 20px;
 }
 
-.auth-panel {
-  width: 380px;
-  max-width: calc(100% - 32px);
+/* ── Card ── */
+.card {
+  background: rgba(220, 229, 237, 0.86);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.auth-card {
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── Tabs ── */
+.tabs {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
 }
 
-.auth-title {
-  /* Rune-flavoured title: retain monospace explicitly now that --font-main
-     is system-ui (Phase 1). */
+.tab {
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
   font-family: var(--font-mono);
-  font-size: var(--text-2xl);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 4px;
-  text-align: center;
+  font-size: 0.82rem;
+  letter-spacing: 2px;
+  color: var(--charcoal-soft);
+  cursor: pointer;
+  text-transform: uppercase;
 }
 
+.tab.active {
+  color: var(--terracotta-deep);
+  border-bottom-color: var(--terracotta);
+  font-weight: 600;
+}
+
+/* ── Form fields ── */
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
-.auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+.field {
+  margin-bottom: 14px;
 }
 
-.rune-input { width: 100%; }
+.field label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--charcoal-soft);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
 
-.auth-error { font-size: var(--text-sm); color: var(--enemy-red); }
-.auth-notice {
-  font-size: var(--text-sm);
-  color: var(--text-secondary, currentColor);
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  opacity: 0.9;
+.field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-family: var(--font-main);
+  font-size: 0.95rem;
+  background: rgba(245, 250, 254, 0.85);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--charcoal);
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28);
+}
+
+.role-display {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--charcoal-soft);
+  font-size: 0.95rem;
+}
+
+/* ── Password checklist ── */
+.checklist {
+  list-style: none;
+  margin: 6px 0 14px;
+  padding: 0;
+}
+
+.checklist li {
+  padding: 2px 0;
+  font-size: 0.82rem;
+  color: var(--charcoal-soft);
+}
+
+.checklist li::before {
+  content: "○ ";
+  color: var(--muted);
+}
+
+.checklist li.ok {
+  color: var(--charcoal);
+}
+
+.checklist li.ok::before {
+  content: "✓ ";
+  color: var(--sage-deep);
+  font-weight: 700;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-main);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  min-height: 44px;
+  border: 1px solid rgba(111, 138, 161, 0.4);
+  border-radius: 10px;
+  background: rgba(245, 250, 254, 0.78);
+  color: var(--charcoal);
+  cursor: pointer;
+  letter-spacing: 0.4px;
+  transition: all 0.16s ease;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  text-transform: none;
+}
+
+.btn:hover {
+  background: #fff;
+  border-color: var(--terracotta);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn .label {
+  flex: 0 0 auto;
+}
+
+.btn-primary {
+  align-self: center;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  border: 1px solid var(--gold-deep);
+  font-size: 1rem;
+  letter-spacing: 1.2px;
+  min-height: 50px;
+  padding: 12px 22px;
+  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  margin-top: 4px;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
+  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--charcoal-soft);
+  font-size: 0.88rem;
+  min-height: 38px;
+  padding: 7px 14px;
+}
+
+.btn-ghost:hover {
+  background: rgba(245, 250, 254, 0.6);
+  color: var(--charcoal);
+}
+
+.auth-block {
+  width: 100%;
+}
+
+/* ── Auxiliary text ── */
+.auth-title {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--charcoal);
+  letter-spacing: 4px;
+  text-align: center;
+  margin-bottom: 18px;
 }
 
 .mfa-hint {
-  font-size: var(--text-sm);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  opacity: 0.8;
-  margin: 0;
+  font-size: 0.85rem;
+  color: var(--charcoal-soft);
   text-align: center;
+  margin: 0 0 6px;
 }
 
-.password-rules {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  opacity: 0.7;
+.auth-error {
+  font-size: 0.85rem;
+  color: var(--clay-deep);
+  margin: 2px 0 8px;
 }
 
-.password-rules li::before {
-  content: '✕ ';
-  color: var(--enemy-red);
+.auth-notice {
+  font-size: 0.85rem;
+  color: var(--sage-deep);
+  background: rgba(126, 144, 119, 0.12);
+  border: 1px solid rgba(126, 144, 119, 0.35);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  line-height: 1.45;
 }
 
-.password-rules li.met::before {
-  content: '✓ ';
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+.auth-switch {
+  text-align: center;
+  margin: 14px 0;
+  font-size: 0.85rem;
+  color: var(--charcoal-soft);
 }
 
-.password-rules li.met {
-  opacity: 0.5;
+.auth-switch a {
+  color: var(--terracotta-deep);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
 }
 
 .demo-hint {
   text-align: center;
-  font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  opacity: 0.6;
-  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 14px;
 }
 
 .demo-hint code {
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  font-family: inherit;
+  font-family: var(--font-mono);
+  color: var(--terracotta-deep);
 }
 
-.toggle-btn, .back-btn {
-  font-size: var(--text-xs);
-  letter-spacing: 1px;
-  border-color: var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-}
-
-.toggle-btn:hover, .back-btn:hover {
-  background: var(--axis);
-  color: var(--stone-dark);
-}
-
-.role-display {
-  padding: 4px 8px;
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 2px;
-  color: var(--axis);
-  font-size: var(--text-xs);
+.auth-foot {
+  border-top: 1px dashed var(--line-strong);
+  padding-top: 14px;
 }
 </style>
