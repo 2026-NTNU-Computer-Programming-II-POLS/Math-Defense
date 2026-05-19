@@ -39,6 +39,9 @@ export function createEnemy(
     _targetX: targetX,
     _direction: targetX > startX ? 1 : -1,
 
+    vx: 0,
+    vy: 0,
+
     killValue: def.killValue,
 
     shield: def.shieldHp ?? 0,

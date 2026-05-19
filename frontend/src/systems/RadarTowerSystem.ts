@@ -1,7 +1,7 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
-import { selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
+import { interceptPoint, radarProjectileSpeed, selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy, Projectile, TargetingMode } from '@/entities/types'
 
@@ -119,11 +119,15 @@ export class RadarTowerSystem {
   }
 
   private _fireProjectile(tower: Tower, target: Enemy, damage: number, game: Game): void {
-    const dx = target.x - tower.x
-    const dy = target.y - tower.y
+    const speed = radarProjectileSpeed(tower.type)
+    // Lead-aim: both projectile direction and the RADAR_C dashed bore-sight
+    // call interceptPoint with the same inputs, guaranteeing the aim line
+    // and projectile cannot diverge at fire time.
+    const aim = interceptPoint(tower.x, tower.y, target, speed)
+    const dx = aim.x - tower.x
+    const dy = aim.y - tower.y
     const len = Math.sqrt(dx * dx + dy * dy)
     if (len < 1e-3) return
-    const speed = tower.type === TowerType.RADAR_C ? 8 : 15
     game.projectiles.push(makeProjectile(
       tower.x, tower.y,
       (dx / len) * speed, (dy / len) * speed,

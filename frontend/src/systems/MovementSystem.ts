@@ -204,6 +204,15 @@ export class MovementSystem {
       direction: enemy._direction,
     })
     this._states.set(enemy.id, next)
+    // Record per-tick velocity from the actual displacement so downstream
+    // readers (RadarTargeting.interceptPoint) extrapolate from real motion.
+    // Auto-handles vertical segments (vx=0), slow/boost debuffs, and the
+    // first frame of a segment crossing without needing path awareness.
+    if (dt > 0) {
+      const invDt = 1 / dt
+      enemy.vx = (next.x - prev.x) * invDt
+      enemy.vy = (next.y - prev.y) * invDt
+    }
     enemy.x = next.x
     enemy.y = next.y
     enemy._pathX = next.x
