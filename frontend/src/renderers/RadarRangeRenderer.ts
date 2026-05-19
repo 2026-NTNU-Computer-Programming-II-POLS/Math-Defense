@@ -2,6 +2,7 @@ import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { TowerType, GamePhase, UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import { selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
 import type { Tower } from '@/entities/types'
 
 export class RadarRangeRenderer {
@@ -73,18 +74,28 @@ export class RadarRangeRenderer {
       ctx.arc(px, py, radiusPx * 0.7, -arcEnd, -arcStart)
       ctx.stroke()
     } else {
-      // Telescope C — dashed bore-sight to nearest in-range enemy + scope
-      // bracket ticks at the wedge endpoints. Aim is cosmetic; the actual
-      // firing target is still picked by RadarTowerSystem.
-      const aim = this._nearestEnemyAngle(tower, game)
-      const aimAngle = aim !== null ? -aim : -(arcStart + arcEnd) / 2
+      // Telescope C — dashed bore-sight(s) to the same enemies RadarTowerSystem
+      // would actually fire at this tick (honors targetingMode, arc restrict,
+      // and target_count), so the aim line cannot diverge from the projectile.
+      const targets = selectRadarTargets(tower, game.enemies, radarTargetCount(tower))
       ctx.strokeStyle = `${color}aa`
       ctx.lineWidth = 1.4
       ctx.setLineDash([4, 4])
-      ctx.beginPath()
-      ctx.moveTo(px, py)
-      ctx.lineTo(px + Math.cos(aimAngle) * radiusPx, py + Math.sin(aimAngle) * radiusPx)
-      ctx.stroke()
+      if (targets.length === 0) {
+        const aimAngle = -(arcStart + arcEnd) / 2
+        ctx.beginPath()
+        ctx.moveTo(px, py)
+        ctx.lineTo(px + Math.cos(aimAngle) * radiusPx, py + Math.sin(aimAngle) * radiusPx)
+        ctx.stroke()
+      } else {
+        for (const t of targets) {
+          const aimAngle = -Math.atan2(t.y - tower.y, t.x - tower.x)
+          ctx.beginPath()
+          ctx.moveTo(px, py)
+          ctx.lineTo(px + Math.cos(aimAngle) * radiusPx, py + Math.sin(aimAngle) * radiusPx)
+          ctx.stroke()
+        }
+      }
       ctx.setLineDash([])
 
       ctx.strokeStyle = `${color}cc`
@@ -104,21 +115,4 @@ export class RadarRangeRenderer {
     ctx.restore()
   }
 
-  private _nearestEnemyAngle(tower: Tower, game: import('@/engine/Game').Game): number | null {
-    const r = tower.effectiveRange
-    let bestDist = Infinity
-    let bestX = 0
-    let bestY = 0
-    let found = false
-    for (const e of game.enemies) {
-      if (!e.alive) continue
-      const dx = e.x - tower.x
-      const dy = e.y - tower.y
-      const d = Math.hypot(dx, dy)
-      if (d > r) continue
-      if (d < bestDist) { bestDist = d; bestX = e.x; bestY = e.y; found = true }
-    }
-    if (!found) return null
-    return Math.atan2(bestY - tower.y, bestX - tower.x)
-  }
 }

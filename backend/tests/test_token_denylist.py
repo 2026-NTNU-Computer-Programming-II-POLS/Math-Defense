@@ -12,11 +12,15 @@ from app.models.denied_token import DeniedToken
 
 
 def _register_and_token(client) -> str:
-    res = client.post(
+    email = "logoutme@test.local"
+    password = "xQ7!aPm2#vKz9"
+    reg = client.post(
         "/api/auth/register",
-        json={"email": "logoutme@test.local", "password": "xQ7!aPm2#vKz9", "player_name": "logoutme"},
+        json={"email": email, "password": password, "player_name": "logoutme"},
     )
-    assert res.status_code == 201
+    assert reg.status_code == 202
+    res = client.post("/api/auth/login", json={"email": email, "password": password})
+    assert res.status_code == 200
     return res.cookies.get("access_token")
 
 

@@ -174,7 +174,7 @@ h1 {
   border-radius: 8px;
   padding: 1.2rem 0.5rem;
   cursor: pointer;
-  flex: 1;
+  flex: 1 1 140px;
   min-width: 0;
   text-align: center;
   transition: all 0.2s;

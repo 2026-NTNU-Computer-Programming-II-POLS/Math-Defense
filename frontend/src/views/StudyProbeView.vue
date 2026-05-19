@@ -151,12 +151,12 @@ function backToMenu() {
 }
 .probe-header h1 {
   margin: 0 0 0.25rem;
-  font-size: 1.6rem;
+  font-size: var(--text-xl);
 }
 .probe-meta {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
 }
 .probe-warning {
   background: var(--gold-tint);
@@ -179,7 +179,7 @@ function backToMenu() {
 }
 .probe-stem {
   margin: 0 0 0.75rem;
-  font-size: 1rem;
+  font-size: var(--text-base);
   line-height: 1.45;
 }
 .probe-num {

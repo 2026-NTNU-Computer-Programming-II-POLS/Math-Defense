@@ -1,12 +1,18 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import Boolean, String, Integer, Float, DateTime, Enum
+from sqlalchemy import Boolean, CheckConstraint, String, Integer, Float, DateTime, Enum, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "ia_recent_accuracy BETWEEN 0.0 AND 1.0",
+            name="ck_user_ia_accuracy_range",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
@@ -22,7 +28,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     password_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     totp_last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Rolling fraction of the last 10 completed sessions whose Initial-Answer
@@ -36,5 +42,5 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
     )

@@ -138,12 +138,12 @@ function backToMenu() {
 }
 .affect-header h1 {
   margin: 0 0 0.25rem;
-  font-size: 1.6rem;
+  font-size: var(--text-xl);
 }
 .affect-meta {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
 }
 .affect-warning {
   background: var(--gold-tint);
@@ -170,7 +170,7 @@ function backToMenu() {
 }
 .affect-stem {
   margin: 0 0 0.6rem;
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 .affect-num {
   margin-right: 0.4rem;
@@ -214,7 +214,7 @@ function backToMenu() {
   text-shadow: var(--gold-shadow);
 }
 .likert-text {
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 .affect-actions {

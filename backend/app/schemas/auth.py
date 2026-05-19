@@ -36,8 +36,9 @@ class RegisterRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def role_valid(cls, v: str) -> str:
-        if v not in ("student", "teacher"):
-            raise ValueError("Role must be 'student' or 'teacher'")
+        # M-04: self-service registration only permits student accounts.
+        if v != "student":
+            raise ValueError("Self-service registration is limited to the 'student' role")
         return v
 
     @field_validator("email")
@@ -92,6 +93,17 @@ class TokenResponse(BaseModel):
     is_email_verified: bool = False
     mfa_required: bool = False
     mfa_token: str | None = None
+
+
+class RegisterAcceptedResponse(BaseModel):
+    """Generic 202 response for /register.
+
+    Carries no user fields so the response is byte-identical regardless of
+    whether the email was previously registered (M-05 anti-enumeration).
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    detail: str = "If the email is available, an account was created. Check your inbox to verify the address before signing in."
 
 
 class ChangePasswordRequest(BaseModel):
@@ -171,6 +183,19 @@ class AvatarUpdateRequest(BaseModel):
         return v
 
 
+class MFASetupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str
+
+    @field_validator("current_password")
+    @classmethod
+    def current_password_max_length(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
+            raise ValueError("Password is too long")
+        return v
+
+
 class MFASetupResponse(BaseModel):
     provisioning_uri: str
 
@@ -178,7 +203,15 @@ class MFASetupResponse(BaseModel):
 class MFAConfirmRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    current_password: str
     code: str
+
+    @field_validator("current_password")
+    @classmethod
+    def current_password_max_length(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
+            raise ValueError("Password is too long")
+        return v
 
     @field_validator("code")
     @classmethod

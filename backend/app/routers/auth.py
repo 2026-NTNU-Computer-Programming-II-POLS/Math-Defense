@@ -21,7 +21,9 @@ from app.schemas.auth import (
     LoginRequest,
     MFAChallengeRequest,
     MFAConfirmRequest,
+    MFASetupRequest,
     MFASetupResponse,
+    RegisterAcceptedResponse,
     RegisterRequest,
     TokenResponse,
     UpdatePlayerNameRequest,
@@ -89,28 +91,27 @@ def _clear_refresh_cookie(response: Response) -> None:
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterAcceptedResponse, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("5/minute")
-def register(request: Request, response: Response, req: RegisterRequest, db: Session = Depends(get_db)):
-    user, access_token, refresh_token = build_auth_service(db).register(
+def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
+    # M-05: registration is enumeration-safe. The service performs the same
+    # observable work in both branches; this router returns one fixed 202
+    # body with no cookies. New users complete the flow by clicking the
+    # verification link in their inbox and then signing in via /login.
+    user, is_new_user = build_auth_service(db).register(
         email=req.email,
         password=req.password,
         player_name=req.player_name,
         role=req.role,
     )
-    logger.info("User registered: anon=%s", _anon(str(user.id)))
-    record_audit_event(request, "REGISTER", user.id, {"email_anon": _anon(req.email), "role": user.role.value})
-    _set_auth_cookie(response, access_token)
-    _set_refresh_cookie(response, refresh_token)
-    mint_csrf_cookie(response)
-    return TokenResponse(
-        id=user.id,
-        email=user.email,
-        player_name=user.player_name,
-        role=user.role.value,
-        avatar_url=user.avatar_url,
-        is_email_verified=user.is_email_verified,
-    )
+    # Distinguish only server-side via audit log; the HTTP response is identical.
+    if is_new_user:
+        logger.info("User registered: anon=%s", _anon(str(user.id)))
+        record_audit_event(request, "REGISTER", user.id, {"email_anon": _anon(req.email), "role": user.role.value})
+    else:
+        logger.info("Registration attempt for existing account: anon=%s", _anon(req.email))
+        record_audit_event(request, "REGISTER_EXISTING", user.id, {"email_anon": _anon(req.email)})
+    return RegisterAcceptedResponse()
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -338,10 +339,11 @@ def resend_verification(
 @limiter.limit("5/minute")
 def mfa_setup(
     request: Request,
+    req: MFASetupRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _secret, provisioning_uri = build_auth_service(db).setup_mfa(current_user.id)
+    _secret, provisioning_uri = build_auth_service(db).setup_mfa(current_user.id, req.current_password)
     record_audit_event(request, "MFA_SETUP_INITIATED", current_user.id)
     return MFASetupResponse(provisioning_uri=provisioning_uri)
 
@@ -354,7 +356,7 @@ def mfa_confirm(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    build_auth_service(db).confirm_mfa(current_user.id, req.code)
+    build_auth_service(db).confirm_mfa(current_user.id, req.current_password, req.code)
     logger.info("MFA enabled: id=%s", current_user.id)
     record_audit_event(request, "MFA_ENABLED", current_user.id)
 

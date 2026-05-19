@@ -29,6 +29,7 @@ class LeaderboardEntryOut(BaseModel):
     player_name: str
     level: int
     score: int
+    total_score: float | None = None
     kills: int
     waves_survived: int
     created_at: datetime

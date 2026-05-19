@@ -173,9 +173,11 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   // ── V2 tower events ──
   MAGIC_FUNCTION_SELECTED: [
     { module: 'systems/MagicTowerSystem', handler: 'anonymous', purpose: 'Store player-entered expression on tower' },
+    { module: 'stores/gameStore',         handler: 'anonymous', purpose: 'Bump towerUpgradeTick so MagicModePanel re-renders after Apply' },
   ],
   MAGIC_MODE_CHANGED: [
     { module: 'systems/MagicTowerSystem', handler: 'anonymous', purpose: 'Toggle debuff/buff mode on magic tower' },
+    { module: 'stores/gameStore',         handler: 'anonymous', purpose: 'Bump towerUpgradeTick so MagicModePanel re-renders on mode toggle' },
   ],
   RADAR_ARC_CHANGED: [
     { module: 'systems/RadarTowerSystem', handler: 'anonymous', purpose: 'Update arc parameters on radar tower' },

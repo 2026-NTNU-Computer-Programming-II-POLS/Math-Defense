@@ -1,6 +1,7 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
+import { selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy, Projectile, TargetingMode } from '@/entities/types'
 
@@ -90,8 +91,8 @@ export class RadarTowerSystem {
     if (tower.cooldownTimer > 0) return
     tower.cooldownTimer = tower.cooldown
 
-    const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
-    const targets = this._findTargets(tower, game, count)
+    const count = radarTargetCount(tower)
+    const targets = selectRadarTargets(tower, game.enemies, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)
       this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus, game)
@@ -103,10 +104,10 @@ export class RadarTowerSystem {
     if (tower.cooldownTimer > 0) return
     tower.cooldownTimer = tower.cooldown
 
-    const count = 1 + Math.floor(tower.talentMods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
+    const count = radarTargetCount(tower)
     const critChance = Math.min(1, tower.upgradeExtras?.['critChance'] ?? 0)
     const critDmgBonus = tower.upgradeExtras?.['critDamage'] ?? 0
-    const targets = this._findTargets(tower, game, count)
+    const targets = selectRadarTargets(tower, game.enemies, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)
       // game.rng (seeded) so a recorded run replays with identical crit hits
@@ -115,30 +116,6 @@ export class RadarTowerSystem {
       const critMult = isCrit ? 2.0 + critDmgBonus : 1.0
       this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus * critMult, game)
     }
-  }
-
-  private _findTargets(tower: Tower, game: Game, count: number): Enemy[] {
-    const range = tower.effectiveRange
-    const candidates: { enemy: Enemy; dist: number }[] = []
-    for (const enemy of game.enemies) {
-      if (!enemy.alive) continue
-      const d = distance(tower.x, tower.y, enemy.x, enemy.y)
-      if (d > range) continue
-      if (tower.arcRestrict && !this._isInArc(tower, enemy)) continue
-      candidates.push({ enemy, dist: d })
-    }
-
-    // Game convention (see MovementSystem): enemies travel from larger x → smaller x
-    // toward the origin. So "first" (closest to goal) = smallest x.
-    const mode: TargetingMode = tower.targetingMode ?? 'first'
-    switch (mode) {
-      case 'first':     candidates.sort((a, b) => a.enemy.x - b.enemy.x); break
-      case 'last':      candidates.sort((a, b) => b.enemy.x - a.enemy.x); break
-      case 'strongest': candidates.sort((a, b) => b.enemy.hp - a.enemy.hp); break
-      case 'closest':
-      default:          candidates.sort((a, b) => a.dist - b.dist); break
-    }
-    return candidates.slice(0, count).map(c => c.enemy)
   }
 
   private _fireProjectile(tower: Tower, target: Enemy, damage: number, game: Game): void {

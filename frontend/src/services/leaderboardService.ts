@@ -28,6 +28,7 @@ export interface PersonalHistoryEntry {
 
 export interface PersonalHistoryResponse {
   entries: PersonalHistoryEntry[]
+  total: number
 }
 
 export const leaderboardService = {

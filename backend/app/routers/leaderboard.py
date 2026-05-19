@@ -49,13 +49,26 @@ def get_leaderboard(
     ranked, total = build_leaderboard_service(db).get_leaderboard(
         level, page, per_page, class_id=class_id, challenge_id=challenge_id,
     )
+    # M-08: anonymize player names for unauthenticated viewers to avoid
+    # exposing student identities in an educational context.
+    def _display_name(r) -> str:
+        if current_user is not None:
+            return r.player_name
+        name = r.player_name
+        if not name:
+            return "*"
+        if len(name) <= 2:
+            return name[0] + "*"
+        return name[0] + "*" * (len(name) - 2) + name[-1]
+
     entries = [
         LeaderboardEntryOut(
             id=r.id,
             rank=r.rank,
-            player_name=r.player_name,
+            player_name=_display_name(r),
             level=r.level,
             score=r.score,
+            total_score=r.total_score,
             kills=r.kills,
             waves_survived=r.waves_survived,
             created_at=r.created_at,

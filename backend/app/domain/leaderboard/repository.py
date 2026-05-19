@@ -50,11 +50,14 @@ class LeaderboardRepository(Protocol):
         self,
         user_id: str,
         level: int | None = None,
-    ) -> list[LeaderboardEntry]:
-        """Personal history — all of a user's entries, newest first.
+    ) -> tuple[list[LeaderboardEntry], int]:
+        """Personal history — all of a user's entries, newest first, plus a
+        true total count.
 
-        Returns the full un-paginated list so the caller can compute
-        personal-best markers over the complete history before slicing for
-        display. Optional ``level`` filter scopes to a single star-rating.
+        The list is capped by an implementation-defined safety limit so a
+        runaway user cannot OOM the process. The second tuple element is the
+        un-capped ``COUNT(*)`` so the caller can report an accurate ``total``
+        to the client even when the row list itself was truncated.
+        Optional ``level`` filter scopes to a single star-rating.
         """
         pass

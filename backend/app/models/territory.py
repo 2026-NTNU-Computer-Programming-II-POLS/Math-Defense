@@ -59,7 +59,6 @@ class TerritoryOccupation(Base):
         UniqueConstraint("slot_id", name="uq_territory_occupation_slot"),
         UniqueConstraint("session_id", name="uq_territory_occupation_session"),
         Index("ix_territory_occupations_student_id", "student_id"),
-        Index("ix_territory_occupations_slot_id", "slot_id"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))

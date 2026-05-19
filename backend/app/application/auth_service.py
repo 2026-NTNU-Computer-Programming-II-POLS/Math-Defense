@@ -110,32 +110,53 @@ class AuthApplicationService:
         password: str,
         player_name: str,
         role: str = "student",
-    ) -> tuple[User, str, str]:
-        """Create a new user and issue tokens. Returns (user, access_token, refresh_token)."""
+    ) -> tuple[User, bool]:
+        """Submit a registration request. Returns (user, is_new_user).
+
+        Under M-05 the caller MUST NOT expose `is_new_user` in the HTTP
+        response — it exists only so the router can write an accurate audit
+        log row. The HTTP response is identical regardless of branch.
+        """
         try:
             email_vo = Email(email)
         except ValueError as e:
             raise DomainValueError(str(e)) from e
 
+        # M-04 (self-service registration is student-only) is enforced at the
+        # HTTP boundary in RegisterRequest. The application service stays
+        # role-agnostic so administrative flows and tests can seed teachers
+        # and admins without going through the public /register route.
         try:
             role_enum = Role(role)
         except ValueError:
             raise DomainValueError(f"Invalid role: {role}. Must be one of: admin, teacher, student")
 
+        # M-05: registration is enumeration-safe. Both branches do the same
+        # observable work (zxcvbn strength check, single email send, identical
+        # HTTP response). The verification token is only minted for genuinely
+        # new accounts — reusing it for existing users would mutate their
+        # verification state and the email is the wrong template anyway.
+        _assert_password_strength(password)
+
         with self._uow:
-            # B-SEC-17 trade-off: this surfaces account existence to a
-            # registrant who guesses an email. For a school math game the
-            # risk is Low (no financial value, emails are typically
-            # institutional and known). Fully fixing it would require a
-            # silent-success-with-email flow (send "you already have an
-            # account" to the existing address, return generic success to
-            # the form) which is a UX-level redesign. Keep the explicit
-            # message for clearer failure diagnosis until that lands.
-            if self._user_repo.find_by_email(email_vo.value):
-                raise DomainValueError("Email already registered")
-            # Check password strength after the existence check so we don't
-            # burn CPU on zxcvbn for emails that will be rejected immediately.
-            _assert_password_strength(password)
+            existing_user = self._user_repo.find_by_email(email_vo.value)
+            if existing_user:
+                # Mask the dominant timing cost (bcrypt ~50–150ms) so the
+                # existing-user branch isn't observably faster than the new-
+                # user branch. Without this, response-time analysis defeats
+                # M-05 even though the body/cookies are identical. The hash
+                # is discarded — we just need the CPU work to happen.
+                _ = hash_password(password)
+                self._uow.commit()
+                try:
+                    self._email_svc.send_account_exists_notice(
+                        existing_user.email,
+                        existing_user.player_name,
+                    )
+                except Exception:
+                    logger.warning("Failed to send account-exists notice for user %s", existing_user.id)
+                return existing_user, False
+
             password_hash = hash_password(password)
             user = User.create(
                 email=email_vo.value,
@@ -143,24 +164,43 @@ class AuthApplicationService:
                 role=role_enum,
                 password_hash=password_hash,
             )
+            raced_user: User | None = None
             try:
                 self._user_repo.save(user)
-            except ConstraintViolationError:
-                raise DomainValueError("Email already registered")
-            verification_token = self._create_verification_token(user.id)
-            refresh_token = self._issue_refresh_token(user.id)
-            try:
+                verification_token = self._create_verification_token(user.id)
                 self._uow.commit()
-            except ConstraintViolationError as e:
-                raise DomainValueError("Email already registered") from e
+            except ConstraintViolationError:
+                # A concurrent request committed the same email between our
+                # find_by_email and our INSERT. Fall through to the "existing
+                # user" path so the response stays 202 and M-05's
+                # indistinguishability holds across the race window. The
+                # rollback issued by the failed flush leaves the session
+                # usable for a fresh SELECT.
+                self._uow.rollback()
+                raced_user = self._user_repo.find_by_email(email_vo.value)
+                if raced_user is None:
+                    # The unique-violation wasn't on email after all — bubble
+                    # up a generic error. This branch cannot leak enumeration
+                    # because it does not depend on whether the email exists.
+                    raise DomainValueError("Email registration failed")
+        if raced_user is not None:
+            try:
+                self._email_svc.send_account_exists_notice(
+                    raced_user.email,
+                    raced_user.player_name,
+                )
+            except Exception:
+                logger.warning("Failed to send account-exists notice for user %s", raced_user.id)
+            return raced_user, False
 
         try:
             self._email_svc.send_verification_email(user.email, user.player_name, verification_token)
         except Exception:
             logger.warning("Failed to send verification email for user %s", user.id)
 
-        access_token = create_access_token({"sub": user.id, "role": user.role.value, "pv": user.password_version})
-        return user, access_token, refresh_token
+        # No auto-login: registration is now a submit-then-verify flow so the
+        # HTTP response is indistinguishable from the existing-account branch.
+        return user, True
 
     def _create_verification_token(self, user_id: str) -> str:
         """Generate a fresh token; invalidates any pending tokens for this user first."""
@@ -388,7 +428,7 @@ class AuthApplicationService:
 
     # ── MFA (TOTP) ──────────────────────────────────────────────────────────
 
-    def setup_mfa(self, user_id: str) -> tuple[str, str]:
+    def setup_mfa(self, user_id: str, current_password: str) -> tuple[str, str]:
         """Generate and store a TOTP secret. Returns (secret, provisioning_uri).
 
         The user must call confirm_mfa() with a valid code before MFA is active.
@@ -397,6 +437,8 @@ class AuthApplicationService:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
                 raise UserNotFoundError("User not found")
+            if not verify_password(current_password, user.password_hash):
+                raise InvalidCredentialsError("Current password is incorrect")
             if user.mfa_enabled:
                 raise MFAAlreadyEnabledError("MFA is already enabled for this account")
             secret = totp_utils.generate_secret()
@@ -407,12 +449,14 @@ class AuthApplicationService:
         uri = totp_utils.get_provisioning_uri(secret, user.email, issuer="MathDefense")
         return secret, uri
 
-    def confirm_mfa(self, user_id: str, code: str) -> None:
+    def confirm_mfa(self, user_id: str, current_password: str, code: str) -> None:
         """Verify a TOTP code and activate MFA for the account."""
         with self._uow:
             user = self._user_repo.find_by_id(user_id)
             if user is None:
                 raise UserNotFoundError("User not found")
+            if not verify_password(current_password, user.password_hash):
+                raise InvalidCredentialsError("Current password is incorrect")
             if not user.totp_secret:
                 raise MFANotSetupError("MFA setup has not been started — call /mfa/setup first")
             if user.mfa_enabled:

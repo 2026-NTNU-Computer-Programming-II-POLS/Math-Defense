@@ -21,6 +21,7 @@ class RankedLeaderboardEntry:
     kills: int
     waves_survived: int
     created_at: datetime
+    total_score: float | None = None
 
 
 @dataclass(frozen=True)

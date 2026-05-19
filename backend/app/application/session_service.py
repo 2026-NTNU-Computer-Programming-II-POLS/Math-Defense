@@ -212,7 +212,14 @@ class SessionApplicationService:
         # server-side derivation from the replay event log, but the client
         # cannot drive them.
         with self._uow:
-            session = self._get_session(session_id, user_id)
+            # M-01: acquire FOR UPDATE lock to serialize concurrent score
+            # updates and prevent TOCTOU race on monotonicity check (score
+            # must not decrease). Without the lock, two PATCHes can both read
+            # stale snapshots and both pass the check.
+            session = self._session_repo.find_by_id_for_update(session_id, user_id)
+            if not session:
+                raise SessionNotFoundError("Session not found")
+            self._ensure_not_stale_or_abandon(session)
             session.update_progress(
                 current_wave=current_wave,
                 score=score,
@@ -279,7 +286,14 @@ class SessionApplicationService:
                 authoritative_waves = self._derive_waves_from_events(
                     session.id, events=replay_events
                 )
-                if authoritative_waves is not None:
+                # Gated on a NON-EMPTY log for the same reason the BD-1 score
+                # bound below is gated: an empty log means "no replay evidence",
+                # not "0 waves cleared", and overwriting the submitted count
+                # with 0 would (a) bypass the design comment 8 lines down and
+                # (b) downstream trip _verify_score's "no evidence" early
+                # return, clobbering total_score to 0.0 on every legitimate
+                # session whose event upload raced or was never wired.
+                if authoritative_waves is not None and replay_events:
                     if waves_survived > authoritative_waves:
                         logger.warning(
                             "waves_survived inflated session=%s submitted=%d derived=%d",
@@ -429,7 +443,7 @@ class SessionApplicationService:
         caller so an audit-log entry can be emitted.
         """
         with self._uow:
-            session = self._session_repo.find_by_id(session_id, user_id)
+            session = self._session_repo.find_by_id_for_update(session_id, user_id)
             if not session:
                 raise SessionNotFoundError("Session not found")
             previous = session.reflection_text
@@ -596,6 +610,9 @@ class SessionApplicationService:
         time_exclude_prepare = session.time_exclude_prepare
 
         derived = self._derive_timing_from_events(session.id, events=events)
+        if derived is None and session.waves_survived == 0:
+            session.override_total_score(0.0)
+            return
         if derived is not None:
             derived_time_total_min, derived_prepare = derived
             # Floor time_total: a submitted value below the event-log proof is

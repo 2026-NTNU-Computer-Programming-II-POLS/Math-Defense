@@ -132,11 +132,11 @@ function exit(): void {
   align-items: center;
   gap: 1rem;
 }
-.header h1 { font-size: 1.1rem; margin: 0; }
+.header h1 { font-size: var(--text-md); margin: 0; }
 .status {
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   background: var(--panel-bg);
 }
 .status[data-status="live"] { color: var(--live-green); }

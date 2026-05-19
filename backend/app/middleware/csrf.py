@@ -30,7 +30,14 @@ _UNSAFE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 # before the auth cookie (and the CSRF cookie) exist, so there is no
 # prior authenticated session to abuse. Logout is intentionally NOT exempt:
 # a cross-site POST that logs a victim out disrupts their session.
-_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register"}
+_EXEMPT_PATHS = {
+    "/api/auth/login",
+    "/api/auth/register",
+    # M-06: MFA challenge arrives before the auth cookie exists (the user has
+    # only passed step-1 credentials). Safe for the same reason as login/register
+    # but was previously exempt only by accident (no cookie → check skipped).
+    "/api/auth/mfa/challenge",
+}
 
 
 def mint_csrf_cookie(response) -> None:

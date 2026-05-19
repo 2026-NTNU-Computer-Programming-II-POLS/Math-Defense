@@ -15,8 +15,10 @@ services:
       POSTGRES_USER: mathdefense
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: math_defense
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/pg_init_roles.sh:/docker-entrypoint-initdb.d/init-roles.sh:ro
     # No ports: exposed. Only the backend talks to PG across the docker network.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mathdefense -d math_defense"]
@@ -27,6 +29,11 @@ services:
     # M20: harden the postgres container.
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
 
   backend:
     build:
@@ -42,6 +49,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       CORS_ORIGINS: ${CORS_ORIGINS}
       FRONTEND_URL: ${FRONTEND_URL}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
       # C-02: enable per-IP rate limiting behind the nginx reverse proxy.
       # TRUSTED_PROXY_IPS uses the RFC-1918 range that Docker Compose assigns
       # to containers in user-defined networks; adjust to match your subnet if
@@ -65,6 +73,11 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
     # M20: harden the backend container.
     read_only: true
     tmpfs: ["/tmp"]
@@ -112,6 +125,11 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
     # M20: harden the frontend container. nginx writes nothing at runtime
     # beyond the pid file and temp dirs that are already in tmpfs.
     read_only: true
@@ -119,5 +137,37 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: mathdefense
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: math_defense
+      BACKUP_DIR: /backups
+      RETENTION_DAYS: "7"
+    volumes:
+      - ./scripts/pg_backup.sh:/usr/local/bin/pg_backup.sh:ro
+      - pg_backups:/backups
+    # Run daily at 02:00 UTC via a lightweight cron loop.
+    # Script is mounted :ro so chmod is impossible — invoke via /bin/sh.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "0 2 * * * /bin/sh /usr/local/bin/pg_backup.sh" | crontab -
+        crond -f -l 2
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+
 volumes:
   postgres_data:
+  pg_backups:

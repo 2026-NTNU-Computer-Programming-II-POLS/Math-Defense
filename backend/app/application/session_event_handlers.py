@@ -62,6 +62,9 @@ class LeaderboardInsertHandler:
                         waves_survived=event.waves_survived,
                         session_id=event.session_id,
                         challenge_id=event.challenge_id,
+                        # M-02: pass through the V2 total_score so rankings use
+                        # the canonical floating-point value instead of raw score.
+                        total_score=event.total_score,
                     )
                     self._leaderboard_repo.save(entry)
                 self._uow.commit()
@@ -124,6 +127,7 @@ class AchievementCheckHandler:
                 session_gold_remaining=gold_remaining,
                 territories_held=territories_held,
                 territory_max_star=territory_max_star,
+                completed_at=session.ended_at,
             )
             if result and self._assessment_svc is not None:
                 evidence = [(a.achievement_id, True) for a in result]

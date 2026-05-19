@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, UTC
 
-from app.factories import build_auth_service
+from tests.conftest import register_test_user
 
 
 def _auth(token):
@@ -11,16 +11,20 @@ def _auth(token):
 
 
 def _register_student(client, name):
-    res = client.post("/api/auth/register", json={
-        "email": f"{name}@test.local",
-        "password": "xQ7!aPm2#vKz9",
+    email = f"{name}@test.local"
+    password = "xQ7!aPm2#vKz9"
+    client.post("/api/auth/register", json={
+        "email": email,
+        "password": password,
         "player_name": name,
     })
+    res = client.post("/api/auth/login", json={"email": email, "password": password})
     return res.cookies.get("access_token")
 
 
 def _register_teacher(db_session, name):
-    _user, token, _refresh = build_auth_service(db_session).register(
+    _u, token, _r = register_test_user(
+        db_session,
         email=f"{name}@test.local",
         password="xQ7!aPm2#vKz9",
         player_name=name,
@@ -30,7 +34,8 @@ def _register_teacher(db_session, name):
 
 
 def _register_admin(db_session, name):
-    _user, token, _refresh = build_auth_service(db_session).register(
+    _u, token, _r = register_test_user(
+        db_session,
         email=f"{name}@test.local",
         password="xQ7!aPm2#vKz9",
         player_name=name,
@@ -158,8 +163,8 @@ def test_add_nonexistent_student_email_returns_404(client, db_session):
 def test_add_teacher_as_student_returns_400(client, db_session):
     t1 = _register_teacher(db_session, "t_addteacher1")
     t2_email = "t_addteacher2@test.local"
-    build_auth_service(db_session).register(
-        email=t2_email, password="xQ7!aPm2#vKz9", player_name="t_addteacher2", role="teacher",
+    register_test_user(
+        db_session, email=t2_email, password="xQ7!aPm2#vKz9", player_name="t_addteacher2", role="teacher",
     )
     class_id = _create_class(client, t1).json()["id"]
     res = client.post(

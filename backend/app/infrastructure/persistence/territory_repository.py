@@ -69,7 +69,17 @@ class SqlAlchemyTerritoryRepository:
         return [self._activity_to_domain(r) for r in rows]
 
     def find_all_activities(self) -> list[GrabbingTerritoryActivity]:
-        rows = self._db.query(ActivityModel).order_by(ActivityModel.created_at.desc()).all()
+        rows = self._db.query(ActivityModel).order_by(ActivityModel.created_at.desc()).limit(500).all()
+        return [self._activity_to_domain(r) for r in rows]
+
+    def find_inter_class_activities(self) -> list[GrabbingTerritoryActivity]:
+        rows = (
+            self._db.query(ActivityModel)
+            .filter(ActivityModel.class_id.is_(None))
+            .order_by(ActivityModel.created_at.desc())
+            .limit(500)
+            .all()
+        )
         return [self._activity_to_domain(r) for r in rows]
 
     def find_unsettled_expired_activities(self) -> list[GrabbingTerritoryActivity]:
@@ -186,10 +196,11 @@ class SqlAlchemyTerritoryRepository:
         # B-M-1: advisory lock on (activity, student) pair prevents two parallel
         # requests by the same student from both reading count=N and both inserting.
         # Acquired here as an implementation detail; callers need not know about PG advisory locks.
-        self._db.execute(
-            text("SELECT pg_advisory_xact_lock(hashtext(:a)::int, hashtext(:s)::int)"),
-            {"a": activity_id, "s": student_id},
-        )
+        if self._db.get_bind().dialect.name == "postgresql":
+            self._db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:a)::int, hashtext(:s)::int)"),
+                {"a": activity_id, "s": student_id},
+            )
         rows = (
             self._db.query(OccupationModel.id)
             .join(SlotModel, OccupationModel.slot_id == SlotModel.id)

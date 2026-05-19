@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Index, UniqueConstraint, CheckConstraint
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Index, UniqueConstraint, CheckConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
@@ -22,5 +22,5 @@ class TalentAllocation(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
     )

@@ -38,7 +38,7 @@ class SqlAlchemyClassRepository:
         return [self._to_domain(r) for r in rows]
 
     def find_all(self) -> list[Class]:
-        rows = self._db.query(ClassModel).all()
+        rows = self._db.query(ClassModel).limit(1000).all()
         return [self._to_domain(r) for r in rows]
 
     def find_all_paginated(self, offset: int, limit: int) -> tuple[list[Class], int]:

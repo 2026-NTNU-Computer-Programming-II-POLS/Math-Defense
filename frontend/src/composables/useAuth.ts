@@ -102,32 +102,14 @@ export function useAuth() {
     playerName: string,
     role: string = 'student',
   ): Promise<boolean> {
+    // M-05: the backend returns a fixed 202 acknowledgement and does NOT
+    // issue auth cookies — the caller cannot tell whether the email was
+    // newly created or already on file. The user completes onboarding by
+    // verifying their email and then signing in via /login.
     loading.value = true
     error.value = ''
     try {
-      const res = await authService.register(email, password, playerName, role)
-      try {
-        const me = await authService.me()
-        authStore.setUser({
-          id: me.id,
-          email: me.email,
-          player_name: me.player_name,
-          role: me.role as UserRole,
-          avatar_url: me.avatar_url ?? null,
-          ia_unlock_earned: me.ia_unlock_earned ?? false,
-          ia_recent_accuracy: me.ia_recent_accuracy ?? 0,
-        })
-      } catch {
-        authStore.setUser({
-          id: res.id ?? '',
-          email: res.email ?? email,
-          player_name: res.player_name ?? playerName,
-          role: (res.role as UserRole) ?? 'student',
-          avatar_url: res.avatar_url ?? null,
-          ia_unlock_earned: false,
-          ia_recent_accuracy: 0,
-        })
-      }
+      await authService.register(email, password, playerName, role)
       return true
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Registration failed'

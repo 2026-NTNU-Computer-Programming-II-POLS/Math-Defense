@@ -79,7 +79,7 @@ export const sessionService = {
   getActive() {
     return api.get<SessionOut | null>('/api/sessions/active')
   },
-  update(id: string, data: Partial<{ current_wave: number; gold: number; hp: number; score: number; kill_value: number; cost_total: number }>) {
+  update(id: string, data: Partial<{ current_wave: number; score: number; kill_value: number; cost_total: number }>) {
     return api.patch<SessionOut>(`/api/sessions/${id}`, data)
   },
   end(id: string, data: SessionEndPayload) {

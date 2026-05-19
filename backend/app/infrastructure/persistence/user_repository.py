@@ -10,6 +10,7 @@ from app.domain.errors import ConstraintViolationError
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 from app.models.user import User as UserModel
+from app.utils.encryption import decrypt_field, encrypt_field
 from app.utils.integrity import extract_constraint_name
 
 
@@ -32,8 +33,8 @@ class SqlAlchemyUserRepository:
         rows = self._db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()
         return [self._to_domain(r) for r in rows]
 
-    def find_by_role(self, role: Role) -> list[User]:
-        rows = self._db.query(UserModel).filter(UserModel.role == role.value).all()
+    def find_by_role(self, role: Role, limit: int = 10000) -> list[User]:
+        rows = self._db.query(UserModel).filter(UserModel.role == role.value).limit(limit).all()
         return [self._to_domain(r) for r in rows]
 
     def find_by_role_paginated(self, role: Role, offset: int, limit: int) -> tuple[list[User], int]:
@@ -47,7 +48,16 @@ class SqlAlchemyUserRepository:
         )
         return [self._to_domain(r) for r in rows], total
 
+    @staticmethod
+    def _encrypt_totp(secret: str | None) -> str | None:
+        return encrypt_field(secret) if secret else None
+
+    @staticmethod
+    def _decrypt_totp(stored: str | None) -> str | None:
+        return decrypt_field(stored) if stored else None
+
     def save(self, user: User) -> None:
+        encrypted_totp = self._encrypt_totp(user.totp_secret)
         row = self._db.query(UserModel).filter(UserModel.id == user.id).first()
         if row:
             row.email = user.email
@@ -58,7 +68,7 @@ class SqlAlchemyUserRepository:
             row.password_hash = user.password_hash
             row.password_version = user.password_version
             row.is_email_verified = user.is_email_verified
-            row.totp_secret = user.totp_secret
+            row.totp_secret = encrypted_totp
             row.mfa_enabled = user.mfa_enabled
             row.totp_last_used_at = user.totp_last_used_at
             row.ia_recent_accuracy = user.ia_recent_accuracy
@@ -74,7 +84,7 @@ class SqlAlchemyUserRepository:
                 password_version=user.password_version,
                 created_at=user.created_at,
                 is_email_verified=user.is_email_verified,
-                totp_secret=user.totp_secret,
+                totp_secret=encrypted_totp,
                 mfa_enabled=user.mfa_enabled,
                 totp_last_used_at=user.totp_last_used_at,
                 ia_recent_accuracy=user.ia_recent_accuracy,
@@ -90,8 +100,8 @@ class SqlAlchemyUserRepository:
                 str(e), constraint_name=extract_constraint_name(e)
             ) from e
 
-    @staticmethod
-    def _to_domain(row: UserModel) -> User:
+    @classmethod
+    def _to_domain(cls, row: UserModel) -> User:
         return User(
             id=row.id,
             email=row.email,
@@ -103,7 +113,7 @@ class SqlAlchemyUserRepository:
             created_at=_ensure_utc(row.created_at),
             password_version=row.password_version or 0,
             is_email_verified=row.is_email_verified if row.is_email_verified is not None else False,
-            totp_secret=row.totp_secret,
+            totp_secret=cls._decrypt_totp(row.totp_secret),
             mfa_enabled=row.mfa_enabled if row.mfa_enabled is not None else False,
             totp_last_used_at=_ensure_utc(row.totp_last_used_at),
             ia_recent_accuracy=row.ia_recent_accuracy if row.ia_recent_accuracy is not None else 0.0,

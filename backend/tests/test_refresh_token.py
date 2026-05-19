@@ -14,11 +14,16 @@ _PASSWORD = "xQ7!aPm2#vKz9"
 
 
 def _register(client, name: str):
-    res = client.post(
+    """Submit-then-login so the response carries access/refresh cookies the
+    test can inspect. Registration itself is 202 with no cookies (M-05)."""
+    email = f"{name}@test.local"
+    reg = client.post(
         "/api/auth/register",
-        json={"email": f"{name}@test.local", "password": _PASSWORD, "player_name": name},
+        json={"email": email, "password": _PASSWORD, "player_name": name},
     )
-    assert res.status_code == 201, res.text
+    assert reg.status_code == 202, reg.text
+    res = client.post("/api/auth/login", json={"email": email, "password": _PASSWORD})
+    assert res.status_code == 200, res.text
     return res
 
 

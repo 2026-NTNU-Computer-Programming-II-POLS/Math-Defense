@@ -1,7 +1,7 @@
 """Generative Challenge Mode integration tests (Backlog §23)."""
 from __future__ import annotations
 
-from app.factories import build_auth_service
+from tests.conftest import register_test_user
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -9,19 +9,19 @@ def _auth(token: str) -> dict[str, str]:
 
 
 def _register_student(client, name: str) -> str:
-    res = client.post(
+    email = f"{name}@test.local"
+    password = "xQ7!aPm2#vKz9"
+    client.post(
         "/api/auth/register",
-        json={
-            "email": f"{name}@test.local",
-            "password": "xQ7!aPm2#vKz9",
-            "player_name": name,
-        },
+        json={"email": email, "password": password, "player_name": name},
     )
+    res = client.post("/api/auth/login", json={"email": email, "password": password})
     return res.cookies.get("access_token")
 
 
 def _register_teacher(db_session, name: str) -> str:
-    _user, token, _refresh = build_auth_service(db_session).register(
+    _user, token, _refresh = register_test_user(
+        db_session,
         email=f"{name}@test.local",
         password="xQ7!aPm2#vKz9",
         player_name=name,

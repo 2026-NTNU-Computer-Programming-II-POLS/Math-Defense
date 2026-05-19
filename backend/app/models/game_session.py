@@ -12,6 +12,7 @@ class GameSession(Base):
     __tablename__ = "game_sessions"
     __table_args__ = (
         Index("ix_game_session_user_id", "user_id"),
+        Index("ix_game_sessions_challenge_id", "challenge_id"),
         Index(
             "uq_one_active_per_user",
             "user_id",
@@ -19,6 +20,11 @@ class GameSession(Base):
             postgresql_where=text("status = 'active'"),
         ),
         CheckConstraint("star_rating BETWEEN 1 AND 5", name="ck_game_session_star_range"),
+        CheckConstraint("score >= 0", name="ck_game_session_score_nonneg"),
+        CheckConstraint("kills >= 0", name="ck_game_session_kills_nonneg"),
+        CheckConstraint("waves_survived >= 0", name="ck_game_session_waves_nonneg"),
+        CheckConstraint("hp >= 0", name="ck_game_session_hp_nonneg"),
+        CheckConstraint("gold >= 0", name="ck_game_session_gold_nonneg"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -32,7 +38,7 @@ class GameSession(Base):
     )
     star_rating: Mapped[int] = mapped_column(Integer, nullable=False)
     path_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    initial_answer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    initial_answer: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False, server_default="false")
     # Backlog §20 — slider-fallback / practice mode flag. Server filters these
     # out of the global leaderboard but still awards achievements & talent points.
     practice_mode: Mapped[bool] = mapped_column(
@@ -41,11 +47,12 @@ class GameSession(Base):
     status: Mapped[str] = mapped_column(
         SAEnum(SessionStatus, values_callable=lambda e: [m.value for m in e]),
         default=SessionStatus.ACTIVE.value,
+        nullable=False,
     )
-    current_wave: Mapped[int] = mapped_column(Integer, default=0)
-    gold: Mapped[int] = mapped_column(Integer, default=INITIAL_GOLD)
-    hp: Mapped[int] = mapped_column(Integer, default=20)
-    score: Mapped[int] = mapped_column(Integer, default=0)
+    current_wave: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    gold: Mapped[int] = mapped_column(Integer, default=INITIAL_GOLD, nullable=False)
+    hp: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     kills: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     waves_survived: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     kill_value: Mapped[int | None] = mapped_column(Integer, nullable=True)

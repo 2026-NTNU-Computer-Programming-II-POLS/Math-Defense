@@ -15,6 +15,9 @@ const password = ref('')
 const playerName = ref('')
 const role = ref('student')
 const mfaCode = ref('')
+// M-05: register no longer auto-logs in. After a successful submission we
+// show a generic confirmation message and switch the form back to login.
+const registrationSubmitted = ref(false)
 
 const title = computed(() => isLogin.value ? 'Log In' : 'Register')
 
@@ -47,6 +50,7 @@ function onPasswordInput(event: Event): void {
 function toggleMode(): void {
   isLogin.value = !isLogin.value
   error.value = ''
+  registrationSubmitted.value = false
   if (!isLogin.value) updatePasswordRules(password.value)
 }
 
@@ -110,10 +114,17 @@ async function submit(): Promise<void> {
     error.value = msg
     return
   }
-  const ok = isLogin.value
-    ? await login(e, p)
-    : await register(e, p, playerName.value.trim(), role.value)
-  if (ok) router.push(getNextPath())
+  if (isLogin.value) {
+    const ok = await login(e, p)
+    if (ok) router.push(getNextPath())
+    return
+  }
+  const ok = await register(e, p, playerName.value.trim(), role.value)
+  if (ok) {
+    registrationSubmitted.value = true
+    isLogin.value = true
+    password.value = ''
+  }
 }
 </script>
 
@@ -121,6 +132,11 @@ async function submit(): Promise<void> {
   <div class="auth-view">
     <div class="auth-panel rune-panel">
       <h2 class="auth-title">{{ mfaRequired ? 'Two-Factor Authentication' : title }}</h2>
+
+      <div v-if="registrationSubmitted" class="auth-notice">
+        If the email is available, an account was created. Please check your
+        inbox to verify the address, then sign in below.
+      </div>
 
       <form class="auth-form" @submit.prevent="submit">
         <template v-if="mfaRequired">
@@ -168,12 +184,11 @@ async function submit(): Promise<void> {
               />
             </label>
 
+            <!-- M-04: self-service registration only allows student role.
+                 Teacher accounts require administrator setup. -->
             <label class="auth-field">
               <span>Role</span>
-              <select v-model="role" class="rune-input">
-                <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
-              </select>
+              <div class="role-display">Student</div>
             </label>
           </template>
 
@@ -267,6 +282,15 @@ async function submit(): Promise<void> {
 .rune-input { width: 100%; }
 
 .auth-error { font-size: var(--text-sm); color: var(--enemy-red); }
+.auth-notice {
+  font-size: var(--text-sm);
+  color: var(--text-secondary, currentColor);
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.9;
+}
 
 .mfa-hint {
   font-size: var(--text-sm);
@@ -331,5 +355,13 @@ async function submit(): Promise<void> {
 .toggle-btn:hover, .back-btn:hover {
   background: var(--axis);
   color: var(--stone-dark);
+}
+
+.role-display {
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  color: var(--axis);
+  font-size: var(--text-xs);
 }
 </style>

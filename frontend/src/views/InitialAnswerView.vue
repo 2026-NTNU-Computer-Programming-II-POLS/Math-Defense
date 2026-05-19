@@ -172,7 +172,7 @@ function startGame() {
 }
 
 h1 {
-  font-size: 1.8rem;
+  font-size: var(--text-2xl);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
@@ -211,7 +211,7 @@ h1 {
 
 .region {
   margin-bottom: 1.5rem;
-  font-size: 1.1rem;
+  font-size: var(--text-md);
 }
 
 .answer-inputs {
@@ -240,7 +240,7 @@ h1 {
   border: 2px solid var(--card-border);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: var(--text-base);
   width: 160px;
 }
 
@@ -255,13 +255,13 @@ h1 {
 
 .parse-error {
   color: var(--hp-red);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .validation-msg {
   margin-top: 0.8rem;
   color: var(--hp-red);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .actions {
@@ -280,7 +280,7 @@ h1 {
 
 .submit-btn {
   padding: 0.9rem 2.5rem;
-  font-size: 1.15rem;
+  font-size: var(--text-md);
   background: var(--tower-cannon);
   color: #fff;
   border: none;
@@ -290,7 +290,7 @@ h1 {
 
 .pay-btn {
   padding: 0.5rem 1rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   background: transparent;
   color: var(--gold-dim);
   border: 1px solid var(--gold-dim);
@@ -300,7 +300,7 @@ h1 {
 
 .ignore-btn {
   padding: 0.5rem 1rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   background: transparent;
   color: var(--scope-border);
   border: 1px solid var(--scope-border);
@@ -312,15 +312,15 @@ h1 {
   text-align: center;
 }
 
-.result-correct { color: var(--hp-green); font-size: 1.1rem; }
-.result-wrong { color: var(--hp-red); font-size: 1.1rem; }
-.result-paid { color: var(--gold-dim); font-size: 1.1rem; }
-.result-ignored { color: var(--scope-border); font-size: 1.1rem; }
+.result-correct { color: var(--hp-green); font-size: var(--text-md); }
+.result-wrong { color: var(--hp-red); font-size: var(--text-md); }
+.result-paid { color: var(--gold-dim); font-size: var(--text-md); }
+.result-ignored { color: var(--scope-border); font-size: var(--text-md); }
 
 .start-btn {
   margin-top: 1rem;
   padding: 0.8rem 2rem;
-  font-size: 1.1rem;
+  font-size: var(--text-md);
   background: var(--tower-cannon);
   color: #fff;
   border: none;

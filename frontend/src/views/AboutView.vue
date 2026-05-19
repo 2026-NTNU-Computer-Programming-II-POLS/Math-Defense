@@ -83,7 +83,7 @@ const router = useRouter()
 }
 
 h1 {
-  font-size: 1.8rem;
+  font-size: var(--text-2xl);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   margin-bottom: 0.5rem;
@@ -93,7 +93,7 @@ h1 {
 .about-lead {
   color: var(--axis);
   text-shadow: var(--gold-shadow);
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 
 .about-section {
@@ -101,7 +101,7 @@ h1 {
 }
 
 .about-section h2 {
-  font-size: 1.1rem;
+  font-size: var(--text-md);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
   margin-bottom: 0.6rem;

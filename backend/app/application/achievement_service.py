@@ -84,6 +84,7 @@ class AchievementApplicationService:
         session_gold_remaining: int,
         territories_held: int = 0,
         territory_max_star: int = 0,
+        completed_at: datetime | None = None,
     ) -> list[UserAchievement]:
         unlocked_ids = {a.achievement_id for a in self._achievement_repo.find_by_user(user_id)}
         stats = self._session_repo.get_cumulative_stats(user_id)
@@ -102,8 +103,8 @@ class AchievementApplicationService:
                 # award the same achievement under different multipliers
                 # if a season toggled mid-loop.
                 seasons_by_id = self._load_seasons()
-                now = datetime.now(UTC)
-                points = self._award_points(d, seasons_by_id, now)
+                award_time = completed_at or datetime.now(UTC)
+                points = self._award_points(d, seasons_by_id, award_time)
                 achievement = UserAchievement.create(user_id, d.id, points)
                 # B-BUG-3: save() returns False when the unique-constraint
                 # short-circuit fires (concurrent end_session unlocked the

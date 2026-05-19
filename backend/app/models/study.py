@@ -36,9 +36,6 @@ from app.db.database import Base
 
 class StudyEnrollment(Base):
     __tablename__ = "study_enrollments"
-    __table_args__ = (
-        UniqueConstraint("user_id", "study_id", name="uq_study_enrollment"),
-    )
 
     user_id: Mapped[str] = mapped_column(
         String,
