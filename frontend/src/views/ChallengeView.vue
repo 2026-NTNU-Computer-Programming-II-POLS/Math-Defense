@@ -126,29 +126,35 @@ function goToLeaderboard(): void {
 }
 
 .setup-panel {
-  width: 480px;
+  width: 620px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .setup-title {
-  font-size: var(--text-base);
+  font-size: 1.35rem;
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 3px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
   text-align: center;
 }
 
-.loading { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-xs); text-align: center; }
-.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
+.loading { color: var(--charcoal-soft); font-size: var(--text-xs); text-align: center; font-style: italic; }
+.error-msg { font-size: var(--text-xs); color: var(--clay-deep); }
 
 .challenge-detail { display: flex; flex-direction: column; gap: 12px; }
 .title-row { display: flex; align-items: baseline; justify-content: space-between; }
-.ch-title { font-size: var(--text-sm); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
-.ch-desc { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); margin: 0; line-height: 1.4; }
+.ch-title { font-size: 1.05rem; color: var(--charcoal); font-weight: 700; margin: 0; }
+.ch-desc { font-size: var(--text-xs); color: var(--charcoal-soft); margin: 0; line-height: 1.4; }
 
 .constraints {
   display: grid;
@@ -157,20 +163,23 @@ function goToLeaderboard(): void {
   font-size: var(--text-xs);
   margin: 0;
 }
-.constraints dt { color: var(--gold); text-shadow: var(--gold-shadow); }
-.constraints dd { color: var(--axis); text-shadow: var(--gold-shadow); margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.constraints dt { color: var(--charcoal-soft); font-family: var(--font-mono); }
+.constraints dd { color: var(--charcoal); margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 
 .chip {
-  display: inline-block;
-  padding: 2px 6px;
-  border: 1px solid var(--axis);
-  font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(111, 138, 161, 0.35);
+  background: rgba(111, 138, 161, 0.18);
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--terracotta-deep);
 }
-.chip.danger { border-color: var(--enemy-red); color: var(--enemy-red); }
+.chip.danger { border-color: rgba(185, 134, 116, 0.35); background: rgba(185, 134, 116, 0.2); color: var(--clay-deep); }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn { border-color: var(--line); color: var(--charcoal-soft); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 </style>

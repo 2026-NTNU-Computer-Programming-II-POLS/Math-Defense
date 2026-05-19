@@ -132,29 +132,38 @@ function backToMenu() {
 <style scoped>
 .affect-view {
   max-width: 760px;
-  margin: 2rem auto;
-  padding: 0 1.25rem 3rem;
-  color: var(--text-primary);
+  margin: 40px auto;
+  padding: 26px;
+  color: var(--charcoal);
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 .affect-header h1 {
   margin: 0 0 0.25rem;
   font-size: var(--text-xl);
+  font-family: var(--font-mono);
+  color: var(--charcoal);
+  letter-spacing: 2px;
 }
 .affect-meta {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--charcoal-soft);
   font-size: var(--text-base);
 }
 .affect-warning {
-  background: var(--gold-tint);
-  border: 1px solid var(--gold-dim);
+  background: rgba(168, 188, 203, 0.2);
+  border: 1px solid var(--terracotta);
   padding: 0.6rem 0.8rem;
-  border-radius: 6px;
+  border-radius: 10px;
   margin-top: 0.75rem;
 }
 .affect-instructions {
   margin: 1rem 0 0;
-  color: var(--text-secondary);
+  color: var(--charcoal-soft);
 }
 .affect-list {
   list-style: none;
@@ -164,9 +173,9 @@ function backToMenu() {
 .affect-item {
   margin-bottom: 1.4rem;
   padding: 1rem 1.1rem;
-  background: var(--card-surface);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 .affect-stem {
   margin: 0 0 0.6rem;
@@ -174,9 +183,8 @@ function backToMenu() {
 }
 .affect-num {
   margin-right: 0.4rem;
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  font-weight: 600;
+  color: var(--terracotta-deep);
+  font-weight: 700;
 }
 .likert {
   display: grid;
@@ -189,18 +197,18 @@ function backToMenu() {
   align-items: center;
   gap: 0.15rem;
   padding: 0.5rem 0.4rem;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
   cursor: pointer;
   text-align: center;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 .likert-cell:hover {
-  background: var(--gold-tint-hover);
+  background: rgba(245, 250, 254, 0.7);
 }
 .likert-cell.selected {
-  border-color: var(--gold);
-  background: var(--gold-tint-select);
+  border-color: var(--terracotta-deep);
+  background: var(--terracotta);
 }
 .likert-cell input[type="radio"] {
   position: absolute;
@@ -210,24 +218,27 @@ function backToMenu() {
 }
 .likert-num {
   font-weight: 700;
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal);
+}
+.likert-cell.selected .likert-num,
+.likert-cell.selected .likert-text {
+  color: #fff;
 }
 .likert-text {
   font-size: var(--text-xs);
-  color: var(--text-secondary);
+  color: var(--charcoal-soft);
 }
 .affect-actions {
   margin-top: 1.5rem;
   text-align: right;
 }
 .affect-submit {
-  background: var(--gold);
-  color: var(--text-on-accent);
-  border: none;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  border: 1px solid var(--gold-deep);
   padding: 0.6rem 1.4rem;
-  border-radius: 6px;
-  font-weight: 600;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
 }
 .affect-submit:disabled {
@@ -235,7 +246,7 @@ function backToMenu() {
   cursor: not-allowed;
 }
 .affect-error {
-  color: var(--error-red);
+  color: var(--clay-deep);
   margin-top: 1rem;
 }
 .affect-result {

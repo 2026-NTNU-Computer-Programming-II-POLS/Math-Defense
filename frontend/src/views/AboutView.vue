@@ -68,13 +68,16 @@ const router = useRouter()
 
 <style scoped>
 .about-view {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 3rem;
-  color: var(--text-primary);
-  min-height: 100vh;
-  min-height: 100dvh;
-  background: var(--bg-base);
+  max-width: 760px;
+  margin: 40px auto;
+  padding: 26px;
+  color: var(--charcoal);
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   line-height: 1.6;
 }
 
@@ -83,16 +86,16 @@ const router = useRouter()
 }
 
 h1 {
-  font-size: var(--text-2xl);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  font-size: 1.6rem;
+  font-family: var(--font-mono);
+  color: var(--charcoal);
   margin-bottom: 0.5rem;
   letter-spacing: 2px;
+  font-weight: 800;
 }
 
 .about-lead {
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal-soft);
   font-size: var(--text-base);
 }
 
@@ -101,11 +104,12 @@ h1 {
 }
 
 .about-section h2 {
-  font-size: var(--text-md);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--charcoal-soft);
+  text-transform: uppercase;
   margin-bottom: 0.6rem;
-  letter-spacing: 1px;
+  letter-spacing: 4px;
 }
 
 .about-section ul {
@@ -117,45 +121,45 @@ h1 {
 }
 
 .about-section a {
-  color: var(--gold-bright);
+  color: var(--terracotta-deep);
   text-decoration: underline;
 }
 
 .about-section a:hover,
 .about-section a:focus-visible {
-  filter: brightness(1.2);
+  filter: brightness(1.1);
 }
 
 kbd {
   display: inline-block;
-  padding: 1px 6px;
+  padding: 2px 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
-  background: var(--stone-selected);
-  border: 1px solid var(--panel-border);
-  border-radius: 3px;
+  color: var(--terracotta-deep);
+  background: rgba(168, 188, 203, 0.24);
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--terracotta-deep);
 }
 
 .back-btn {
   padding: 0.5rem 1.5rem;
   background: transparent;
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  color: var(--charcoal-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
   cursor: pointer;
 }
 
 .back-btn:hover,
 .back-btn:focus-visible {
-  border-color: var(--gold-bright);
-  color: var(--gold-bright);
+  border-color: var(--terracotta);
+  color: var(--charcoal);
+  background: rgba(245, 250, 254, 0.6);
 }
 </style>
