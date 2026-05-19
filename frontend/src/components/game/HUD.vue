@@ -102,7 +102,7 @@ onMounted(() => {
   const el = hudRef.value
   if (!el) return
   publishHudHeight(el.offsetHeight)
-  hudRo = new ResizeObserver((entries) => {
+  hudRo = new ResizeObserver((entries, _observer) => {
     for (const entry of entries) publishHudHeight(entry.contentRect.height)
   })
   hudRo.observe(el)

@@ -28,7 +28,7 @@ onMounted(() => {
   const el = barRef.value
   if (!el) return
   publishHeight(el.offsetHeight)
-  ro = new ResizeObserver((entries) => {
+  ro = new ResizeObserver((entries, _observer) => {
     for (const entry of entries) publishHeight(entry.contentRect.height)
   })
   ro.observe(el)
