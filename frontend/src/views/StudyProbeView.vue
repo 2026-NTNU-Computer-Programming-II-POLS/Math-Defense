@@ -145,24 +145,33 @@ function backToMenu() {
 <style scoped>
 .probe-view {
   max-width: 760px;
-  margin: 2rem auto;
-  padding: 0 1.25rem 3rem;
-  color: var(--text-primary);
+  margin: 40px auto;
+  padding: 26px;
+  color: var(--charcoal);
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 .probe-header h1 {
   margin: 0 0 0.25rem;
   font-size: var(--text-xl);
+  font-family: var(--font-mono);
+  color: var(--charcoal);
+  letter-spacing: 2px;
 }
 .probe-meta {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--charcoal-soft);
   font-size: var(--text-base);
 }
 .probe-warning {
-  background: var(--gold-tint);
-  border: 1px solid var(--gold-dim);
+  background: rgba(168, 188, 203, 0.2);
+  border: 1px solid var(--terracotta);
   padding: 0.6rem 0.8rem;
-  border-radius: 6px;
+  border-radius: 10px;
   margin-top: 0.75rem;
 }
 .probe-list {
@@ -173,9 +182,9 @@ function backToMenu() {
 .probe-item {
   margin-bottom: 1.5rem;
   padding: 1rem 1.1rem;
-  background: var(--card-surface);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 .probe-stem {
   margin: 0 0 0.75rem;
@@ -185,9 +194,8 @@ function backToMenu() {
 .probe-num {
   display: inline-block;
   margin-right: 0.4rem;
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  font-weight: 600;
+  color: var(--terracotta-deep);
+  font-weight: 700;
 }
 .probe-options {
   border: none;
@@ -201,38 +209,38 @@ function backToMenu() {
   gap: 0.6rem;
   align-items: flex-start;
   padding: 0.55rem 0.7rem;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 .probe-option:hover {
-  background: var(--gold-tint-hover);
+  background: rgba(245, 250, 254, 0.7);
 }
 .probe-option.selected {
-  border-color: var(--gold);
-  background: var(--gold-tint-select);
+  border-color: var(--terracotta-deep);
+  background: rgba(168, 188, 203, 0.26);
 }
 .probe-option input[type="radio"] {
   margin-top: 0.2rem;
+  accent-color: var(--terracotta);
 }
 .probe-option-label {
-  font-weight: 600;
+  font-weight: 700;
   margin-right: 0.25rem;
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  color: var(--terracotta-deep);
 }
 .probe-actions {
   margin-top: 1.5rem;
   text-align: right;
 }
 .probe-submit {
-  background: var(--gold);
-  color: var(--text-on-accent);
-  border: none;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  border: 1px solid var(--gold-deep);
   padding: 0.6rem 1.4rem;
-  border-radius: 6px;
-  font-weight: 600;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
 }
 .probe-submit:disabled {
@@ -240,7 +248,7 @@ function backToMenu() {
   cursor: not-allowed;
 }
 .probe-error {
-  color: var(--error-red);
+  color: var(--clay-deep);
   margin-top: 1rem;
 }
 .probe-result {

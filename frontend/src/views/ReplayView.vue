@@ -243,21 +243,22 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
-  background: var(--bg-base);
-  color: var(--text-primary);
+  color: var(--charcoal);
 }
 .replay-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--divider);
+  background: linear-gradient(180deg, rgba(220, 229, 237, 0.98), rgba(200, 210, 220, 0.94));
+  border-bottom: 1px solid var(--line-strong);
 }
 .replay-header h1 {
   font-size: var(--text-md);
   margin: 0;
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  font-family: var(--font-mono);
+  color: var(--charcoal);
+  letter-spacing: 2px;
 }
 .replay-stage {
   flex: 1;
@@ -269,57 +270,59 @@ onBeforeUnmount(() => {
 .replay-canvas {
   max-width: 100%;
   max-height: 100%;
-  background: var(--stone-light);
+  background: var(--paper);
 }
 .replay-controls {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid var(--divider);
+  background: linear-gradient(0deg, rgba(220, 229, 237, 0.98), rgba(200, 210, 220, 0.94));
+  border-top: 1px solid var(--line-strong);
 }
 .scrub {
   flex: 1;
   height: 8px;
-  background: var(--divider);
+  background: rgba(79, 74, 72, 0.08);
+  border: 1px solid var(--line);
   border-radius: 4px;
   overflow: hidden;
 }
 .scrub-bar {
   height: 100%;
-  background: var(--gold-bright);
+  background: linear-gradient(90deg, var(--terracotta-deep), var(--terracotta));
   transition: width 0.08s linear;
 }
 .meta {
   display: flex;
   gap: 0.5rem;
   font-size: var(--text-sm);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
 }
-.warn { color: var(--hp-red); }
+.warn { color: var(--clay-deep); }
 .btn {
   padding: 0.4rem 0.9rem;
-  background: var(--tower-cannon);
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
   color: #fff;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 10px;
   cursor: pointer;
 }
 .btn-ghost {
   padding: 0.4rem 0.9rem;
   background: transparent;
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  color: var(--charcoal-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
   cursor: pointer;
 }
+.btn-ghost:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 .boot-state {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.boot-state.error { color: var(--hp-red); }
+.boot-state.error { color: var(--clay-deep); }
 </style>
