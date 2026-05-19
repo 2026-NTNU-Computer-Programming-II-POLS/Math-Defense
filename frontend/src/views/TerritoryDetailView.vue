@@ -214,39 +214,60 @@ watch(activityId, (id) => {
 }
 
 .detail-panel {
-  width: 600px;
+  width: 680px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .detail-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .detail-title {
-  font-size: var(--text-base);
+  font-size: 1.35rem;
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 3px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
 }
 
 .status-badge {
-  padding: 2px 8px;
-  border: 1px solid var(--gold);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 144, 119, 0.32);
+  background: rgba(126, 144, 119, 0.18);
+  color: var(--sage-deep);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
 }
 
-.status-badge.settled { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
+.status-badge.settled { border-color: rgba(79, 74, 72, 0.16); background: rgba(79, 74, 72, 0.07); color: var(--charcoal-soft); }
 
-.detail-meta { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); display: flex; gap: 12px; align-items: center; }
-.scope-tag { padding: 2px 6px; border: 1px solid var(--scope-border); color: var(--scope-text); font-size: var(--text-xs); letter-spacing: 1px; }
+.detail-meta { font-size: var(--text-sm); color: var(--charcoal-soft); display: flex; gap: 12px; align-items: center; }
+.scope-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(107, 127, 148, 0.32);
+  background: rgba(107, 127, 148, 0.18);
+  color: var(--slate-deep);
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+}
 
 .slot-grid {
   display: grid;
@@ -260,27 +281,28 @@ watch(activityId, (id) => {
   justify-content: flex-end;
 }
 
-.settle-btn { border-color: var(--enemy-red); color: var(--enemy-red); }
-.settle-btn:hover { background: var(--enemy-red); color: var(--stone-dark); }
+.settle-btn { border-color: rgba(185, 134, 116, 0.5); color: var(--clay-deep); }
+.settle-btn:hover { background: var(--clay); color: #fff; }
 
-.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn { border-color: var(--line); color: var(--charcoal-soft); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .loading, .error-msg { text-align: center; padding: 20px; font-size: var(--text-sm); }
-.loading { color: var(--axis); text-shadow: var(--gold-shadow); }
-.error-msg { color: var(--enemy-red); }
+.loading { color: var(--charcoal-soft); }
+.error-msg { color: var(--clay-deep); }
 
 .recommendation-bar {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px;
-  border: 1px dashed var(--gold);
-  background: var(--gold-tint-faint);
+  padding: 10px 14px;
+  border: 1px solid var(--terracotta);
+  border-radius: 10px;
+  background: rgba(168, 188, 203, 0.2);
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--charcoal-soft);
 }
-.rec-icon { color: var(--gold); text-shadow: var(--gold-shadow); font-size: var(--text-sm); }
+.rec-icon { color: var(--terracotta-deep); font-size: var(--text-sm); }
 .rec-text { flex: 1; }
-.rec-text strong { color: var(--gold); text-shadow: var(--gold-shadow); }
-.rec-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); padding: 4px 10px; font-size: var(--text-xs); }
-.rec-btn:hover { background: var(--gold); color: var(--stone-dark); }
+.rec-text strong { color: var(--terracotta-deep); }
+.rec-btn { border-color: var(--terracotta); color: var(--terracotta-deep); padding: 4px 10px; font-size: var(--text-xs); }
+.rec-btn:hover { background: var(--terracotta); color: #fff; }
 </style>

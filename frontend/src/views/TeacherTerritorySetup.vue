@@ -153,25 +153,31 @@ onMounted(async () => {
 }
 
 .setup-panel {
-  width: 440px;
+  width: 720px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .setup-title {
-  font-size: var(--text-base);
-  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
+  font-size: 1.35rem;
+  /* Mono title kept after Phase 1 swapped --font-main to system-ui. */
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 3px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
   text-align: center;
 }
 
-.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
-.warn-msg { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin-top: 4px; }
+.error-msg { font-size: var(--text-xs); color: var(--clay-deep); }
+.warn-msg { font-size: var(--text-xs); color: var(--gold-deep); margin-top: 4px; }
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
@@ -183,7 +189,7 @@ onMounted(async () => {
 }
 
 .field { display: flex; flex-direction: column; gap: 4px; }
-.field-label { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); }
+.field-label { font-size: var(--text-xs); color: var(--charcoal-soft); font-weight: 500; }
 
 .slot-list { display: flex; flex-direction: column; gap: 6px; }
 
@@ -193,29 +199,30 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.slot-num { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); min-width: 24px; }
+.slot-num { font-size: var(--text-xs); color: var(--charcoal-soft); font-family: var(--font-mono); min-width: 24px; }
 .star-select { flex: 1; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 .btn-sm {
   font-size: var(--text-xs);
-  padding: 2px 6px;
+  padding: 2px 12px;
   min-height: var(--min-touch-target);
   display: inline-flex;
   align-items: center;
-  background: none;
-  border: 1px solid var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--charcoal-soft);
   cursor: pointer;
+  transition: all 0.16s ease;
 }
 
-.btn-sm:hover { background: var(--axis); color: var(--stone-dark); }
-.btn-sm.danger { border-color: var(--enemy-red); color: var(--enemy-red); }
-.btn-sm.danger:hover { background: var(--enemy-red); color: var(--stone-dark); }
+.btn-sm:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); border-color: var(--terracotta); }
+.btn-sm.danger { border-color: rgba(185, 134, 116, 0.5); color: var(--clay-deep); }
+.btn-sm.danger:hover { background: var(--clay); color: #fff; }
 .btn-sm:disabled { opacity: 0.3; cursor: default; }
 
-.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn { border-color: var(--line); color: var(--charcoal-soft); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 </style>
