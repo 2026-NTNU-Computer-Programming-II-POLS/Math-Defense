@@ -371,19 +371,25 @@ async function selectAvatar(url: string): Promise<void> {
 }
 
 .profile-panel {
-  width: 420px;
+  width: 560px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 20px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .profile-title {
-  font-size: var(--text-base);
+  font-size: 1.35rem;
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 4px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
   text-align: center;
 }
 
@@ -397,10 +403,10 @@ async function selectAvatar(url: string): Promise<void> {
 .avatar-current {
   width: 64px;
   height: 64px;
-  border: 2px solid var(--gold);
+  border: 2px solid var(--terracotta);
   border-radius: 50%;
   object-fit: contain;
-  background: var(--stone-dark);
+  background: rgba(245, 250, 254, 0.85);
   padding: 4px;
 }
 
@@ -415,7 +421,7 @@ async function selectAvatar(url: string): Promise<void> {
   width: 44px;
   height: 44px;
   padding: 3px;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--line);
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
@@ -428,11 +434,11 @@ async function selectAvatar(url: string): Promise<void> {
   object-fit: contain;
 }
 
-.avatar-btn:hover { border-color: var(--axis); }
-.avatar-btn.selected { border-color: var(--gold); border-width: 2px; }
+.avatar-btn:hover { border-color: var(--terracotta); }
+.avatar-btn.selected { border-color: var(--terracotta-deep); border-width: 2px; }
 .avatar-btn:disabled { opacity: 0.5; cursor: default; }
 
-.avatar-error { font-size: var(--text-xs); color: var(--error-red); }
+.avatar-error { font-size: var(--text-xs); color: var(--clay-deep); }
 
 .profile-info {
   display: flex;
@@ -446,24 +452,23 @@ async function selectAvatar(url: string): Promise<void> {
   font-size: var(--text-xs);
 }
 
-.profile-label { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; }
-.profile-value { color: var(--gold); text-shadow: var(--gold-shadow); }
+.profile-label { color: var(--charcoal-soft); }
+.profile-value { color: var(--charcoal); font-weight: 600; }
 
 .name-value { display: flex; align-items: center; gap: 6px; }
 
 .name-edit-btn {
   background: none;
   border: none;
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  opacity: 0.5;
+  color: var(--charcoal-soft);
+  opacity: 0.6;
   cursor: pointer;
   font-size: var(--text-xs);
   padding: 0;
   line-height: 1;
 }
 
-.name-edit-btn:hover { opacity: 1; color: var(--gold); text-shadow: var(--gold-shadow); }
+.name-edit-btn:hover { opacity: 1; color: var(--terracotta-deep); }
 
 .name-edit-inline {
   display: flex;
@@ -487,15 +492,15 @@ async function selectAvatar(url: string): Promise<void> {
   letter-spacing: 0;
 }
 
-.name-save-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
-.name-save-btn:hover { background: var(--gold); color: var(--stone-dark); }
-.name-cancel-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.name-cancel-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.name-save-btn { border-color: var(--gold-deep); color: #fff; background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%); }
+.name-save-btn:hover { filter: brightness(1.06); }
+.name-cancel-btn { border-color: var(--line); color: var(--charcoal-soft); }
+.name-cancel-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
-.name-error { font-size: var(--text-xs); color: var(--error-red); }
+.name-error { font-size: var(--text-xs); color: var(--clay-deep); }
 
-.progression-loading { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; text-align: center; }
-.progression-error { font-size: var(--text-xs); color: var(--enemy-red); text-align: center; }
+.progression-loading { font-size: var(--text-xs); color: var(--charcoal-soft); text-align: center; }
+.progression-error { font-size: var(--text-xs); color: var(--clay-deep); text-align: center; }
 
 .progression-summary {
   display: flex;
@@ -504,17 +509,19 @@ async function selectAvatar(url: string): Promise<void> {
 
 .summary-card {
   flex: 1;
-  padding: 12px;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  padding: 14px;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 10px;
   cursor: pointer;
   transition: border-color 0.2s;
+  text-align: center;
 }
 
-.summary-card:hover { border-color: var(--gold); }
-.summary-title { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
-.summary-stat { font-size: var(--text-base); color: var(--gold); text-shadow: var(--gold-shadow); }
-.summary-sub { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 4px; }
+.summary-card:hover { border-color: var(--terracotta); }
+.summary-title { font-size: var(--text-2xs); color: var(--charcoal-soft); font-family: var(--font-mono); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+.summary-stat { font-size: 1.4rem; font-family: var(--font-mono); color: var(--terracotta-deep); font-weight: 700; }
+.summary-sub { font-size: var(--text-2xs); color: var(--charcoal-soft); opacity: 0.8; margin-top: 4px; }
 
 .profile-links {
   display: flex;
@@ -525,25 +532,23 @@ async function selectAvatar(url: string): Promise<void> {
   flex: 1;
   font-size: var(--text-xs);
   letter-spacing: 1px;
-  border-color: var(--gold);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  border-color: var(--terracotta);
+  color: var(--terracotta-deep);
 }
 
-.link-btn:hover { background: var(--gold); color: var(--stone-dark); }
+.link-btn:hover { background: var(--terracotta); color: #fff; }
 
 .pw-section { display: flex; flex-direction: column; }
 
 .pw-toggle-btn {
   font-size: var(--text-xs);
   letter-spacing: 1px;
-  border-color: var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border-color: var(--line);
+  color: var(--charcoal-soft);
   align-self: flex-start;
 }
 
-.pw-toggle-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.pw-toggle-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .pw-form {
   display: flex;
@@ -551,7 +556,7 @@ async function selectAvatar(url: string): Promise<void> {
   gap: 8px;
 }
 
-.section-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.section-title { font-size: var(--text-xs); color: var(--charcoal-soft); font-family: var(--font-mono); letter-spacing: 1px; text-transform: uppercase; margin: 0; }
 
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
 .settings-row {
@@ -562,16 +567,15 @@ async function selectAvatar(url: string): Promise<void> {
   color: var(--text-primary);
   cursor: pointer;
 }
-.settings-checkbox { accent-color: var(--gold); cursor: pointer; }
-.settings-label { color: var(--text-primary); }
+.settings-checkbox { accent-color: var(--terracotta); cursor: pointer; }
+.settings-label { color: var(--charcoal); }
 .settings-row--with-hint { align-items: flex-start; }
 .settings-row--with-hint .settings-checkbox { margin-top: 2px; }
 .settings-label--block { display: flex; flex-direction: column; gap: 2px; }
 .settings-hint {
   font-size: var(--text-2xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  opacity: 0.75;
+  color: var(--charcoal-soft);
+  opacity: 0.85;
   line-height: 1.4;
   font-style: italic;
 }
@@ -580,35 +584,34 @@ async function selectAvatar(url: string): Promise<void> {
 .volume-label { flex-shrink: 0; }
 .settings-range {
   flex: 1;
-  accent-color: var(--gold);
+  accent-color: var(--terracotta);
   cursor: pointer;
 }
 .settings-range:disabled { opacity: 0.4; cursor: not-allowed; }
 .volume-pct {
   font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
   min-width: 36px;
   text-align: right;
 }
 
-.pw-error { font-size: var(--text-xs); color: var(--error-red); }
-.pw-success { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); }
+.pw-error { font-size: var(--text-xs); color: var(--clay-deep); }
+.pw-success { font-size: var(--text-xs); color: var(--sage-deep); }
 
 .pw-actions { display: flex; gap: 8px; }
 
-.pw-save-btn { font-size: var(--text-xs); border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
-.pw-save-btn:hover:not(:disabled) { background: var(--gold); color: var(--stone-dark); }
-.pw-cancel-btn { font-size: var(--text-xs); border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.pw-cancel-btn:hover:not(:disabled) { background: var(--axis); color: var(--stone-dark); }
+.pw-save-btn { font-size: var(--text-xs); border-color: var(--gold-deep); color: #fff; background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%); }
+.pw-save-btn:hover:not(:disabled) { filter: brightness(1.06); }
+.pw-cancel-btn { font-size: var(--text-xs); border-color: var(--line); color: var(--charcoal-soft); }
+.pw-cancel-btn:hover:not(:disabled) { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .back-btn {
   font-size: var(--text-xs);
   letter-spacing: 1px;
-  border-color: var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border-color: var(--line);
+  color: var(--charcoal-soft);
 }
 
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 </style>
