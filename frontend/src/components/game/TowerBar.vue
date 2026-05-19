@@ -289,12 +289,13 @@ function canAfford(cost: number): boolean {
 </template>
 
 <style scoped>
+/* Bottom tower bar — Morandi foot strip (mockup .gh-foot) */
 .tower-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  background: var(--bar-bg);
-  border-top: 2px solid var(--gold);
-  padding: 8px 16px;
+  background: linear-gradient(0deg, rgba(220, 229, 237, 0.98), rgba(200, 210, 220, 0.94));
+  border-top: 1px solid var(--line-strong);
+  padding: 10px 18px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -302,8 +303,12 @@ function canAfford(cost: number): boolean {
 }
 
 .bar-label {
-  font-size: var(--text-xs); color: var(--axis);
-  letter-spacing: 2px; text-transform: uppercase; white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--charcoal-soft);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .category-chips {
@@ -312,17 +317,18 @@ function canAfford(cost: number): boolean {
   flex-shrink: 0;
   flex-wrap: nowrap;
 }
+/* Category filter chips (mockup .tcat) */
 .chip {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 12px;
+  background: rgba(245, 250, 254, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 999px;
   padding: 4px 10px;
-  font-size: var(--text-xs);
-  color: #ffffff;
+  font-size: 0.68rem;
+  color: var(--charcoal-soft);
   cursor: pointer;
   white-space: nowrap;
   font-family: var(--font-mono);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.7px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -331,90 +337,99 @@ function canAfford(cost: number): boolean {
 }
 .chip:hover {
   border-color: var(--gold);
-  color: var(--gold);
+  color: var(--gold-deep);
 }
 .chip:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--terracotta-deep);
   outline-offset: 1px;
 }
 .chip--active {
-  border-color: var(--gold);
-  background: var(--gold);
-  color: var(--text-on-accent);
+  border-color: var(--gold-deep);
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(122, 113, 86, 0.34);
 }
 .chip-count {
-  font-size: var(--text-xs);
-  color: var(--axis);
-  background: rgba(0, 0, 0, 0.3);
+  font-size: 0.6rem;
+  color: var(--charcoal-soft);
+  background: rgba(79, 74, 72, 0.08);
   padding: 1px 5px;
   border-radius: 8px;
-  font-weight: bold;
+  font-weight: 700;
 }
 .chip--active .chip-count {
-  color: #ffffff;
-  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .empty-msg {
   font-size: var(--text-xs);
-  color: var(--axis);
+  color: var(--charcoal-soft);
   margin: 0;
   padding: 0 12px;
   align-self: center;
   font-style: italic;
 }
 
+/* Tower card row (mockup .tcard-row) */
 .tower-list {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: nowrap;
   overflow-x: auto;
   overflow-y: hidden;
+  border-left: 1px dashed var(--line);
+  padding-left: 10px;
+  margin-left: 6px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(139, 115, 66, 0.5) transparent;
+  scrollbar-color: rgba(111, 132, 151, 0.5) transparent;
 }
 .tower-list::-webkit-scrollbar { height: 6px; }
 .tower-list::-webkit-scrollbar-track { background: transparent; }
 .tower-list::-webkit-scrollbar-thumb {
-  background: rgba(139, 115, 66, 0.45);
+  background: rgba(111, 132, 151, 0.45);
   border-radius: 3px;
 }
 
+/* Tower card (mockup .tcard) — radius locked at 10px so the shape never
+   changes between buff/debuff states. */
 .tower-btn {
   display: flex; flex-direction: column; align-items: center;
   gap: 3px; padding: 8px 12px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 6px;
+  background: rgba(245, 250, 254, 0.86);
+  border: 1px solid var(--line);
+  border-radius: 10px !important;
   cursor: pointer;
   min-width: 90px;
   flex: 0 0 auto;
-  transition: border-color 0.15s, background 0.15s;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
 }
 
 .tower-btn:hover:not(.unaffordable) {
-  border-color: var(--gold);
-  background: rgba(255, 215, 0, 0.15);
+  border-color: var(--terracotta);
+  background: #fff;
+  transform: translateY(-1px);
 }
 
 /* Keyboard focus must be visually distinct from inert state (A-8) */
 .tower-btn:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--terracotta-deep);
   outline-offset: 2px;
 }
 
-/* U-6: stronger selection cue — double inset stroke + richer tint so the
-   selected state reads clearly against the gold-on-dark palette. */
+/* Selected cue — terracotta gradient + white text (Morandi). Per-tower
+   colour still reads from .tower-icon (def.color); a per-tower-tinted
+   selected card would need a template style-binding (out of scope here). */
 .tower-btn.selected {
-  border-color: var(--gold);
-  background: var(--gold);
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+  border-color: var(--terracotta-deep);
+  background: linear-gradient(135deg, var(--terracotta) 0%, var(--terracotta-soft) 100%);
+  box-shadow: 0 4px 12px rgba(79, 74, 72, 0.24);
 }
 
 .tower-btn.selected .tower-name,
 .tower-btn.selected .tower-cost,
 .tower-btn.selected .tower-glyph {
-  color: var(--text-on-accent);
+  color: #fff;
 }
 
 /* U-3: shake rejection cue for unaffordable clicks */
@@ -434,7 +449,7 @@ function canAfford(cost: number): boolean {
    so text contrast stays above WCAG AA (A-5) */
 .tower-btn.unaffordable {
   filter: grayscale(0.85);
-  border-color: var(--hp-red);
+  border-color: var(--clay-deep);
   border-style: dashed;
   cursor: not-allowed;
 }
@@ -448,7 +463,7 @@ function canAfford(cost: number): boolean {
   height: 16px;
 }
 .tower-icon-svg { width: 100%; height: 100%; }
-.tower-name { font-size: var(--text-xs); color: #ffffff; letter-spacing: 1px; }
+.tower-name { font-size: var(--text-xs); color: var(--charcoal); letter-spacing: 0.5px; font-weight: 600; }
 /* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
    colour-blind players can identify tower type without relying on the
    colour of .tower-icon. Lives inline with the label. */
@@ -456,11 +471,11 @@ function canAfford(cost: number): boolean {
   display: inline-block;
   margin-right: 4px;
   font-size: var(--text-xs);
-  color: var(--gold-bright);
+  color: var(--terracotta-deep);
   font-weight: bold;
 }
-.tower-cost { font-size: var(--text-xs); color: var(--gold); font-family: var(--font-mono); }
-.cost-red   { color: var(--hp-red); }
+.tower-cost { font-size: var(--text-xs); color: var(--gold-deep); font-family: var(--font-mono); }
+.cost-red   { color: var(--clay-deep); }
 
 /* Custom tooltip replacing native title (FE-11) */
 .tower-btn[data-tooltip] { position: relative; }
@@ -473,10 +488,10 @@ function canAfford(cost: number): boolean {
   width: max-content;
   max-width: 220px;
   padding: 6px 10px;
-  background: rgba(50, 68, 95, 0.97);
-  border: 1px solid var(--gold);
-  border-radius: 6px;
-  color: #ffffff;
+  background: rgba(79, 74, 72, 0.95);
+  border: 1px solid var(--terracotta-deep);
+  border-radius: 8px;
+  color: #F4EFE3;
   font-size: var(--text-xs);
   line-height: 1.4;
   white-space: pre-line;
