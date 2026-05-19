@@ -81,42 +81,50 @@ function goBack(): void {
 }
 
 .result-panel {
-  width: 360px;
+  width: 520px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
   align-items: center;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .result-title {
-  font-size: var(--text-base);
+  font-size: 1.6rem;
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 3px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
+  font-weight: 800;
 }
 
-.error-msg { font-size: var(--text-sm); color: var(--enemy-red); text-align: center; }
-.loading { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); text-align: center; }
+.error-msg { font-size: var(--text-sm); color: var(--clay-deep); text-align: center; }
+.loading { font-size: var(--text-sm); color: var(--charcoal-soft); text-align: center; }
 
 .result-box {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 20px;
-  border: 1px solid var(--axis);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   width: 100%;
 }
 
-.result-box.success { border-color: var(--gold); }
-.result-box.failure { border-color: var(--enemy-red); }
+.result-box.success { border-color: rgba(126, 144, 119, 0.4); background: rgba(126, 144, 119, 0.12); }
+.result-box.failure { border-color: rgba(185, 134, 116, 0.4); background: rgba(185, 134, 116, 0.12); }
 
-.result-text { font-size: var(--text-sm); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; }
-.result-score { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); }
+.result-text { font-size: var(--text-sm); color: var(--sage-deep); letter-spacing: 2px; font-weight: 600; }
+.result-score { font-size: var(--text-xs); color: var(--charcoal-soft); }
 
 .result-actions { display: flex; gap: 8px; }
-.retry-btn { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
-.retry-btn:hover { background: var(--gold); color: var(--stone-dark); }
+.retry-btn { border-color: var(--terracotta); color: var(--terracotta-deep); }
+.retry-btn:hover { background: var(--terracotta); color: #fff; }
 </style>

@@ -98,73 +98,92 @@ onMounted(() => store.loadActivities())
 }
 
 .territory-panel {
-  width: 500px;
+  width: 620px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .panel-title {
-  font-size: var(--text-base);
+  font-size: 1.35rem;
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 4px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
 }
 
 .header-actions { display: flex; gap: 8px; }
 
-.error-msg { font-size: var(--text-sm); color: var(--enemy-red); }
-.loading, .empty { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; text-align: center; padding: 20px; }
+.error-msg { font-size: var(--text-sm); color: var(--clay-deep); }
+.loading, .empty { font-size: var(--text-sm); color: var(--charcoal-soft); text-align: center; padding: 20px; font-style: italic; }
 
 .activity-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 
 .activity-item {
-  border: 1px solid var(--axis);
-  padding: 12px;
+  background: rgba(245, 250, 254, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: border-color 0.16s ease, transform 0.16s ease;
 }
 
-.activity-item:hover { border-color: var(--gold); }
+.activity-item:hover { border-color: var(--terracotta); transform: translateY(-2px); }
 
-.activity-title { color: var(--gold); text-shadow: var(--gold-shadow); font-size: var(--text-sm); }
+.activity-title { color: var(--charcoal); font-weight: 700; font-size: 1.05rem; }
 
 .activity-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
 }
 
 .status-badge {
-  padding: 2px 6px;
-  border: 1px solid var(--gold);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 144, 119, 0.32);
+  background: rgba(126, 144, 119, 0.18);
+  color: var(--sage-deep);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
   letter-spacing: 1px;
 }
 
-.status-badge.settled { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.status-badge.expired { border-color: var(--enemy-red); color: var(--enemy-red); }
+.status-badge.settled { border-color: rgba(79, 74, 72, 0.16); background: rgba(79, 74, 72, 0.07); color: var(--charcoal-soft); }
+.status-badge.expired { border-color: rgba(185, 134, 116, 0.35); background: rgba(185, 134, 116, 0.2); color: var(--clay-deep); }
 
 .scope-badge {
-  padding: 2px 6px;
-  border: 1px solid var(--scope-border);
-  color: var(--scope-text);
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(107, 127, 148, 0.32);
+  background: rgba(107, 127, 148, 0.18);
+  color: var(--slate-deep);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
   letter-spacing: 1px;
 }
 
@@ -172,14 +191,13 @@ onMounted(() => store.loadActivities())
 
 .back-btn {
   font-size: var(--text-xs);
-  border-color: var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border-color: var(--line);
+  color: var(--charcoal-soft);
 }
 
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.page-info { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); }
+.page-info { font-size: var(--text-xs); color: var(--charcoal-soft); font-family: var(--font-mono); }
 .page-btn:disabled { opacity: 0.3; cursor: default; }
 </style>
