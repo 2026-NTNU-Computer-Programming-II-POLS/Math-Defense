@@ -521,65 +521,70 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+/* Exit Run — clay-tinted labelled pill (mockup .gh-icon-btn.exit) */
 .return-level-btn {
   position: absolute;
-  top: calc(var(--hud-height, 48px) + 56px);
+  top: calc(var(--hud-height, 56px) + 56px);
   right: 12px;
   z-index: var(--z-action);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--gold-border);
-  border-radius: 4px;
-  background: rgba(44, 62, 80, 0.82);
-  color: var(--gold-bright);
-  font-family: var(--font-mono);
+  padding: 0 14px;
+  border: 1px solid rgba(185, 134, 116, 0.45);
+  border-radius: 10px;
+  background: rgba(185, 134, 116, 0.18);
+  color: var(--clay-deep);
+  font-family: var(--font-main);
   font-size: var(--text-xs);
   font-weight: 700;
+  letter-spacing: 1px;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-sm);
 }
 
 .return-level-btn:hover {
-  background: rgba(44, 62, 80, 0.96);
-  border-color: var(--gold);
+  background: var(--clay);
+  color: #fff;
+  border-color: var(--clay-deep);
 }
 
 .return-level-btn:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--clay-deep);
   outline-offset: 2px;
 }
 
+/* Manual — light icon button (mockup .gh-icon-btn) */
 .manual-btn {
   position: absolute;
-  top: calc(var(--hud-height, 48px) + 12px);
+  top: calc(var(--hud-height, 56px) + 12px);
   right: 12px;
   z-index: var(--z-action);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--gold-border);
-  border-radius: 4px;
-  background: rgba(44, 62, 80, 0.82);
-  color: var(--gold-bright);
-  font-family: var(--font-mono);
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: rgba(245, 250, 254, 0.7);
+  color: var(--charcoal-soft);
+  font-family: var(--font-main);
   font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-sm);
 }
 
 .manual-btn:hover {
-  background: rgba(44, 62, 80, 0.96);
-  border-color: var(--gold);
+  background: #fff;
+  color: var(--terracotta-deep);
+  border-color: var(--terracotta);
 }
 
 .manual-btn:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--terracotta-deep);
   outline-offset: 2px;
 }
 
@@ -603,18 +608,18 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: var(--overlay-bg);
-  color: #ffffff;
+  background: rgba(220, 229, 237, 0.92);
+  color: var(--charcoal);
   font-family: var(--font-mono);
   z-index: var(--z-modal);
 }
-.boot-state.error { color: var(--hp-red); }
-.boot-title { font-size: var(--text-base); letter-spacing: 2px; color: var(--gold); text-shadow: var(--gold-shadow); }
-.boot-msg   { font-size: var(--text-xs); text-align: center; max-width: 480px; padding: 0 16px; }
+.boot-state.error { color: var(--clay-deep); }
+.boot-title { font-size: var(--text-base); letter-spacing: 2px; color: var(--terracotta-deep); text-shadow: none; }
+.boot-msg   { font-size: var(--text-xs); text-align: center; max-width: 480px; padding: 0 16px; color: var(--charcoal-soft); }
 .boot-spinner {
   width: 32px; height: 32px;
-  border: 3px solid var(--gold-dim);
-  border-top-color: var(--gold);
+  border: 3px solid var(--line-strong);
+  border-top-color: var(--terracotta);
   border-radius: 50%;
   animation: boot-spin 0.9s linear infinite;
 }
@@ -624,7 +629,7 @@ onBeforeUnmount(() => {
 .pause-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(79, 74, 72, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -637,33 +642,33 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 16px;
   padding: 32px 48px;
-  background: var(--panel-bg);
-  border: 1px solid var(--gold);
-  box-shadow: var(--panel-shadow);
+  background: rgba(220, 229, 237, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
 }
 .pause-title {
   font-size: var(--text-xl);
-  color: var(--gold-bright);
+  color: var(--charcoal);
   letter-spacing: 6px;
 }
-.pause-hint { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
+.pause-hint { font-size: var(--text-xs); color: var(--charcoal-soft); letter-spacing: 1px; }
 .pause-hint kbd {
   display: inline-block;
   padding: 2px 6px;
   margin: 0 2px;
-  border: 1px solid var(--gold-dim);
-  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal);
 }
 
 /* §12: Star-5 checkpoint retry dialog */
 .checkpoint-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.78);
+  background: rgba(79, 74, 72, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -676,35 +681,35 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 14px;
   padding: 28px 40px;
-  background: var(--panel-bg);
-  border: 1px solid var(--gold);
-  box-shadow: var(--panel-shadow);
+  background: rgba(220, 229, 237, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
   max-width: 460px;
   text-align: center;
 }
 .checkpoint-title {
   margin: 0;
   font-size: var(--text-lg);
-  color: var(--gold-bright);
+  color: var(--charcoal);
   letter-spacing: 4px;
 }
 .checkpoint-stat {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--text-primary);
+  color: var(--charcoal);
 }
 .checkpoint-hint {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal-soft);
   line-height: 1.5;
 }
 .checkpoint-practice {
   display: inline-block;
   margin-top: 6px;
   font-size: var(--text-xs);
-  color: var(--gold-dim);
+  color: var(--plum-deep);
   font-style: italic;
 }
 .checkpoint-actions {
@@ -714,38 +719,41 @@ onBeforeUnmount(() => {
 }
 .btn-checkpoint {
   padding: 8px 20px;
-  border: 1px solid var(--gold-dim);
-  border-radius: 4px;
-  background: rgba(212, 160, 23, 0.1);
-  color: var(--text-primary);
-  font-family: var(--font-mono);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: rgba(245, 250, 254, 0.78);
+  color: var(--charcoal);
+  font-family: var(--font-main);
   font-size: var(--text-xs);
+  font-weight: 600;
   cursor: pointer;
-  transition: background 120ms;
+  transition: all 0.16s ease;
 }
 .btn-checkpoint:hover {
-  background: rgba(212, 160, 23, 0.25);
+  background: #fff;
+  border-color: var(--terracotta);
 }
 .btn-checkpoint.primary {
-  border-color: var(--gold);
-  color: var(--text-on-accent);
-  background: rgba(212, 160, 23, 0.3);
-  font-weight: bold;
+  border-color: var(--gold-deep);
+  color: #fff;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 .btn-checkpoint.primary:hover {
-  background: rgba(212, 160, 23, 0.5);
+  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
 }
 
 /* Backlog §20 — practice-mode badge */
 .practice-badge {
   position: absolute;
-  top: calc(var(--hud-height, 48px) + 98px);
+  top: calc(var(--hud-height, 56px) + 98px);
   right: 12px;
   padding: 4px 10px;
-  background: rgba(144, 104, 200, 0.18);
-  border: 1px solid #9068c8;
-  border-radius: 4px;
-  color: #c8a4ff;
+  background: rgba(162, 141, 160, 0.2);
+  border: 1px solid var(--plum);
+  border-radius: 999px;
+  color: var(--plum-deep);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.5px;
