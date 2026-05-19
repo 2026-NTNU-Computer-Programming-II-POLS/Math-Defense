@@ -309,16 +309,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* Top HUD — slim Morandi chrome (mockup .gh-top, ~56px) */
 .hud {
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 48px;
-  background: var(--bar-bg);
-  border-bottom: 2px solid var(--gold);
+  height: 56px;
+  background: linear-gradient(180deg, rgba(220, 229, 237, 0.98), rgba(200, 210, 220, 0.94));
+  border-bottom: 1px solid var(--line-strong);
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  gap: 24px;
+  padding: 0 18px;
+  gap: 18px;
   font-family: var(--font-mono);
   z-index: var(--z-chrome);
   overflow-x: auto;
@@ -327,16 +328,17 @@ onBeforeUnmount(() => {
 }
 .hud::-webkit-scrollbar { display: none; }
 
+/* Sub-HUD strip (mockup .gh-subhud, ~68px) */
 .hud-row2 {
   position: absolute;
-  top: var(--hud-height, 48px); left: 0; right: 0;
-  height: 44px;
-  background: var(--bar-bg);
-  border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+  top: var(--hud-height, 56px); left: 0; right: 0;
+  height: 68px;
+  background: rgba(220, 229, 237, 0.78);
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  gap: 16px;
+  padding: 0 18px;
+  gap: 12px;
   font-family: var(--font-mono);
   z-index: var(--z-chrome);
 }
@@ -344,86 +346,101 @@ onBeforeUnmount(() => {
 .hud-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
+/* Phase rendered as a Morandi pill */
+.phase-label {
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(168, 188, 203, 0.24);
+  border: 1px solid rgba(168, 188, 203, 0.45);
+  border-radius: 999px;
+}
+
 .hud-label {
-  font-size: var(--text-xs);
-  color: #ffffff;
-  opacity: 0.8;
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
 }
 
 .hud-value {
   font-size: var(--text-lg);
-  color: var(--gold);
-  font-weight: bold;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  color: var(--charcoal);
+  font-weight: 700;
+  text-shadow: none;
 }
 
-.phase    { color: var(--gold); font-size: var(--text-xs); }
-.gold     { color: var(--gold-bright); }
-.hp-low   { color: var(--hp-red); font-weight: 900; }
-.hp-warn-icon { margin: 0 2px; }
-.score    { color: var(--gold); }
+.phase    { color: var(--charcoal); font-size: var(--text-xs); letter-spacing: 1px; text-transform: uppercase; }
+.gold     { color: var(--gold-deep); }
+.hp-low   { color: var(--clay-deep); font-weight: 900; }
+.hp-warn-icon { margin: 0 2px; color: var(--clay-deep); }
+.score    { color: var(--teal-deep); }
 .score-item { margin-left: auto; }
 
 .star-icons { display: flex; gap: 1px; }
-.star-filled { color: var(--gold-bright); font-size: var(--text-sm); }
+.star-filled { color: var(--terracotta); font-size: var(--text-sm); }
 
-.kill-value { color: var(--hp-red); font-size: var(--text-xs); }
+.kill-value { color: var(--charcoal); font-size: var(--text-xs); }
 
-.ia-indicator { font-size: var(--text-xs); padding: 2px 6px; border-radius: 3px; }
-.ia-correct { background: rgba(96, 240, 144, 0.15); color: #60f090; }
-.ia-wrong { background: rgba(255, 96, 48, 0.15); color: #ff6030; }
+/* IA pill — sage (correct) / clay (wrong) */
+.ia-indicator {
+  font-size: var(--text-2xs);
+  letter-spacing: 1.5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.ia-correct { background: rgba(126, 144, 119, 0.18); color: var(--sage-deep); border: 1px solid rgba(126, 144, 119, 0.4); }
+.ia-wrong   { background: rgba(185, 134, 116, 0.18); color: var(--clay-deep); border: 1px solid rgba(185, 134, 116, 0.4); }
 
 /* Wave progress */
 .wave-progress { gap: 8px; }
-.enemies-val { font-size: var(--text-xs); color: var(--hp-red); }
+.enemies-val { font-size: var(--text-xs); color: var(--charcoal); }
 .wave-bar {
   display: inline-block;
   width: 80px;
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--gold-dim);
+  background: rgba(79, 74, 72, 0.08);
+  border: 1px solid var(--line);
   border-radius: 3px;
   overflow: hidden;
 }
 .wave-bar-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  background: linear-gradient(90deg, var(--terracotta-deep), var(--terracotta));
   transition: width 180ms ease-out;
 }
 
-/* Monty Hall progress */
+/* Monty Hall progress (plum) */
 .mh-progress {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
+.mh-progress .hud-label { color: var(--plum-deep); }
 .mh-bar {
   display: inline-block;
-  width: 60px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid #a855f7;
+  width: 96px;
+  height: 5px;
+  background: rgba(79, 74, 72, 0.08);
+  border: 1px solid rgba(162, 141, 160, 0.4);
   border-radius: 3px;
   overflow: hidden;
 }
 .mh-bar-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #a855f7, #c084fc);
+  background: linear-gradient(90deg, var(--plum), var(--plum-deep));
   transition: width 300ms ease-out;
 }
 
-/* Active buffs — circular countdown tokens. The SVG ring drains as the
-   buff's remaining fraction shrinks (a clock-like readout); the centre
-   shows the buff initial and integer seconds remaining. */
+/* Active buffs — circular countdown tokens with sage chrome. The SVG ring
+   drains as the buff's remaining fraction shrinks (a clock-like readout);
+   the centre shows the buff initial and integer seconds remaining. */
 .active-buffs {
   display: flex;
   gap: 6px;
@@ -433,6 +450,9 @@ onBeforeUnmount(() => {
   position: relative;
   width: 34px;
   height: 34px;
+  border: 1px solid rgba(126, 144, 119, 0.42);
+  border-radius: 8px;
+  background: rgba(173, 187, 166, 0.22);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -511,15 +531,16 @@ onBeforeUnmount(() => {
 .prep-timer {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
+.prep-timer .hud-value { color: var(--charcoal); font-size: var(--text-sm); }
 
-/* Phase pulse */
+/* Phase pulse — Morandi tint */
 .phase-pulse { animation: phase-pulse 520ms ease-out; }
 @keyframes phase-pulse {
-  0%   { transform: scale(1);    color: var(--gold-bright); text-shadow: 0 0 8px var(--gold); }
-  40%  { transform: scale(1.18); color: var(--gold); text-shadow: 0 0 12px var(--gold); }
-  100% { transform: scale(1);    color: #ffffff; text-shadow: none; }
+  0%   { transform: scale(1);    color: var(--terracotta-deep); }
+  40%  { transform: scale(1.18); color: var(--terracotta-deep); }
+  100% { transform: scale(1);    color: var(--charcoal); }
 }
 @media (prefers-reduced-motion: reduce) {
   .phase-pulse { animation: none; }
@@ -538,13 +559,13 @@ onBeforeUnmount(() => {
 .value-pop.pop-up   { animation-name: hud-value-pop-up; }
 .value-pop.pop-down { animation-name: hud-value-pop-down; }
 @keyframes hud-value-pop-up {
-  0%   { transform: scale(1);    color: var(--gold-bright); }
-  40%  { transform: scale(1.18); color: var(--gold-bright); text-shadow: 0 0 8px var(--gold-bright); }
+  0%   { transform: scale(1);    color: var(--gold-deep); }
+  40%  { transform: scale(1.18); color: var(--gold-deep); text-shadow: 0 0 8px var(--gold-soft); }
   100% { transform: scale(1);    color: inherit; text-shadow: none; }
 }
 @keyframes hud-value-pop-down {
-  0%   { transform: scale(1);    color: var(--alert-red); }
-  40%  { transform: scale(1.18); color: var(--alert-red); text-shadow: 0 0 8px var(--alert-red); }
+  0%   { transform: scale(1);    color: var(--clay-deep); }
+  40%  { transform: scale(1.18); color: var(--clay-deep); text-shadow: 0 0 8px var(--clay); }
   100% { transform: scale(1);    color: inherit; text-shadow: none; }
 }
 @keyframes hud-value-pop {
@@ -554,7 +575,7 @@ onBeforeUnmount(() => {
 }
 @media (prefers-reduced-motion: reduce) {
   .value-pop, .value-pop.pop-up, .value-pop.pop-down { animation: none; }
-  .value-pop.pop-up   { color: var(--gold-bright); transition: color 280ms ease-out; }
-  .value-pop.pop-down { color: var(--alert-red);   transition: color 280ms ease-out; }
+  .value-pop.pop-up   { color: var(--gold-deep); transition: color 280ms ease-out; }
+  .value-pop.pop-down { color: var(--clay-deep); transition: color 280ms ease-out; }
 }
 </style>
