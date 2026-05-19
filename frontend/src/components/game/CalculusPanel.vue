@@ -289,18 +289,17 @@ function pendingLabel(op: CalcOp): string {
 
 <style scoped>
 .calc-panel { display: flex; flex-direction: column; gap: 8px; }
-.section-label { font-size: var(--text-xs); color: var(--axis); margin: 0; }
+.section-label { font-size: var(--text-xs); color: var(--charcoal-soft); margin: 0; }
 
 .trait-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   font-size: var(--text-2xs);
-  color: var(--text-primary);
-  opacity: 0.8;
+  color: var(--charcoal-soft);
   padding: 4px 6px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+  background: rgba(79, 74, 72, 0.05);
+  border-radius: 6px;
 }
 .legend-item { display: inline-flex; align-items: center; gap: 4px; }
 
@@ -320,37 +319,35 @@ function pendingLabel(op: CalcOp): string {
   align-items: center;
   gap: 6px;
   font-size: var(--text-2xs);
-  color: var(--text-primary);
-  opacity: 0.7;
+  color: var(--charcoal-soft);
   font-family: var(--font-sans, inherit);
 }
 .trait-label { font-weight: 600; }
 .preset-deriv {
   margin-left: auto;
   font-family: var(--font-mono);
-  color: var(--text-primary);
-  opacity: 0.6;
+  color: var(--charcoal-soft);
   font-size: var(--text-2xs);
 }
-.preset-deriv--warn { color: var(--hp-red); }
+.preset-deriv--warn { color: var(--clay-deep); }
 
 .trait-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--line-strong);
 }
 
 .current-fn {
   font-size: var(--text-lg);
-  color: var(--gold);
+  color: var(--terracotta-deep);
   margin: 0;
   font-family: var(--font-mono);
 }
 .coeff-info {
   font-size: var(--text-xs);
-  color: var(--text-primary);
+  color: var(--charcoal);
   margin: 0;
   display: flex;
   flex-wrap: wrap;
@@ -362,15 +359,14 @@ function pendingLabel(op: CalcOp): string {
   align-items: center;
   gap: 4px;
   font-size: var(--text-2xs);
-  color: var(--text-primary);
-  opacity: 0.8;
+  color: var(--charcoal-soft);
 }
 
-.chain-cost { font-size: var(--text-xs); margin: 0; color: var(--gold); }
-.chain-cost--free { color: #6ee7b7; }
-.chain-cost--broke { color: var(--hp-red); }
+.chain-cost { font-size: var(--text-xs); margin: 0; color: var(--gold-deep); }
+.chain-cost--free { color: var(--sage-deep); }
+.chain-cost--broke { color: var(--clay-deep); }
 
-.hint { font-size: var(--text-2xs); color: var(--text-primary); opacity: 0.5; margin: 0; }
+.hint { font-size: var(--text-2xs); color: var(--charcoal-soft); margin: 0; }
 
 .op-btns { display: flex; gap: 6px; }
 .op-btn {
@@ -384,14 +380,14 @@ function pendingLabel(op: CalcOp): string {
 }
 .op-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .op-btn--pending {
-  border-color: var(--gold-bright);
-  background: rgba(255, 215, 0, 0.18);
-  box-shadow: inset 0 0 0 1px var(--gold-bright);
+  border-color: var(--gold-deep);
+  background: rgba(173, 162, 132, 0.18);
+  box-shadow: inset 0 0 0 1px var(--gold-deep);
   animation: op-btn-pulse 1.2s ease-in-out infinite;
 }
 @keyframes op-btn-pulse {
-  0%, 100% { box-shadow: inset 0 0 0 1px var(--gold-bright); }
-  50%      { box-shadow: inset 0 0 0 1px var(--gold-bright), 0 0 8px rgba(255, 215, 0, 0.5); }
+  0%, 100% { box-shadow: inset 0 0 0 1px var(--gold-deep); }
+  50%      { box-shadow: inset 0 0 0 1px var(--gold-deep), 0 0 8px rgba(173, 162, 132, 0.5); }
 }
 @media (prefers-reduced-motion: reduce) {
   .op-btn--pending { animation: none; }
@@ -400,14 +396,13 @@ function pendingLabel(op: CalcOp): string {
 .op-preview {
   font-size: var(--text-2xs);
   font-family: var(--font-mono);
-  color: var(--text-primary);
-  opacity: 0.7;
+  color: var(--charcoal-soft);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
 }
-.op-preview--collapse { color: var(--gold); }
+.op-preview--collapse { color: var(--gold-deep); }
 .op-tag {
   font-family: var(--font-sans, inherit);
   font-size: var(--text-2xs);
@@ -418,32 +413,32 @@ function pendingLabel(op: CalcOp): string {
 .confirm-banner {
   margin-top: 4px;
   padding: 8px 10px;
-  border-radius: 4px;
-  background: rgba(212, 168, 64, 0.1);
-  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: rgba(173, 162, 132, 0.12);
+  border: 1px solid var(--gold-deep);
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 .confirm-banner--collapse {
-  background: rgba(212, 168, 64, 0.15);
-  border-color: var(--gold-bright);
+  background: rgba(173, 162, 132, 0.18);
+  border-color: var(--gold-deep);
 }
 .confirm-text {
   font-size: var(--text-xs);
   margin: 0;
-  color: var(--text-primary);
+  color: var(--charcoal);
   line-height: 1.4;
 }
 .confirm-text code {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(111, 138, 161, 0.14);
   padding: 1px 4px;
   border-radius: 3px;
-  color: var(--gold-bright);
+  color: var(--terracotta-deep);
   font-family: var(--font-mono);
 }
-.confirm-warn { color: var(--gold); }
-.confirm-info { color: var(--gold); }
+.confirm-warn { color: var(--clay-deep); }
+.confirm-info { color: var(--terracotta-deep); }
 .confirm-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .confirm-yes,
 .confirm-no {
@@ -455,15 +450,14 @@ function pendingLabel(op: CalcOp): string {
 .minimal-hint {
   font-size: var(--text-2xs);
   margin: 0;
-  color: var(--text-primary);
-  opacity: 0.7;
+  color: var(--charcoal-soft);
   line-height: 1.4;
 }
 .minimal-hint code {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(111, 138, 161, 0.14);
   padding: 1px 4px;
   border-radius: 3px;
-  color: var(--gold-bright);
+  color: var(--terracotta-deep);
   font-family: var(--font-mono);
 }
 </style>

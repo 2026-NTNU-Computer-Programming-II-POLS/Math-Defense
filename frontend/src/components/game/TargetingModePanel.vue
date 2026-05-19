@@ -81,7 +81,7 @@ function setMode(mode: TargetingMode) {
 
 .section-label {
   font-size: var(--text-2xs);
-  color: var(--axis);
+  color: var(--charcoal-soft);
   letter-spacing: 1px;
   text-transform: uppercase;
   margin: 0;
@@ -99,10 +99,10 @@ function setMode(mode: TargetingMode) {
   align-items: center;
   gap: 2px;
   padding: 6px 2px;
-  background: var(--overlay-cell-bg);
-  border: 1px solid var(--grid-line);
-  border-radius: 4px;
-  color: #c8b894;
+  background: rgba(245, 250, 254, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--charcoal-soft);
   cursor: pointer;
   font-family: var(--font-mono);
   transition: border-color 0.15s, background 0.15s, color 0.15s;
@@ -110,21 +110,21 @@ function setMode(mode: TargetingMode) {
 }
 
 .mode-btn:hover {
-  border-color: var(--gold);
-  background: rgba(212, 168, 64, 0.08);
-  color: var(--overlay-text);
+  border-color: var(--terracotta);
+  background: #fff;
+  color: var(--charcoal);
 }
 
 .mode-btn:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--terracotta-deep);
   outline-offset: 1px;
 }
 
 .mode-btn.active {
-  border-color: var(--gold-bright);
-  background: var(--overlay-cell-active);
-  color: var(--gold-bright);
-  box-shadow: inset 0 0 0 1px var(--gold-bright);
+  border-color: var(--terracotta-deep);
+  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-soft));
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(79, 74, 72, 0.24);
 }
 
 .mode-icon { font-size: var(--text-sm); }

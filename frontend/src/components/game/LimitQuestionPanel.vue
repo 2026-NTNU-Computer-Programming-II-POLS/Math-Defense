@@ -133,18 +133,19 @@ function submitTyped(): void {
 
 <style scoped>
 .limit-panel { display: flex; flex-direction: column; gap: 8px; }
-.question-text { font-size: var(--text-xs); color: var(--text-primary); margin: 0; line-height: 1.5; }
+.question-text { font-size: var(--text-xs); color: var(--charcoal); margin: 0; line-height: 1.5; }
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .choice-btn { font-size: var(--text-xs); padding: 8px; }
-.result-text { font-size: var(--text-xs); color: var(--gold); margin: 0; }
+.result-text { font-size: var(--text-xs); color: var(--sage-deep); margin: 0; font-weight: 600; }
 .change-btn { font-size: var(--text-xs); padding: 6px 12px; align-self: flex-start; }
 .typed-entry { display: flex; gap: 6px; }
 .typed-input {
-  flex: 1; padding: 6px; font-size: var(--text-xs);
-  background: var(--stone-dark); color: #ffffff;
-  border: 1px solid var(--gold); border-radius: 4px;
+  flex: 1; padding: 8px 10px; font-size: var(--text-xs);
+  background: #fff; color: var(--charcoal);
+  border: 1px solid var(--line-strong); border-radius: 8px;
 }
+.typed-input:focus { outline: none; border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28); }
 .submit-btn { font-size: var(--text-xs); padding: 6px 12px; }
-.error-text { font-size: var(--text-xs); color: #ff7a7a; margin: 0; }
-.hint-text { font-size: var(--text-2xs); color: var(--text-primary); opacity: 0.5; margin: 0; font-style: italic; }
+.error-text { font-size: var(--text-xs); color: var(--clay-deep); margin: 0; }
+.hint-text { font-size: var(--text-2xs); color: var(--charcoal-soft); margin: 0; font-style: italic; }
 </style>
