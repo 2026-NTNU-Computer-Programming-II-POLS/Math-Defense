@@ -35,25 +35,27 @@ function toggleSpeed(): void {
 </template>
 
 <style scoped>
+/* Speed tool — Morandi left-bar button (mockup .ptool.speed, teal accent) */
 .speed-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 4px;
-  background: var(--overlay-panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  padding: 5px;
+  background: rgba(245, 250, 254, 0.86);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
   font-family: var(--font-mono);
 }
 
 .speed-cell {
   width: 40px;
   height: 40px;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  background: var(--overlay-cell-bg);
-  color: var(--overlay-text);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(245, 250, 254, 0.94);
+  color: var(--charcoal);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 700;
@@ -65,26 +67,25 @@ function toggleSpeed(): void {
 }
 
 .speed-cell:hover {
-  background: var(--overlay-cell-hover);
-  border-color: var(--gold);
+  background: #fff;
+  border-color: var(--terracotta);
 }
 
 .speed-cell:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--terracotta-deep);
   outline-offset: 2px;
 }
 
 .speed-cell.active {
-  border-color: var(--gold-bright);
-  background: var(--overlay-cell-active);
-  color: var(--gold-bright);
+  border-color: var(--teal-deep);
+  background: rgba(143, 168, 163, 0.24);
+  color: var(--teal-deep);
 }
 
 .speed-hint {
   font-size: var(--text-2xs);
   line-height: 1;
-  color: var(--overlay-text);
-  opacity: 0.75;
+  color: var(--charcoal-soft);
   white-space: nowrap;
 }
 </style>
