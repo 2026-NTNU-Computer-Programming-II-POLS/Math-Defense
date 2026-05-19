@@ -215,15 +215,20 @@ onMounted(async () => {
 
 <style scoped>
 .talent-view {
+  position: relative;
+  z-index: 1;
   max-width: 900px;
-  margin: 0 auto;
-  padding: 32px;
+  margin: 40px auto;
+  padding: 26px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-y: auto;
+  gap: 18px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .talent-header {
@@ -234,30 +239,34 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.talent-title { font-size: var(--text-lg); font-family: var(--font-mono); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 4px; }
+.talent-title { font-size: 1.35rem; font-family: var(--font-mono); color: var(--charcoal); letter-spacing: 2px; }
 .talent-points { font-size: var(--text-xs); }
-.tp-available { color: var(--gold); text-shadow: var(--gold-shadow); font-weight: bold; }
-.tp-detail { color: var(--axis); text-shadow: var(--gold-shadow); margin-left: 8px; }
+.tp-available { color: var(--terracotta-deep); font-weight: 700; }
+.tp-detail { color: var(--charcoal-soft); margin-left: 8px; }
 .talent-actions { display: flex; gap: 8px; }
 
-.reset-btn { border-color: var(--enemy-red); color: var(--enemy-red); }
-.reset-btn:hover:not(:disabled) { background: var(--enemy-red); color: var(--stone-dark); }
+.reset-btn { border-color: rgba(185, 134, 116, 0.5); color: var(--clay-deep); }
+.reset-btn:hover:not(:disabled) { background: var(--clay); color: #fff; }
 .reset-btn:disabled { opacity: 0.3; }
 
-.talent-loading, .talent-error { text-align: center; color: var(--axis); text-shadow: var(--gold-shadow); padding: 32px; }
-.talent-error { color: var(--enemy-red); }
-.talent-alloc-error { font-size: var(--text-xs); color: var(--enemy-red); text-align: center; }
+.talent-loading, .talent-error { text-align: center; color: var(--charcoal-soft); padding: 32px; }
+.talent-error { color: var(--clay-deep); }
+.talent-alloc-error { font-size: var(--text-xs); color: var(--clay-deep); text-align: center; }
 
-.talent-towers { display: flex; flex-direction: column; gap: 24px; }
+.talent-towers { display: flex; flex-direction: column; gap: 18px; }
 
 .tower-section {
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 12px;
   padding: 16px;
 }
 
 .tower-name {
   font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--charcoal-soft);
+  text-transform: uppercase;
   letter-spacing: 2px;
   margin-bottom: 12px;
 }
@@ -266,52 +275,52 @@ onMounted(async () => {
 
 .talent-node {
   width: 140px;
-  padding: 10px;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  padding: 12px;
+  background: rgba(245, 250, 254, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 12px;
   cursor: default;
   transition: border-color 0.2s, background 0.2s;
 }
 
 .talent-node.available {
   cursor: pointer;
-  border-color: var(--gold);
+  border-color: var(--terracotta);
 }
 
 .talent-node.available:hover {
-  background: var(--gold-tint);
+  background: linear-gradient(135deg, rgba(168, 188, 203, 0.26), #fff);
 }
 
 .talent-node.maxed {
-  border-color: var(--gold);
-  background: var(--gold-tint-soft);
+  border-color: var(--terracotta);
+  background: linear-gradient(135deg, rgba(168, 188, 203, 0.26), #fff);
 }
 
-.talent-node.locked { opacity: 0.4; }
+.talent-node.locked { opacity: 0.5; }
 .talent-node.loading { opacity: 0.6; cursor: wait; }
 
 .talent-node.recommended {
   /* Override .locked dimming so the highlighted root remains visible even
      when the user has no points to spend. */
   opacity: 1;
-  border-color: var(--gold);
-  box-shadow: 0 0 0 1px var(--gold), 0 0 12px rgba(212, 160, 23, 0.45);
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 1px var(--terracotta), 0 0 12px rgba(168, 188, 203, 0.5);
 }
 
 .talent-recommendation {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background: var(--gold-tint-select);
-  border: 1px solid var(--gold);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  border-radius: 4px;
+  background: rgba(168, 188, 203, 0.2);
+  border: 1px solid var(--terracotta);
+  color: var(--charcoal-soft);
+  border-radius: 10px;
   padding: 0.5rem 0.8rem;
   font-size: var(--text-xs);
 }
 
-.rec-text strong { color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 1px; }
+.rec-text strong { color: var(--terracotta-deep); letter-spacing: 1px; }
 
 .rec-dismiss {
   background: transparent;
@@ -326,8 +335,9 @@ onMounted(async () => {
 .rec-dismiss:hover { opacity: 0.7; }
 
 .node-name {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  color: var(--charcoal);
+  font-weight: 600;
   margin-bottom: 4px;
   display: flex;
   align-items: center;
@@ -335,18 +345,18 @@ onMounted(async () => {
   justify-content: space-between;
 }
 
+/* Phase 7 (Q14): tier-2 badge placed inline next to .node-name. */
 .tier-badge {
   font-size: var(--text-2xs);
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  border: 1px solid var(--gold);
+  color: var(--terracotta-deep);
+  border: 1px solid var(--terracotta-deep);
   border-radius: 2px;
   padding: 0 4px;
   letter-spacing: 1px;
 }
-.node-level { font-size: var(--text-sm); color: var(--gold); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
-.node-desc { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
-.node-effect { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); opacity: 0.8; }
-.node-cost { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; margin-top: 2px; }
+.node-level { font-size: var(--text-sm); font-family: var(--font-mono); color: var(--terracotta-deep); font-weight: 700; margin-bottom: 4px; }
+.node-desc { font-size: var(--text-xs); color: var(--charcoal-soft); margin-bottom: 4px; }
+.node-effect { font-size: var(--text-xs); color: var(--terracotta-deep); opacity: 0.9; }
+.node-cost { font-size: var(--text-2xs); color: var(--charcoal-soft); opacity: 0.8; margin-top: 2px; }
 </style>
