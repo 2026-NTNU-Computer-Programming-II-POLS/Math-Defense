@@ -261,9 +261,37 @@ function toggleMode(mode: MagicMode) {
 }
 .fn-locked { color: var(--hp-red); opacity: 0.85; text-decoration: line-through; }
 .error-msg { font-size: var(--text-xs); color: #ff8888; margin: 0; }
-.mode-btns { display: flex; gap: 6px; }
-.mode-btns .btn { flex: 1; font-size: var(--text-xs); padding: 6px; }
-.mode-btns .btn.active { background: var(--gold); color: var(--stone-dark); }
+/* Magic mode toggle — Debuff = dark purple, Buff = light purple. Pure text
+   labels; the inactive option fades to 0.55, the active one gains a purple
+   glow ring. Layout/padding identical so only the purple shade differs. */
+.mode-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mode-btns .btn {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  text-transform: none;
+}
+.mode-btns .btn:first-child {
+  background: linear-gradient(135deg, var(--tw-magic-debuff), var(--tw-magic-debuff-soft));
+  color: #fff;
+  border: 1px solid var(--tw-magic-debuff-deep);
+}
+.mode-btns .btn:last-child {
+  background: linear-gradient(135deg, var(--tw-magic-buff), var(--tw-magic-buff-soft));
+  color: var(--tw-magic-buff-deep);
+  border: 1px solid var(--tw-magic-buff-deep);
+}
+.mode-btns .btn:hover { filter: brightness(1.06); }
+.mode-btns .btn:not(.active) { opacity: 0.55; }
+.mode-btns .btn:first-child.active {
+  box-shadow: 0 0 0 2px var(--tw-magic-debuff-soft), 0 4px 12px rgba(94, 74, 120, 0.32);
+}
+.mode-btns .btn:last-child.active {
+  box-shadow: 0 0 0 2px var(--tw-magic-buff-deep), 0 4px 12px rgba(140, 122, 168, 0.32);
+}
 .slider-fn-input { gap: 6px; }
 .slider-row { display: flex; flex-direction: column; gap: 4px; }
 .slider-cell { display: grid; grid-template-columns: 14px 1fr 28px; align-items: center; gap: 6px; }
