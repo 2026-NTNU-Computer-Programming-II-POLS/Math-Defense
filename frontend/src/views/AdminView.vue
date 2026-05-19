@@ -216,39 +216,48 @@ watch(activeTab, loadData, { immediate: true })
 }
 
 .admin-panel {
-  width: 480px;
+  width: 720px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .admin-title {
-  font-size: var(--text-base);
-  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
+  font-size: 1.35rem;
+  /* Mono title kept after Phase 1 swapped --font-main to system-ui. */
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 4px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
   text-align: center;
 }
 
-.tab-bar { display: flex; gap: 4px; }
+.tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
 
 .tab-btn {
   flex: 1;
-  font-size: var(--text-xs);
-  padding: 6px;
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 10px 6px;
   min-height: 44px;
   background: none;
-  border: 1px solid var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--charcoal-soft);
   cursor: pointer;
 }
 
-.tab-btn.active { border-color: var(--gold); color: var(--gold); text-shadow: var(--gold-shadow); }
-.tab-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.tab-btn.active { border-bottom-color: var(--terracotta); color: var(--terracotta-deep); font-weight: 600; }
+.tab-btn:hover { color: var(--terracotta-deep); }
 
 .item-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 
@@ -256,26 +265,25 @@ watch(activeTab, loadData, { immediate: true })
   display: flex;
   justify-content: space-between;
   font-size: var(--text-sm);
-  padding: 6px;
-  border: 1px solid var(--axis);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
 }
 
-.item-name { color: var(--gold); text-shadow: var(--gold-shadow); }
-.item-detail { color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; font-size: var(--text-xs); }
+.item-name { color: var(--charcoal); font-weight: 600; }
+.item-detail { color: var(--charcoal-soft); opacity: 0.85; font-size: var(--text-xs); }
 
 .search-input { font-size: var(--text-xs); }
-.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
-.loading, .empty { font-size: var(--text-sm); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.5; }
+.error-msg { font-size: var(--text-xs); color: var(--clay-deep); }
+.loading, .empty { font-size: var(--text-sm); color: var(--charcoal-soft); font-style: italic; }
 
 .back-btn {
   font-size: var(--text-xs);
   letter-spacing: 1px;
-  border-color: var(--axis);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  border-color: var(--line);
+  color: var(--charcoal-soft);
 }
 
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .seasons-section { display: flex; flex-direction: column; gap: 12px; }
 
@@ -283,27 +291,29 @@ watch(activeTab, loadData, { immediate: true })
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px;
-  border: 1px solid var(--axis);
+  padding: 14px;
+  background: rgba(245, 250, 254, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
-.season-form-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); letter-spacing: 2px; margin: 0 0 4px; }
-.season-label { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); display: flex; flex-direction: column; gap: 2px; }
+.season-form-title { font-size: var(--text-xs); color: var(--charcoal-soft); font-family: var(--font-mono); letter-spacing: 2px; text-transform: uppercase; margin: 0 0 4px; }
+.season-label { font-size: var(--text-xs); color: var(--charcoal-soft); display: flex; flex-direction: column; gap: 2px; }
 .season-row { flex-direction: column; gap: 4px; align-items: flex-start; }
 
-.season-id-hint { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
+.season-id-hint { font-size: var(--text-xs); color: var(--charcoal-soft); opacity: 0.7; }
 
 .season-pill {
   margin-left: 6px;
-  padding: 1px 6px;
+  padding: 2px 8px;
   font-size: var(--text-2xs);
   letter-spacing: 1px;
-  border: 1px solid var(--gold);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  border-radius: 2px;
+  border: 1px solid rgba(126, 144, 119, 0.32);
+  background: rgba(126, 144, 119, 0.18);
+  color: var(--sage-deep);
+  border-radius: 999px;
 }
 
-.season-pill.archived { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.season-pill.upcoming { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.7; }
+.season-pill.archived { border-color: rgba(79, 74, 72, 0.16); background: rgba(79, 74, 72, 0.07); color: var(--charcoal-soft); }
+.season-pill.upcoming { border-color: rgba(107, 127, 148, 0.32); background: rgba(107, 127, 148, 0.18); color: var(--slate-deep); }
 </style>

@@ -244,39 +244,45 @@ onMounted(async () => {
 }
 
 .setup-panel {
-  width: 520px;
+  width: 720px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: rgba(220, 229, 237, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .setup-title {
-  font-size: var(--text-base);
+  font-size: 1.35rem;
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 3px;
+  color: var(--charcoal);
+  letter-spacing: 2px;
   text-align: center;
 }
 
 .subtitle {
-  font-size: var(--text-sm);
+  font-size: 0.68rem;
   font-family: var(--font-mono);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  letter-spacing: 2px;
+  color: var(--charcoal-soft);
+  letter-spacing: 4px;
+  text-transform: uppercase;
   margin-top: 16px;
 }
 
-.error-msg { font-size: var(--text-xs); color: var(--enemy-red); }
+.error-msg { font-size: var(--text-xs); color: var(--clay-deep); }
 
 .setup-form { display: flex; flex-direction: column; gap: 12px; }
 
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field.row { flex-direction: row; gap: 12px; }
 .half { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.field-label { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); }
+.field-label { font-size: var(--text-xs); color: var(--charcoal-soft); font-weight: 500; }
 
 .checkbox-grid {
   display: grid;
@@ -289,8 +295,7 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal);
   cursor: pointer;
 }
 
@@ -304,17 +309,16 @@ onMounted(async () => {
 .coef-label {
   font-family: var(--font-mono, monospace);
   font-size: var(--text-xs);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  color: var(--terracotta-deep);
   min-width: 12px;
 }
 .num-input { width: 70px; }
-.dash { color: var(--axis); text-shadow: var(--gold-shadow); }
-.hint { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-2xs); opacity: 0.7; }
+.dash { color: var(--charcoal-soft); }
+.hint { color: var(--charcoal-soft); font-size: var(--text-2xs); opacity: 0.8; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.back-btn { border-color: var(--axis); color: var(--axis); text-shadow: var(--gold-shadow); }
-.back-btn:hover { background: var(--axis); color: var(--stone-dark); }
+.back-btn { border-color: var(--line); color: var(--charcoal-soft); }
+.back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .my-challenges { display: flex; flex-direction: column; gap: 6px; }
 .ch-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -322,10 +326,10 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   font-size: var(--text-xs);
-  padding: 4px 6px;
-  border: 1px solid var(--axis);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
 }
-.ch-title { color: var(--gold); text-shadow: var(--gold-shadow); text-decoration: none; }
+.ch-title { color: var(--terracotta-deep); font-weight: 600; text-decoration: none; }
 .ch-title:hover { text-decoration: underline; }
-.ch-meta { color: var(--axis); text-shadow: var(--gold-shadow); font-size: var(--text-xs); }
+.ch-meta { color: var(--charcoal-soft); font-size: var(--text-xs); }
 </style>
