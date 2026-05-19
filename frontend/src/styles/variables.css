@@ -1,114 +1,214 @@
-/* CSS variables — medieval fantasy pixel art theme */
+/* CSS variables — Morandi cool-blue theme (see UI_Mockup_Preview.html :root) */
 :root {
-  --bg-base: #a4b9d4;
-  --stone-dark: #5b718f;
-  --stone-light: #7a8da8;
-  --grid-line: rgba(255, 255, 255, 0.2);
-  --axis: #c79d50;
-  --gold: #c79d50;
-  --gold-bright: #ffd54f;
-  --gold-dim: #a07526f3;
-  --tower-cannon: #5a82b3c7;
+   --bg-base: #DCE5ED;
+   --stone-dark: #807A75;
+   --stone-light: #C9C3BB;
+   --grid-line: rgba(95, 118, 142, 0.3);
+   --axis: rgba(79, 74, 72, 0.65);
+   --gold: #ADA284;
+   --gold-bright: #C5BCA1;
+   --gold-dim: #7A7156;
+   --tower-cannon: #7C9CBD;
 
-  --enemy-red: #b84040;
-  --hp-green: #048634;
-  --hp-yellow: #b99d6df1;
-  --hp-red: #a31f1f;
-  /* Visual Redesign Phase 4: HUD value-down pop flash. Distinct from --hp-red
-     (which is reserved for HP-critical state) — slightly brighter so a brief
-     flash reads on dark HUD chrome without bleeding into the static red. */
-  --alert-red: #ff4d4d;
+   --enemy-red: #C44343;
+   --hp-green: #7E9077;
+   --hp-yellow: #ADA284;
+   --hp-red: #8E5E4D;
+   /* Visual Redesign Phase 4: HUD value-down pop flash. Distinct from --hp-red
+     (which is reserved for HP-critical state, now a deep clay) — kept a clear
+     muted red so a brief flash still reads on HUD chrome. */
+   --alert-red: #C44343;
 
-  --panel-bg: rgba(235, 242, 250, 0.96);
-  --panel-border: var(--gold);
-  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
-  --bar-bg: rgba(80, 100, 130, 0.96);
-  --overlay-bg: rgba(91, 113, 143, 0.92);
-  --text-on-accent: #1a2a3a;
+   --panel-bg: rgba(232, 239, 245, 0.96);
+   --panel-border: var(--gold);
+   --panel-shadow: 0 12px 40px rgba(79, 74, 72, 0.12);
+   --bar-bg: rgba(200, 210, 220, 0.96);
+   --overlay-bg: rgba(95, 118, 142, 0.92);
+   --text-on-accent: #2D3A47;
 
-  /* In-game dark overlay surfaces — HUD/Shop/Spell/etc. panels that sit over
-     the game canvas. Kept dark on purpose (see V3 UI plan); these tokens are
+   /* In-game surfaces — retinted from the old dark V3 panels to the Morandi
+     light scheme used by the mockup (Build Panel / HUD read light now). Still
      the single source of truth so the alpha values stop fragmenting. */
-  --overlay-panel-bg:    rgba(26, 21, 32, 0.95);
-  --overlay-text:        #e8dcc8;
-  --overlay-cell-bg:     rgba(255, 255, 255, 0.04);
-  --overlay-cell-hover:  rgba(255, 255, 255, 0.1);
-  --overlay-cell-active: rgba(255, 215, 0, 0.15);
+   --overlay-panel-bg: rgba(232, 239, 245, 0.96);
+   --overlay-text: #4F4A48;
+   --overlay-cell-bg: rgba(95, 118, 142, 0.06);
+   --overlay-cell-hover: rgba(95, 118, 142, 0.12);
+   --overlay-cell-active: rgba(173, 162, 132, 0.20);
 
-  --text-primary: #2c3e50;
-  --text-secondary: #5d6d7e;
-  --stone-selected: #b1c4de;
-  --option-selected: #e1e8f0;
-  --correct-bg: #e8f5e9;
-  --wrong-bg: #ffebee;
-  --error-red: #d32f2f;
+   --text-primary: #4F4A48;
+   --text-secondary: #6F6A65;
+   --stone-selected: #C6D2DC;
+   --option-selected: #E8EFF5;
+   --correct-bg: #E3EAE0;
+   --wrong-bg: #F0E2DC;
+   --error-red: #8E5E4D;
 
-  --font-mono: 'Courier New', Courier, monospace;
-  --font-main: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+   --font-mono: 'JetBrains Mono', 'Courier New', Courier, monospace;
+   --font-main: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  /* Typography scale (rem-based; resolves against the 17px html root).
+   /* Typography scale (rem-based; resolves against the 17px html root).
      See docs/V3_surgicalPlan/UI_Typography_Refresh_Plan.md §4. */
-  --text-2xs:  0.6875rem; /* 11.69px — captions, tertiary hints only */
-  --text-xs:   0.75rem;   /* 12.75px — small labels, dense tables */
-  --text-sm:   0.875rem;  /* 14.88px — default body in dense panels */
-  --text-base: 1rem;      /* 17.00px — default body, form fields */
-  --text-md:   1.125rem;  /* 19.13px — emphasised body */
-  --text-lg:   1.25rem;   /* 21.25px — sub-headings, HUD values */
-  --text-xl:   1.5rem;    /* 25.50px — panel titles */
-  --text-2xl:  1.875rem;  /* 31.88px — view titles */
-  --text-3xl:  2.25rem;   /* 38.25px — hero / login title */
+   --text-2xs: 0.6875rem;
+   /* 11.69px — captions, tertiary hints only */
+   --text-xs: 0.75rem;
+   /* 12.75px — small labels, dense tables */
+   --text-sm: 0.875rem;
+   /* 14.88px — default body in dense panels */
+   --text-base: 1rem;
+   /* 17.00px — default body, form fields */
+   --text-md: 1.125rem;
+   /* 19.13px — emphasised body */
+   --text-lg: 1.25rem;
+   /* 21.25px — sub-headings, HUD values */
+   --text-xl: 1.5rem;
+   /* 25.50px — panel titles */
+   --text-2xl: 1.875rem;
+   /* 31.88px — view titles */
+   --text-3xl: 2.25rem;
+   /* 38.25px — hero / login title */
 
-  /* Line-height tokens (unit-less) */
-  --leading-tight:  1.2;
-  --leading-normal: 1.45;
-  --leading-loose:  1.65;
+   /* Line-height tokens (unit-less) */
+   --leading-tight: 1.2;
+   --leading-normal: 1.45;
+   --leading-loose: 1.65;
 
-  /* Spacing scale (rem-based) */
-  --space-1:  0.25rem;
-  --space-2:  0.5rem;
-  --space-3:  0.75rem;
-  --space-4:  1rem;
-  --space-5:  1.25rem;
-  --space-6:  1.5rem;
-  --space-8:  2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
+   /* Spacing scale (rem-based) */
+   --space-1: 0.25rem;
+   --space-2: 0.5rem;
+   --space-3: 0.75rem;
+   --space-4: 1rem;
+   --space-5: 1.25rem;
+   --space-6: 1.5rem;
+   --space-8: 2rem;
+   --space-10: 2.5rem;
+   --space-12: 3rem;
 
-  /* Z-index ladder — single source of truth. Higher value = on top.
+   /* Z-index ladder — single source of truth. Higher value = on top.
      hints      : passive in-canvas helpers (FunctionPanel, BuildHint)
      chrome     : persistent HUD surfaces (HUD bar, TowerBar)
      action     : primary action buttons above chrome (Start Wave)
      floating   : transient per-interaction panels (BuildPanel)
      overlay    : full-screen dimmers for modal states (Buff, LevelSelect)
      modal      : the dialog itself, always on top of its overlay (Modal) */
-  --z-hints: 15;
-  --z-chrome: 20;
-  --z-action: 25;
-  --z-floating: 30;
-  --z-overlay: 40;
-  --z-modal: 50;
-  --z-toast: 100;
+   --z-hints: 15;
+   --z-chrome: 20;
+   --z-action: 25;
+   --z-floating: 30;
+   --z-overlay: 40;
+   --z-modal: 50;
+   --z-toast: 100;
 
-  --live-green:   #6cc44a;
-  --formula-blue: #60c0ff;
-  --scope-border: #7a6fa0;
-  --scope-text:   #a08fc0;
+   --live-green: #7E9077;
+   --formula-blue: #6F8AA1;
+   --scope-border: #7E6A7E;
+   --scope-text: #A28DA0;
 
-  --card-border:      rgba(164, 185, 212, 0.5);
-  --divider:          rgba(164, 185, 212, 0.4);
-  --card-surface:     rgba(255, 255, 255, 0.72);
-  --gold-tint:        rgba(212, 160, 23, 0.10);
-  --gold-tint-hover:  rgba(212, 160, 23, 0.06);
-  --gold-tint-select: rgba(212, 160, 23, 0.12);
-  --gold-tint-faint:  rgba(212, 160, 23, 0.05);
-  --gold-tint-soft:   rgba(212, 160, 23, 0.08);
-  --gold-shadow:      0 1px 4px rgba(0, 0, 0, 0.45);
-  --gold-border:      rgba(142, 122, 71, 0.65);
+   --card-border: rgba(111, 138, 161, 0.35);
+   --divider: rgba(79, 74, 72, 0.18);
+   --card-surface: rgba(245, 250, 254, 0.78);
+   --gold-tint: rgba(173, 162, 132, 0.12);
+   --gold-tint-hover: rgba(173, 162, 132, 0.08);
+   --gold-tint-select: rgba(173, 162, 132, 0.16);
+   --gold-tint-faint: rgba(173, 162, 132, 0.06);
+   --gold-tint-soft: rgba(173, 162, 132, 0.10);
+   --gold-shadow: 0 1px 4px rgba(79, 74, 72, 0.30);
+   --gold-border: rgba(122, 113, 86, 0.55);
 
-  /* MenuView light-theme navy palette */
-  --menu-navy:        #0f2a4a;
-  --menu-btn-color:   #1a3a6a;
+   /* MenuView light-theme palette */
+   --menu-navy: #2D3A47;
+   --menu-btn-color: #3A4A5C;
 
-  /* Input text on dark backgrounds */
-  --input-text:       #ffffff;
+   /* Input text on light form fields */
+   --input-text: #2D3A47;
+
+   /* ============================================================
+     Morandi palette — added verbatim from UI_Mockup_Preview.html :root.
+     Token names match the mockup so the redesigned views wire straight to
+     them; the existing tokens above are retinted into this same scheme.
+     ============================================================ */
+   --cream:        #DCE5ED;   /* soft blue-grey body / card base */
+   --cream-soft:   #E8EFF5;   /* lighter for elevated surfaces */
+   --cream-deep:   #C2CFDB;   /* deeper for accents/edges */
+   --sand:         #C8D2DC;   /* secondary cool surface */
+   --paper:        #D6E0E8;   /* game plane paper */
+
+   --stone:        #B5AFA8;
+   --stone-soft:   #C9C3BB;
+   /* --stone-dark retinted above to the mockup value (#807A75) */
+
+   --slate:        #8FA3B5;
+   --slate-soft:   #B0BDCB;
+   --slate-deep:   #6F8497;
+
+   /* PRIMARY — Morandi light blue (name kept from the historical warm primary) */
+   --terracotta:        #A8BCCB;
+   --terracotta-soft:   #C6D2DC;
+   --terracotta-deep:   #6F8AA1;
+
+   /* WARM accent — reserved for stars / pre-origin focal marks only */
+   --warm:        #C9A48C;
+   --warm-soft:   #DCBFA9;
+   --warm-deep:   #A8856C;
+
+   /* GOLD — desaturated grayish khaki (stars, currency, primary CTAs) */
+   --gold-soft:   #C5BCA1;
+   --gold-deep:   #7A7156;
+
+   /* TEAL — secondary cool variation (score, coords, segment chips) */
+   --teal:        #8FA8A3;
+   --teal-soft:   #B2C2BF;
+   --teal-deep:   #6F8A86;
+
+   /* TOWER-TYPE PALETTE — each tower carries its own Morandi hue. */
+   /* Magic — two purples: dark for Debuff, light for Buff */
+   --tw-magic-debuff:      #8A75A8;
+   --tw-magic-debuff-soft: #A998C0;
+   --tw-magic-debuff-deep: #5E4A78;
+   --tw-magic-buff:        #C8B5DA;
+   --tw-magic-buff-soft:   #DDCFEA;
+   --tw-magic-buff-deep:   #8C7AA8;
+   /* Radar A — green */
+   --tw-radar-a:      #8FB082;
+   --tw-radar-a-soft: #B0C8A4;
+   --tw-radar-a-deep: #5E8052;
+   /* Radar B — blue */
+   --tw-radar-b:      #7C9CBD;
+   --tw-radar-b-soft: #A0BBD4;
+   --tw-radar-b-deep: #4F7090;
+   /* Radar C — Morandi orange-brown */
+   --tw-radar-c:      #B47B57;
+   --tw-radar-c-soft: #CFA189;
+   --tw-radar-c-deep: #7E5535;
+   /* Matrix — bright Morandi yellow */
+   --tw-matrix:      #D2BE60;
+   --tw-matrix-soft: #E0D193;
+   --tw-matrix-deep: #8E7C28;
+   /* Calculus — Morandi neutral gray */
+   --tw-calculus:      #9A958D;
+   --tw-calculus-soft: #B8B3AB;
+   --tw-calculus-deep: #6B665F;
+   /* Limit — lotus root pink (蓮藕色) */
+   --tw-limit:      #D2B8B0;
+   --tw-limit-soft: #E3CFC7;
+   --tw-limit-deep: #9E807A;
+
+   --sage:         #ADBBA6;
+   --sage-deep:    #7E9077;
+
+   --plum:         #A28DA0;
+   --plum-deep:    #7E6A7E;
+
+   --clay:         #B98674;
+   --clay-deep:    #8E5E4D;
+
+   --charcoal:       #4F4A48;
+   --charcoal-soft:  #6F6A65;
+   --muted:          #9A938C;
+
+   --line:           rgba(79, 74, 72, 0.14);
+   --line-strong:    rgba(79, 74, 72, 0.28);
+
+   --shadow-sm: 0 1px 3px rgba(79, 74, 72, 0.08);
+   --shadow:    0 10px 30px rgba(79, 74, 72, 0.10), 0 2px 8px rgba(79, 74, 72, 0.05);
+   --shadow-lg: 0 18px 48px rgba(79, 74, 72, 0.12), 0 4px 14px rgba(79, 74, 72, 0.06);
 }
