@@ -48,8 +48,8 @@ const mathGlyphs = [
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255,255,255,0.55) 0%, transparent 70%),
-    linear-gradient(160deg, #8aaecb 0%, #a4b9d4 45%, #b8cfe0 100%);
+    radial-gradient(ellipse 70% 50% at 50% 35%, rgba(248, 252, 255, 0.55) 0%, transparent 70%),
+    linear-gradient(165deg, #B8C8D5 0%, #CDD9E2 50%, #ACBDCC 100%);
 }
 
 .math-field {
@@ -61,7 +61,7 @@ const mathGlyphs = [
   position: absolute;
   left: var(--glyph-left);
   top: var(--glyph-top);
-  color: rgba(15, 42, 88, 0.22);
+  color: rgba(58, 76, 96, 0.16);
   font-family: var(--font-mono);
   font-size: var(--glyph-size);
   font-weight: 700;
@@ -72,11 +72,11 @@ const mathGlyphs = [
 }
 
 .math-glyph:nth-child(3n) {
-  color: rgba(25, 65, 140, 0.17);
+  color: rgba(107, 127, 148, 0.18);
 }
 
 .math-glyph:nth-child(4n) {
-  color: rgba(50, 90, 165, 0.14);
+  color: rgba(168, 133, 108, 0.13);
 }
 
 @keyframes glyph-float {
