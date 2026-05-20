@@ -29,6 +29,7 @@ import {
   createLevelLayoutService,
   type LevelLayoutService,
 } from '@/domain/level/level-layout-service'
+import { computeLegalPositions } from '@/domain/placement/legal-positions'
 
 /**
  * Minimal event-sink interface the context needs. Declared structurally
@@ -82,7 +83,15 @@ export function createLevelContext(
   }
 
   const path = buildLevelPath(level)
-  const layout = createLevelLayoutService(level, path)
+  // 'buildable' tiles must mark exactly the lattice points TowerPlacementSystem
+  // will accept a click on; both derive from computeLegalPositions so the grid
+  // never shows a placeable cell that placement then rejects. The level's own
+  // `buildablePositions` list stays an input to path-validator only.
+  const legalPositions = computeLegalPositions(path)
+  const layout = createLevelLayoutService(
+    { buildablePositions: legalPositions.positions },
+    path,
+  )
   const tracker = createPathProgressTracker(path, (payload) => {
     eventBus.emit(Events.SEGMENT_CHANGED, payload)
   })

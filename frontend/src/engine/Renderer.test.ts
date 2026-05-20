@@ -117,7 +117,7 @@ describe('Renderer.drawGrid', () => {
     vi.unstubAllGlobals()
   })
 
-  it('calls layout.classify for every grid cell when a layout is provided', () => {
+  it('calls layout.classify for every lattice point when a layout is provided', () => {
     const seen = new Set<string>()
     const layout = makeLayout((gx, gy) => {
       seen.add(`${gx},${gy}`)
@@ -126,10 +126,12 @@ describe('Renderer.drawGrid', () => {
 
     renderer.drawGrid(layout)
 
-    const expected = (GRID_MAX_X - GRID_MIN_X) * (GRID_MAX_Y - GRID_MIN_Y)
+    // Tiles are centred on lattice points, so classify() is asked for every
+    // point GRID_MIN..GRID_MAX inclusive — towers stand on intersections.
+    const expected = (GRID_MAX_X - GRID_MIN_X + 1) * (GRID_MAX_Y - GRID_MIN_Y + 1)
     expect(seen.size).toBe(expected)
-    for (let gx = GRID_MIN_X; gx < GRID_MAX_X; gx++) {
-      for (let gy = GRID_MIN_Y; gy < GRID_MAX_Y; gy++) {
+    for (let gx = GRID_MIN_X; gx <= GRID_MAX_X; gx++) {
+      for (let gy = GRID_MIN_Y; gy <= GRID_MAX_Y; gy++) {
         expect(seen.has(`${gx},${gy}`)).toBe(true)
       }
     }

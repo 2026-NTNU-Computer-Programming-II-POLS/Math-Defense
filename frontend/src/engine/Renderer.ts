@@ -111,10 +111,18 @@ export class Renderer {
     // path/buildable/forbidden inline (spec §8, plan §6.3 SoC Gate). Without
     // a layout (pre-level-start, or flag-off legacy path) we fall back to
     // the stone checkerboard so the grid never renders as an empty void.
-    for (let gx = GRID_MIN_X; gx < GRID_MAX_X; gx++) {
-      for (let gy = GRID_MIN_Y; gy < GRID_MAX_Y; gy++) {
-        const px = gameToCanvasX(gx)
-        const py = gameToCanvasY(gy + 1)
+    // Tiles are centred on lattice points, not anchored to a cell corner.
+    // Towers stand on grid-line intersections (see `drawPlacementCursor`), so
+    // a tile must mark the *point* a tower will occupy. Corner-anchoring
+    // offset every tile half a unit from its tower, so a 'buildable' fill
+    // visually covered a different lattice point than the one a click in its
+    // centre resolved to. Iterating GRID_MIN..GRID_MAX inclusive keeps the
+    // edge points (which `classify` now answers for) painted.
+    const half = UNIT_PX / 2
+    for (let gx = GRID_MIN_X; gx <= GRID_MAX_X; gx++) {
+      for (let gy = GRID_MIN_Y; gy <= GRID_MAX_Y; gy++) {
+        const px = gameToCanvasX(gx) - half
+        const py = gameToCanvasY(gy) - half
         if (layout) {
           this._paintTile(px, py, layout.classify(gx, gy))
         } else {

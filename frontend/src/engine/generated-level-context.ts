@@ -9,6 +9,7 @@ import {
   type LevelLayoutService,
 } from '@/domain/level/level-layout-service'
 import { generateDecoyCells } from '@/domain/level/decoy-generator'
+import { computeLegalPositions } from '@/domain/placement/legal-positions'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import { computeSpawnPoints, type SpawnPoint } from '@/domain/path/spawn-calculator'
 import type { GeneratedLevel, DisclosureRegion } from '@/math/curve-types'
@@ -54,8 +55,15 @@ export function createGeneratedLevelContext(
   const spawnDescriptors = pairSpawnsWithPaths(spawns, paths, level.endpoint.x)
 
   const decoyCells = generateDecoyCells({ paths, region: level.region })
+  // Single source of truth for "where can a tower stand". The renderer's
+  // tile fills (LevelLayoutService.classify) and the placement systems
+  // (TowerPlacementSystem / useKeyboardPlacement) must agree, otherwise the
+  // grid paints a 'buildable' cell the player then cannot click. All sides
+  // now derive 'buildable' from the same geometric rule — computeLegalPositions
+  // called with these identical inputs (paths + decoyCells).
+  const legalPositions = computeLegalPositions({ paths, decoyCells })
   const layout = createLevelLayoutService(
-    { buildablePositions: [], decoyCells },
+    { buildablePositions: legalPositions.positions, decoyCells },
     paths,
   )
 

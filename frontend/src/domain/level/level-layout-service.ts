@@ -66,8 +66,11 @@ export function createLevelLayoutService(
   }
   if (level.decoyCells) {
     for (const [gx, gy] of level.decoyCells) {
-      if (gx < GRID_MIN_X || gx >= GRID_MAX_X) continue
-      if (gy < GRID_MIN_Y || gy >= GRID_MAX_Y) continue
+      // Bounds are lattice-point inclusive (GRID_MIN..GRID_MAX): towers stand
+      // on grid-line intersections, so classify() answers for points, and the
+      // GRID_MAX edge is a valid point — not an out-of-range cell index.
+      if (gx < GRID_MIN_X || gx > GRID_MAX_X) continue
+      if (gy < GRID_MIN_Y || gy > GRID_MAX_Y) continue
       pathCells.add(cellKey(gx, gy))
     }
   }
@@ -95,11 +98,11 @@ function derivePathCells(
     if (s.params.kind === 'vertical') {
       const { x, yStart, yEnd } = s.params
       const gx = Math.round(x)
-      if (gx < GRID_MIN_X || gx >= GRID_MAX_X) continue
+      if (gx < GRID_MIN_X || gx > GRID_MAX_X) continue
       const lo = Math.min(yStart, yEnd)
       const hi = Math.max(yStart, yEnd)
       const loGy = Math.max(Math.floor(lo), GRID_MIN_Y)
-      const hiGy = Math.min(Math.ceil(hi), GRID_MAX_Y - 1)
+      const hiGy = Math.min(Math.ceil(hi), GRID_MAX_Y)
       for (let gy = loGy; gy <= hiGy; gy++) {
         cells.add(cellKey(gx, gy))
       }
@@ -107,10 +110,10 @@ function derivePathCells(
     }
     const [lo, hi] = s.xRange
     const loGx = Math.max(Math.ceil(lo), GRID_MIN_X)
-    const hiGx = Math.min(Math.floor(hi), GRID_MAX_X - 1)
+    const hiGx = Math.min(Math.floor(hi), GRID_MAX_X)
     for (let gx = loGx; gx <= hiGx; gx += SAMPLE_STEP) {
       const gy = Math.round(s.evaluate(gx))
-      if (gy < GRID_MIN_Y || gy >= GRID_MAX_Y) continue
+      if (gy < GRID_MIN_Y || gy > GRID_MAX_Y) continue
       cells.add(cellKey(gx, gy))
     }
   }
@@ -122,8 +125,8 @@ function deriveBuildableCells(
 ): Set<string> {
   const cells = new Set<string>()
   for (const [gx, gy] of buildable) {
-    if (gx < GRID_MIN_X || gx >= GRID_MAX_X) continue
-    if (gy < GRID_MIN_Y || gy >= GRID_MAX_Y) continue
+    if (gx < GRID_MIN_X || gx > GRID_MAX_X) continue
+    if (gy < GRID_MIN_Y || gy > GRID_MAX_Y) continue
     cells.add(cellKey(gx, gy))
   }
   return cells
