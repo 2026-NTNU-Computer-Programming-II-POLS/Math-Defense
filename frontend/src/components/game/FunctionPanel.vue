@@ -325,7 +325,7 @@ function onUnhover(): void {
 }
 
 .fn-seg-past {
-  color: var(--muted);
+  color: var(--charcoal-soft);
   text-decoration: line-through;
 }
 

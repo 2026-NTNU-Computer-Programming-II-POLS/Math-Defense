@@ -207,8 +207,9 @@ function startGame() {
   padding: 48px 20px;
 }
 
-/* `.card`, `.btn`, `.btn-primary`, `.btn-ghost`, `.btn-stack`, `.motto` and
-   `.section-label` are shared primitives in global.css (review §3.1). */
+/* `.card`, `.btn`, `.btn-primary`, `.btn-ghost`, `.btn-stack` and `.motto`
+   are shared primitives in global.css (review §3.1). `.section-label` stays
+   scoped — the name collides with a plainer in-canvas label. */
 
 .ia-card {
   width: 100%;
@@ -237,6 +238,26 @@ function startGame() {
   color: var(--charcoal-soft);
   line-height: var(--leading-normal);
   margin: 10px 0 0;
+}
+
+/* ── Section labels ── */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 4px;
+  color: var(--charcoal-soft);
+  text-transform: uppercase;
+  margin: 22px 0 12px;
+}
+
+.section-label::after {
+  content: "";
+  flex: 1;
+  height: 0;
+  border-top: 1px dashed var(--line-strong);
 }
 
 /* ── Math blocks ── */

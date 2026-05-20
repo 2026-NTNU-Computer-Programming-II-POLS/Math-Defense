@@ -441,7 +441,7 @@ async function submit(): Promise<void> {
 }
 
 /* ── Buttons — view-specific tweaks only (`.btn` family in global.css) ── */
-.btn-primary {
+.btn.btn-primary {
   align-self: center;
   margin-top: 4px;
 }

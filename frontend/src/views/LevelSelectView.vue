@@ -314,11 +314,11 @@ async function startLevel() {
   margin-top: 22px;
 }
 
-.btn-ghost {
+.btn.btn-ghost {
   flex: 0 0 auto;
 }
 
-.btn-primary {
+.btn.btn-primary {
   flex: 1;
 }
 </style>

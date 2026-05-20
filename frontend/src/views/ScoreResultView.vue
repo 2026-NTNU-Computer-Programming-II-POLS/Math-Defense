@@ -196,8 +196,9 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   padding: 20px;
 }
 
-/* `.card`, `.section-label`, `.motto`, the `.pill` base and the `.btn`
-   family are shared primitives in global.css (review §3.1). */
+/* `.card`, `.motto`, the `.pill` base and the `.btn` family are shared
+   primitives in global.css (review §3.1). `.section-label` stays scoped —
+   the name collides with a plainer in-canvas label of the same name. */
 
 /* Modal panel — opaque + heavier shadow than the base .card surface. */
 .score-panel {
@@ -232,6 +233,26 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   color: var(--charcoal);
   letter-spacing: 2px;
   line-height: 1.1;
+}
+
+/* ── Section labels ── */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 4px;
+  color: var(--charcoal-soft);
+  text-transform: uppercase;
+  margin: 22px 0 12px;
+}
+
+.section-label::after {
+  content: "";
+  flex: 1;
+  height: 0;
+  border-top: 1px dashed var(--line-strong);
 }
 
 /* ── Breakdown table ── */

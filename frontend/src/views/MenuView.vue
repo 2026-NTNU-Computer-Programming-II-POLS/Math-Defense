@@ -175,8 +175,9 @@ const manualOpen = ref(false)
   border-radius: 2px;
 }
 
-/* `.card`, `.section-label`, `.motto` and the `.btn` family are shared
-   primitives in global.css (review §3.1). */
+/* `.card`, `.motto` and the `.btn` family are shared primitives in
+   global.css (review §3.1). `.section-label` stays scoped — the name
+   collides with a plainer in-canvas label of the same name. */
 
 .menu-card {
   max-width: 480px;
@@ -189,6 +190,25 @@ const manualOpen = ref(false)
   border-top: 1px dashed var(--line-strong);
   padding-top: 14px;
   margin-top: 18px;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 4px;
+  color: var(--charcoal-soft);
+  text-transform: uppercase;
+  margin: 22px 0 12px;
+}
+
+.section-label::after {
+  content: "";
+  flex: 1;
+  height: 0;
+  border-top: 1px dashed var(--line-strong);
 }
 
 .section-label:first-child {
