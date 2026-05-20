@@ -304,7 +304,7 @@ function canAfford(cost: number): boolean {
 
 .bar-label {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   color: var(--charcoal-soft);
   letter-spacing: 2.5px;
   text-transform: uppercase;
@@ -323,7 +323,7 @@ function canAfford(cost: number): boolean {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 4px 10px;
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   color: var(--charcoal-soft);
   cursor: pointer;
   white-space: nowrap;
@@ -350,7 +350,7 @@ function canAfford(cost: number): boolean {
   box-shadow: 0 2px 6px rgba(122, 113, 86, 0.34);
 }
 .chip-count {
-  font-size: 0.6rem;
+  font-size: var(--text-2xs);
   color: var(--charcoal-soft);
   background: rgba(79, 74, 72, 0.08);
   padding: 1px 5px;
@@ -391,14 +391,14 @@ function canAfford(cost: number): boolean {
   border-radius: 3px;
 }
 
-/* Tower card (mockup .tcard) — radius locked at 10px so the shape never
-   changes between buff/debuff states. */
+/* Tower card (mockup .tcard) — fixed 10px radius. No rule competes for the
+   tower-btn border-radius, so no !important specificity hack is needed. */
 .tower-btn {
   display: flex; flex-direction: column; align-items: center;
   gap: 3px; padding: 8px 12px;
   background: rgba(245, 250, 254, 0.86);
   border: 1px solid var(--line);
-  border-radius: 10px !important;
+  border-radius: 10px;
   cursor: pointer;
   min-width: 90px;
   flex: 0 0 auto;

@@ -105,7 +105,7 @@ onBeforeUnmount(() => {
   background: var(--overlay-panel-bg);
   border: 2px solid var(--gold);
   border-radius: 4px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow);
   font-family: var(--font-mono);
   color: var(--overlay-text);
   z-index: var(--z-floating);
@@ -116,15 +116,15 @@ onBeforeUnmount(() => {
 .wave-banner-label {
   font-size: var(--text-sm);
   letter-spacing: 3px;
-  color: var(--gold);
+  color: var(--gold-deep);
   font-weight: 700;
 }
 
 .wave-banner-num {
   font-size: var(--text-2xl);
   font-weight: 900;
-  color: var(--gold-bright);
-  text-shadow: 0 0 12px rgba(255, 213, 79, 0.6);
+  color: var(--gold-deep);
+  text-shadow: var(--gold-shadow);
 }
 
 .wave-banner-mix {

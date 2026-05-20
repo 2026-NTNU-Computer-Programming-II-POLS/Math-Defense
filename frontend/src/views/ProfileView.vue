@@ -386,7 +386,7 @@ async function selectAvatar(url: string): Promise<void> {
 }
 
 .profile-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;
@@ -520,7 +520,7 @@ async function selectAvatar(url: string): Promise<void> {
 
 .summary-card:hover { border-color: var(--terracotta); }
 .summary-title { font-size: var(--text-2xs); color: var(--charcoal-soft); font-family: var(--font-mono); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
-.summary-stat { font-size: 1.4rem; font-family: var(--font-mono); color: var(--terracotta-deep); font-weight: 700; }
+.summary-stat { font-size: var(--text-xl); font-family: var(--font-mono); color: var(--terracotta-deep); font-weight: 700; }
 .summary-sub { font-size: var(--text-2xs); color: var(--charcoal-soft); opacity: 0.8; margin-top: 4px; }
 
 .profile-links {

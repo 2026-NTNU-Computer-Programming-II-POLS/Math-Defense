@@ -231,7 +231,7 @@ watch(activeTab, loadData, { immediate: true })
 }
 
 .admin-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   /* Mono title kept after Phase 1 swapped --font-main to system-ui. */
   font-family: var(--font-mono);
   color: var(--charcoal);
@@ -243,7 +243,7 @@ watch(activeTab, loadData, { immediate: true })
 
 .tab-btn {
   flex: 1;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   font-family: var(--font-mono);
   letter-spacing: 2px;
   text-transform: uppercase;

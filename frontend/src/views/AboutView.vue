@@ -86,7 +86,7 @@ const router = useRouter()
 }
 
 h1 {
-  font-size: 1.6rem;
+  font-size: var(--text-xl);
   font-family: var(--font-mono);
   color: var(--charcoal);
   margin-bottom: 0.5rem;
@@ -104,7 +104,7 @@ h1 {
 }
 
 .about-section h2 {
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   font-family: var(--font-mono);
   color: var(--charcoal-soft);
   text-transform: uppercase;

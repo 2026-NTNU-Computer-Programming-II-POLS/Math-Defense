@@ -35,7 +35,7 @@ const show = computed(() => gameStore.phase === GamePhase.BUILD)
   border: 1px solid var(--gold-dim);
   padding: 6px 16px;
   font-size: var(--text-xs);
-  color: var(--gold);
+  color: var(--overlay-text);
   letter-spacing: 1px;
   max-width: calc(100% - 320px);
   text-align: center;

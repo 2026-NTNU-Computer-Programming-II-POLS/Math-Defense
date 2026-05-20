@@ -111,7 +111,7 @@ onMounted(load)
 }
 
 .header { text-align: center; }
-.setup-title { font-size: 1.35rem; font-family: var(--font-mono); color: var(--charcoal); letter-spacing: 2px; margin: 0; }
+.setup-title { font-size: var(--text-lg); font-family: var(--font-mono); color: var(--charcoal); letter-spacing: 2px; margin: 0; }
 .ch-name { font-size: var(--text-xs); color: var(--charcoal-soft); margin-top: 4px; }
 
 .loading, .empty-msg { color: var(--charcoal-soft); font-size: var(--text-xs); text-align: center; padding: 16px 0; font-style: italic; }
@@ -121,14 +121,14 @@ onMounted(load)
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 .ranking-table th, .ranking-table td {
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
   text-align: left;
 }
-.ranking-table th { color: var(--charcoal-soft); font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; }
+.ranking-table th { color: var(--charcoal-soft); font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 2px; }
 .ranking-table td { color: var(--charcoal); }
 .rank-col { width: 36px; text-align: center; color: var(--gold-deep); font-family: var(--font-mono); font-weight: 700; }
 .score-col { width: 80px; text-align: right; color: var(--teal-deep); font-family: var(--font-mono); font-weight: 700; }

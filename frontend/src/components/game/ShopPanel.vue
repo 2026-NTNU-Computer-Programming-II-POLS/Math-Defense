@@ -254,7 +254,7 @@ function purchase(itemId: string, cost: number): void {
 
 .shop-title {
   font-family: var(--font-mono);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--charcoal);
   text-transform: uppercase;
   letter-spacing: 1.5px;
@@ -295,7 +295,7 @@ function purchase(itemId: string, cost: number): void {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 4px 10px;
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   color: var(--charcoal-soft);
   cursor: pointer;
   white-space: nowrap;
@@ -323,7 +323,7 @@ function purchase(itemId: string, cost: number): void {
   color: #fff;
 }
 .chip-count {
-  font-size: 0.6rem;
+  font-size: var(--text-2xs);
   color: var(--charcoal-soft);
   background: rgba(79, 74, 72, 0.08);
   padding: 0 5px;

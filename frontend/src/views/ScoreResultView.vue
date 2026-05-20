@@ -196,23 +196,18 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   padding: 20px;
 }
 
-/* ── Card (modal panel) ── */
-.card {
-  background: rgba(220, 229, 237, 0.96);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--shadow-lg);
-  padding: 26px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+/* `.card`, `.section-label`, `.motto`, the `.pill` base and the `.btn`
+   family are shared primitives in global.css (review §3.1). */
 
+/* Modal panel — opaque + heavier shadow than the base .card surface. */
 .score-panel {
   width: 100%;
   max-width: 640px;
   max-height: 90vh;
   overflow-y: auto;
   text-align: left;
+  background: rgba(220, 229, 237, 0.96);
+  box-shadow: var(--shadow-lg);
 }
 
 .score-head {
@@ -221,7 +216,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .stars-row {
-  font-size: 2.2rem;
+  font-size: var(--text-3xl);
   letter-spacing: 4px;
   line-height: 1;
   margin-bottom: 6px;
@@ -232,39 +227,11 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .title-main {
   font-family: var(--font-mono);
-  font-size: 1.6rem;
+  font-size: var(--text-xl);
   font-weight: 800;
   color: var(--charcoal);
   letter-spacing: 2px;
   line-height: 1.1;
-}
-
-.motto {
-  font-size: 0.98rem;
-  color: var(--charcoal-soft);
-  letter-spacing: 0.5px;
-  font-style: italic;
-  margin-top: 6px;
-}
-
-/* ── Section labels ── */
-.section-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 4px;
-  color: var(--charcoal-soft);
-  text-transform: uppercase;
-  margin: 22px 0 12px;
-}
-
-.section-label::after {
-  content: "";
-  flex: 1;
-  height: 0;
-  border-top: 1px dashed var(--line-strong);
 }
 
 /* ── Breakdown table ── */
@@ -272,7 +239,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .tbl td {
@@ -312,7 +279,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .total-label {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   letter-spacing: 2px;
   color: var(--charcoal-soft);
   text-transform: uppercase;
@@ -320,7 +287,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .total-value {
   font-family: var(--font-mono);
-  font-size: 1.3rem;
+  font-size: var(--text-lg);
   font-weight: 700;
   color: var(--terracotta-deep);
 }
@@ -331,7 +298,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   border-left: 3px solid var(--slate);
   border-radius: 6px;
   background: rgba(107, 127, 148, 0.1);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--slate-deep);
   line-height: 1.45;
 }
@@ -351,7 +318,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   min-height: 100px;
   padding: 12px 14px;
   font-family: var(--font-main);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   background: rgba(245, 250, 254, 0.85);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
@@ -367,7 +334,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .field-hint {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--muted);
   margin-top: 8px;
 }
@@ -379,25 +346,11 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 }
 
 .reflection-meta {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
 .reflection-meta.error { color: var(--clay-deep); }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 1px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(111, 138, 161, 0.18);
-  color: var(--terracotta-deep);
-  border: 1px solid rgba(111, 138, 161, 0.35);
-}
 
 .pill-success {
   background: rgba(126, 144, 119, 0.18);
@@ -405,90 +358,12 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
   border-color: rgba(126, 144, 119, 0.32);
 }
 
-/* ── Buttons ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-family: var(--font-main);
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 10px 18px;
-  min-height: 44px;
-  border: 1px solid rgba(111, 138, 161, 0.4);
-  border-radius: 10px;
-  background: rgba(245, 250, 254, 0.78);
-  color: var(--charcoal);
-  cursor: pointer;
-  letter-spacing: 0.4px;
-  transition: all 0.16s ease;
-  box-shadow: var(--shadow-sm);
-  white-space: nowrap;
-  text-transform: none;
-}
-
-.btn:hover {
-  background: #fff;
-  border-color: var(--terracotta);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
-}
-
-.btn:focus-visible {
-  outline: 2px solid var(--terracotta-deep);
-  outline-offset: 2px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn .label {
-  flex: 0 0 auto;
-}
-
-.btn-primary {
-  align-self: center;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
-  color: #fff;
-  border: 1px solid var(--gold-deep);
-  font-size: 1rem;
-  letter-spacing: 1.2px;
-  min-height: 50px;
-  padding: 12px 22px;
-  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
-  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
-}
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--charcoal-soft);
-  font-size: 0.88rem;
-  min-height: 38px;
-  padding: 7px 14px;
-}
-
-.btn-ghost:hover {
-  background: rgba(245, 250, 254, 0.6);
-  color: var(--charcoal);
-}
-
+/* ── Buttons — view-specific tweaks only (`.btn` family in global.css) ── */
 .btn-submit {
   margin-left: auto;
 }
 
 .btn-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   margin-top: 22px;
 }
 </style>

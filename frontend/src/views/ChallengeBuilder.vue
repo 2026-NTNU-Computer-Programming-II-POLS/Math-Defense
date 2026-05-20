@@ -259,7 +259,7 @@ onMounted(async () => {
 }
 
 .setup-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;
@@ -267,7 +267,7 @@ onMounted(async () => {
 }
 
 .subtitle {
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   font-family: var(--font-mono);
   color: var(--charcoal-soft);
   letter-spacing: 4px;

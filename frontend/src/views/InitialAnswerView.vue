@@ -109,12 +109,18 @@ function startGame() {
         </p>
       </div>
 
+      <p class="ia-instruction">
+        All paths share exactly one common point — find it. The region below
+        bounds where that point lies.
+      </p>
+
       <div class="section-label">The curves</div>
       <div
         v-for="(eq, i) in equations"
         :key="i"
         class="math-block"
       >
+        <span class="path-label">Path {{ i + 1 }}:</span>
         <MathDisplay :latex="eq" />
       </div>
 
@@ -201,16 +207,8 @@ function startGame() {
   padding: 48px 20px;
 }
 
-/* ── Card ── */
-.card {
-  background: rgba(220, 229, 237, 0.86);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--shadow);
-  padding: 26px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+/* `.card`, `.btn`, `.btn-primary`, `.btn-ghost`, `.btn-stack`, `.motto` and
+   `.section-label` are shared primitives in global.css (review §3.1). */
 
 .ia-card {
   width: 100%;
@@ -225,49 +223,33 @@ function startGame() {
 
 .title-main {
   font-family: var(--font-mono);
-  font-size: 1.6rem;
+  font-size: var(--text-xl);
   font-weight: 800;
   color: var(--charcoal);
   letter-spacing: 2px;
   line-height: 1.1;
 }
 
-.motto {
-  font-size: 0.98rem;
+/* Restores the rule statement PR #67 dropped (review §2.2). */
+.ia-instruction {
+  text-align: center;
+  font-size: var(--text-sm);
   color: var(--charcoal-soft);
-  letter-spacing: 0.5px;
-  font-style: italic;
-  margin-top: 6px;
-}
-
-/* ── Section labels ── */
-.section-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 4px;
-  color: var(--charcoal-soft);
-  text-transform: uppercase;
-  margin: 22px 0 12px;
-}
-
-.section-label::after {
-  content: "";
-  flex: 1;
-  height: 0;
-  border-top: 1px dashed var(--line-strong);
+  line-height: var(--leading-normal);
+  margin: 10px 0 0;
 }
 
 /* ── Math blocks ── */
 .math-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   background: rgba(245, 250, 254, 0.9);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 14px 18px;
-  font-family: 'Cambria', 'Times New Roman', serif;
-  font-size: 1.1rem;
+  font-size: var(--text-md);
   text-align: center;
   margin: 10px 0;
 }
@@ -275,6 +257,15 @@ function startGame() {
 .math-block :deep(em) {
   color: var(--terracotta-deep);
   font-style: italic;
+}
+
+/* Per-curve cross-reference label, restored with the curves (review §2.2). */
+.path-label {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 1px;
+  color: var(--charcoal-soft);
 }
 
 /* ── Answer fields ── */
@@ -290,7 +281,7 @@ function startGame() {
 
 .field label {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   color: var(--charcoal-soft);
   margin-bottom: 6px;
   font-weight: 500;
@@ -300,7 +291,7 @@ function startGame() {
   width: 100%;
   padding: 12px 14px;
   font-family: var(--font-main);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   background: rgba(245, 250, 254, 0.85);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
@@ -321,115 +312,24 @@ function startGame() {
 .parse-error {
   display: inline-block;
   margin-top: 4px;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--clay-deep);
 }
 
 .validation-msg {
   margin-top: 10px;
   color: var(--clay-deep);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   text-align: center;
 }
 
-/* ── Buttons ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-family: var(--font-main);
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 10px 18px;
-  min-height: 44px;
-  border: 1px solid rgba(111, 138, 161, 0.4);
-  border-radius: 10px;
-  background: rgba(245, 250, 254, 0.78);
-  color: var(--charcoal);
-  cursor: pointer;
-  letter-spacing: 0.4px;
-  transition: all 0.16s ease;
-  box-shadow: var(--shadow-sm);
-  white-space: nowrap;
-  text-transform: none;
-}
-
-.btn:hover {
-  background: #fff;
-  border-color: var(--terracotta);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
-}
-
-.btn:focus-visible {
-  outline: 2px solid var(--terracotta-deep);
-  outline-offset: 2px;
-}
-
-.btn .icon {
-  font-family: var(--font-mono);
-  font-size: 1.05rem;
-  color: var(--terracotta-deep);
-  flex-shrink: 0;
-}
-
-.btn .label {
-  flex: 0 0 auto;
-}
-
+/* ── Buttons — view-specific tweaks only ── */
 .btn .hint {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   letter-spacing: 2px;
   color: var(--muted);
   margin-left: 6px;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
-  color: #fff;
-  border: 1px solid var(--gold-deep);
-  font-size: 1rem;
-  letter-spacing: 1.2px;
-  min-height: 50px;
-  padding: 12px 22px;
-  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-}
-
-.btn-primary .icon {
-  color: #fff;
-  font-size: 1.1rem;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
-  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
-}
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--charcoal-soft);
-  font-size: 0.88rem;
-  min-height: 38px;
-  padding: 7px 14px;
-}
-
-.btn-ghost:hover {
-  background: rgba(245, 250, 254, 0.6);
-  color: var(--charcoal);
-}
-
-.btn-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.btn-stack > .btn {
-  width: 100%;
 }
 
 .ia-actions {
@@ -442,10 +342,10 @@ function startGame() {
   margin-top: 18px;
 }
 
-.result-correct { color: var(--sage-deep); font-size: 1rem; }
-.result-wrong { color: var(--clay-deep); font-size: 1rem; }
-.result-paid { color: var(--gold-deep); font-size: 1rem; }
-.result-ignored { color: var(--slate-deep); font-size: 1rem; }
+.result-correct { color: var(--sage-deep); font-size: var(--text-base); }
+.result-wrong { color: var(--clay-deep); font-size: var(--text-base); }
+.result-paid { color: var(--gold-deep); font-size: var(--text-base); }
+.result-ignored { color: var(--slate-deep); font-size: var(--text-base); }
 
 .start-btn {
   margin-top: 14px;

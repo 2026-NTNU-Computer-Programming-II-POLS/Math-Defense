@@ -126,7 +126,7 @@ defineExpose({ castingSpell, castAtPosition })
 }
 
 .spell-btn.casting {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--overlay-cell-active);
   box-shadow: 0 0 8px var(--spell-color);
 }
 
@@ -164,7 +164,7 @@ defineExpose({ castingSpell, castAtPosition })
   top: 1px;
   right: 2px;
   font-size: var(--text-xs);
-  color: var(--gold);
+  color: var(--gold-deep);
   z-index: 2;
 }
 

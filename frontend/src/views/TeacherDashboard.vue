@@ -216,7 +216,7 @@ onMounted(async () => {
 }
 
 .dashboard-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   /* Mono title kept after Phase 1 swapped --font-main to system-ui. */
   font-family: var(--font-mono);
   color: var(--charcoal);

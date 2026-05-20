@@ -47,6 +47,16 @@ const starLabels: Record<number, string> = {
   5: 'Legendary',
 }
 
+// Short per-star blurb. Kept in script (not inlined in the template) so the
+// content data has a single, readable home — review §3.7.
+const starDescriptions: Record<number, string> = {
+  1: 'Learn the ropes',
+  2: 'Steady waves',
+  3: 'Real pressure',
+  4: 'Few mistakes',
+  5: 'Solve Initial Answer first',
+}
+
 const STAR_5_LOCK_TOOLTIP =
   'Complete the Initial Answer phase correctly at any star rating to unlock.'
 
@@ -132,17 +142,14 @@ async function startLevel() {
           :aria-disabled="isStarLocked(star) || undefined"
           @click="selectStar(star)"
         >
+          <div
+            v-if="isStarLocked(star)"
+            class="lock-badge"
+            aria-hidden="true"
+          >&#128274;</div>
           <div class="stars">{{ '★'.repeat(star) }}</div>
           <div class="name">{{ starLabels[star] }}</div>
-          <div class="desc">
-            {{ ({
-              1: 'Learn the ropes',
-              2: 'Steady waves',
-              3: 'Real pressure',
-              4: 'Few mistakes',
-              5: 'Solve Initial Answer first',
-            })[star] }}
-          </div>
+          <div class="desc">{{ starDescriptions[star] }}</div>
         </button>
       </div>
 
@@ -178,16 +185,9 @@ async function startLevel() {
   padding: 48px 20px;
 }
 
-/* ── Card ── */
-.card {
-  background: rgba(220, 229, 237, 0.86);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--shadow);
-  padding: 26px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+/* `.card`, `.btn`, `.btn-primary`, `.btn-ghost`, `.motto` and the `.pill`
+   base are shared primitives in global.css (review §3.1) — only the
+   view-specific tweaks live here. */
 
 .ls-card {
   width: 100%;
@@ -202,39 +202,17 @@ async function startLevel() {
 
 .title-main {
   font-family: var(--font-mono);
-  font-size: 1.8rem;
+  font-size: var(--text-2xl);
   font-weight: 800;
   color: var(--charcoal);
   letter-spacing: 3px;
   line-height: 1.1;
 }
 
-.motto {
-  font-size: 0.98rem;
-  color: var(--charcoal-soft);
-  letter-spacing: 0.5px;
-  font-style: italic;
-  margin-top: 6px;
-}
-
 /* ── Suggestion pill ── */
 .ls-suggestion {
   text-align: center;
   margin-bottom: 18px;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 1px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(111, 138, 161, 0.18);
-  color: var(--terracotta-deep);
-  border: 1px solid rgba(111, 138, 161, 0.35);
 }
 
 .pill-info {
@@ -249,14 +227,17 @@ async function startLevel() {
   cursor: pointer;
 }
 
-/* ── Star grid ── */
+/* ── Star grid ──
+   auto-fit + minmax keeps five columns on desktop and wraps to 2–3 on a
+   phone, replacing the fixed 5-column track that overflowed (review §1.3). */
 .star-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
   gap: 12px;
 }
 
 .star-card {
+  position: relative;
   width: 100%;
   text-align: center;
   padding: 18px 8px;
@@ -277,7 +258,7 @@ async function startLevel() {
 .star-card.selected {
   border-color: var(--gold);
   background: #fff;
-  box-shadow: 0 8px 22px #ADA28452;
+  box-shadow: 0 8px 22px rgba(173, 162, 132, 0.32);
 }
 
 .star-card.locked,
@@ -291,8 +272,18 @@ async function startLevel() {
   background: rgba(245, 250, 254, 0.7);
 }
 
+/* Lock cue on the Star-5 card while the Initial-Answer unlock is unearned
+   (review §2.1 — restores the badge PR #67 dropped). */
+.lock-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
 .star-card .stars {
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   color: var(--gold);
   margin-bottom: 6px;
   line-height: 1;
@@ -300,11 +291,11 @@ async function startLevel() {
 
 .star-card .name {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .star-card .desc {
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   color: var(--charcoal-soft);
   margin-top: 4px;
 }
@@ -312,7 +303,7 @@ async function startLevel() {
 /* ── Actions ── */
 .error {
   color: var(--clay-deep);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   margin: 18px 0 0;
   text-align: center;
 }
@@ -323,91 +314,11 @@ async function startLevel() {
   margin-top: 22px;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-family: var(--font-main);
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 10px 18px;
-  min-height: 44px;
-  border: 1px solid rgba(111, 138, 161, 0.4);
-  border-radius: 10px;
-  background: rgba(245, 250, 254, 0.78);
-  color: var(--charcoal);
-  cursor: pointer;
-  letter-spacing: 0.4px;
-  transition: all 0.16s ease;
-  box-shadow: var(--shadow-sm);
-  white-space: nowrap;
-  text-transform: none;
-}
-
-.btn:hover {
-  background: #fff;
-  border-color: var(--terracotta);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
-}
-
-.btn:focus-visible {
-  outline: 2px solid var(--terracotta-deep);
-  outline-offset: 2px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn .icon {
-  font-family: var(--font-mono);
-  font-size: 1.05rem;
-  color: var(--terracotta-deep);
-  flex-shrink: 0;
-}
-
-.btn .label {
-  flex: 0 0 auto;
-}
-
 .btn-ghost {
   flex: 0 0 auto;
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--charcoal-soft);
-  font-size: 0.88rem;
-  min-height: 38px;
-  padding: 7px 14px;
-}
-
-.btn-ghost:hover {
-  background: rgba(245, 250, 254, 0.6);
-  color: var(--charcoal);
 }
 
 .btn-primary {
   flex: 1;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
-  color: #fff;
-  border: 1px solid var(--gold-deep);
-  font-size: 1rem;
-  letter-spacing: 1.2px;
-  min-height: 50px;
-  padding: 12px 22px;
-  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-}
-
-.btn-primary .icon {
-  color: #fff;
-  font-size: 1.1rem;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
-  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
 }
 </style>

@@ -524,7 +524,7 @@ onBeforeUnmount(cancelInflight)
   justify-content: center;
   gap: 8px;
   font-family: var(--font-main);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   padding: 8px 14px;
   min-height: 38px;
@@ -541,7 +541,7 @@ onBeforeUnmount(cancelInflight)
 .btn:focus-visible { outline: 2px solid var(--terracotta-deep); outline-offset: 2px; }
 
 .rk-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.rk-title { font-size: 1.35rem; font-family: var(--font-mono); color: var(--charcoal); letter-spacing: 2px; }
+.rk-title { font-size: var(--text-lg); font-family: var(--font-mono); color: var(--charcoal); letter-spacing: 2px; }
 
 /* Tabs (mockup .tabs / .tab) */
 .rk-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
@@ -553,7 +553,7 @@ onBeforeUnmount(cancelInflight)
   border-radius: 0;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--charcoal-soft);
@@ -567,12 +567,12 @@ onBeforeUnmount(cancelInflight)
 
 /* Table (mockup .tbl) */
 .rk-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.rk-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.92rem; }
+.rk-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); }
 th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); }
 th {
   color: var(--charcoal-soft);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   letter-spacing: 2px;
   text-transform: uppercase;
   background: rgba(245, 250, 254, 0.4);

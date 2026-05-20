@@ -87,7 +87,7 @@ onBeforeUnmount(clearTimer)
   background: var(--overlay-panel-bg);
   border: 1px solid var(--gold);
   border-radius: 4px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--shadow-lg);
   color: var(--overlay-text);
   font-family: var(--font-mono);
   display: flex;
@@ -106,7 +106,7 @@ onBeforeUnmount(clearTimer)
   margin: 0;
   font-size: var(--text-base);
   letter-spacing: 1px;
-  color: var(--gold-bright, var(--gold));
+  color: var(--gold-deep);
 }
 
 .principle-formula {
@@ -118,7 +118,7 @@ onBeforeUnmount(clearTimer)
   margin: 0;
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: #d4cab4;
+  color: var(--overlay-text);
 }
 
 .principle-dismiss-hint {

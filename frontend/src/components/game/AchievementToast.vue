@@ -68,11 +68,11 @@ watch(() => props.achievements, (newVal) => {
   animation: slideIn 0.3s ease-out;
 }
 
-.toast-icon { color: var(--gold); font-size: var(--text-sm); }
+.toast-icon { color: var(--gold-deep); font-size: var(--text-sm); }
 .toast-body { display: flex; flex-direction: column; gap: 2px; }
 .toast-name { color: var(--overlay-text); font-weight: 600; }
-.toast-desc { color: #b8a98c; font-size: var(--text-xs); }
-.toast-tp { color: var(--gold); font-size: var(--text-xs); margin-left: auto; }
+.toast-desc { color: var(--charcoal-soft); font-size: var(--text-xs); }
+.toast-tp { color: var(--gold-deep); font-size: var(--text-xs); margin-left: auto; }
 
 .toast-enter-active { animation: slideIn 0.3s ease-out; }
 .toast-leave-active { animation: slideIn 0.3s ease-in reverse; }

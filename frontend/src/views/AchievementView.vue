@@ -166,7 +166,7 @@ onMounted(async () => {
 }
 
 .ach-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;

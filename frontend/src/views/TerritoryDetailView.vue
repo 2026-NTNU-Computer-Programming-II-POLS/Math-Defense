@@ -236,7 +236,7 @@ watch(activityId, (id) => {
 }
 
 .detail-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;
@@ -251,7 +251,7 @@ watch(activityId, (id) => {
   background: rgba(126, 144, 119, 0.18);
   color: var(--sage-deep);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
 }
 
 .status-badge.settled { border-color: rgba(79, 74, 72, 0.16); background: rgba(79, 74, 72, 0.07); color: var(--charcoal-soft); }
@@ -265,7 +265,7 @@ watch(activityId, (id) => {
   border: 1px solid rgba(107, 127, 148, 0.32);
   background: rgba(107, 127, 148, 0.18);
   color: var(--slate-deep);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
 }
 

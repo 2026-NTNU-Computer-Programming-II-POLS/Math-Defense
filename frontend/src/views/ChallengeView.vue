@@ -141,7 +141,7 @@ function goToLeaderboard(): void {
 }
 
 .setup-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;
@@ -153,7 +153,7 @@ function goToLeaderboard(): void {
 
 .challenge-detail { display: flex; flex-direction: column; gap: 12px; }
 .title-row { display: flex; align-items: baseline; justify-content: space-between; }
-.ch-title { font-size: 1.05rem; color: var(--charcoal); font-weight: 700; margin: 0; }
+.ch-title { font-size: var(--text-base); color: var(--charcoal); font-weight: 700; margin: 0; }
 .ch-desc { font-size: var(--text-xs); color: var(--charcoal-soft); margin: 0; line-height: 1.4; }
 
 .constraints {
@@ -173,7 +173,7 @@ function goToLeaderboard(): void {
   border-radius: 999px;
   border: 1px solid rgba(111, 138, 161, 0.35);
   background: rgba(111, 138, 161, 0.18);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   font-family: var(--font-mono);
   color: var(--terracotta-deep);
 }

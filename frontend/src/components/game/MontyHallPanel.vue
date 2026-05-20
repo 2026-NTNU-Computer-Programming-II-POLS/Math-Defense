@@ -139,9 +139,10 @@ function close(): void {
 }
 
 .monty-hall-panel {
-  background: linear-gradient(135deg, #1a1520, #252030);
+  background: var(--overlay-panel-bg);
   border: 2px solid var(--gold);
   border-radius: 8px;
+  box-shadow: var(--shadow-lg);
   padding: 24px 32px;
   text-align: center;
   min-width: 360px;
@@ -149,7 +150,7 @@ function close(): void {
 }
 
 .mh-title {
-  color: var(--gold-bright);
+  color: var(--gold-deep);
   font-size: var(--text-md);
   margin: 0 0 12px;
 }
@@ -161,7 +162,7 @@ function close(): void {
 }
 
 .mh-prompt.won {
-  color: #60f090;
+  color: var(--sage-deep);
   font-weight: bold;
 }
 
@@ -177,7 +178,7 @@ function close(): void {
   height: 80px;
   border: 2px solid var(--panel-border);
   border-radius: 6px;
-  background: rgba(139, 115, 66, 0.2);
+  background: var(--gold-tint);
   color: var(--overlay-text);
   cursor: pointer;
   font-family: var(--font-mono);
@@ -193,11 +194,11 @@ function close(): void {
 
 .door:hover:not(:disabled) {
   transform: scale(1.08);
-  background: rgba(139, 115, 66, 0.4);
+  background: var(--gold-tint-select);
 }
 
 .door.selected {
-  border-color: var(--gold-bright);
+  border-color: var(--gold-deep);
   box-shadow: 0 0 8px var(--gold);
 }
 
@@ -207,13 +208,13 @@ function close(): void {
 }
 
 .door.prize {
-  border-color: #60f090;
-  background: rgba(96, 240, 144, 0.15);
+  border-color: var(--sage-deep);
+  background: rgba(126, 144, 119, 0.18);
 }
 
 .door-number { font-size: var(--text-lg); }
 .door-empty { font-size: var(--text-2xs); color: var(--hp-red); }
-.door-prize { font-size: var(--text-2xs); color: #60f090; }
+.door-prize { font-size: var(--text-2xs); color: var(--sage-deep); }
 
 .switch-buttons {
   display: flex;
@@ -232,25 +233,25 @@ function close(): void {
 }
 
 .btn-switch {
-  background: rgba(96, 192, 255, 0.2);
-  color: #60c0ff;
-  border-color: #60c0ff;
+  background: rgba(111, 138, 161, 0.16);
+  color: var(--terracotta-deep);
+  border-color: var(--terracotta-deep);
 }
 
 .btn-keep {
-  background: rgba(212, 168, 64, 0.2);
-  color: var(--gold);
-  border-color: var(--gold);
+  background: var(--gold-tint-select);
+  color: var(--gold-deep);
+  border-color: var(--gold-deep);
 }
 
 .btn-close {
-  background: rgba(96, 240, 144, 0.15);
-  color: #60f090;
-  border-color: #60f090;
+  background: rgba(126, 144, 119, 0.18);
+  color: var(--sage-deep);
+  border-color: var(--sage-deep);
 }
 
 .btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--overlay-cell-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {

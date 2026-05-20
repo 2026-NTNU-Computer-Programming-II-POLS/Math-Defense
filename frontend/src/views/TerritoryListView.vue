@@ -120,7 +120,7 @@ onMounted(() => store.loadActivities())
 }
 
 .panel-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;
@@ -147,7 +147,7 @@ onMounted(() => store.loadActivities())
 
 .activity-item:hover { border-color: var(--terracotta); transform: translateY(-2px); }
 
-.activity-title { color: var(--charcoal); font-weight: 700; font-size: 1.05rem; }
+.activity-title { color: var(--charcoal); font-weight: 700; font-size: var(--text-base); }
 
 .activity-meta {
   display: flex;
@@ -167,7 +167,7 @@ onMounted(() => store.loadActivities())
   background: rgba(126, 144, 119, 0.18);
   color: var(--sage-deep);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
 }
 
@@ -183,7 +183,7 @@ onMounted(() => store.loadActivities())
   background: rgba(107, 127, 148, 0.18);
   color: var(--slate-deep);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
 }
 

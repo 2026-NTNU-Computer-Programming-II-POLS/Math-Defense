@@ -148,7 +148,7 @@ const manualOpen = ref(false)
 .title-eyebrow {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   letter-spacing: 5px;
   color: var(--terracotta-deep);
   padding: 5px 12px;
@@ -159,7 +159,7 @@ const manualOpen = ref(false)
 
 .title-main {
   font-family: var(--font-mono);
-  font-size: clamp(2.1rem, 4.5vw, 3rem);
+  font-size: var(--text-3xl);
   font-weight: 800;
   color: var(--charcoal);
   letter-spacing: 5px;
@@ -175,23 +175,8 @@ const manualOpen = ref(false)
   border-radius: 2px;
 }
 
-.motto {
-  font-size: 0.98rem;
-  color: var(--charcoal-soft);
-  letter-spacing: 0.5px;
-  font-style: italic;
-}
-
-/* ── Card ── */
-.card {
-  background: rgba(220, 229, 237, 0.86);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--shadow);
-  padding: 26px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+/* `.card`, `.section-label`, `.motto` and the `.btn` family are shared
+   primitives in global.css (review §3.1). */
 
 .menu-card {
   max-width: 480px;
@@ -206,119 +191,8 @@ const manualOpen = ref(false)
   margin-top: 18px;
 }
 
-.section-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 4px;
-  color: var(--charcoal-soft);
-  text-transform: uppercase;
-  margin: 22px 0 12px;
-}
-
-.section-label::after {
-  content: "";
-  flex: 1;
-  height: 0;
-  border-top: 1px dashed var(--line-strong);
-}
-
 .section-label:first-child {
   margin-top: 0;
-}
-
-/* ── Buttons ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-family: var(--font-main);
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 10px 18px;
-  min-height: 44px;
-  border: 1px solid rgba(111, 138, 161, 0.4);
-  border-radius: 10px;
-  background: rgba(245, 250, 254, 0.78);
-  color: var(--charcoal);
-  cursor: pointer;
-  letter-spacing: 0.4px;
-  transition: all 0.16s ease;
-  box-shadow: var(--shadow-sm);
-  white-space: nowrap;
-  text-transform: none;
-}
-
-.btn:hover {
-  background: #fff;
-  border-color: var(--terracotta);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
-}
-
-.btn:focus-visible {
-  outline: 2px solid var(--terracotta-deep);
-  outline-offset: 2px;
-}
-
-.btn .icon {
-  font-family: var(--font-mono);
-  font-size: 1.05rem;
-  color: var(--terracotta-deep);
-  flex-shrink: 0;
-}
-
-.btn .label {
-  flex: 0 0 auto;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
-  color: #fff;
-  border: 1px solid var(--gold-deep);
-  font-size: 1rem;
-  letter-spacing: 1.2px;
-  min-height: 50px;
-  padding: 12px 22px;
-  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-}
-
-.btn-primary .icon {
-  color: #fff;
-  font-size: 1.1rem;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
-  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
-}
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--charcoal-soft);
-  font-size: 0.88rem;
-  min-height: 38px;
-  padding: 7px 14px;
-}
-
-.btn-ghost:hover {
-  background: rgba(245, 250, 254, 0.6);
-  color: var(--charcoal);
-}
-
-.btn-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.btn-stack > .btn {
-  width: 100%;
 }
 
 /* ── Account row ── */
@@ -353,7 +227,7 @@ const manualOpen = ref(false)
 }
 
 .account-sub {
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--charcoal-soft);
 }
 
@@ -361,7 +235,7 @@ const manualOpen = ref(false)
 .footer {
   margin-top: 40px;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   color: var(--muted);
   letter-spacing: 2px;
   text-align: center;

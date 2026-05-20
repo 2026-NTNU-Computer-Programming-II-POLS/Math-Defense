@@ -330,16 +330,8 @@ async function submit(): Promise<void> {
   padding: 48px 20px;
 }
 
-/* ── Card ── */
-.card {
-  background: rgba(220, 229, 237, 0.86);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--shadow);
-  padding: 26px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+/* `.card` and the `.btn` family are shared primitives in global.css
+   (review §3.1). */
 
 .auth-card {
   max-width: 460px;
@@ -361,7 +353,7 @@ async function submit(): Promise<void> {
   border: none;
   border-bottom: 2px solid transparent;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   letter-spacing: 2px;
   color: var(--charcoal-soft);
   cursor: pointer;
@@ -386,7 +378,7 @@ async function submit(): Promise<void> {
 
 .field label {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   color: var(--charcoal-soft);
   margin-bottom: 6px;
   font-weight: 500;
@@ -396,7 +388,7 @@ async function submit(): Promise<void> {
   width: 100%;
   padding: 12px 14px;
   font-family: var(--font-main);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   background: rgba(245, 250, 254, 0.85);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
@@ -417,7 +409,7 @@ async function submit(): Promise<void> {
   border: 1px solid var(--line);
   border-radius: 10px;
   color: var(--charcoal-soft);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
 }
 
 /* ── Password checklist ── */
@@ -429,7 +421,7 @@ async function submit(): Promise<void> {
 
 .checklist li {
   padding: 2px 0;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   color: var(--charcoal-soft);
 }
 
@@ -448,81 +440,10 @@ async function submit(): Promise<void> {
   font-weight: 700;
 }
 
-/* ── Buttons ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-family: var(--font-main);
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 10px 18px;
-  min-height: 44px;
-  border: 1px solid rgba(111, 138, 161, 0.4);
-  border-radius: 10px;
-  background: rgba(245, 250, 254, 0.78);
-  color: var(--charcoal);
-  cursor: pointer;
-  letter-spacing: 0.4px;
-  transition: all 0.16s ease;
-  box-shadow: var(--shadow-sm);
-  white-space: nowrap;
-  text-transform: none;
-}
-
-.btn:hover {
-  background: #fff;
-  border-color: var(--terracotta);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(111, 138, 161, 0.24);
-}
-
-.btn:focus-visible {
-  outline: 2px solid var(--terracotta-deep);
-  outline-offset: 2px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn .label {
-  flex: 0 0 auto;
-}
-
+/* ── Buttons — view-specific tweaks only (`.btn` family in global.css) ── */
 .btn-primary {
   align-self: center;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
-  color: #fff;
-  border: 1px solid var(--gold-deep);
-  font-size: 1rem;
-  letter-spacing: 1.2px;
-  min-height: 50px;
-  padding: 12px 22px;
-  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   margin-top: 4px;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
-  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
-}
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--charcoal-soft);
-  font-size: 0.88rem;
-  min-height: 38px;
-  padding: 7px 14px;
-}
-
-.btn-ghost:hover {
-  background: rgba(245, 250, 254, 0.6);
-  color: var(--charcoal);
 }
 
 .auth-block {
@@ -532,7 +453,7 @@ async function submit(): Promise<void> {
 /* ── Auxiliary text ── */
 .auth-title {
   font-family: var(--font-mono);
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   font-weight: 800;
   color: var(--charcoal);
   letter-spacing: 4px;
@@ -541,20 +462,20 @@ async function submit(): Promise<void> {
 }
 
 .mfa-hint {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--charcoal-soft);
   text-align: center;
   margin: 0 0 6px;
 }
 
 .auth-error {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--clay-deep);
   margin: 2px 0 8px;
 }
 
 .auth-notice {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--sage-deep);
   background: rgba(126, 144, 119, 0.12);
   border: 1px solid rgba(126, 144, 119, 0.35);
@@ -567,7 +488,7 @@ async function submit(): Promise<void> {
 .auth-switch {
   text-align: center;
   margin: 14px 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--charcoal-soft);
 }
 
@@ -584,7 +505,7 @@ async function submit(): Promise<void> {
 
 .demo-hint {
   text-align: center;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--muted);
   margin: 0 0 14px;
 }

@@ -242,7 +242,7 @@ function onUnhover(): void {
 
 .fn-current-label {
   font-size: var(--text-xs);
-  color: var(--gold-bright, #d4a840);
+  color: var(--gold-deep);
   font-weight: bold;
 }
 
@@ -321,16 +321,16 @@ function onUnhover(): void {
 
 .fn-seg-active {
   background: var(--overlay-cell-active);
-  color: var(--gold-bright, #d4a840);
+  color: var(--gold-deep);
 }
 
 .fn-seg-past {
-  color: #6c6050;
+  color: var(--muted);
   text-decoration: line-through;
 }
 
 .fn-seg-upcoming {
-  color: #b5a586;
+  color: var(--charcoal-soft);
 }
 
 .fn-seg-label {

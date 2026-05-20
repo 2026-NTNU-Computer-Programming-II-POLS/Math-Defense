@@ -97,7 +97,7 @@ function goBack(): void {
 }
 
 .result-title {
-  font-size: 1.6rem;
+  font-size: var(--text-xl);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;

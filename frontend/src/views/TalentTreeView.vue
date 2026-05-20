@@ -239,7 +239,7 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.talent-title { font-size: 1.35rem; font-family: var(--font-mono); color: var(--charcoal); letter-spacing: 2px; }
+.talent-title { font-size: var(--text-lg); font-family: var(--font-mono); color: var(--charcoal); letter-spacing: 2px; }
 .talent-points { font-size: var(--text-xs); }
 .tp-available { color: var(--terracotta-deep); font-weight: 700; }
 .tp-detail { color: var(--charcoal-soft); margin-left: 8px; }

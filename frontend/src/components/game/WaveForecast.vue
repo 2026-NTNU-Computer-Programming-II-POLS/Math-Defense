@@ -68,7 +68,7 @@ const warnings = computed(() =>
 }
 
 .forecast-enemy {
-  color: var(--gold-bright);
+  color: var(--gold-deep);
   font-weight: 700;
 }
 

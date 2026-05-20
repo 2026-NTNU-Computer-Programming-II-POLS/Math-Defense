@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 8px;
   font-family: var(--font-main);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   padding: 8px 14px;
   min-height: 38px;
@@ -234,7 +234,7 @@ onBeforeUnmount(() => {
 }
 
 .lb-title {
-  font-size: 1.35rem;
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   color: var(--charcoal);
   letter-spacing: 2px;
@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
   border-radius: 0;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--charcoal-soft);
@@ -267,7 +267,7 @@ onBeforeUnmount(() => {
   padding: 4px 12px;
   min-height: 30px;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
   background: rgba(79, 74, 72, 0.07);
   color: var(--charcoal-soft);
@@ -282,7 +282,7 @@ onBeforeUnmount(() => {
 
 /* Table (mockup .tbl) */
 .lb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.lb-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.92rem; }
+.lb-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); }
 
 th, td {
   padding: 12px 14px;
@@ -293,7 +293,7 @@ th, td {
 th {
   color: var(--charcoal-soft);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   letter-spacing: 2px;
   text-transform: uppercase;
   background: rgba(245, 250, 254, 0.4);
