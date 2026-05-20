@@ -39,7 +39,23 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements-dev.txt
       - name: Audit Python dependencies
-        run: pip install pip-audit && pip-audit -r requirements.txt
+        # All three ignored advisories are non-actionable — no version bump fixes them:
+        #   PYSEC-2025-183 (CVE-2025-45768) — disputed by PyJWT maintainers; the OSV
+        #     range has no fix event, so it flags every PyJWT release. The "weak
+        #     encryption" claim only applies when the app picks a short HMAC key, and
+        #     config.py enforces a >=32-char SECRET_KEY, so it does not apply here.
+        #   PYSEC-2024-311 (CVE-2024-47813) — fixed in wasmtime 25.0.2; we run 44.0.0.
+        #     False positive: the OSV range events are malformed, so its enumerated
+        #     version list wrongly includes releases past the fix (27.0.0-44.0.0).
+        #   PYSEC-2026-151 (CVE-2026-34983) — fixed in wasmtime 43.0.1; we run 44.0.0.
+        #     False positive from the same malformed OSV range.
+        # Revisit when any of these gets a real, applicable fix version.
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt \
+            --ignore-vuln PYSEC-2025-183 \
+            --ignore-vuln PYSEC-2024-311 \
+            --ignore-vuln PYSEC-2026-151
       - name: pytest
         env:
           SECRET_KEY: ci-placeholder-secret-key-not-used-in-prod
