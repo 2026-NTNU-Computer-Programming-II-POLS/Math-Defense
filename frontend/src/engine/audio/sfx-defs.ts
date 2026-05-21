@@ -39,6 +39,7 @@ export type SfxSlug =
   | 'tower-upgrade'
   | 'tower-refund'
   | 'tower-select'
+  | 'buff-expire'
   // Combat
   | 'tower-attack-light'
   | 'tower-attack-heavy'
@@ -89,6 +90,7 @@ export const SFX_DEFS: Record<SfxSlug, SfxDef> = {
   'tower-upgrade': { url: '/audio/tower-upgrade.wav', volume: 0.65, bus: 'sfx' },
   'tower-refund':  { url: '/audio/tower-refund.wav',  volume: 0.5,  bus: 'sfx' },
   'tower-select':  { url: '/audio/tower-select.wav',  volume: 0.35, bus: 'sfx', minIntervalMs: 100, pitchJitter: 0.04 },
+  'buff-expire':   { url: '/audio/buff-expire.wav',   volume: 0.4,  bus: 'sfx' },
 
   // ─── Spell / combat ────────────────────────────────────────────────────
   'cast-spell': { url: '/audio/cast-spell.wav', volume: 0.6, bus: 'sfx' },

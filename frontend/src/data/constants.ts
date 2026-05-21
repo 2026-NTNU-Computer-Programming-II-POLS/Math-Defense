@@ -156,6 +156,10 @@ export const Events = Object.freeze({
   COST_TOTAL_CHANGED:   'costTotalChanged',
 
   ACTIVE_BUFFS_CHANGED: 'activeBuffsChanged',
+  // Feedback-only: a timed buff's countdown reached zero. Drives the HUD
+  // expiry flash + expire SFX. Distinct from ACTIVE_BUFFS_CHANGED, which also
+  // fires on purchase and on the level-start buff cleanup.
+  BUFF_EXPIRED:         'buffExpired',
 
   MONTY_HALL_STATE_CHANGED: 'montyHallStateChanged',
 

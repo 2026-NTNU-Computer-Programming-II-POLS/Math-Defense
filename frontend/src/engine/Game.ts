@@ -155,6 +155,7 @@ export interface GameEvents {
   [Events.COST_TOTAL_CHANGED]:   number
 
   [Events.ACTIVE_BUFFS_CHANGED]: ReadonlyArray<ActiveBuffEntry>
+  [Events.BUFF_EXPIRED]:         { id: string; name: string; effectId: string }
 
   [Events.MONTY_HALL_STATE_CHANGED]: MontyHallState | null
 

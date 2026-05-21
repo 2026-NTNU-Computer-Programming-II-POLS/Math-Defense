@@ -71,4 +71,18 @@ describe('BuffSystem — time-based duration', () => {
     expect(emitted).toHaveLength(2) // from expiry
     expect(emitted[1]).toHaveLength(0)
   })
+
+  it('emits BUFF_EXPIRED with the buff identity when the countdown hits zero', () => {
+    const expired: { id: string; name: string; effectId: string }[] = []
+    game.eventBus.on(Events.BUFF_EXPIRED, (p) => { expired.push(p) })
+
+    game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'short_buff', cost: 50 })
+    system.update(1, game) // still active — no event yet
+    expect(expired).toHaveLength(0)
+
+    system.update(2, game) // crosses zero
+    expect(expired).toHaveLength(1)
+    expect(expired[0].name).toBe('Short Buff')
+    expect(expired[0].effectId).toBe('ALL_TOWERS_DAMAGE_MULTIPLY_1_5')
+  })
 })

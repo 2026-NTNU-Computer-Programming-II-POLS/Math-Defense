@@ -16,6 +16,7 @@
  *   TOWER_PLACED          → tower-place
  *   TOWER_UPGRADED        → tower-upgrade
  *   TOWER_REFUND_RESULT*  → tower-refund (success only)
+ *   BUFF_EXPIRED          → buff-expire      (timed buff countdown hit zero)
  *   TOWER_SELECTED        → tower-select (throttled, ignore null deselect)
  *   TOWER_ATTACK          → tower-attack-light (heavy-throttled + jittered)
  *   ENEMY_SPAWNED         → enemy-spawn / boss-spawn (boss override)
@@ -77,6 +78,7 @@ export function bindEngineAudio(g: Game, audio: AchievementAudioRef): (() => voi
   offs.push(g.eventBus.on(Events.TOWER_REFUND_RESULT, ({ success }) => {
     if (success) assetManager.play('tower-refund')
   }))
+  offs.push(g.eventBus.on(Events.BUFF_EXPIRED, () => assetManager.play('buff-expire')))
   // Selection: ignore the deselect (null) edge — only the human's pick-up
   // gesture should click. Throttle is enforced inside AssetManager.
   offs.push(g.eventBus.on(Events.TOWER_SELECTED, (t) => {

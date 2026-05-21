@@ -227,6 +227,13 @@ export class BuffSystem implements GameSystem {
         if (expired.revertId) applyEffect(expired.revertId, game)
         buffs.splice(i, 1)
         changed = true
+        // Feedback-only signal: drives the HUD expiry flash + expire SFX.
+        // Not recorded for replay (simulation-derived, not a player decision).
+        game.eventBus.emit(Events.BUFF_EXPIRED, {
+          id: expired.id,
+          name: expired.name,
+          effectId: expired.effectId,
+        })
       }
     }
     if (changed) {

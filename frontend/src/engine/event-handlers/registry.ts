@@ -283,6 +283,10 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'stores/gameStore', handler: 'anonymous', purpose: 'Mirror active buffs to reactive store' },
     { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Respawn Calculus pets so global tower-buff multipliers propagate to pet damage' },
   ],
+  BUFF_EXPIRED: [
+    { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger buff-expire SFX' },
+    { module: 'components/game/HUD',        handler: 'anonymous', purpose: 'Spawn an expiry-flash ghost when a timed buff ends' },
+  ],
 
   // ── Pedagogy ──
   PRINCIPLE_SHOW: [

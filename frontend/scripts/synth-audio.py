@@ -264,6 +264,25 @@ def synth_tower_select() -> list[float]:
     return samples
 
 
+def synth_buff_expire() -> list[float]:
+    """Soft 'power-down' — a gentle descending glissando with a sub-octave
+    body and a slow tremolo shimmer, ~340ms. Signals a timed buff fading
+    out; kept mellow so it reads as a neutral wind-down, not an alarm."""
+    n = int(SAMPLE_RATE * 0.34)
+    samples = []
+    for i in range(n):
+        t = i / SAMPLE_RATE
+        # Exponential downward sweep — bright start settling to a low tail.
+        f = 320 + 480 * math.exp(-3.2 * t)
+        env = envelope(i, n, attack=0.012, release=0.26)
+        base = math.sin(2 * math.pi * f * t)
+        sub = 0.4 * math.sin(2 * math.pi * f * 0.5 * t)
+        # Slow tremolo for a soft wind-down shimmer.
+        trem = 0.85 + 0.15 * math.sin(2 * math.pi * 11 * t)
+        samples.append(0.4 * env * trem * (base + sub))
+    return samples
+
+
 # ─── Combat ─────────────────────────────────────────────────────────
 
 def synth_tower_attack_light() -> list[float]:
@@ -428,6 +447,7 @@ GENERATORS = {
     "tower-upgrade.wav":       synth_tower_upgrade,
     "tower-refund.wav":        synth_tower_refund,
     "tower-select.wav":        synth_tower_select,
+    "buff-expire.wav":         synth_buff_expire,
     "tower-attack-light.wav":  synth_tower_attack_light,
     "tower-attack-heavy.wav":  synth_tower_attack_heavy,
     "enemy-spawn.wav":         synth_enemy_spawn,
