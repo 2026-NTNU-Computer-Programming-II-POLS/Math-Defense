@@ -363,36 +363,44 @@ onBeforeUnmount(() => {
       <AchievementToast :achievements="newlyUnlockedAchievements" />
       <PrincipleOverlay :principle-id="currentPrincipleId" @dismiss="clearPrinciple" />
       <HUD />
-      <button
-        v-if="activePhases.includes(gameStore.phase)"
-        type="button"
-        class="return-level-btn"
-        aria-label="Exit run early. This run will not be recorded."
-        title="Exit run early. This run will not be recorded."
-        @click="returnToLevelSelect"
-      >
-        <span aria-hidden="true">←</span>
-        Exit Run
-      </button>
-      <button
-        type="button"
-        class="manual-btn"
-        aria-label="Open field reference manual"
-        title="Field reference (towers, enemies, spells)"
-        @click="manualOpen = true"
-      >
-        <span aria-hidden="true">◇</span>
-        Manual
-      </button>
+      <!-- Bottom-left corner controls — system buttons + practice badge in
+           one horizontal row. Kept clear of the top-right so they never
+           overlap the HUD buff-countdown rings or the FunctionPanel, and
+           bottom-LEFT (not bottom-right) so they clear the TowerInfoPanel.
+           Anchored above the TowerBar — same idiom as StartWaveButton. -->
+      <div class="corner-controls">
+        <button
+          type="button"
+          class="manual-btn"
+          aria-label="Open field reference manual"
+          title="Field reference (towers, enemies, spells)"
+          @click="manualOpen = true"
+        >
+          <span aria-hidden="true">◇</span>
+          Manual
+        </button>
+        <button
+          v-if="activePhases.includes(gameStore.phase)"
+          type="button"
+          class="return-level-btn"
+          aria-label="Exit run early. This run will not be recorded."
+          title="Exit run early. This run will not be recorded."
+          @click="returnToLevelSelect"
+        >
+          <span aria-hidden="true">←</span>
+          Exit Run
+        </button>
+        <!-- Backlog §20 — practice-mode badge persists for the entire
+             WAVE/BUILD session so the player never forgets the run is
+             leaderboard-ineligible. -->
+        <div
+          v-if="isPracticeMode"
+          class="practice-badge"
+          role="status"
+          aria-live="polite"
+        >Practice mode — leaderboard ineligible</div>
+      </div>
       <ManualModal :open="manualOpen" mode="reference" @close="manualOpen = false" />
-      <!-- Backlog §20 — practice-mode badge persists for the entire WAVE/BUILD
-           session so the player never forgets the run is leaderboard-ineligible. -->
-      <div
-        v-if="isPracticeMode"
-        class="practice-badge"
-        role="status"
-        aria-live="polite"
-      >Practice mode — leaderboard ineligible</div>
       <BuildHint />
       <WaveForecast />
       <WaveBanner />
@@ -510,6 +518,29 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
+/* Bottom-left corner controls — one horizontal row (system buttons +
+   practice badge) anchored above the TowerBar, the same idiom as
+   StartWaveButton / TowerInfoPanel. Sitting at bottom-LEFT keeps it clear
+   of the HUD buff-countdown rings, the FunctionPanel, and the
+   TowerInfoPanel (all top/bottom-right). The container is click-through
+   (this overrides the `.game-overlay > *` auto rule above — note the
+   higher-specificity selector); only the buttons catch pointer events, so
+   the gaps between row items never swallow canvas input. */
+.game-overlay > .corner-controls {
+  position: absolute;
+  left: 16px;
+  bottom: calc(var(--tower-bar-height, 64px) + 12px);
+  z-index: var(--z-action);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.corner-controls .manual-btn,
+.corner-controls .return-level-btn {
+  pointer-events: auto;
+}
+
 .left-utility-stack {
   position: absolute;
   left: 8px;
@@ -522,10 +553,6 @@ onBeforeUnmount(() => {
 }
 
 .return-level-btn {
-  position: absolute;
-  top: calc(var(--hud-height, 48px) + 56px);
-  right: 12px;
-  z-index: var(--z-action);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -553,10 +580,6 @@ onBeforeUnmount(() => {
 }
 
 .manual-btn {
-  position: absolute;
-  top: calc(var(--hud-height, 48px) + 12px);
-  right: 12px;
-  z-index: var(--z-action);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -738,9 +761,6 @@ onBeforeUnmount(() => {
 
 /* Backlog §20 — practice-mode badge */
 .practice-badge {
-  position: absolute;
-  top: calc(var(--hud-height, 48px) + 98px);
-  right: 12px;
   padding: 4px 10px;
   background: rgba(144, 104, 200, 0.18);
   border: 1px solid #9068c8;
@@ -749,7 +769,6 @@ onBeforeUnmount(() => {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.5px;
-  z-index: var(--z-overlay);
   pointer-events: none;
 }
 
