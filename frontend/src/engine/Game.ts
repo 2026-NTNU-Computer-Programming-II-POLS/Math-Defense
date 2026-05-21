@@ -21,6 +21,7 @@ import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { PathProgressTracker, SegmentChangedPayload } from '@/domain/path/path-progress-tracker'
 import type { PlacementRejectionReason } from '@/domain/level/placement-policy'
 import type { ChainRuleQuestion } from '@/math/chain-rule-generator'
+import type { CalcOp } from '@/math/monomial'
 import type { LevelContext } from './level-context'
 import { isGeneratedLevelContext, type GeneratedLevelContext } from './generated-level-context'
 import type { GeneratedLevel } from '@/math/curve-types'
@@ -123,7 +124,7 @@ export interface GameEvents {
   [Events.TOWER_TARGETING_CHANGED]: { towerId: string; mode: TargetingMode }
   [Events.MATRIX_PAIR_CHANGED]:  { towerId: string; pairId: string }
   [Events.LIMIT_ANSWER]:         { towerId: string; answer: LimitResult }
-  [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: 'derivative' | 'derivative2' | 'integral' }
+  [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: CalcOp }
   [Events.CALCULUS_STATE_CHANGED]:{ towerId: string; state: CalculusState | null }
   [Events.TOWER_UPGRADE]:        { towerId: string }
   [Events.TOWER_UPGRADED]:       { towerId: string }

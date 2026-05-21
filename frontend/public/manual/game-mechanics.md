@@ -75,7 +75,7 @@ Wave-clear bonus: `25 + 8 × starRating`. Answering the Boss Type-B Chain Rule c
 In Build Phase no enemies are on the board, so you can think without time pressure. The engine still ticks (so spells, audio, and HUD update) but everything you do here is captured as prep time and is **subtracted** from the score's active-time term. What you can do:
 
 - **Place towers.** Click the tower bar (top), then click a legal grid point. Cost is deducted immediately. Towers snap to integer coordinates.
-- **Configure each tower's math.** Click any placed tower to open its panel. Each tower has its own UI — Magic picks a curve and a debuff/buff mode, Radars aim an angular arc (a ×1.5 focus sector, optionally a hard attack restriction), Matrix picks its pair partner, Limit answers a `lim` question, Calculus picks a function and derivative/integral.
+- **Configure each tower's math.** Click any placed tower to open its panel. Each tower has its own UI — Magic picks a curve and a debuff/buff mode, Radars aim an angular arc (a ×1.5 focus sector, optionally a hard attack restriction), Matrix picks its pair partner, Limit answers a `lim` question, Calculus picks a function then solves a derivative or integral to apply it.
 - **Upgrade or refund.** Each tower can be upgraded twice (Tier 2 / Tier 3) for a fraction of base cost. Refunding pays back a portion of total invested gold.
 - **Open the shop.** Buy time-based buffs (extra damage, slow enemies, heal, shield, gold multiplier). See §9.
 - **Set targeting.** Each combat tower has a targeting mode toggle: closest / strongest / first / last.

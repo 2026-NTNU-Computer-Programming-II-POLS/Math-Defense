@@ -80,7 +80,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 100 / 0 base / 10 / — (does not fire directly)
 - **Math:** derivatives, integrals, power rule
 - **Unlocked from:** Star 3
-- **Mechanic:** pick a polynomial function, then pick **derivative** or **integral**. The result of `d/dx` or `∫` is a monomial of the form `C·x^n`. The tower spawns **C pets**, each whose trait is determined by **n** — homing speed, lifetime, damage profile, AoE radius. Pets fly out, home onto the nearest enemy, and detonate.
+- **Mechanic:** pick a monomial `f(x)`, then pick an operation — `f'`, `f''`, or `∫f` — and **solve it yourself**: type the resulting monomial. The panel never shows the answer; only a correct answer applies the operation. The result `C·x^n` spawns **C pets**, each whose trait is determined by **n** — homing speed, lifetime, damage profile, AoE radius. Pets fly out, home onto the nearest enemy, and detonate. The first operation is free; chaining another costs gold, while a wrong answer is rejected at no cost.
 - **Tier 2/3:** pet damage +25% / +50%; Tier 3 also +1 pet count and +20% pet speed.
 - **Pick when:** you want autonomous chip damage during waves or extra cleanup that doesn't need direct line-of-sight positioning.
 - **Exam tie-in:** AP Calculus AB Section I differentiation/integration of polynomials.

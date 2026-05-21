@@ -79,7 +79,7 @@ frontend/
 │   │   │   ├── RadarConfigPanel.vue Radar tower: arc start/end/restrict config
 │   │   │   ├── MatrixPairPanel.vue  Matrix tower: pair selection
 │   │   │   ├── LimitQuestionPanel.vue  Limit tower: multiple-choice lim question (branches on starRating)
-│   │   │   ├── CalculusPanel.vue   Calculus tower: derivative/integral function picker
+│   │   │   ├── CalculusPanel.vue   Calculus tower: function picker + typed derivative/integral quiz
 │   │   │   ├── ChainRulePanel.vue  Boss Type-B chain-rule challenge overlay (KaTeX)
 │   │   │   ├── MontyHallPanel.vue  Monty Hall event overlay (doors, reveal, switch)
 │   │   │   ├── TargetingModePanel.vue Per-tower targeting-mode picker (closest / strongest / first / last)

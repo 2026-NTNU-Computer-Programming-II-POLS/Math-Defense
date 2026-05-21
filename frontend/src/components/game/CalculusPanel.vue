@@ -4,8 +4,8 @@ import { useGameStore } from '@/stores/gameStore'
 import { Events } from '@/data/constants'
 import { CALCULUS_OP_COST } from '@/systems/CalculusTowerSystem'
 import type { CalculusTowerSystem, MonomialPreset } from '@/systems/CalculusTowerSystem'
-
-type CalcOp = 'derivative' | 'derivative2' | 'integral'
+import { applyCalcOp, checkMonomialAnswer } from '@/math/monomial'
+import type { CalcOp } from '@/math/monomial'
 
 const props = defineProps<{ towerId: string }>()
 const gameStore = useGameStore()
@@ -47,58 +47,15 @@ function petCount(c: number): number {
   return Number.isInteger(c) && c > 0 ? c : 1
 }
 
-function fmtMono(c: number, n: number): string {
-  if (n === 0) return `${c}`
-  if (n === 1) return c === 1 ? 'x' : c === -1 ? '-x' : `${c}x`
-  return c === 1 ? `x^${n}` : c === -1 ? `-x^${n}` : `${c}x^${n}`
-}
-
-function roundUi(v: number): number {
-  return Math.round(v * 1e4) / 1e4
-}
-
-interface PresetPreview {
-  trait: TraitKey
-  count: number
-  derivExpr: string
-  derivBreaks: boolean
-}
-
-const presetPreviews = computed(() =>
-  presets.value.map((p): PresetPreview => {
-    const trait = traitFromExp(p.exponent)
-    const count = petCount(p.coefficient)
-    const newC = p.coefficient * p.exponent
-    const newN = p.exponent - 1
-    const collapses = newC === 0 || p.exponent === 0 || newN === 0
-    const derivExpr = newC === 0 ? '0' : fmtMono(newC, newN)
-    return { trait, count, derivExpr, derivBreaks: collapses }
-  }),
+// Preset display surfaces only the strategic facts — pet trait (from n) and pet
+// count (from C). The derivative result is deliberately NOT pre-computed here:
+// that is the math the student solves at the operation step.
+const presetMeta = computed(() =>
+  presets.value.map((p) => ({
+    trait: traitFromExp(p.exponent),
+    count: petCount(p.coefficient),
+  })),
 )
-
-interface OpPreview {
-  expr: string
-  outcome: 'ok' | 'collapse'
-}
-
-function previewOp(op: 'derivative' | 'derivative2' | 'integral'): OpPreview | null {
-  const s = calcState.value
-  if (!s) return null
-  let nc: number, nn: number
-  if (op === 'derivative') { nc = s.coefficient * s.exponent; nn = s.exponent - 1 }
-  else if (op === 'derivative2') { nc = s.coefficient * s.exponent * (s.exponent - 1); nn = s.exponent - 2 }
-  else { nc = roundUi(s.coefficient / (s.exponent + 1)); nn = s.exponent + 1 }
-
-  if (nc === 0 || (op === 'derivative' && s.exponent === 0)) {
-    return { expr: '0', outcome: 'collapse' }
-  }
-  if (nn === 0) return { expr: `${nc}`, outcome: 'collapse' }
-  return { expr: fmtMono(nc, nn), outcome: 'ok' }
-}
-
-const opDeriv = computed(() => previewOp('derivative'))
-const opDeriv2 = computed(() => previewOp('derivative2'))
-const opInteg = computed(() => previewOp('integral'))
 
 // The minimal f(x) = x fallback — a fresh tower or the state a collapsed
 // operation lands in. Surfaced so the student knows to grow it again.
@@ -118,46 +75,89 @@ function selectPreset(index: number) {
   engine.eventBus.emit(Events.CALCULUS_OPERATION, { towerId: props.towerId, presetIndex: index })
 }
 
-// Two-step confirm flow for irreversible ops. f', f'', and ∫f mutate the
-// tower's polynomial in-place; once committed, there is no rollback (a chain op
-// also costs gold). The first click stages an op; the second commits.
-const pendingOp = ref<CalcOp | null>(null)
-
-// Reset confirmation if the calculus state changes (op committed elsewhere,
-// preset chosen, etc.) so a stale pending action doesn't fire on next click.
-watch(calcState, () => { pendingOp.value = null })
-
-function opPreviewFor(op: CalcOp): OpPreview | null {
-  if (op === 'derivative')  return opDeriv.value
-  if (op === 'derivative2') return opDeriv2.value
-  return opInteg.value
+// ── Operation quiz ──
+// f', f'', and ∫f mutate the tower's monomial in-place and are irreversible.
+// The student must compute the result themselves: pick an operation, type the
+// resulting monomial, and only a correct answer commits the op. For a chain op
+// the gold is spent on commit, so a wrong answer costs nothing — see the
+// CalculusTowerSystem charge logic.
+const OP_ORDER = ['derivative', 'derivative2', 'integral'] as const
+const OP_LABEL: Record<CalcOp, string> = {
+  derivative: "f'",
+  derivative2: "f''",
+  integral: '∫f',
 }
 
-function clickOp(op: CalcOp) {
+const selectedOp = ref<CalcOp | null>(null)
+const typedAnswer = ref('')
+const errorMsg = ref('')
+
+// A committed op (or any external state change) clears the in-progress quiz so
+// a stale answer can't be submitted against the new function.
+watch(calcState, () => {
+  selectedOp.value = null
+  typedAnswer.value = ''
+  errorMsg.value = ''
+})
+
+function selectOp(op: CalcOp) {
   if (!canAffordOp.value) return
-  if (pendingOp.value !== op) {
-    pendingOp.value = op
+  // Clicking the active operation again cancels it.
+  selectedOp.value = selectedOp.value === op ? null : op
+  typedAnswer.value = ''
+  errorMsg.value = ''
+}
+
+function cancelOp() {
+  selectedOp.value = null
+  typedAnswer.value = ''
+  errorMsg.value = ''
+}
+
+const activeOpLabel = computed(() => (selectedOp.value ? OP_LABEL[selectedOp.value] : ''))
+
+const activePrompt = computed(() => {
+  const op = selectedOp.value
+  if (!op) return ''
+  const expr = calcState.value?.currentExpr ?? 'x'
+  if (op === 'derivative') return `d/dx ( ${expr} )`
+  if (op === 'derivative2') return `d²/dx² ( ${expr} )`
+  return `∫ ( ${expr} ) dx`
+})
+
+// The indefinite integral's answer omits the constant of integration. A typed
+// "+ C" is unparseable (C is not a known symbol), so the integral prompt says
+// so up-front rather than rejecting a mathematically-rigorous student.
+const quizSubLabel = computed(() =>
+  selectedOp.value === 'integral'
+    ? 'Type the resulting monomial (omit the + C):'
+    : 'Type the resulting monomial:',
+)
+
+function submitAnswer() {
+  errorMsg.value = ''
+  const op = selectedOp.value
+  const s = calcState.value
+  if (!op || !s) return
+  if (!canAffordOp.value) {
+    errorMsg.value = `Not enough gold — a chain operation costs ${CALCULUS_OP_COST}g.`
     return
   }
-  // Confirmed — commit.
-  pendingOp.value = null
+  const expected = applyCalcOp({ coefficient: s.coefficient, exponent: s.exponent }, op)
+  const verdict = checkMonomialAnswer(typedAnswer.value, expected)
+  if (verdict === 'unparseable') {
+    errorMsg.value = 'Could not read that. Use forms like 6x, 6x^2, -x, or 12.'
+    return
+  }
+  if (verdict === 'incorrect') {
+    errorMsg.value = 'Incorrect — re-apply the power rule and try again.'
+    return
+  }
+  // Correct: commit. The system applies the op, charges a chain op, and emits
+  // CALCULUS_STATE_CHANGED — the watcher above then resets the quiz.
   const engine = gameStore.getEngine()
   if (!engine) return
   engine.eventBus.emit(Events.CALCULUS_OPERATION, { towerId: props.towerId, operation: op })
-}
-
-function cancelPending() {
-  pendingOp.value = null
-}
-
-function pendingPreview() {
-  return pendingOp.value ? opPreviewFor(pendingOp.value) : null
-}
-
-function pendingLabel(op: CalcOp): string {
-  if (op === 'derivative')  return "f'"
-  if (op === 'derivative2') return "f''"
-  return '∫f'
 }
 </script>
 
@@ -180,15 +180,9 @@ function pendingLabel(op: CalcOp): string {
         >
           <span class="preset-fn">f(x) = {{ p.expr }}</span>
           <span class="preset-meta">
-            <span class="trait-dot" :style="{ background: TRAIT_INFO[presetPreviews[i].trait].color }"></span>
+            <span class="trait-dot" :style="{ background: TRAIT_INFO[presetMeta[i].trait].color }"></span>
             <span class="trait-label">
-              {{ presetPreviews[i].count }}× {{ TRAIT_INFO[presetPreviews[i].trait].label }}
-            </span>
-            <span
-              class="preset-deriv"
-              :class="{ 'preset-deriv--warn': presetPreviews[i].derivBreaks }"
-            >
-              f' = {{ presetPreviews[i].derivExpr }}<span v-if="presetPreviews[i].derivBreaks"> ⚠</span>
+              {{ presetMeta[i].count }}× {{ TRAIT_INFO[presetMeta[i].trait].label }}
             </span>
           </span>
         </button>
@@ -218,71 +212,45 @@ function pendingLabel(op: CalcOp): string {
       <p v-if="isMinimalState" class="minimal-hint" data-testid="calc-minimal-hint">
         Function is at the minimal <code>f(x) = x</code> — pick an operation to grow it again.
       </p>
+
+      <p class="section-label">Pick an operation, then solve it to apply:</p>
       <div class="op-btns">
         <button
-          :class="['btn', 'op-btn', { 'op-btn--pending': pendingOp === 'derivative' }]"
+          v-for="op in OP_ORDER"
+          :key="op"
+          :class="['btn', 'op-btn', { 'op-btn--active': selectedOp === op }]"
           :disabled="!canAffordOp"
-          :title="opDeriv ? `f' = ${opDeriv.expr}` : ''"
-          @click="clickOp('derivative')"
+          :data-testid="`calc-op-${op}`"
+          @click="selectOp(op)"
         >
-          <span class="op-label">f'</span>
-          <span v-if="opDeriv" class="op-preview" :class="`op-preview--${opDeriv.outcome}`">
-            → {{ opDeriv.expr }}
-            <span v-if="opDeriv.outcome === 'collapse'" class="op-tag">collapses</span>
-          </span>
-        </button>
-        <button
-          :class="['btn', 'op-btn', { 'op-btn--pending': pendingOp === 'derivative2' }]"
-          :disabled="!canAffordOp"
-          :title="opDeriv2 ? `f'' = ${opDeriv2.expr}` : ''"
-          @click="clickOp('derivative2')"
-        >
-          <span class="op-label">f''</span>
-          <span v-if="opDeriv2" class="op-preview" :class="`op-preview--${opDeriv2.outcome}`">
-            → {{ opDeriv2.expr }}
-            <span v-if="opDeriv2.outcome === 'collapse'" class="op-tag">collapses</span>
-          </span>
-        </button>
-        <button
-          :class="['btn', 'op-btn', { 'op-btn--pending': pendingOp === 'integral' }]"
-          :disabled="!canAffordOp"
-          :title="opInteg ? `∫f = ${opInteg.expr}` : ''"
-          @click="clickOp('integral')"
-        >
-          <span class="op-label">∫f</span>
-          <span v-if="opInteg" class="op-preview" :class="`op-preview--${opInteg.outcome}`">
-            → {{ opInteg.expr }}
-          </span>
+          <span class="op-label">{{ OP_LABEL[op] }}</span>
         </button>
       </div>
 
-      <!-- Two-step confirm prevents costly mis-clicks. The pending op is
-           highlighted above; this banner makes the consequences explicit
-           (especially a collapse) and offers a one-click cancel. -->
-      <div v-if="pendingOp" class="confirm-banner" :class="{
-        'confirm-banner--collapse': pendingPreview()?.outcome === 'collapse',
-      }">
-        <p class="confirm-text">
-          Apply <strong>{{ pendingLabel(pendingOp) }}</strong>
-          <span v-if="pendingPreview()"> → <code>{{ pendingPreview()?.expr }}</code></span>
-          <span v-if="pendingPreview()?.outcome === 'collapse'" class="confirm-warn">
-            — the function collapses; the tower resets to <code>f(x) = x</code>
-            (free — pick another operation after).
-          </span>
-          <span v-else class="confirm-info">— irreversible.</span>
-        </p>
-        <div class="confirm-actions">
-          <!-- Gold can drop between staging and confirming (other costs in
-               the BUILD phase). Mirror the op-button gate so a doomed click
-               can't stall on a no-op silently. -->
-          <button
-            class="btn confirm-yes"
-            :disabled="!canAffordOp"
-            @click="clickOp(pendingOp)"
-          >Confirm{{ canAffordOp ? '' : ' (need gold)' }}</button>
-          <button class="btn confirm-no" @click="cancelPending">Cancel</button>
+      <!-- The quiz: the student types the operation's result. The panel never
+           shows the answer — it only grades what is entered. A wrong answer is
+           rejected with no cost; a correct answer commits the operation. -->
+      <form v-if="selectedOp" class="op-quiz" @submit.prevent="submitAnswer">
+        <p class="quiz-prompt" data-testid="calc-quiz-prompt">{{ activePrompt }} = ?</p>
+        <p class="quiz-sub">{{ quizSubLabel }}</p>
+        <div class="quiz-entry">
+          <input
+            v-model="typedAnswer"
+            class="quiz-input"
+            type="text"
+            placeholder="e.g. 6x^2, -x, (5/2)x^3, 12"
+            data-testid="calc-answer-input"
+            @input="errorMsg = ''"
+          />
+          <button class="btn quiz-submit" type="submit" data-testid="calc-answer-submit">Apply</button>
         </div>
-      </div>
+        <p v-if="errorMsg" class="quiz-error" data-testid="calc-answer-error">{{ errorMsg }}</p>
+        <p class="quiz-hint">
+          A correct answer applies <strong>{{ activeOpLabel }}</strong><span v-if="isChainOp"> and spends {{ CALCULUS_OP_COST }}g</span>.
+          A wrong answer costs nothing — try again.
+        </p>
+        <button type="button" class="quiz-cancel" @click="cancelOp">Cancel</button>
+      </form>
     </template>
   </div>
 </template>
@@ -325,14 +293,6 @@ function pendingLabel(op: CalcOp): string {
   font-family: var(--font-sans, inherit);
 }
 .trait-label { font-weight: 600; }
-.preset-deriv {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-  opacity: 0.6;
-  font-size: var(--text-2xs);
-}
-.preset-deriv--warn { color: var(--hp-red); }
 
 .trait-dot {
   display: inline-block;
@@ -376,47 +336,20 @@ function pendingLabel(op: CalcOp): string {
 .op-btn {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  font-size: var(--text-xs);
-  padding: 6px 4px;
+  justify-content: center;
+  padding: 8px 4px;
 }
 .op-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.op-btn--pending {
+.op-btn--active {
   border-color: var(--gold-bright);
   background: rgba(255, 215, 0, 0.18);
   box-shadow: inset 0 0 0 1px var(--gold-bright);
-  animation: op-btn-pulse 1.2s ease-in-out infinite;
-}
-@keyframes op-btn-pulse {
-  0%, 100% { box-shadow: inset 0 0 0 1px var(--gold-bright); }
-  50%      { box-shadow: inset 0 0 0 1px var(--gold-bright), 0 0 8px rgba(255, 215, 0, 0.5); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .op-btn--pending { animation: none; }
 }
 .op-label { font-size: var(--text-lg); font-family: var(--font-mono); }
-.op-preview {
-  font-size: var(--text-2xs);
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-  opacity: 0.7;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-}
-.op-preview--collapse { color: var(--gold); }
-.op-tag {
-  font-family: var(--font-sans, inherit);
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
-.confirm-banner {
-  margin-top: 4px;
+.op-quiz {
+  margin-top: 2px;
   padding: 8px 10px;
   border-radius: 4px;
   background: rgba(212, 168, 64, 0.1);
@@ -425,31 +358,48 @@ function pendingLabel(op: CalcOp): string {
   flex-direction: column;
   gap: 6px;
 }
-.confirm-banner--collapse {
-  background: rgba(212, 168, 64, 0.15);
-  border-color: var(--gold-bright);
-}
-.confirm-text {
+.quiz-prompt {
   font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--gold-bright);
   margin: 0;
-  color: var(--text-primary);
   line-height: 1.4;
 }
-.confirm-text code {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 1px 4px;
-  border-radius: 3px;
-  color: var(--gold-bright);
-  font-family: var(--font-mono);
+.quiz-sub {
+  font-size: var(--text-2xs);
+  color: var(--text-primary);
+  opacity: 0.7;
+  margin: 0;
 }
-.confirm-warn { color: var(--gold); }
-.confirm-info { color: var(--gold); }
-.confirm-actions { display: flex; gap: 6px; justify-content: flex-end; }
-.confirm-yes,
-.confirm-no {
+.quiz-entry { display: flex; gap: 6px; }
+.quiz-input {
+  flex: 1;
+  padding: 6px;
   font-size: var(--text-xs);
-  padding: 6px 12px;
-  min-height: 32px;
+  font-family: var(--font-mono);
+  background: var(--stone-dark);
+  color: #ffffff;
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+}
+.quiz-submit { font-size: var(--text-xs); padding: 6px 12px; }
+.quiz-error { font-size: var(--text-xs); color: #ff7a7a; margin: 0; }
+.quiz-hint {
+  font-size: var(--text-2xs);
+  color: var(--text-primary);
+  opacity: 0.6;
+  margin: 0;
+  line-height: 1.4;
+}
+.quiz-cancel {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font-size: var(--text-xs);
+  color: var(--axis);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .minimal-hint {

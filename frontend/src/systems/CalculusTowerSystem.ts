@@ -1,9 +1,11 @@
 import { Events, TowerType } from '@/data/constants'
 import { hashStr, mulberry32 } from '@/math/RandomUtils'
+import { applyCalcOp } from '@/math/monomial'
 import { spawnPets } from '@/entities/PetFactory'
 import { formatCoefficient } from '@/utils/formatters'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
+import type { CalcOp } from '@/math/monomial'
 
 export const CALCULUS_OP_COST = 50
 
@@ -31,7 +33,7 @@ export class CalculusTowerSystem {
       game.eventBus.on(Events.CALCULUS_OPERATION, (payload: {
         towerId: string
         presetIndex?: number
-        operation?: 'derivative' | 'derivative2' | 'integral'
+        operation?: CalcOp
       }) => {
         const tower = game.towers.find((t) => t.id === payload.towerId)
         if (!tower || tower.type !== TowerType.CALCULUS) return
@@ -128,26 +130,16 @@ export class CalculusTowerSystem {
   // to the minimal f(x) = x so the student can immediately try another op.
   private _applyOperation(
     tower: Tower,
-    op: 'derivative' | 'derivative2' | 'integral',
+    op: CalcOp,
     game: Game,
   ): 'ok' | 'collapsed' {
     const state = tower.calculusState!
-    let newCoeff: number
-    let newExp: number
+    const { coefficient: newCoeff, exponent: newExp, collapsed } = applyCalcOp(
+      { coefficient: state.coefficient, exponent: state.exponent },
+      op,
+    )
 
-    if (op === 'derivative') {
-      newCoeff = state.coefficient * state.exponent
-      newExp = state.exponent - 1
-    } else if (op === 'derivative2') {
-      newCoeff = state.coefficient * state.exponent * (state.exponent - 1)
-      newExp = state.exponent - 2
-    } else {
-      const integratedCoeff = state.coefficient / (state.exponent + 1)
-      newCoeff = Math.round(integratedCoeff * 1e12) / 1e12
-      newExp = state.exponent + 1
-    }
-
-    if (newCoeff === 0 || (op === 'derivative' && state.exponent === 0) || newExp === 0) {
+    if (collapsed) {
       state.coefficient = 1
       state.exponent = 1
       state.currentExpr = 'x'

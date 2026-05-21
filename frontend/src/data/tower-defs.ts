@@ -174,7 +174,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     range: 10,
     cooldown: 0,
     unlockLevel: 3,
-    description: 'Choose a function, then derivative or integral. Result C*x^n spawns C pets with trait based on n.',
+    description: 'Choose a function, then solve its derivative or integral. Result C*x^n spawns C pets with trait based on n.',
     mathConcept: 'Derivatives, integrals, power rule',
     examRelevance: 'Differentiation and integration of polynomials are on AP Calculus AB Section I.',
     glyph: '∫',
