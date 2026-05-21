@@ -22,7 +22,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 50 / 5 / 6 / 0.5 s
 - **Math:** radian arcs, sector area
 - **Unlocked from:** Star 1
-- **Mechanic:** sweeps a continuous AoE arc around the tower; enemies inside the arc take damage on every tick the sweep crosses them.
+- **Mechanic:** a needle sweeps a continuous **full 360°** circle; any enemy in range takes AoE damage every tick the needle crosses it. The configurable arc does not steer the sweep — it only marks the ×1.5 focus sector (see below).
 - **Tier 2/3:** sweep speed +20% / +40%; Tier 3 also widens the AoE band by +30%.
 - **Pick when:** the path makes a tight wrap around a small region — you cover it with one tower.
 
@@ -31,7 +31,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 65 / 8 / 7 / 0.3 s
 - **Math:** radian arcs
 - **Unlocked from:** Star 2
-- **Mechanic:** fast single-target shots within its restricted arc. The shortest cooldown in the roster.
+- **Mechanic:** fast single-target shots — the shortest cooldown in the roster. Fires in every direction by default; the arc adds a ×1.5 focus sector, or restricts targeting to that sector when toggled on (see below).
 - **Tier 2/3:** simultaneous target count +1 / +2.
 - **Pick when:** lots of small, fast enemies in a corridor.
 
@@ -40,9 +40,11 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 90 / 40 / 12 / 2.5 s
 - **Math:** radian arcs
 - **Unlocked from:** Star 2
-- **Mechanic:** slow, very heavy single-target shots at long range. The longest range and the heaviest base damage in the roster.
+- **Mechanic:** slow, very heavy single-target shots at long range — the longest range and the heaviest base damage in the roster. Shots **lead** moving targets (aim ahead of them). Uses the arc for a ×1.5 focus sector and an optional restriction (see below).
 - **Tier 2/3:** +10% / +20% crit chance, plus +50% crit damage at Tier 3.
 - **Pick when:** the path has one chokepoint a long way from a placeable cell — and you want every shot to count.
+
+**Radar arc (A / B / C).** Each radar has a configurable angular sector, set in its panel in degrees. Enemies inside it take **×1.5 damage** — a focus-fire bonus that is always on, even on the default 0°–90° sector. The **Restrict attacks to arc** checkbox is optional: off (the default) leaves the tower firing in every direction with the arc as a pure bonus zone; on makes the tower ignore every enemy outside the sector. For full-circle coverage, set Arc Start 0° and Arc End 360°.
 
 ### Matrix Tower — ⊞
 

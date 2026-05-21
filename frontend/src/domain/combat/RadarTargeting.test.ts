@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { TowerType } from '@/data/constants'
-import { interceptPoint, radarProjectileSpeed } from './RadarTargeting'
+import { interceptPoint, radarProjectileSpeed, isAngleInArc } from './RadarTargeting'
 import type { Enemy } from '@/entities/types'
 
 function enemyAt(x: number, y: number, vx = 0, vy = 0): Enemy {
@@ -84,5 +84,41 @@ describe('interceptPoint', () => {
     const aim = interceptPoint(0, 0, enemyAt(5, 0, 20, 0), 10)
     expect(aim.x).toBe(5)
     expect(aim.y).toBe(0)
+  })
+})
+
+const DEG = Math.PI / 180
+
+describe('isAngleInArc', () => {
+  it('plain quadrant arc 0°→90° includes the inside, excludes the outside', () => {
+    expect(isAngleInArc(45 * DEG, 0, 90 * DEG)).toBe(true)
+    expect(isAngleInArc(135 * DEG, 0, 90 * DEG)).toBe(false)
+  })
+
+  it('full 0°→360° arc covers every angle (regression: used to collapse to one ray)', () => {
+    for (const deg of [0, 45, 90, 180, 270, 359]) {
+      expect(isAngleInArc(deg * DEG, 0, 360 * DEG)).toBe(true)
+    }
+  })
+
+  it('full circle still works when wound the other way (360°→0°)', () => {
+    expect(isAngleInArc(123 * DEG, 360 * DEG, 0)).toBe(true)
+  })
+
+  it('arc that wraps past 0° (270°→90°) includes 0°, excludes 180°', () => {
+    expect(isAngleInArc(0, 270 * DEG, 90 * DEG)).toBe(true)
+    expect(isAngleInArc(180 * DEG, 270 * DEG, 90 * DEG)).toBe(false)
+  })
+
+  it('zero-width arc (start === end) stays zero-width, matching the renderer', () => {
+    expect(isAngleInArc(45 * DEG, 45 * DEG, 45 * DEG)).toBe(true)
+    expect(isAngleInArc(46 * DEG, 45 * DEG, 45 * DEG)).toBe(false)
+  })
+
+  it('handles the negative angles atan2 produces', () => {
+    // atan2 returns (-π, π]; an enemy below-right of the tower yields a
+    // negative angle that must still test against an upper-half arc correctly.
+    expect(isAngleInArc(-45 * DEG, 270 * DEG, 360 * DEG)).toBe(true)
+    expect(isAngleInArc(-45 * DEG, 0, 90 * DEG)).toBe(false)
   })
 })

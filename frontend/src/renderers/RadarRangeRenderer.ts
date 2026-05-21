@@ -37,14 +37,23 @@ export class RadarRangeRenderer {
     const arcStart = tower.arcStart ?? 0
     const arcEnd = tower.arcEnd ?? Math.PI / 2
 
+    // When arcRestrict is on the tower never fires outside the sector, so the
+    // overlay must read differently from a plain focus arc: the full-range ring
+    // recedes (faint + dashed) and the sector's radial edges become solid
+    // "walls". With restrict off the ring stays prominent — the tower still
+    // shoots everywhere and the arc is only the ×1.5 bonus zone.
+    const restricted = tower.arcRestrict ?? false
+
     ctx.save()
-    ctx.strokeStyle = `${color}44`
+    ctx.strokeStyle = restricted ? `${color}22` : `${color}44`
     ctx.lineWidth = 1
+    if (restricted) ctx.setLineDash([3, 5])
     ctx.beginPath()
     ctx.arc(px, py, radiusPx, 0, Math.PI * 2)
     ctx.stroke()
+    ctx.setLineDash([])
 
-    ctx.fillStyle = `${color}22`
+    ctx.fillStyle = restricted ? `${color}33` : `${color}22`
     ctx.beginPath()
     ctx.moveTo(px, py)
     ctx.arc(px, py, radiusPx, -arcEnd, -arcStart)
@@ -56,6 +65,19 @@ export class RadarRangeRenderer {
     ctx.beginPath()
     ctx.arc(px, py, radiusPx, -arcEnd, -arcStart)
     ctx.stroke()
+
+    if (restricted) {
+      // Solid radial walls at the sector edges — the cue that enemies outside
+      // the wedge are ignored entirely, not merely denied the focus bonus.
+      ctx.strokeStyle = `${color}cc`
+      ctx.lineWidth = 2
+      for (const a of [-arcStart, -arcEnd]) {
+        ctx.beginPath()
+        ctx.moveTo(px, py)
+        ctx.lineTo(px + Math.cos(a) * radiusPx, py + Math.sin(a) * radiusPx)
+        ctx.stroke()
+      }
+    }
 
     if (tower.type === TowerType.RADAR_A) {
       ctx.strokeStyle = `${color}cc`

@@ -1,7 +1,7 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
-import { interceptPoint, radarProjectileSpeed, selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
+import { interceptPoint, radarProjectileSpeed, selectRadarTargets, radarTargetCount, isAngleInArc } from '@/domain/combat/RadarTargeting'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy, Projectile, TargetingMode } from '@/entities/types'
 
@@ -70,7 +70,6 @@ export class RadarTowerSystem {
 
     const range = tower.effectiveRange
     const aoeWidth = 0.5 + (tower.upgradeExtras?.['aoeWidth'] ?? 0)
-    const arcBonus = this._getArcBonus(tower, angle)
 
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
@@ -81,6 +80,11 @@ export class RadarTowerSystem {
       const enemyAngle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
       const angleDiff = Math.abs(normalizeAngle(enemyAngle - angle))
       if (angleDiff < aoeWidth) {
+        // Focus-sector bonus keyed on the ENEMY's angle, not the sweep
+        // needle's — same basis as RADAR_B/C (_getArcBonusForTarget), so all
+        // three radars agree on what "inside the arc" means. Keying it on the
+        // needle smeared the ×1.5 across the arc edge by ±aoeWidth.
+        const arcBonus = this._getArcBonus(tower, enemyAngle)
         this._dealDamage(enemy, tower.effectiveDamage * arcBonus * dt, game)
       }
     }
@@ -172,16 +176,12 @@ export class RadarTowerSystem {
 
 }
 
+// Difference helper for RADAR_A's sweep band — maps an angle delta into
+// (-π, π] so `Math.abs(diff) < aoeWidth` measures the true gap. Distinct from
+// isAngleInArc (a [0, 2π) containment test); kept local because only the sweep
+// uses it.
 function normalizeAngle(a: number): number {
   while (a > Math.PI) a -= 2 * Math.PI
   while (a < -Math.PI) a += 2 * Math.PI
   return a
-}
-
-function isAngleInArc(angle: number, start: number, end: number): boolean {
-  let a = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-  let s = ((start % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-  let e = ((end % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-  if (s <= e) return a >= s && a <= e
-  return a >= s || a <= e
 }

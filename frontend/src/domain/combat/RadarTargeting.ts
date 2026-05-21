@@ -106,10 +106,24 @@ function isInArc(tower: Tower, enemy: Enemy): boolean {
   return isAngleInArc(angle, tower.arcStart ?? 0, tower.arcEnd ?? Math.PI / 2)
 }
 
-function isAngleInArc(angle: number, start: number, end: number): boolean {
-  const a = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-  const s = ((start % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-  const e = ((end % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-  if (s <= e) return a >= s && a <= e
-  return a >= s || a <= e
+// Containment test for the configurable radar arc. Exported so RadarTowerSystem
+// (arc damage bonus + attack restriction) shares this exact definition — the
+// firing side and the target filter cannot drift apart.
+//
+// The arc is a counter-clockwise span FROM `start`. We deliberately do NOT
+// normalize `start` and `end` into [0, 2π) independently before comparing:
+// that collapses a full 0°→360° arc — a player setting Arc Start 0, Arc End
+// 360 to "cover everything" — down to a single zero-width ray at angle 0,
+// because both endpoints normalize to the same value. Measuring the raw span
+// keeps a full circle full. A genuine zero-width arc (start === end) stays
+// zero-width, matching what RadarRangeRenderer draws.
+export function isAngleInArc(angle: number, start: number, end: number): boolean {
+  const TWO_PI = 2 * Math.PI
+  const rawSpan = end - start
+  // |span| ≥ 2π means the arc covers the whole circle (in either winding).
+  if (Math.abs(rawSpan) >= TWO_PI - 1e-9) return true
+  let span = rawSpan
+  if (span < 0) span += TWO_PI // end < start → the arc wraps once past 0
+  const rel = (((angle - start) % TWO_PI) + TWO_PI) % TWO_PI
+  return rel <= span
 }
