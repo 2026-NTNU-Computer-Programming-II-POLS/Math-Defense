@@ -15,7 +15,7 @@ class UserRepository(Protocol):
 
     def find_by_ids(self, user_ids: list[str]) -> list[User]: pass
 
-    def find_by_role(self, role: Role, limit: int = 10000) -> list[User]: pass
+    def count_active_by_role(self, role: Role) -> int: pass
 
     def find_by_role_paginated(self, role: Role, offset: int, limit: int) -> tuple[list[User], int]: pass
 

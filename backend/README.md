@@ -329,8 +329,8 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 |---|---|---|
 | `400` | `SessionValidationError`, `MFANotSetupError`, `NotAStudentError` | Generic validation / pre-condition failure |
 | `401` | `InvalidCredentialsError`, `InvalidTokenError`, `InvalidMFACodeError` | Bad credentials / token / TOTP code |
-| `403` | `PermissionDeniedError`, `Star5LockedError`, `AccountDisabledError`, `EmailNotVerifiedError`, `UserNotFoundError`, `NotClassOwnerError`, `NotActivityOwnerError`, `StudentRemovedFromClassError` | Not authorised |
-| `404` | `SessionNotFoundError`, `ChallengeNotFoundError`, `ClassNotFoundError`, `ActivityNotFoundError`, `SlotNotFoundError`, `InvalidJoinCodeError`, `StudentEmailNotFoundError`, `StudentNotInClassError` | Resource missing |
+| `403` | `PermissionDeniedError`, `Star5LockedError`, `AccountDisabledError`, `EmailNotVerifiedError`, `NotClassOwnerError`, `NotActivityOwnerError`, `StudentRemovedFromClassError` | Not authorised |
+| `404` | `SessionNotFoundError`, `ChallengeNotFoundError`, `ClassNotFoundError`, `ActivityNotFoundError`, `SlotNotFoundError`, `InvalidJoinCodeError`, `StudentEmailNotFoundError`, `StudentNotInClassError`, `UserNotFoundError` | Resource missing |
 | `409` | `UsernameTakenError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `DuplicateSubmissionError`, `MFAAlreadyEnabledError`, `ChallengeImmutableError`, `InsufficientTalentPointsError`, `PrerequisiteNotMetError`, `MaxLevelReachedError`, `TalentNodeNotFoundError`, `ConstraintViolationError`, `ActivityExpiredError`, `ActivityAlreadySettledError`, `TerritoryCapReachedError`, `ScoreNotHighEnoughError`, `StudentAlreadyInClassError`, `ClassNameConflictError` | Conflict / state |
 | `410` | `SessionStaleError` | Session > 2h active — auto-abandoned before raise |
 | `422` | `DomainValueError`, `ReplayMismatchError` (`detail: "replay_mismatch"`), `InvalidSessionError`, `ClassNameInvalidError` | Value-level invariant. v2 strict tolerance is `1e-4`; v1 sessions log a warning and overwrite client value with server value instead of rejecting. |

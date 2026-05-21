@@ -302,12 +302,12 @@ def test_season_award_doubled(client, monkeypatch):
     assert star1["unlocked"] is True
     assert star1["season_id"] == "spring_2026"
     assert star1["season_active"] is True
-    # Stored reward must reflect the 2x multiplier — base talent_points=1 → 2.
-    other_unlocked = sum(
-        e["talent_points"] for e in achievements
-        if e["unlocked"] and e["id"] != "explore_star_1"
-    )
-    assert summary["talent_points_earned"] == other_unlocked + seasoned.talent_points * 2
+    # The list endpoint reports each achievement's *effective* talent points
+    # (2x for a season unlock — base talent_points=1 → 2), so summing unlocked
+    # entries matches the summary with no per-achievement special-casing.
+    assert star1["talent_points"] == seasoned.talent_points * 2
+    list_total = sum(e["talent_points"] for e in achievements if e["unlocked"])
+    assert summary["talent_points_earned"] == list_total
 
 
 def test_season_inactive_normal_award(client, monkeypatch):
@@ -329,9 +329,8 @@ def test_season_inactive_normal_award(client, monkeypatch):
     star1 = next(e for e in achievements if e["id"] == "explore_star_1")
     assert star1["unlocked"] is True
     assert star1["season_active"] is False
-    other_unlocked = sum(
-        e["talent_points"] for e in achievements
-        if e["unlocked"] and e["id"] != "explore_star_1"
-    )
-    # No multiplier — points equal the def's base value.
-    assert summary["talent_points_earned"] == other_unlocked + seasoned.talent_points
+    # No multiplier — the seasonal achievement reports its base value, and the
+    # per-achievement totals still sum to the summary's talent_points_earned.
+    assert star1["talent_points"] == seasoned.talent_points
+    list_total = sum(e["talent_points"] for e in achievements if e["unlocked"])
+    assert summary["talent_points_earned"] == list_total

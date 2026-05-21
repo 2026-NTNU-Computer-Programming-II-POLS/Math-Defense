@@ -137,7 +137,9 @@ export const useGameStore = defineStore('game', () => {
   const isWave = computed(() => phase.value === GamePhase.WAVE)
   const isBuff = computed(() => phase.value === GamePhase.BUFF_SELECT)
   const isMontyHall = computed(() => phase.value === GamePhase.MONTY_HALL)
-  const hpPercent = computed(() => (hp.value / maxHp.value) * 100)
+  // Guard the divisor: a misconfigured level or engine bug leaving maxHp at 0
+  // would otherwise make every health-bar binding render NaN/Infinity.
+  const hpPercent = computed(() => (hp.value / Math.max(1, maxHp.value)) * 100)
 
   const activeTime = computed(() => {
     const prepSum = timeExcludePrepare.value.reduce((a, b) => a + b, 0)

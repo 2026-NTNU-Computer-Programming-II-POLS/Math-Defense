@@ -5,6 +5,9 @@ export interface AchievementOut {
   name: string
   description: string
   category: string
+  // Effective talent points: banked reward for an unlocked achievement (2x for
+  // a season unlock) or the prospective reward while still locked. Summing this
+  // over unlocked entries equals AchievementSummary.talent_points_earned.
   talent_points: number
   unlocked: boolean
   unlocked_at: string | null

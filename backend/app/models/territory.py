@@ -115,5 +115,10 @@ class TerritorySessionUse(Base):
     __tablename__ = "territory_session_uses"
 
     session_id: Mapped[str] = mapped_column(
-        String, ForeignKey("game_sessions.id", ondelete="RESTRICT"), primary_key=True,
+        # ON DELETE CASCADE: GameSession.user_id cascades from users, so a
+        # RESTRICT here would block deleting any user who ever captured
+        # territory. Once the game_session row itself is gone there is no
+        # rng_seed / session_events left to replay, so the use-record has
+        # nothing left to protect.
+        String, ForeignKey("game_sessions.id", ondelete="CASCADE"), primary_key=True,
     )

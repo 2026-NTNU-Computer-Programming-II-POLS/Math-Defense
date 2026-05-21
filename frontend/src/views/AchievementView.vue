@@ -119,7 +119,7 @@ onMounted(async () => {
           </div>
           <div class="ach-desc">{{ a.description }}</div>
           <div class="ach-meta">
-            <span class="ach-tp">+{{ a.season_active ? a.talent_points * 2 : a.talent_points }} TP</span>
+            <span class="ach-tp">+{{ a.talent_points }} TP</span>
             <span v-if="a.season_id && a.season_ends_at" class="ach-date">
               {{ a.season_active ? 'ends' : 'ended' }} {{ formatEndDate(a.season_ends_at) }}
             </span>

@@ -56,6 +56,13 @@ jobs:
             --ignore-vuln PYSEC-2025-183 \
             --ignore-vuln PYSEC-2024-311 \
             --ignore-vuln PYSEC-2026-151
+      - name: Verify WASM runtime loads
+        # Backend WASM-dependent tests (test_wasm_runtime, test_score_verify)
+        # skip silently when is_wasm_loaded() is False — a missing or corrupt
+        # committed math_engine.wasm, or a broken wasmtime install, would leave
+        # the bit-exact score-verification contract unverified while CI stays
+        # green. Fail loudly here instead of letting those tests skip.
+        run: python -c "from app.infrastructure.wasm_runtime import is_wasm_loaded; assert is_wasm_loaded(), 'WASM runtime failed to load; see wasm_runtime logs'"
       - name: pytest
         env:
           SECRET_KEY: ci-placeholder-secret-key-not-used-in-prod
@@ -87,6 +94,12 @@ jobs:
         uses: mymindstorm/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
       - name: Build WASM
         run: npm run prebuild
+      - name: Verify WASM artifact
+        # npm run prebuild can exit 0 yet emit a binary missing an export, which
+        # makes WasmBridge silently fall back to JS and quietly breaks the FU-A
+        # bit-exact score contract. Instantiate the artifact and assert every
+        # wasm/Makefile EXPORTED_FUNCTIONS symbol is present.
+        run: npm run verify-wasm
       - name: Type-check
         run: npx vue-tsc -b
       - name: Arch check

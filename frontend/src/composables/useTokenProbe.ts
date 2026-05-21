@@ -1,4 +1,4 @@
-import type { Ref } from 'vue'
+import { onScopeDispose, type Ref } from 'vue'
 import { authService } from '@/services/authService'
 
 const TOKEN_PROBE_INTERVAL_MS = 60_000
@@ -59,6 +59,12 @@ export function useTokenProbe(user: Ref<unknown | null>) {
       pageShowListener = null
     }
   }
+
+  // start()/stop() are paired on login/logout, but if the owning effect
+  // scope (the auth store) is disposed without an explicit stop() — e.g.
+  // test teardown or SSR — the interval and window listeners would leak.
+  // onScopeDispose runs stop() on scope teardown as a safety net.
+  onScopeDispose(stop)
 
   return { start, stop }
 }

@@ -15,6 +15,7 @@ from app.application.session_service import (
     SessionNotFoundError,
 )
 from app.db.database import get_db
+from app.domain.constraints import HP_MAX
 from app.domain.session.aggregate import (
     GameSession as DomainGameSession,
     SessionNotActiveError,
@@ -234,7 +235,7 @@ class TestAbuseCases:
         """If a non-HTTP caller bypassed the schema, the aggregate must still clamp."""
         s = DomainGameSession.create("u-1", Level(1))
         s.update_progress(hp=999)
-        assert s.hp == 100  # _MAX_HP
+        assert s.hp == HP_MAX
         s.update_progress(hp=-50)  # would never reach here from HTTP, but defensive:
         assert s.hp == 0
 

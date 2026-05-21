@@ -23,6 +23,12 @@ _FIXTURES = (
     Path(__file__).resolve().parents[2] / "shared" / "score_parity_fixtures.json"
 )
 
+# Shared cross-implementation parity tolerance — kept identical to
+# frontend/src/domain/scoring/score-calculator.parity.test.ts. Both suites
+# compare the raw formula output against the same fixtures, so the only
+# admissible difference is last-ULP pow variance across libm implementations.
+_PARITY_TOLERANCE = 1e-12
+
 
 def test_python_matches_shared_fixtures() -> None:
     with _FIXTURES.open("r", encoding="utf-8") as f:
@@ -34,6 +40,6 @@ def test_python_matches_shared_fixtures() -> None:
             assert actual is None, f"expected None, got {actual!r} for {case['input']}"
             continue
         assert actual is not None, f"expected {expected!r}, got None for {case['input']}"
-        assert abs(actual - expected) < 1e-12, (
+        assert abs(actual - expected) < _PARITY_TOLERANCE, (
             f"score drift on case {case['input']}: actual={actual!r} expected={expected!r}"
         )

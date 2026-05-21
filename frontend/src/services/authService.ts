@@ -2,11 +2,13 @@ import { api, readCookie, CSRF_COOKIE_NAME, CSRF_HEADER_NAME, REQUEST_TIMEOUT_MS
 
 export interface TokenResponse {
   token_type: string
-  id: string
-  email: string
-  player_name: string
-  role: string
-  avatar_url: string | null
+  // Identity fields are absent on an MFA-challenge response (mfa_required:
+  // true); they are present only once login completes.
+  id?: string
+  email?: string
+  player_name?: string
+  role?: string
+  avatar_url?: string | null
   mfa_required?: boolean
   mfa_token?: string | null
 }

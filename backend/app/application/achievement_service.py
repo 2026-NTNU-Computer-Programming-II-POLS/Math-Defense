@@ -39,14 +39,27 @@ class AchievementApplicationService:
         result = []
         for d in get_all_defs():
             season_info = self._season_info_for_def(d, seasons_by_id, now)
+            is_unlocked = d.id in unlocked
+            # Report the *effective* talent points so a client can sum this
+            # field across unlocked achievements and match the /summary
+            # endpoint's talent_points_earned. An unlocked achievement reports
+            # the reward actually banked (already doubled if it was unlocked
+            # during an active season); a still-locked one reports what
+            # unlocking it now would grant. Returning the raw definition value
+            # here would understate seasonal rewards versus the summary.
+            effective_points = (
+                unlocked[d.id].talent_points
+                if is_unlocked
+                else self._award_points(d, seasons_by_id, now)
+            )
             result.append({
                 "id": d.id,
                 "name": d.name,
                 "description": d.description,
                 "category": d.category,
-                "talent_points": d.talent_points,
-                "unlocked": d.id in unlocked,
-                "unlocked_at": unlocked[d.id].unlocked_at.isoformat() if d.id in unlocked else None,
+                "talent_points": effective_points,
+                "unlocked": is_unlocked,
+                "unlocked_at": unlocked[d.id].unlocked_at.isoformat() if is_unlocked else None,
                 "season_id": d.season_id,
                 "season_active": season_info["active"] if season_info else False,
                 "season_starts_at": (

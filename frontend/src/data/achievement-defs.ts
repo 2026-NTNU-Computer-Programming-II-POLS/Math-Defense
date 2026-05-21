@@ -36,11 +36,14 @@ export const ACHIEVEMENT_DEFS: Record<string, AchievementDef> = {
   survival_waves_5:   { id: 'survival_waves_5', name: 'Endurance', description: 'Survive 5 waves in one session', category: 'survival', talentPoints: 2, icon: '♥' },
   survival_total_waves_20: { id: 'survival_total_waves_20', name: 'Marathon', description: 'Survive 20 waves total', category: 'survival', talentPoints: 2, icon: '♥' },
 
-  efficiency_low_spend: { id: 'efficiency_low_spend', name: 'Frugal Commander', description: 'Complete a session with score > 500 and gold > 100', category: 'efficiency', talentPoints: 2, icon: '$' },
+  efficiency_low_spend: { id: 'efficiency_low_spend', name: 'Frugal Commander', description: 'Complete a session with score > 500 and gold remaining > 100', category: 'efficiency', talentPoints: 2, icon: '$' },
 
   explore_star_1:     { id: 'explore_star_1', name: 'First Steps', description: 'Complete a 1-star level', category: 'exploration', talentPoints: 1, icon: '?' },
   explore_star_3:     { id: 'explore_star_3', name: 'Intermediate', description: 'Complete a 3-star level', category: 'exploration', talentPoints: 1, icon: '?' },
   explore_star_5:     { id: 'explore_star_5', name: 'Expert', description: 'Complete a 5-star level', category: 'exploration', talentPoints: 2, icon: '?' },
+  // max_star_cleared milestones — fill the star-2 and star-4 progression gaps.
+  explore_reach_star_2: { id: 'explore_reach_star_2', name: 'Rising Challenger', description: 'Clear a level at difficulty 2 or higher', category: 'exploration', talentPoints: 1, icon: '?' },
+  explore_reach_star_4: { id: 'explore_reach_star_4', name: 'Hardened Veteran', description: 'Clear a level at difficulty 4 or higher', category: 'exploration', talentPoints: 2, icon: '?' },
   explore_all_stars:  { id: 'explore_all_stars', name: 'Cartographer', description: 'Play at every star rating (1-5)', category: 'exploration', talentPoints: 3, icon: '?' },
   explore_sessions_5: { id: 'explore_sessions_5', name: 'Regular', description: 'Complete 5 sessions', category: 'exploration', talentPoints: 1, icon: '?' },
   explore_sessions_20: { id: 'explore_sessions_20', name: 'Dedicated', description: 'Complete 20 sessions', category: 'exploration', talentPoints: 2, icon: '?' },

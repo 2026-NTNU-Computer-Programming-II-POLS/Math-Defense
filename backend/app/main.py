@@ -27,6 +27,7 @@ from app.middleware.csrf import CsrfMiddleware
 from app.routers import achievement, admin, assessment, auth, challenge, class_, leaderboard, game_session, recommendation, replay, study, talent, territory
 from app.limiter import limiter
 from app.seed import ensure_demo_user
+from app.utils.encryption import verify_key_configured
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,6 +75,9 @@ async def _auth_store_janitor() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Fail fast on a missing/malformed TOTP_ENCRYPTION_KEY rather than letting
+    # the misconfiguration surface as a 500 on the first MFA-related request.
+    verify_key_configured()
     # Use a PostgreSQL advisory lock to serialise migrations across concurrent
     # workers. Only one worker runs `upgrade head`; the rest wait for the lock
     # and then proceed (the upgrade is a no-op when already at head).

@@ -136,14 +136,9 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
         if mfa_required:
             logger.info("MFA challenge issued: anon=%s", _anon(str(user.id)))
             record_audit_event(request, "LOGIN_MFA_REQUIRED", user.id, {"email_anon": _anon(req.email)})
-            return TokenResponse(
-                id="",
-                email="",
-                player_name="",
-                role="",
-                mfa_required=True,
-                mfa_token=token,
-            )
+            # Identity fields are omitted: the caller is not authenticated
+            # until the MFA challenge is solved at /mfa/challenge.
+            return TokenResponse(mfa_required=True, mfa_token=token)
         logger.info("User logged in: anon=%s", _anon(str(user.id)))
         record_audit_event(request, "LOGIN_SUCCESS", user.id, {"email_anon": _anon(req.email)})
         _set_auth_cookie(response, token)

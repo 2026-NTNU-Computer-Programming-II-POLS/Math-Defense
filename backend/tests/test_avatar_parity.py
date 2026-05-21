@@ -21,10 +21,10 @@ def _parse_frontend_avatars() -> frozenset[str]:
 def test_avatar_whitelist_matches_frontend():
     if not _FRONTEND_VIEW.exists():
         pytest.skip("Frontend source not available in this environment")
-    from app.schemas.auth import _ALLOWED_AVATAR_URLS  # noqa: PLC2701
+    from app.domain.user.constraints import ALLOWED_AVATAR_URLS
     frontend = _parse_frontend_avatars()
-    backend_only = _ALLOWED_AVATAR_URLS - frontend
-    frontend_only = frontend - _ALLOWED_AVATAR_URLS
+    backend_only = ALLOWED_AVATAR_URLS - frontend
+    frontend_only = frontend - ALLOWED_AVATAR_URLS
     assert not backend_only and not frontend_only, (
         f"Avatar mismatch — backend only: {backend_only}, frontend only: {frontend_only}"
     )

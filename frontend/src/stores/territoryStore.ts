@@ -115,6 +115,13 @@ export const useTerritoryStore = defineStore('territory', () => {
     }
   }
 
+  // Reset only the detail slice. Used when switching between activities so a
+  // stale detail (or stale error) doesn't flash before the new load resolves.
+  function clearDetail(): void {
+    currentDetail.value = null
+    errorDetail.value = ''
+  }
+
   function clear(): void {
     activities.value = []
     currentDetail.value = null
@@ -149,6 +156,7 @@ export const useTerritoryStore = defineStore('territory', () => {
     loadRankings,
     loadRankingsWithMeta,
     settleActivity,
+    clearDetail,
     clear,
   }
 })

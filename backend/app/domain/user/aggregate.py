@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, UTC
 
 from app.domain.user.constraints import (
+    ALLOWED_AVATAR_URLS,
     PLAYER_NAME_MAX_LENGTH,
     PLAYER_NAME_MIN_LENGTH,
 )
@@ -117,8 +118,11 @@ class User:
     def update_avatar(self, avatar_url: str | None) -> None:
         """Validate and assign a new avatar URL (B-BUG-19).
 
-        ``None`` clears the avatar. Otherwise the URL must be non-empty and
-        within the column's storage bound.
+        ``None`` (or an empty/whitespace string) clears the avatar. Otherwise
+        the URL must be one of the application's shipped avatars. The allowlist
+        is enforced here so every caller — the HTTP schema, internal services,
+        and any future non-HTTP callers — gets the same guarantee rather than
+        relying on the Pydantic layer alone.
         """
         if avatar_url is None:
             self.avatar_url = None
@@ -133,6 +137,8 @@ class User:
             raise ValueError(
                 f"avatar_url exceeds {self.AVATAR_URL_MAX_LENGTH} characters"
             )
+        if cleaned not in ALLOWED_AVATAR_URLS:
+            raise ValueError("Invalid avatar URL")
         self.avatar_url = cleaned
 
     def update_ia_accuracy(self, value: float) -> None:

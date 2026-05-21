@@ -53,7 +53,10 @@ _STATUS_BY_CLASS: dict[type[DomainError], int] = {
     AccountLockedError: 429,
     AccountDisabledError: 403,
     InvalidTokenError: 401,
-    UserNotFoundError: 403,
+    # 404 not 401: this also fires when an authenticated admin targets a
+    # non-existent user (admin_service.set_user_active). 401 would wrongly
+    # signal "not authenticated" and could log a legitimate admin out.
+    UserNotFoundError: 404,
     EmailNotVerifiedError: 403,
     InvalidMFACodeError: 401,
     MFANotSetupError: 400,

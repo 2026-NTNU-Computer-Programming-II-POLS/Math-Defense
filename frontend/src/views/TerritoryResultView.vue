@@ -22,13 +22,18 @@ onMounted(async () => {
     return
   }
 
-  const res = await store.playSlot(activityId.value, slotId.value, sessionId)
-  if (res) {
-    const rawScore = res.occupation?.score
-    const safeScore = typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore : null
-    result.value = { seized: res.seized, score: safeScore }
+  try {
+    const res = await store.playSlot(activityId.value, slotId.value, sessionId)
+    if (res) {
+      const rawScore = res.occupation?.score
+      const safeScore = typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore : null
+      result.value = { seized: res.seized, score: safeScore }
+    }
+  } finally {
+    // Always leave the submitting state, even on an unexpected throw, so the
+    // view falls through to an error/result branch instead of a stuck spinner.
+    submitting.value = false
   }
-  submitting.value = false
 })
 
 function goBack(): void {

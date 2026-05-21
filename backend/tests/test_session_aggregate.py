@@ -15,6 +15,7 @@ from app.domain.session.events import (
     SessionAbandoned,
     SessionUpdated,
 )
+from app.shared_constants import INITIAL_GOLD, INITIAL_HP
 
 
 # ── Factory method ──
@@ -27,8 +28,8 @@ class TestCreate:
         assert session.level == 1
         assert session.status == SessionStatus.ACTIVE
         assert session.current_wave == 0
-        assert session.gold == 200
-        assert session.hp == 20
+        assert session.gold == INITIAL_GOLD
+        assert session.hp == INITIAL_HP
         assert session.score == 0
 
     def test_create_emits_session_created(self):
@@ -77,7 +78,7 @@ class TestUpdateProgress:
         session = GameSession.create("user-1", Level(1))
         session.update_progress(gold=300)
         assert session.gold == 300
-        assert session.hp == 20  # unchanged
+        assert session.hp == INITIAL_HP  # unchanged
 
     def test_update_emits_event(self):
         session = GameSession.create("user-1", Level(1))

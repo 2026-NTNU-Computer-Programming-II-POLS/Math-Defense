@@ -22,6 +22,8 @@ class ClassRepository(Protocol):
 
     def count_by_teacher(self, teacher_id: str) -> int: pass
 
+    def count_by_teacher_bulk(self, teacher_ids: list[str]) -> dict[str, int]: pass
+
     def save(self, cls_: Class) -> None: pass
 
     def delete(self, class_id: str) -> None: pass
@@ -34,7 +36,11 @@ class ClassRepository(Protocol):
 
     def count_memberships_by_class(self, class_id: str) -> int: pass
 
+    def count_memberships_by_class_bulk(self, class_ids: list[str]) -> dict[str, int]: pass
+
     def count_memberships_by_student(self, student_id: str) -> int: pass
+
+    def count_memberships_by_student_bulk(self, student_ids: list[str]) -> dict[str, int]: pass
 
     def save_membership(self, membership: ClassMembership) -> None: pass
 

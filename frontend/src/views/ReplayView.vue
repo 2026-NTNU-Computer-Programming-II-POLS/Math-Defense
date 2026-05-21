@@ -142,7 +142,9 @@ async function wireEngine(): Promise<void> {
   })
 
   // Mirror score for the HUD overlay so the viewer can see the live
-  // simulation score climb back to the recorded final score.
+  // simulation score climb back to the recorded final score. Drop any prior
+  // subscription first so a repeat wireEngine call can't orphan a listener.
+  unsubScore?.()
   unsubScore = g.eventBus.on(Events.SCORE_CHANGED, (score) => {
     liveScore.value = score
   })

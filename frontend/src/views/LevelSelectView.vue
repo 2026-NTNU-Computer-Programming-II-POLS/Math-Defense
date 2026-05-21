@@ -59,7 +59,9 @@ function isStarLocked(star: number): boolean {
 // Pull the latest profile once on entry so an unlock earned in the previous
 // session takes effect without a full reload (Pedagogical_Backlog_Spec §5.3).
 onMounted(async () => {
-  authStore.refreshProfile()
+  // Fire-and-forget: refreshProfile swallows its own errors internally, so
+  // the returned promise never rejects. void marks the intent explicitly.
+  void authStore.refreshProfile()
   // Recommendation fetch is best-effort — a failure (network, 401, anything)
   // must not block level selection.
   try {

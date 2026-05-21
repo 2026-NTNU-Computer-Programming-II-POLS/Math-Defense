@@ -2,7 +2,11 @@ import re
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.domain.user.constraints import PLAYER_NAME_MIN_LENGTH, PLAYER_NAME_MAX_LENGTH
+from app.domain.user.constraints import (
+    ALLOWED_AVATAR_URLS,
+    PLAYER_NAME_MIN_LENGTH,
+    PLAYER_NAME_MAX_LENGTH,
+)
 from app.domain.user.value_objects import Email
 from app.utils.security import BCRYPT_MAX_BYTES
 
@@ -85,10 +89,13 @@ class TokenResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     token_type: str = "bearer"
-    id: str
-    email: str
-    player_name: str
-    role: str
+    # Identity fields are absent on an MFA-challenge response — the caller is
+    # not authenticated yet and only mfa_required/mfa_token are meaningful.
+    # They are populated once login (or the MFA challenge) completes.
+    id: str | None = None
+    email: str | None = None
+    player_name: str | None = None
+    role: str | None = None
     avatar_url: str | None = None
     is_email_verified: bool = False
     mfa_required: bool = False
@@ -160,16 +167,6 @@ class UpdatePlayerNameRequest(BaseModel):
         return v
 
 
-_ALLOWED_AVATAR_URLS = frozenset({
-    '/avatars/wizard.svg',
-    '/avatars/knight.svg',
-    '/avatars/archer.svg',
-    '/avatars/mage.svg',
-    '/avatars/scholar.svg',
-    '/avatars/alchemist.svg',
-})
-
-
 class AvatarUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -178,7 +175,9 @@ class AvatarUpdateRequest(BaseModel):
     @field_validator("avatar_url")
     @classmethod
     def avatar_url_valid(cls, v: str | None) -> str | None:
-        if v is not None and v not in _ALLOWED_AVATAR_URLS:
+        # Early 422 for HTTP callers; the domain aggregate re-enforces the same
+        # allowlist (single source of truth in domain.user.constraints).
+        if v is not None and v not in ALLOWED_AVATAR_URLS:
             raise ValueError("Invalid avatar URL")
         return v
 

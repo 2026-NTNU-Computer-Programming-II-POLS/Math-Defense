@@ -33,9 +33,14 @@ class SqlAlchemyUserRepository:
         rows = self._db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()
         return [self._to_domain(r) for r in rows]
 
-    def find_by_role(self, role: Role, limit: int = 10000) -> list[User]:
-        rows = self._db.query(UserModel).filter(UserModel.role == role.value).limit(limit).all()
-        return [self._to_domain(r) for r in rows]
+    def count_active_by_role(self, role: Role) -> int:
+        """Number of active users with the given role, via a single COUNT
+        query — avoids loading every row just to count them."""
+        return (
+            self._db.query(UserModel)
+            .filter(UserModel.role == role.value, UserModel.is_active.is_(True))
+            .count()
+        )
 
     def find_by_role_paginated(self, role: Role, offset: int, limit: int) -> tuple[list[User], int]:
         q = self._db.query(UserModel).filter(UserModel.role == role.value)

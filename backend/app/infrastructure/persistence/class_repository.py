@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
@@ -55,6 +56,22 @@ class SqlAlchemyClassRepository:
     def count_by_teacher(self, teacher_id: str) -> int:
         return self._db.query(ClassModel).filter(ClassModel.teacher_id == teacher_id).count()
 
+    def count_by_teacher_bulk(self, teacher_ids: list[str]) -> dict[str, int]:
+        """Class counts for many teachers in one GROUP BY query (avoids N+1).
+
+        Returns a sparse dict — teachers with no classes are absent; callers
+        should default a missing key to 0.
+        """
+        if not teacher_ids:
+            return {}
+        rows = (
+            self._db.query(ClassModel.teacher_id, func.count(ClassModel.id))
+            .filter(ClassModel.teacher_id.in_(teacher_ids))
+            .group_by(ClassModel.teacher_id)
+            .all()
+        )
+        return {teacher_id: count for teacher_id, count in rows}
+
     def save(self, cls_: Class) -> None:
         row = self._db.query(ClassModel).filter(ClassModel.id == cls_.id).first()
         if row:
@@ -102,8 +119,40 @@ class SqlAlchemyClassRepository:
     def count_memberships_by_class(self, class_id: str) -> int:
         return self._db.query(MembershipModel).filter(MembershipModel.class_id == class_id).count()
 
+    def count_memberships_by_class_bulk(self, class_ids: list[str]) -> dict[str, int]:
+        """Membership counts for many classes in one GROUP BY query (avoids N+1).
+
+        Returns a sparse dict — empty classes are absent; callers should
+        default a missing key to 0.
+        """
+        if not class_ids:
+            return {}
+        rows = (
+            self._db.query(MembershipModel.class_id, func.count(MembershipModel.id))
+            .filter(MembershipModel.class_id.in_(class_ids))
+            .group_by(MembershipModel.class_id)
+            .all()
+        )
+        return {class_id: count for class_id, count in rows}
+
     def count_memberships_by_student(self, student_id: str) -> int:
         return self._db.query(MembershipModel).filter(MembershipModel.student_id == student_id).count()
+
+    def count_memberships_by_student_bulk(self, student_ids: list[str]) -> dict[str, int]:
+        """Membership counts for many students in one GROUP BY query (avoids N+1).
+
+        Returns a sparse dict — students in no classes are absent; callers
+        should default a missing key to 0.
+        """
+        if not student_ids:
+            return {}
+        rows = (
+            self._db.query(MembershipModel.student_id, func.count(MembershipModel.id))
+            .filter(MembershipModel.student_id.in_(student_ids))
+            .group_by(MembershipModel.student_id)
+            .all()
+        )
+        return {student_id: count for student_id, count in rows}
 
     def save_membership(self, membership: ClassMembership) -> None:
         row = MembershipModel(

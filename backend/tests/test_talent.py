@@ -29,6 +29,20 @@ def _complete_session(client, token, level=1, score=500, kills=10, waves_survive
         json={"star_rating": level},
         headers=_auth(token),
     ).json()["id"]
+    # B-BUG-8: end_session derives waves_survived from the persisted event log
+    # rather than trusting the request body. Post the matching waveEnd events
+    # so the server-derived count agrees with the request — otherwise
+    # achievements that gate on session_waves >= 1 never unlock and no talent
+    # points are earned. (Mirrors test_achievement.py's helper.)
+    if waves_survived > 0:
+        client.post(
+            f"/api/sessions/{sid}/events",
+            json={"events": [
+                {"seq": i + 1, "ts": float(i + 1), "event_type": "waveEnd", "payload": None}
+                for i in range(waves_survived)
+            ]},
+            headers=_auth(token),
+        )
     client.post(
         f"/api/sessions/{sid}/end",
         json={"score": score, "kills": kills, "waves_survived": waves_survived},

@@ -123,7 +123,7 @@ function viewRankings(): void {
 }
 
 watch(activityId, (id) => {
-  store.currentDetail = null
+  store.clearDetail()
   store.loadDetail(id)
 }, { immediate: true })
 </script>

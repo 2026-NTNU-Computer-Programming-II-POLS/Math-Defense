@@ -72,6 +72,7 @@ export function useSessionSync() {
   let consecutiveUpdateFailures = 0
   let alertedForFailures = false
   let lastSyncedWave = -1
+  let isEnding = false
 
   type PendingWrite = { snapshot: WaveEndSnapshot; gen: number }
   const pending = ref<PendingWrite | null>(null)
@@ -196,40 +197,52 @@ export function useSessionSync() {
   async function endRun(game: Game): Promise<void> {
     if (!authStore.isLoggedIn) return
 
-    // F-BUG-20: a WAVE_END flush may still be in flight (or queued in
-    // `pending`) when LEVEL_END / GAME_OVER fires. If we POST /end before
-    // those updates land, the server's snapshot is stale and the final
-    // score+leaderboard row are computed against pre-final-wave state.
-    // Wait for the in-flight WAVE_END loop to drain (and any newly enqueued
-    // job to flush) before sending the terminal payload. Bounded so a wedged
-    // request (server hang past the 10s fetch timeout) can't permanently
-    // block the score-submission path; better to send a slightly-stale
-    // wave snapshot than never end the session at all.
-    const drainDeadline = Date.now() + 12_000
-    while ((syncing.value || pending.value) && Date.now() < drainDeadline) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 25))
-    }
-
-    if (!sessionId.value && pendingLevel != null) {
-      const gen = ++createGeneration
-      sessionId.value = await createSession(pendingLevel, gen, game)
-    }
-
-    if (!sessionId.value) return
-    const id = sessionId.value
+    // Concurrency guard: LEVEL_END and PHASE_CHANGED→GAME_OVER can both fire
+    // for a single run (and a rapid retry can re-trigger an end event). Since
+    // endRun awaits the drain loop below before it reads sessionId, two
+    // overlapping calls would each see a non-null sessionId and POST
+    // /sessions/:id/end twice. Bail out if an end is already in flight; the
+    // in-flight call owns the terminal payload.
+    if (isEnding) return
+    isEnding = true
     try {
-      const result = await endSessionRequest(id, game.state)
-      if (result.newly_unlocked_achievements?.length) {
-        newlyUnlockedAchievements.value = result.newly_unlocked_achievements
-        // Drop the cached unlocked-id set so panels (e.g. MagicModePanel's
-        // curve-family gate) see freshly-unlocked achievements on next read.
-        achievementService.invalidateUnlockedIds()
+      // F-BUG-20: a WAVE_END flush may still be in flight (or queued in
+      // `pending`) when LEVEL_END / GAME_OVER fires. If we POST /end before
+      // those updates land, the server's snapshot is stale and the final
+      // score+leaderboard row are computed against pre-final-wave state.
+      // Wait for the in-flight WAVE_END loop to drain (and any newly enqueued
+      // job to flush) before sending the terminal payload. Bounded so a wedged
+      // request (server hang past the 10s fetch timeout) can't permanently
+      // block the score-submission path; better to send a slightly-stale
+      // wave snapshot than never end the session at all.
+      const drainDeadline = Date.now() + 12_000
+      while ((syncing.value || pending.value) && Date.now() < drainDeadline) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 25))
       }
-      lastCompletedSessionId.value = id
-      sessionId.value = null
-      pendingLevel = null
-    } catch (e) {
-      console.warn('[SessionSync] Failed to end session (will retry on next end event):', e)
+
+      if (!sessionId.value && pendingLevel != null) {
+        const gen = ++createGeneration
+        sessionId.value = await createSession(pendingLevel, gen, game)
+      }
+
+      if (!sessionId.value) return
+      const id = sessionId.value
+      try {
+        const result = await endSessionRequest(id, game.state)
+        if (result.newly_unlocked_achievements?.length) {
+          newlyUnlockedAchievements.value = result.newly_unlocked_achievements
+          // Drop the cached unlocked-id set so panels (e.g. MagicModePanel's
+          // curve-family gate) see freshly-unlocked achievements on next read.
+          achievementService.invalidateUnlockedIds()
+        }
+        lastCompletedSessionId.value = id
+        sessionId.value = null
+        pendingLevel = null
+      } catch (e) {
+        console.warn('[SessionSync] Failed to end session (will retry on next end event):', e)
+      }
+    } finally {
+      isEnding = false
     }
   }
 

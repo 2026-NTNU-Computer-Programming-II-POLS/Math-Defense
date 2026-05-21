@@ -26,26 +26,20 @@ class AdminApplicationService:
         self._class_repo = class_repo
         self._uow = uow
 
-    def list_teachers(self) -> list[User]:
-        return self._user_repo.find_by_role(Role.TEACHER)
-
-    def list_students(self) -> list[User]:
-        return self._user_repo.find_by_role(Role.STUDENT)
-
-    def list_all_classes(self) -> list[Class]:
-        return self._class_repo.find_all()
-
     def list_teachers_paginated(self, offset: int, limit: int) -> tuple[list[tuple[User, int]], int]:
         users, total = self._user_repo.find_by_role_paginated(Role.TEACHER, offset, limit)
-        return [(u, self._class_repo.count_by_teacher(u.id)) for u in users], total
+        counts = self._class_repo.count_by_teacher_bulk([u.id for u in users])
+        return [(u, counts.get(u.id, 0)) for u in users], total
 
     def list_students_paginated(self, offset: int, limit: int) -> tuple[list[tuple[User, int]], int]:
         users, total = self._user_repo.find_by_role_paginated(Role.STUDENT, offset, limit)
-        return [(u, self._class_repo.count_memberships_by_student(u.id)) for u in users], total
+        counts = self._class_repo.count_memberships_by_student_bulk([u.id for u in users])
+        return [(u, counts.get(u.id, 0)) for u in users], total
 
     def list_all_classes_paginated(self, offset: int, limit: int) -> tuple[list[tuple[Class, int]], int]:
         classes, total = self._class_repo.find_all_paginated(offset, limit)
-        return [(c, self._class_repo.count_memberships_by_class(c.id)) for c in classes], total
+        counts = self._class_repo.count_memberships_by_class_bulk([c.id for c in classes])
+        return [(c, counts.get(c.id, 0)) for c in classes], total
 
     def set_user_active(self, user_id: str, is_active: bool, requester_id: str) -> User:
         if self._uow is None:
@@ -67,12 +61,10 @@ class AdminApplicationService:
                 if user.id == requester_id:
                     raise DomainValueError("Admins cannot disable their own account")
                 if user.role == Role.ADMIN:
-                    active_admins = [
-                        u for u in self._user_repo.find_by_role(Role.ADMIN) if u.is_active
-                    ]
-                    # The user we're about to disable is in the list; refuse
-                    # if removing them would empty it.
-                    if len(active_admins) <= 1:
+                    # COUNT query instead of loading every admin row. The user
+                    # we're about to disable is still active and counted here;
+                    # refuse if disabling them would empty the active set.
+                    if self._user_repo.count_active_by_role(Role.ADMIN) <= 1:
                         raise DomainValueError("Cannot disable the last active admin")
             user.is_active = is_active
             self._user_repo.save(user)

@@ -15,6 +15,7 @@
     "lint-chinese-comments": "tsx scripts/lint-chinese-comments.ts",
     "lint-determinism": "tsx scripts/lint-determinism.ts",
     "no-raw-px": "tsx scripts/no-raw-px.ts",
+    "verify-wasm": "tsx scripts/verify-wasm.ts",
     "bench": "vitest run --config dev/vitest.bench.config.ts",
     "ci": "npm run arch-check && npm run event-registry-check && npm run lint-chinese-comments && npm run lint-determinism && npm run no-raw-px && vitest run"
   },

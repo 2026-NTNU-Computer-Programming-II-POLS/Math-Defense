@@ -8,6 +8,10 @@ class AchievementOut(BaseModel):
     name: str
     description: str
     category: str
+    # Effective talent points: the reward actually banked for an unlocked
+    # achievement (2x when unlocked during an active season) or what unlocking
+    # it now would grant when still locked. Summing this over unlocked entries
+    # equals AchievementSummaryOut.talent_points_earned.
     talent_points: int
     unlocked: bool
     unlocked_at: str | None = None
