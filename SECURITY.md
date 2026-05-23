@@ -44,6 +44,8 @@ The signing algorithm is pinned to `HS256` in the decode call; the library's def
 
 A separate long-lived refresh token (30-day expiry by default, configurable via `REFRESH_TOKEN_EXPIRE_DAYS`) is issued on login, registration, and MFA challenge completion. The raw token is delivered as a second `HttpOnly`, `Secure`, `SameSite=Lax` cookie; only a SHA-256 hash of the token is stored server-side in the `refresh_tokens` table. Refresh tokens are rotated on every successful `/api/auth/refresh` call: the previous hash is invalidated and a new raw token replaces the cookie. On logout, both the access-token `jti` and the active refresh token hash are revoked.
 
+If the same refresh token is presented twice (typically because an attacker has captured the cookie and the legitimate client has already used it, or vice versa), the second use is detected as a reuse event. When this happens, **every** refresh token for that user is revoked inside the same transaction before the error is returned to the client, forcing the legitimate user to re-authenticate but preventing the attacker from minting any further access tokens. Password changes likewise revoke the user's entire refresh-token family in addition to incrementing `password_version`.
+
 ### Token Revocation
 
 On logout, the token's `jti` is inserted into a persistent PostgreSQL deny-list table with its expiry timestamp. A background janitor task runs every 10 minutes and bulk-deletes rows whose `expires_at` has passed, so the table stays bounded without touching the hot insertion path. This means revocation survives application restarts.
@@ -52,17 +54,30 @@ Password changes increment the user's `password_version` field. Any token whose 
 
 ### Account Lockout
 
-After five consecutive failed login attempts within a five-minute window, the account is locked. The lockout duration escalates with each successive lockout: 5 minutes → 15 minutes → 1 hour → 24 hours (exponential backoff tracked by `login_attempts.lockout_count`). The lockout state is stored in the database and updated with a PostgreSQL `INSERT ... ON CONFLICT DO UPDATE` statement to avoid race conditions under concurrent login attempts. A dummy bcrypt comparison is performed for usernames that do not exist, so response timing does not reveal whether an account exists.
+After five consecutive failed login attempts within a five-minute window, the account is locked. The lockout duration escalates with each successive lockout: 5 minutes for the first, 15 minutes for the second, and 60 minutes for every lockout thereafter (tracked by `login_attempts.lockout_count`). The lockout state is stored in the database and updated with a PostgreSQL `INSERT ... ON CONFLICT DO UPDATE` statement to avoid race conditions under concurrent login attempts. A dummy bcrypt comparison is performed for usernames that do not exist, so response timing does not reveal whether an account exists. In addition to per-IP rate limiting, an in-process per-email throttle (10 attempts/minute) is applied at the login route so that a single IP cannot mask attacks against a specific account by spreading them across many usernames.
 
 ### Password Hashing
 
 Passwords are hashed with bcrypt at a cost factor of 12. Input is truncated to 72 bytes before hashing to avoid a bcrypt-specific issue where bytes beyond the 72-byte limit are silently ignored.
 
+### Multi-Factor Authentication (TOTP)
+
+Users may optionally enrol a TOTP authenticator (`totp_secret`, `mfa_enabled` columns). When a user with MFA enabled completes the password check, the login route does not issue an access cookie directly; instead it returns a short-lived **MFA challenge JWT** (5-minute TTL) that the client must exchange for an access token by submitting a fresh TOTP code to `/api/auth/mfa/verify`.
+
+Two guards protect this flow:
+
+- **Challenge-token reuse**: on a successful verification the challenge token's `jti` is inserted into the deny-list inside the same transaction that issues the new access cookie. A captured challenge token cannot be re-exchanged with a different code.
+- **TOTP step-replay**: the `totp_last_used_at` column records the timestamp of the most recent accepted code; codes presented within a 90-second window of a prior success are rejected. This defends against an attacker who intercepts a code in transit and races the legitimate user.
+
+### Email Verification Tokens
+
+Verification tokens are emitted at registration and on resend requests. Only a SHA-256 hash of each token is stored in `email_verification_tokens`; the raw token appears only in the outbound email link. Tokens are single-use (consumed atomically via a `used` boolean), expire after 24 hours, and any pending tokens for the user are invalidated when a new one is issued. This bounds the damage if an old verification email is later exposed.
+
 ---
 
 ## Input Validation
 
-All request bodies are parsed through Pydantic v2 models with `extra="forbid"`, meaning unknown fields are rejected with HTTP 422 rather than silently discarded.
+All request bodies are parsed through Pydantic v2 models with `extra="forbid"`, meaning unknown fields are rejected with HTTP 422 rather than silently discarded. Response schemas use `extra="ignore"`, which has no security impact because they describe outbound payloads only. One input schema — `PathConfig` in `app/schemas/territory.py` — deliberately uses `extra="allow"` so that designer-supplied path configurations can carry extension fields; the values it accepts are stored as opaque JSON and never executed.
 
 Key field-level validations:
 
@@ -80,6 +95,19 @@ These validations are applied at the schema boundary, not only in the database l
 ## SQL Injection
 
 The application uses SQLAlchemy's ORM for all database interactions. No raw SQL strings were observed in the codebase. Parameterized queries are used throughout, including the PostgreSQL-specific `INSERT ... ON CONFLICT` statements in the login guard and token deny-list.
+
+---
+
+## Game Integrity
+
+Because the application is a competitive game with a public leaderboard, score and progression endpoints have to assume that any value sent by the client may have been tampered with. The backend is designed so that score-bearing fields are never trusted from the client:
+
+- **Append-only session event log**: every meaningful in-game action is persisted to `session_events` as a JSONB row with an explicit `seq` field assigned client-side. A `UNIQUE(session_id, seq)` constraint makes retried flushes idempotent. The event log feeds replay/spectate playback and ad-hoc post-game verification rather than primary scoring.
+- **Server-side score validation**: the score formula is implemented in WebAssembly (`math_engine.wasm`) and shipped to both sides. The backend loads it through `wasmtime-py` and recomputes the authoritative `total_score` from scalar fields persisted on the `game_sessions` row (kill value, time totals, costs, starting/ending health, the initial answer, etc.). On v2 (strict) sessions a mismatch between client-declared and server-recomputed score raises `ReplayMismatchError`; on v1 sessions the mismatch is logged. In both cases the server overwrites the persisted score with its own recomputation before the value reaches the leaderboard.
+- **Deterministic RNG seed**: `game_sessions.rng_seed` is fixed when the session is created. The score formula itself does not consume the seed; the seed exists so that the recorded event log can be replayed deterministically for spectator/audit purposes.
+- **Leaderboard submissions use only server-side values**: `/leaderboard/submit` reads the score, kills, and waves_survived from the locked session row, never from the request body, so a tampered client cannot raise its own score even if it passes earlier checks.
+- **Duplicate-submission guards**: the session row is locked with `SELECT ... FOR UPDATE` before the duplicate check, and a database-level `UNIQUE` constraint on `leaderboard.session_id` is the final safety net. Concurrent submissions from the same session are serialised and only one row reaches the leaderboard.
+- **Achievements, talents, and progression**: these are computed server-side from the same session state and the user's persisted progression; the client cannot grant itself an achievement or skill point by sending a crafted request.
 
 ---
 
@@ -114,15 +142,27 @@ Per-IP rate limits are enforced via `slowapi`. The auth-critical endpoints are l
 
 ## HTTP Security Headers
 
-nginx applies the following security headers to all responses in the production configuration:
+nginx applies the following security headers to all responses in the production configuration. A `SecurityHeadersMiddleware` in the FastAPI app independently re-asserts the subset that is safe to set everywhere (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, plus `Cache-Control: no-store` on `/api/auth/*`), so even direct backend access — for example via the dev compose port — still carries those baseline headers. HSTS, COOP, CORP, and CSP are applied by nginx only and rely on the production deployment topology.
 
 | Header | Value |
 |---|---|
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains` (TLS configuration only) |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | Disables camera, microphone, geolocation, and payment |
-| `Content-Security-Policy` | Restricts script and object sources; inline styles use `unsafe-inline` (see Known Limitations) |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+| `Cross-Origin-Resource-Policy` | `same-origin` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ${API_ORIGIN}; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'` |
+| `Cache-Control` | `no-store` on `/api/auth/*` responses |
+
+The CSP forbids inline scripts, plugins, object embedding, and framing (`frame-ancestors 'none'` reinforces `X-Frame-Options: DENY`); `wasm-unsafe-eval` is required for the WebAssembly score engine. Inline styles are still permitted (see Known Limitations).
+
+Additional nginx hardening:
+
+- `server_tokens off` suppresses the nginx version from response headers and error pages.
+- `client_max_body_size 1m` rejects oversized request bodies before they reach the backend.
+- The TLS server accepts only TLS 1.2 and TLS 1.3 with an explicit cipher list, and serves an OCSP-stapled certificate.
 
 ---
 
@@ -144,6 +184,32 @@ The application logs which source supplied `SECRET_KEY` (environment variable or
 
 ---
 
+## Audit Logging
+
+Security-relevant events (login success/failure, registration, password change, MFA enrol/disable, refresh-token reuse detection, etc.) are written to the `audit_logs` table by `audit_logger.record_audit_event`. The writer is designed for forensic durability rather than performance:
+
+- Each event is written on its own SQLAlchemy session and committed independently of the surrounding request transaction, so a business-logic rollback does not also discard the audit trail.
+- The captured user-agent is truncated to 512 characters to prevent a malicious client from exhausting storage by sending an oversized header.
+- If the insert fails (typically because the `audit_logs` table has not yet been provisioned — see Known Limitations) the failure is logged as a warning rather than allowed to break the request.
+
+Separately, the application logger uses a `_anon()` helper that emits only a 10-character SHA-256 prefix of user IDs and email addresses, so failed-login and similar log lines that are shipped off-host do not leak account identifiers in plaintext. The `audit_logs` rows themselves do hold the raw user_id, since they are intended for in-database forensic queries.
+
+## Error Handling
+
+A global exception handler catches any uncaught error, logs the full traceback server-side, and returns a fixed `{"detail": "Internal server error"}` payload with HTTP 500. Stack traces, library versions, and file paths are not surfaced to clients. Pydantic validation errors are returned with the offending field location and error type, but the underlying exception message is sanitised so that library internals do not leak.
+
+## Database Integrity Constraints
+
+PostgreSQL constraints provide a last line of defence below the application-layer checks:
+
+- `CHECK` constraints on `game_sessions` require `score`, `kills`, `waves_survived`, `hp`, and `gold` to be non-negative.
+- `CHECK` constraints on `user_competency_state` require `alpha > 0` and `beta > 0` so the spaced-repetition math remains well-defined.
+- `UNIQUE` constraints back the security-critical token tables: `denied_tokens.jti` (deny-list), `refresh_tokens` token-hash columns, `email_verification_tokens` token-hash, and `leaderboard.session_id`.
+
+These constraints mean that a bug that lets a negative score or a duplicate jti through the application layer is rejected at the database boundary rather than persisted.
+
+---
+
 ## Dependency Auditing
 
 CI runs `pip-audit` against backend dependencies and `npm audit --audit-level=high` against frontend dependencies on every pull request. Dependencies are pinned to specific versions in `requirements.txt` and `package.json`.
@@ -156,6 +222,9 @@ CI runs `pip-audit` against backend dependencies and `npm audit --audit-level=hi
 - The frontend production container uses `nginxinc/nginx-unprivileged`, which binds to an unprivileged port and does not run as root.
 - In the production Docker Compose configuration, the database port is not exposed to the host; only the nginx container has externally bound ports (80 and 443).
 - Development Docker Compose binds services to `127.0.0.1` only, not `0.0.0.0`.
+- All production services drop every Linux capability (`cap_drop: [ALL]`) and set `security_opt: [no-new-privileges:true]`, so a compromised process cannot regain elevated privileges via setuid binaries.
+- Backend and frontend containers run with a read-only root filesystem in production; only explicitly declared `tmpfs` and named-volume mounts are writable.
+- The production compose declares a `healthcheck` for every long-running service (`postgres`, `backend`, `frontend`); the periodic `db-backup` service has no healthcheck because it is a one-shot job. The development compose adds healthchecks for `postgres` and `backend` only — the Vite dev server is left without one because reload-driven restarts make the signal noisy.
 
 ---
 
