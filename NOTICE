@@ -1,0 +1,51 @@
+Math Defense
+Copyright 2026 Isaries, SW9526, Shao077777714
+
+This product includes software developed at National Taiwan Normal
+University (NTNU) as part of the Computer Programming II course (2026).
+
+Licensed under the Apache License, Version 2.0 (the "License").
+See the LICENSE file in the project root for the full license text,
+or obtain a copy at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+----------------------------------------------------------------------
+Third-party components
+----------------------------------------------------------------------
+
+This product bundles or depends on the following third-party software.
+Each component is distributed under its own license; see the linked
+project for the authoritative terms.
+
+Frontend runtime dependencies:
+  - Vue 3              (MIT)        https://github.com/vuejs/core
+  - Vue Router         (MIT)        https://github.com/vuejs/router
+  - Pinia              (MIT)        https://github.com/vuejs/pinia
+  - KaTeX              (MIT)        https://github.com/KaTeX/KaTeX
+
+Frontend build / tooling:
+  - Vite               (MIT)        https://github.com/vitejs/vite
+  - Vitest             (MIT)        https://github.com/vitest-dev/vitest
+  - TypeScript         (Apache-2.0) https://github.com/microsoft/TypeScript
+
+Backend dependencies:
+  - FastAPI            (MIT)        https://github.com/tiangolo/fastapi
+  - Starlette          (BSD-3)      https://github.com/encode/starlette
+  - Uvicorn            (BSD-3)      https://github.com/encode/uvicorn
+  - SQLAlchemy         (MIT)        https://github.com/sqlalchemy/sqlalchemy
+  - Alembic            (MIT)        https://github.com/sqlalchemy/alembic
+  - Pydantic           (MIT)        https://github.com/pydantic/pydantic
+  - PyJWT              (MIT)        https://github.com/jpadilla/pyjwt
+  - bcrypt             (Apache-2.0) https://github.com/pyca/bcrypt
+  - psycopg            (LGPL-3)     https://github.com/psycopg/psycopg
+  - slowapi            (MIT)        https://github.com/laurentS/slowapi
+  - pyotp              (MIT)        https://github.com/pyauth/pyotp
+  - wasmtime           (Apache-2.0) https://github.com/bytecodealliance/wasmtime-py
+
+WebAssembly toolchain:
+  - Emscripten SDK     (MIT / NCSA) https://github.com/emscripten-core/emsdk
+    (vendored in the emsdk/ directory; see emsdk/LICENSE for details)
+
+Database:
+  - PostgreSQL 16      (PostgreSQL License) https://www.postgresql.org/about/licence/

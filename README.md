@@ -331,3 +331,13 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 - [frontend/public/manual/game-mechanics.md](frontend/public/manual/game-mechanics.md) — Full design rationale
 - [frontend/public/manual/towers-and-enemies.md](frontend/public/manual/towers-and-enemies.md) — Tower and enemy field reference
+
+---
+
+## License
+
+Copyright 2026 Isaries, SW9526, Shao077777714.
+
+This project is licensed under the **Apache License, Version 2.0** — see [LICENSE](LICENSE) for the full text and [NOTICE](NOTICE) for project attribution and third-party component credits. In short, you may use, modify, and distribute this software (including for commercial purposes) as long as you preserve the copyright notice, the license, and the NOTICE file, and clearly mark any modifications.
+
+> Built at National Taiwan Normal University (NTNU) for the 2026 Computer Programming II course.
