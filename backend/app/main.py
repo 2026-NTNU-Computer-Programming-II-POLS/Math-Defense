@@ -26,7 +26,7 @@ from app.infrastructure.token_denylist import purge_expired as purge_expired_den
 from app.middleware.csrf import CsrfMiddleware
 from app.routers import achievement, admin, assessment, auth, challenge, class_, leaderboard, game_session, recommendation, replay, study, talent, territory
 from app.limiter import limiter
-from app.seed import ensure_demo_user
+from app.seed import ensure_dev_accounts
 from app.utils.encryption import verify_key_configured
 
 logging.basicConfig(
@@ -90,10 +90,11 @@ async def lifespan(_app: FastAPI):
         finally:
             conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": _MIGRATION_LOCK_ID})
             conn.commit()
-    # Seed demo user after schema is up-to-date
+    # Seed dev accounts (teacher + student) after schema is up-to-date.
+    # No-op unless SEED_DEMO_USER=true AND FRONTEND_URL looks like a local-dev host.
     db = SessionLocal()
     try:
-        ensure_demo_user(db)
+        ensure_dev_accounts(db)
     finally:
         db.close()
     janitor = asyncio.create_task(_auth_store_janitor())

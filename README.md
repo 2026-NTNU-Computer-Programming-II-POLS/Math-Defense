@@ -259,9 +259,8 @@ Create `.env` at the project root (see `.env.example`):
 | `POSTGRES_APP_PASSWORD` | No | M-13 least-privilege app role password; consumed by `pg_init_roles.sh` on first DB init. Required only if you set a second `DATABASE_URL_APP` for runtime queries. |
 | `PROXY_MODE` | No | Default `false`. Set `true` when running behind nginx/another proxy so rate limits key on `X-Forwarded-For` instead of the proxy IP. |
 | `TRUSTED_PROXY_IPS` | No | Comma-separated IPs / CIDRs whose `X-Forwarded-For` the backend trusts when `PROXY_MODE=true`. |
-| `TOTP_ENCRYPTION_KEY` | If MFA used | AES-256 Fernet key used to encrypt TOTP secrets at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
-| `SEED_DEMO_USER` | No | Default `false`. Set `true` to seed a demo user on startup. |
-| `DEMO_SEED_PASSWORD` | If seeding | Required when `SEED_DEMO_USER=true`; must satisfy the standard registration strength rules. |
+| `TOTP_ENCRYPTION_KEY` | Yes | AES-256 Fernet key used to encrypt TOTP secrets at rest. Required at startup unconditionally (`lifespan` calls `verify_key_configured()` before the first request), so a missing key aborts boot regardless of whether MFA is in use. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `SEED_DEMO_USER` | No | Default `false`. Set `true` to seed the dev teacher + student accounts (see `backend/app/seed.py`); the same credentials appear in the AuthView UI when the frontend is built in dev mode. A localhost-only guard refuses to seed unless `FRONTEND_URL` points at a recognised local-dev host. |
 | `COOKIE_SECURE` | No | Default `true`; only `false` is honoured under CI/pytest (see `reject_insecure_cookie_outside_tests` in `backend/app/config.py`) |
 
 > The backend refuses to start when `DATABASE_URL` embeds the literal password `changeme` — replace it in `.env` before first boot.

@@ -30,7 +30,7 @@ backend/
 │   ├── http_status_map.py         DomainError → HTTP status table; the *only* HTTP-aware module the domain knows about
 │   ├── limiter.py                 slowapi Limiter + per-email login throttle helper
 │   ├── shared_constants.py        Loads shared/game-constants.json so Python sees the same canvas / grid / player values as the frontend
-│   ├── seed.py                    Demo user seeding — ensure_demo_user(); called from lifespan after migrations
+│   ├── seed.py                    Dev account seeding — ensure_dev_accounts() creates the teacher + student credentials shown in AuthView's dev hint; called from lifespan after migrations, no-op unless SEED_DEMO_USER=true
 │   │
 │   ├── domain/                    ── DOMAIN LAYER ──
 │   │   ├── value_objects.py       SessionStatus enum, Level, Score, GameResult
@@ -567,8 +567,8 @@ docker-compose up backend        # from project root
 | `JWT_AUDIENCE` | No | Default `math-defense-clients`. Bound into every JWT `aud` and required at decode time. |
 | `PROXY_MODE` | No | Default `false`. When `true`, per-IP rate limiting reads the real client from `X-Forwarded-For`. |
 | `TRUSTED_PROXY_IPS` | No | Comma-separated IP/CIDR list whose `X-Forwarded-For` the backend trusts (consulted when `PROXY_MODE=true`). |
-| `TOTP_ENCRYPTION_KEY` | If MFA enabled | AES-256 Fernet key encrypting TOTP secrets at rest. |
-| `SEED_DEMO_USER` / `DEMO_SEED_PASSWORD` | No | When `SEED_DEMO_USER=true`, `DEMO_SEED_PASSWORD` is required and must satisfy the registration strength rules. |
+| `TOTP_ENCRYPTION_KEY` | Yes | AES-256 Fernet key encrypting TOTP secrets at rest. Required at startup unconditionally — `lifespan` calls `verify_key_configured()` before the first request — so a missing/malformed key fails loudly instead of surfacing as a 500 on the first MFA-related request. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `SEED_DEMO_USER` | No | Default `false`. Set `true` to seed the dev teacher + student accounts on startup (see `backend/app/seed.py`); the credentials are mirrored in `frontend/src/views/AuthView.vue`'s dev hint. A localhost-only guard refuses to seed unless `FRONTEND_URL` resolves to a recognised local-dev host. |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` | No | SQLAlchemy pool tuning. Defaults: `10` / `20` / `3600` s. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | No | Optional; when `SMTP_HOST` is empty `email_service` becomes a no-op. |
 | `SESSION_STALE_CUTOFF_HOURS` | No | Default `2.0`; active sessions older than this are auto-abandoned |

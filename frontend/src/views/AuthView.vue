@@ -7,6 +7,23 @@ const router = useRouter()
 const route = useRoute()
 const { loading, error, login, register, mfaRequired, verifyMfa, cancelMfa } = useAuth()
 
+interface DevAccount {
+  label: string
+  email: string
+  password: string
+}
+
+// MIRROR: backend/app/seed.py _DEV_ACCOUNTS.
+// `import.meta.env.DEV` is statically replaced at build time, so the
+// `false` branch is eliminated from production bundles and the
+// credentials never appear in the shipped JS.
+const DEV_ACCOUNTS: readonly DevAccount[] = import.meta.env.DEV
+  ? [
+      { label: 'Teacher', email: 'teacher@mathdefense.local', password: 'TeacherDev2026!' },
+      { label: 'Student', email: 'student@mathdefense.local', password: 'StudentDev2026!' },
+    ]
+  : []
+
 const isLogin = ref(
   route.query.mode === 'login' || (!route.query.mode && !!route.query.next),
 )
@@ -22,7 +39,10 @@ const registrationSubmitted = ref(false)
 const title = computed(() => isLogin.value ? 'Log In' : 'Register')
 
 const PASSWORD_MIN = 8
-const PASSWORD_MAX = 128
+// Aligns with backend bcrypt's 72-byte input cap (see BCRYPT_MAX_BYTES in
+// backend/app/utils/security.py). A 73+ char password would otherwise pass
+// frontend validation only to be rejected with a 422 from the backend.
+const PASSWORD_MAX = 72
 
 const passwordRules = reactive({
   length: false,
@@ -57,6 +77,16 @@ function toggleMode(): void {
 function handleCancelMfa(): void {
   mfaCode.value = ''
   cancelMfa()
+}
+
+function fillDevAccount(account: DevAccount): void {
+  // Switch the form to login mode and prefill — the dev accounts are
+  // pre-seeded on the backend, so there is nothing to register.
+  isLogin.value = true
+  registrationSubmitted.value = false
+  email.value = account.email
+  password.value = account.password
+  clearError()
 }
 
 function validate(): string {
@@ -227,11 +257,25 @@ async function submit(): Promise<void> {
         </button>
       </template>
 
-      <p v-if="isLogin && !mfaRequired" class="demo-hint">
-        Demo Account: <code>demo@mathdefense.local</code> / <code>Demo1234</code>
-      </p>
-
       <button v-if="!mfaRequired" class="btn back-btn" @click="router.push('/')">← Back to Menu</button>
+
+      <!-- Dev-only credential hint. Mirrors backend/app/seed.py _DEV_ACCOUNTS;
+           DEV_ACCOUNTS is empty in production builds so this whole section
+           renders nothing. -->
+      <div v-if="!mfaRequired && DEV_ACCOUNTS.length > 0" class="dev-hint">
+        <p class="dev-hint-title">Dev accounts (click to fill)</p>
+        <button
+          v-for="account in DEV_ACCOUNTS"
+          :key="account.email"
+          type="button"
+          class="dev-hint-item"
+          @click="fillDevAccount(account)"
+        >
+          <span class="dev-hint-role">{{ account.label }}</span>
+          <code class="dev-hint-credential">{{ account.email }}</code>
+          <code class="dev-hint-credential">{{ account.password }}</code>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -329,21 +373,6 @@ async function submit(): Promise<void> {
   opacity: 0.5;
 }
 
-.demo-hint {
-  text-align: center;
-  font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
-  opacity: 0.6;
-  margin: 0;
-}
-
-.demo-hint code {
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
-  font-family: inherit;
-}
-
 .toggle-btn, .back-btn {
   font-size: var(--text-xs);
   letter-spacing: 1px;
@@ -363,5 +392,66 @@ async function submit(): Promise<void> {
   border-radius: 2px;
   color: var(--axis);
   font-size: var(--text-xs);
+}
+
+.dev-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--axis);
+  border-radius: 4px;
+  opacity: 0.85;
+}
+
+.dev-hint-title {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--axis);
+  text-shadow: var(--gold-shadow);
+  letter-spacing: 1px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.dev-hint-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-column-gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--axis);
+  border-radius: 2px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--axis);
+}
+
+.dev-hint-item:hover {
+  background: var(--axis);
+  color: var(--stone-dark);
+}
+
+.dev-hint-role {
+  grid-row: span 2;
+  font-size: var(--text-xs);
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: var(--gold-shadow);
+}
+
+.dev-hint-credential {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
+  word-break: break-all;
+}
+
+.dev-hint-item:hover .dev-hint-credential {
+  color: var(--stone-dark);
+  text-shadow: none;
 }
 </style>

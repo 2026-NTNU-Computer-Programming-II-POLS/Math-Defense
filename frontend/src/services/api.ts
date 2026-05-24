@@ -29,6 +29,16 @@ export const CSRF_COOKIE_NAME = 'csrf_token'
 export const CSRF_HEADER_NAME = 'X-CSRF-Token'
 const UNSAFE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
 
+// Endpoints whose 401 means "these credentials are wrong", not "your session
+// expired". Clearing local auth state on these would silently log out a
+// previously-authenticated user who mistypes a password while signing in as
+// a different account on /auth.
+const CREDENTIAL_CHECK_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/mfa/challenge',
+  '/api/auth/register',
+])
+
 export function readCookie(name: string): string | null {
   // document.cookie is "k=v; k2=v2"; pick by exact name.
   if (typeof document === 'undefined') return null
@@ -211,7 +221,10 @@ async function requestOnce<T>(
     // 401 interceptor: access token expired / rejected by server. Clear local
     // auth state and (if on a protected route) navigate to /auth so the user
     // isn't stranded on a blank panel with repeating errors.
-    if (res.status === 401) {
+    // Skip for credential-check endpoints (login, MFA challenge, register):
+    // a 401 there is "wrong password", not session expiry, and clearing state
+    // would log out a previously-authenticated user who mistyped on /auth.
+    if (res.status === 401 && !CREDENTIAL_CHECK_PATHS.has(path)) {
       try {
         const { useAuthStore } = await import('@/stores/authStore')
         // Call handleSessionExpiry (sync, no API call) to avoid recursive logout
