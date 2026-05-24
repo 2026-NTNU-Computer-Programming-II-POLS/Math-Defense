@@ -171,7 +171,7 @@ function announce(msg: string): void {
 watch(() => gameStore.phase, (phase) => {
   switch (phase) {
     case GamePhase.BUILD:       announce(`Build phase, wave ${gameStore.wave + 1} ready`); break
-    case GamePhase.WAVE:        announce(`Wave ${gameStore.wave} started`); break
+    case GamePhase.WAVE:        announce(`Wave ${gameStore.wave + 1} started`); break
     case GamePhase.BUFF_SELECT: announce('Buff selection'); break
     case GamePhase.CHAIN_RULE:  announce('Chain rule challenge'); break
     case GamePhase.LEVEL_END:   announce('Victory'); break
@@ -308,7 +308,7 @@ onMounted(() => {
   recomputeScale()
   const shell = shellRef.value
   if (shell) {
-    ro = new ResizeObserver((_entries, _observer) => recomputeScale())
+    ro = new ResizeObserver(() => recomputeScale())
     ro.observe(shell)
   }
   window.addEventListener('resize', recomputeScale)
@@ -479,9 +479,9 @@ onBeforeUnmount(() => {
           <button class="btn" @click="togglePause">Resume</button>
         </div>
       </div>
-    </div>
-    </div>
-  </div>
+    </div> <!-- /.game-overlay -->
+    </div> <!-- /.game-view -->
+  </div> <!-- /.game-shell -->
 </template>
 
 <style scoped>
