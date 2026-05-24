@@ -10,7 +10,7 @@ The frontend hosts both the Vue 3 UI layer and the entire game engine. It render
 | State | Pinia 3 |
 | Router | Vue Router 4 |
 | Build | Vite 8 |
-| Language | TypeScript 5.9 (strict, `erasableSyntaxOnly`, `verbatimModuleSyntax`) |
+| Language | TypeScript 6.0 (strict, `erasableSyntaxOnly`, `verbatimModuleSyntax`) |
 | Rendering | HTML5 Canvas 2D |
 | Math Display | KaTeX (`<MathDisplay>` wrapper component) |
 | Math Module | WebAssembly (Emscripten C) via `WasmBridge.ts` — pure-JS fallback for every call |
@@ -73,7 +73,7 @@ frontend/
 │   │   │   ├── BuildHint.vue       First-time placement hints
 │   │   │   ├── FirstEncounterCard.vue  First-encounter explanation card (driven by `useFirstEncounterCards`)
 │   │   │   ├── ShopPanel.vue       In-BUILD shop for time-based buffs
-│   │   │   ├── SpellBar.vue        Spell cooldown buttons (Fireball / Frost Nova / Lightning / Rejuvenate)
+│   │   │   ├── SpellBar.vue        Spell cooldown buttons (Fireball / Frost Nova / Lightning / Haste)
 │   │   │   ├── SpellIcon.vue       Single spell icon (cooldown ring + glyph)
 │   │   │   ├── MagicModePanel.vue  Magic tower: function curve selection
 │   │   │   ├── RadarConfigPanel.vue Radar tower: arc start/end/restrict config
@@ -237,7 +237,7 @@ frontend/
 │   │   ├── MovementSystem.ts          Path movement with arc-length correction
 │   │   ├── WaveSystem.ts              Enemy spawn queue driven by domain/wave/wave-generator
 │   │   ├── BuffSystem.ts              Time-based buff/curse strategy map; applyExternalBuff() public API
-│   │   ├── SpellSystem.ts             4 spells (Fireball/Frost Nova/Lightning/Rejuvenate) + cooldown mgmt
+│   │   ├── SpellSystem.ts             4 spells (Fireball/Frost Nova/Lightning/Haste) + cooldown mgmt
 │   │   ├── MontyHallSystem.ts         Kill-value threshold triggers; door reveal + switch logic; reward injection
 │   │   ├── EconomySystem.ts           Gold on kill (×goldMultiplier), HP on origin reach, wave bonuses
 │   │   └── __tests__/                 Vitest unit tests
@@ -282,14 +282,14 @@ frontend/
 │   ├── data/                       Static definitions — no functions
 │   │   ├── constants.ts            GamePhase / TowerType / EnemyType / Events (`as const`)
 │   │   ├── tower-defs.ts           Cost, damage, range, math concept, V2 params (7 tower types) + glyph + examRelevance
-│   │   ├── enemy-defs.ts           HP, speed, reward, split/helper/boss config + triggerHpRange (7 enemy types)
+│   │   ├── enemy-defs.ts           HP, speed, reward, split/helper/boss config + triggerHpRange (10 enemy types)
 │   │   ├── counter-enemy-info.ts   Counter-enemy UI metadata used by panels + first-encounter cards
 │   │   ├── difficulty-defs.ts      DIFFICULTY_TABLE, MultisetEntry, pickRandomMultiset
 │   │   ├── buff-defs.ts            Time-based buff/curse IDs, labels, effect strategies (30+ effects)
-│   │   ├── spell-defs.ts           4 spell definitions (Fireball/Frost Nova/Lightning/Rejuvenate)
+│   │   ├── spell-defs.ts           4 spell definitions (Fireball/Frost Nova/Lightning/Haste)
 │   │   ├── monty-hall-defs.ts      Kill-value thresholds per star rating; door reward pool
 │   │   ├── achievement-defs.ts     Achievement definitions (5 categories) — lint-tested against trait-praise vocabulary
-│   │   ├── talent-defs.ts          21 talent node definitions (7 tower types, prereq chains)
+│   │   ├── talent-defs.ts          19 talent node definitions (7 tower types, prereq chains)
 │   │   ├── principle-defs.ts       7 mathematical-principle definitions surfaced by `PrincipleOverlay` after the matching gameplay moment
 │   │   ├── path-segment-types.ts   Piecewise path segment type constants
 │   │   └── ui-defs.ts              Panel layout, colour palette
@@ -447,7 +447,7 @@ Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_ST
 | `LimitTowerSystem` | Presents lim question; resolves ±∞/±C/0 outcome; applies range effect |
 | `CalculusTowerSystem` | Derivative/integral picker; spawns Pet entities managed by `PetCombatSystem` |
 | `PetCombatSystem` | Homing movement for Pet projectiles toward nearest enemy; applies damage on contact; prunes expired or out-of-range pets |
-| `SpellSystem` | Fireball (AoE), Frost Nova (slow), Lightning (single), Rejuvenate (tower buff); cooldown per spell |
+| `SpellSystem` | Fireball (AoE), Frost Nova (slow), Lightning (single), Haste (tower-speed buff); cooldown per spell |
 | `MontyHallSystem` | Kill-value thresholds per star rating; door reveal logic; injects rewards via `BuffSystem.applyExternalBuff()` |
 | `MovementSystem` | Advances enemies along CurvePath/SegmentedPath via matching strategy; reads `speedBoost` + `enemySpeedMultiplier` |
 | `WaveSystem` | Reads wave schedule; spawns via `EnemyFactory`; detects clear, emits `WAVE_END` |
@@ -660,8 +660,9 @@ npm run build        # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite
 npm run preview      # Preview the production build
 npm test             # arch-check + event-registry-check + Vitest (default test command)
 npm run test:watch   # Vitest in watch mode
-npm run ci           # arch-check + event-registry-check + lint-chinese-comments + lint-determinism + Vitest
+npm run ci           # arch-check + event-registry-check + lint-chinese-comments + lint-determinism + no-raw-px + Vitest
 npm run bench        # Run Vitest benchmarks under dev/vitest.bench.config.ts
+npm run verify-wasm  # Verifies the WASM binary loads and matches the JS-fallback parity surface
 ```
 
 Type-check only (no emit): `npx vue-tsc -b`.
@@ -674,6 +675,8 @@ Type-check only (no emit): `npx vue-tsc -b`.
 | `event-registry-check.ts` | `npm run event-registry-check` | Verifies every emitted EventBus event is registered in `engine/event-handlers/registry.ts` |
 | `lint-chinese-comments.ts` | `npm run lint-chinese-comments` | Fails the build if any source file contains Chinese characters in comments |
 | `lint-determinism.ts` | `npm run lint-determinism` | Static checks for non-deterministic primitives (`Math.random`, `Date.now`) inside engine code |
+| `no-raw-px.ts` | `npm run no-raw-px` | Fails the build on raw `font-size: NNpx` declarations outside the allowlisted `html` root anchor (forces the `--text-*` rem token scale) |
+| `verify-wasm.ts` | `npm run verify-wasm` | Loads the compiled WASM binary and verifies it boots + matches the JS-fallback parity surface |
 | `synth-audio.py` | `python scripts/synth-audio.py` | Regenerates `public/audio/*.wav` from a deterministic CC0/synth recipe |
 
 ### TypeScript project settings of note
@@ -687,7 +690,7 @@ Type-check only (no emit): `npx vue-tsc -b`.
 
 ## Testing
 
-Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships ~68 test files spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships ~77 test files spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
 
 - **Engine units** — `EventBus`, `Game`, `PhaseStateMachine`, `Renderer`, `level-context`, `engine/audio/AssetManager`, `engine/projections/project-path-panel`, `engine/projections/project-enemies`, `engine/render-helpers/tile-style`, `engine/__tests__/determinism` (replay reproducibility from `rng_seed`).
 - **Domain** — `domain/combat/SplitPolicy`, `domain/level/{level-generator, level-layout-service, placement-policy, checkpoint}`, `domain/movement/{vertical, x-driven}-movement-strategy`, `domain/path/{path-builder, path-progress-tracker, path-validator, segmented-path}`, `domain/scoring/score-calculator.parity` (frontend ↔ backend formula parity), `domain/wave/wave-generator`.
@@ -733,6 +736,7 @@ Grid bounds: X ∈ [-14, 14], Y ∈ [-14, 14]. Tower placement snaps to grid int
 | `wave-start.wav` / `wave-end.wav` | sfx | Wave flow |
 | `level-victory.wav` / `game-over.wav` | sfx | Run outcome |
 | `mh-reveal.wav` | sfx | Monty Hall door reveal |
+| `buff-expire.wav` | sfx | Buff timer expiry (paired with the HUD's expiry-flash + countdown ring) |
 | `achievement.wav` | sfx | Newly-unlocked achievement toast |
 
 The exact slug → file + mix-parameter mapping lives in `src/engine/audio/sfx-defs.ts`.

@@ -15,7 +15,7 @@ REST API server for Math Defense: authentication (incl. refresh-token rotation, 
 | Rate Limiting | slowapi (per-IP) + per-account login throttle |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
 | WASM host | wasmtime-py 44.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
-| Testing | pytest 9 + pytest-asyncio (≈331 tests / 26 files) |
+| Testing | pytest 9 + pytest-asyncio (≈196 tests / 27 files) |
 
 ---
 
@@ -51,7 +51,7 @@ backend/
 │   │   │   ├── constraints.py     Per-field length / regex bounds
 │   │   │   └── repository.py      Repository Protocol
 │   │   ├── achievement/           Achievement definitions + aggregate + policy (season-multiplier hooks)
-│   │   ├── talent/                Talent tree aggregate + definitions + tree-builder (21 nodes, 7 tower types, prereq chains)
+│   │   ├── talent/                Talent tree aggregate + definitions + tree-builder (19 nodes, 7 tower types, prereq chains)
 │   │   ├── class_/                Class aggregate + ClassMembership + join_code + class-scoped errors
 │   │   ├── auth/                  Auth-specific domain helpers (refresh-token repository protocol)
 │   │   ├── scoring/               score_calculator.py — server-side S1/S2/K/TotalScore formula
@@ -161,10 +161,10 @@ backend/
 ├── data/
 │   └── math_engine.wasm           Shipped WASM blob (mirrors frontend/public/wasm) — backs wasm_runtime singleton
 │
-├── alembic/                       Alembic migration environment (versions/ + env.py) — 35 revisions through y9b0c1d2e3f4
+├── alembic/                       Alembic migration environment (versions/ + env.py) — 40 revisions through z0c1d2e3f4a5_create_audit_logs_table
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
-├── tests/                         26 files / ≈331 tests
+├── tests/                         27 files / ≈196 tests
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py                       — register / login / me / logout
 │   ├── test_auth_lockout.py               — per-account lockout window + exponential backoff
@@ -561,7 +561,16 @@ docker-compose up backend        # from project root
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins. No default — an absent value raises at startup rather than silently defaulting to localhost in prod. |
 | `ALGORITHM` | No | JWT algorithm (default `HS256`) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `15` |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | No | Default `14` (sets refresh cookie `max-age`) |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | No | Default `30` (sets refresh cookie `max-age`) |
+| `FRONTEND_URL` | Yes | Base URL used in outbound emails (verification links). Required — no default so production cannot silently emit links pointing at localhost. |
+| `JWT_ISSUER` | No | Default `math-defense-api`. Bound into every JWT `iss` and required at decode time. |
+| `JWT_AUDIENCE` | No | Default `math-defense-clients`. Bound into every JWT `aud` and required at decode time. |
+| `PROXY_MODE` | No | Default `false`. When `true`, per-IP rate limiting reads the real client from `X-Forwarded-For`. |
+| `TRUSTED_PROXY_IPS` | No | Comma-separated IP/CIDR list whose `X-Forwarded-For` the backend trusts (consulted when `PROXY_MODE=true`). |
+| `TOTP_ENCRYPTION_KEY` | If MFA enabled | AES-256 Fernet key encrypting TOTP secrets at rest. |
+| `SEED_DEMO_USER` / `DEMO_SEED_PASSWORD` | No | When `SEED_DEMO_USER=true`, `DEMO_SEED_PASSWORD` is required and must satisfy the registration strength rules. |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` | No | SQLAlchemy pool tuning. Defaults: `10` / `20` / `3600` s. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | No | Optional; when `SMTP_HOST` is empty `email_service` becomes a no-op. |
 | `SESSION_STALE_CUTOFF_HOURS` | No | Default `2.0`; active sessions older than this are auto-abandoned |
 | `COOKIE_SECURE` | No | Default `true`. Sets `Secure` flag on auth + refresh cookies. Only `false` is honoured under CI/pytest — outside tests, startup aborts so plain-HTTP deployments cannot silently leak cookies. |
 | `CSRF_ENABLED` | No | Default `true` outside the pytest/CI harness. `CsrfMiddleware` enforces a double-submit cookie on unsafe methods whenever the auth cookie is present. |
@@ -575,7 +584,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                       # ≈331 tests across 26 files
+pytest                                       # ≈196 tests across 27 files
 pytest tests/test_session_aggregate.py -v    # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v        # audit-driven edge cases
 pytest tests/test_territory.py -v            # territory integration tests

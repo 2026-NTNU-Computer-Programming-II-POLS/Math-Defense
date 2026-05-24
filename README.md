@@ -92,7 +92,7 @@ Path generation is polynomial-only; the trig / log evaluator is used by the Magi
 
 ### Progression (carries between runs)
 
-- **Achievements** — 33 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
+- **Achievements** — 29 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
 - **Talent Tree** — 19 nodes across the 7 tower types with linear prerequisite chains. Each node has a `maxLevel` (2 or 3) and grants a per-tower attribute multiplier — including damage, range, attack/sweep speed, target count, zone width/strength, Magic zone duration, Matrix damage-ramp rate, and Calculus pet damage/speed/HP. Modifiers are snapshotted at tower placement, so re-build to refresh after reallocating. Free reset is supported.
 - **Avatar & profile** — unlocked along the way.
 - **Class & Territory** — students join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global.
@@ -166,7 +166,7 @@ Browser
 
 | Layer | Technology |
 |---|---|
-| Frontend | Vue 3 (Composition API, `<script setup>`), TypeScript 5.9 strict, Pinia, Vue Router, Vite 8, Vitest |
+| Frontend | Vue 3.5 (Composition API, `<script setup>`), TypeScript 6.0 strict, Pinia 3, Vue Router 4, Vite 8, Vitest 4 |
 | Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
 | WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 17 exported math functions (plus `_malloc`/`_free`) |
 | Database | PostgreSQL 16 (Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
@@ -198,8 +198,8 @@ Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirror
 
 ### Prerequisites
 
-- Node.js 22+
-- Python 3.12+
+- Node.js 26+
+- Python 3.13+
 - Docker & Docker Compose (optional)
 - Emscripten SDK (only if rebuilding WASM; `emsdk/` is vendored)
 
@@ -256,6 +256,12 @@ Create `.env` at the project root (see `.env.example`):
 | `POSTGRES_PASSWORD` | Yes | Password for the `postgres` service (matches the password embedded in `DATABASE_URL`) |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
 | `FRONTEND_URL` | Yes | Base URL used in outbound emails (verification links), e.g. `http://localhost:5173` |
+| `POSTGRES_APP_PASSWORD` | No | M-13 least-privilege app role password; consumed by `pg_init_roles.sh` on first DB init. Required only if you set a second `DATABASE_URL_APP` for runtime queries. |
+| `PROXY_MODE` | No | Default `false`. Set `true` when running behind nginx/another proxy so rate limits key on `X-Forwarded-For` instead of the proxy IP. |
+| `TRUSTED_PROXY_IPS` | No | Comma-separated IPs / CIDRs whose `X-Forwarded-For` the backend trusts when `PROXY_MODE=true`. |
+| `TOTP_ENCRYPTION_KEY` | If MFA used | AES-256 Fernet key used to encrypt TOTP secrets at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `SEED_DEMO_USER` | No | Default `false`. Set `true` to seed a demo user on startup. |
+| `DEMO_SEED_PASSWORD` | If seeding | Required when `SEED_DEMO_USER=true`; must satisfy the standard registration strength rules. |
 | `COOKIE_SECURE` | No | Default `true`; only `false` is honoured under CI/pytest (see `reject_insecure_cookie_outside_tests` in `backend/app/config.py`) |
 
 > The backend refuses to start when `DATABASE_URL` embeds the literal password `changeme` — replace it in `.env` before first boot.
@@ -287,8 +293,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # ~331 tests across 26 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute)
-cd frontend && npm test            # ~68 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
+cd backend  && pytest              # ~196 tests across 27 files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute)
+cd frontend && npm test            # ~77 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).

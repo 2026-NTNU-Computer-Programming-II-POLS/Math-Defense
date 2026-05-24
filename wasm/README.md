@@ -209,7 +209,7 @@ above: `pow` is musl in WASM bytecode, byte-identical regardless of host.
 ```c
 typedef struct { uint64_t state; uint64_t inc; } prng_t;   /* 16 bytes */
 
-void     prng_seed     (prng_t *r, uint64_t seed, uint64_t stream);
+void     prng_seed     (prng_t *r, uint32_t seed, uint32_t stream);   /* see ABI note */
 uint32_t prng_next_u32 (prng_t *r);
 double   prng_next_f64 (prng_t *r);   /* [0, 1), 53-bit mantissa */
 ```
@@ -221,6 +221,13 @@ and a stream-id channel (`inc`) for splitting `level_rng` from
 draws as `(top26 * 2^26 + bot27) / 2^53`; rounding never enters because each
 intermediate is exactly representable. Used by `Game.setSeed` when WASM is
 loaded.
+
+> **ABI note** — the public `prng_seed` signature exposes `seed` and `stream`
+> as `uint32_t` rather than the PCG paper's `uint64_t`. The narrowing is
+> deliberate: Emscripten's `ccall` marshalling for `i64` arguments forces
+> JavaScript `BigInt` round-trips at every call site, which the bridge avoids
+> by widening the 32-bit seed internally inside `prng.c`. See the comment in
+> `wasm/prng.c` for the rationale.
 
 ---
 
