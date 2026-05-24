@@ -479,9 +479,9 @@ onBeforeUnmount(() => {
           <button class="btn" @click="togglePause">Resume</button>
         </div>
       </div>
-    </div>
-    </div>
-  </div>
+    </div> <!-- /.game-overlay -->
+    </div> <!-- /.game-view -->
+  </div> <!-- /.game-shell -->
 </template>
 
 <style scoped>
