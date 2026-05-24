@@ -171,7 +171,9 @@ function announce(msg: string): void {
 watch(() => gameStore.phase, (phase) => {
   switch (phase) {
     case GamePhase.BUILD:       announce(`Build phase, wave ${gameStore.wave + 1} ready`); break
-    case GamePhase.WAVE:        announce(`Wave ${gameStore.wave + 1} started`); break
+    // `wave` is incremented at BUILD→WAVE transition (Game.startWave), so it
+    // is already 1-indexed during WAVE — do NOT add 1 here.
+    case GamePhase.WAVE:        announce(`Wave ${gameStore.wave} started`); break
     case GamePhase.BUFF_SELECT: announce('Buff selection'); break
     case GamePhase.CHAIN_RULE:  announce('Chain rule challenge'); break
     case GamePhase.LEVEL_END:   announce('Victory'); break
