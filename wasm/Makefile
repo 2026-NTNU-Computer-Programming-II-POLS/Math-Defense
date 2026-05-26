@@ -46,9 +46,16 @@ FLAGS = -sEXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
         $(FP_FLAGS) \
         -O2
 
-.PHONY: all clean dts
+.PHONY: all clean dts regenerate-fixtures
 
 all: $(OUT) $(DTS)
+
+# Refresh shared/score_parity_fixtures.json from the current Python mirror.
+# Run after editing compute_total_score in any of {C, Python, TS}. Inputs are
+# canonical and live inside scripts/regenerate_score_fixtures.py; this target
+# just re-evaluates the `expected` column against the live formula.
+regenerate-fixtures:
+	cd $(MAKEFILE_DIR)../backend && python ../scripts/regenerate_score_fixtures.py
 
 $(OUT): $(SRC)
 	$(CC) $(SRC) -o $(OUT) $(FLAGS)

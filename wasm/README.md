@@ -101,6 +101,17 @@ will extend the guarantee to a non-WASM build of the same TUs.
 make clean
 ```
 
+### Regenerate score parity fixtures
+
+`shared/score_parity_fixtures.json` pins the agreed-on output of `compute_total_score` across the C/Python/TS implementations (see `compute_total_score` below). Whenever the formula changes — even by one ULP — the fixtures must be refreshed so the parity tests keep their teeth:
+
+```bash
+cd wasm
+make regenerate-fixtures
+```
+
+This runs `scripts/regenerate_score_fixtures.py`, which loads the Python mirror (`backend/app/domain/scoring/score_calculator.py`) and re-evaluates the canonical input matrix defined in the script. The input matrix is the source of truth for "what cases we care about"; add a new entry there when you introduce a new branch in the formula. The required order of operations during a formula change is documented at the top of that script.
+
 ---
 
 ## Exported Functions
