@@ -70,7 +70,7 @@ _reg(TalentNodeDef("calculus_pet_range", "calculus", "pet_range", "Extended Reac
 # 42 TP total — comfortably exceeds the 55 TP achievement pool so a fully-
 # achievement-loaded player can still aspire to one more node.
 _reg(TalentNodeDef("magic_slow_strength", "magic", "slow_strength", "Deeper Chill",
-                   "Magic debuff slow is stronger (subtracts from the slow factor)",
+                   "Magic debuff slow is stronger",
                    2, 3, 0.10, (), ("magic_zone_width",)))
 _reg(TalentNodeDef("radar_a_aoe_width", "radarA", "aoe_width", "Wider Sweep",
                    "Sweep beam covers a wider arc",
