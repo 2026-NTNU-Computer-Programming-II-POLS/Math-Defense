@@ -69,6 +69,31 @@ but later phases build on the foundation.
 | 5 | `achievements`, `talent_allocations` |
 | 6 | `grabbing_territory_activities`, `territory_slots`, `territory_occupations` |
 
+## 2026-05 Balance Overhaul (player-visible changelog)
+
+19 approved balance changes shipped in 8 phases across `feat/balance-overhaul-2026-05`. See [`balance-overhaul-plan.md`](balance-overhaul-plan.md) for the full plan and [`balance-after-2026-05.md`](balance-after-2026-05.md) for the post-deployment audit.
+
+| Area | Change | Why |
+|---|---|---|
+| **Scoring** | `K^(1/√denom)` and continuous K blend | Smoother high-difficulty curve; no more `S1 == S2` jump |
+| **Shield (Ward)** | Halves the next 3 hits instead of nullifying them | Boss still deals ~50 HP through an active shield |
+| **BULWARK** | Takes 40% of all tower damage (pets/effects bypass) | Replaces the binary `damageCapPerHit: 14` cap |
+| **MAGIC tower** | Zone deals AoE damage + applies slow | Distinct role from radar towers |
+| **LIMIT tower** | Charge-up burst (×1.5 multiplier) | Distinct role; `+inf` instakill preserved |
+| **MATRIX tower** | Base damage 1 (was 0) — fires while pairing | UI also shows "Pairing Required" hint |
+| **Calculus pets** | Count = `floor(log2(coefficient + 1))` | Closes the `99x` → 99-pet exploit |
+| **Pet talents** | `pet_hp` removed, `pet_range` (+20%/lv) added | `pet_hp` had no game effect; range matters |
+| **Pet attack speed** | Linear `max(0.1, 1 - 0.1·(lv-1))` (was `0.85^(lv-1)`) | Less compounding at high levels |
+| **Wave bonus** | `10 + 20·star` (was `25 + 8·star`) | High-star runs net richer; low-star gentler |
+| **Enemy rewards** | Unified at `round(killValue × 1.5)` | Removes ad-hoc per-enemy ratios |
+| **Gold buff stacking** | Additive bonus (×2 + ×3 → ×4, not ×6) | Removes runaway compounding |
+| **Monty Hall (5★ 4th)** | Threshold 1000 (was 1400) | Earlier access to top-tier rewards |
+| **Monty Hall gating** | Per-reward `minStar` filter | 1★ players can no longer roll game-trivializing rewards |
+| **Talent tree** | +7 advanced "Tier-2" nodes, parent-at-max prereq | Tree budget 111 TP vs 55 TP achievement pool — meaningful choice |
+| **Qualitative talents** | 4 of them now cost 3 TP/lv (was 2) | Reflects their actual power tier |
+
+The in-game manual (`frontend/public/manual/`) already mirrors all of the above as of `f8a24f9`.
+
 ## V1 Code Removed
 
 | Phase | Removed |

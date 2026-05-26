@@ -123,17 +123,23 @@ specific target or area and then consumed.
 
 ## 4.5 Scoring Formula
 
-### Formulas
+> **Updated 2026-05-27 (Balance Overhaul Phase 2 — Q1 + Q3):** the K-weight is now a continuous blend (no piecewise cliff at `S1 == S2`) and the HP-loss exponent is `1/√denom` rather than `1/denom`. Both changes are mirrored bit-exactly in `wasm/math_engine.c`, `backend/app/domain/scoring/score_calculator.py`, and `frontend/src/domain/scoring/score-calculator.ts`; parity is enforced by `shared/score_parity_fixtures.json`.
+
+### Formulas (post-overhaul)
 
 ```
 S1 = kill_value / active_time
-   where active_time = time_total - n * sum(time_exclude_prepare)
+   where active_time = max(0.001, time_total - sum(time_exclude_prepare))
 
-S2 = kill_value / cost_total
+S2 = (cost_total > 0) ? kill_value / cost_total : 0
 
-K  = MAX over m in [0.5, 0.7] of (m * S1 + (1 - m) * S2)
+alpha = (S1 + S2 > 0) ? S1 / (S1 + S2) : 0
+K     = alpha * S1 + (1 - alpha) * S2          # Q3: continuous blend
 
-Total Score = K ^ (1 / [1 + (2 + health_origin - health_final - IA)])
+exponent_denom = max(1, 1 + (2 + health_origin - health_final - IA))
+exponent       = 1 / sqrt(exponent_denom)      # Q1: sqrt-softened
+
+Total Score = max(0, K) ^ exponent
 ```
 
 ### Variable Collection
@@ -146,20 +152,21 @@ level end.
 | `kill_value` | EconomySystem (cumulative sum of enemy kill values) | On each enemy death |
 | `time_total` | GameLoop timer | Level start → level end |
 | `time_exclude_prepare` | GameLoop timer | Each preparation phase duration |
-| `n` | WaveSystem | Count of preparation phases |
 | `cost_total` | EconomySystem (cumulative sum of all spending) | On each purchase |
 | `health_origin` | Game store | Level start |
 | `health_final` | Game store | Level end |
 | `IA` | InitialAnswer result | Pre-level phase |
 
-### K Optimization
+### Why the rewrite
 
-To find `K = MAX(m * S1 + (1 - m) * S2)` for m in [0.5, 0.7]:
+- **Q3 (continuous K)**: the original `MAX over m in [0.5, 0.7]` reduced to a piecewise `0.7·S1 + 0.3·S2` vs `0.5·S1 + 0.5·S2` branch with a visible discontinuity at `S1 == S2`. Replays that crossed the equality during play recorded jump-scoring artefacts. The new `alpha = S1/(S1+S2)` interpolates smoothly: efficiency-dominant runs (`S1 ≫ S2`) tilt toward S1, cost-dominant runs toward S2, and the zero-kill case short-circuits to `K = 0`.
+- **Q1 (sqrt-softened exponent)**: the original `1/denom` punished HP loss too harshly (a 5-HP loss at HP-origin 10 dropped the exponent from 1/3 to 1/8, a brutal cliff). `1/sqrt(denom)` keeps the same direction — survive more = score more — but no longer crushes the score on high-difficulty plays. The cap `denom = max(1, …)` keeps the impossible `health_final > health_origin` path bounded.
 
-Since this is a linear function of m, the maximum is at one of the endpoints:
-- If S1 > S2: K = 0.7 * S1 + 0.3 * S2
-- If S1 < S2: K = 0.5 * S1 + 0.5 * S2
-- If S1 = S2: K = S1 (= S2)
+### Edge cases
+
+- `kill_value = 0` ⇒ `K = 0` ⇒ Total Score = 0 (zero-kill runs score nothing).
+- `cost_total = 0` ⇒ `S2 = 0`, `alpha = 1`, `K = S1` (no penalty for the no-tower path — was a 30% penalty pre-Q3).
+- Impossible HP delta (`health_final > health_origin`) ⇒ clamp `exponent_denom` to 1 and log a warning rather than fail the verifier.
 
 ### Implementation
 
