@@ -163,6 +163,41 @@ describe('TowerRenderer — smoke tests', () => {
     expect(() => renderer.render(makeRenderer(ctx), game)).not.toThrow()
   })
 
+  // Phase 6 Q8 — Limit tower also has an "idle hint" branch when the player
+  // hasn't yet picked an answer (configured=false → chargeProgress=null) so
+  // the asymptote-approach sawtooth still plays as a teaser. Smoke-test it.
+  it('Limit tower paints the unconfigured idle-sawtooth branch (chargeProgress=null)', () => {
+    const game = createMockGame();
+    (game as unknown as { hud: { keyboardCursor: null } }).hud = { keyboardCursor: null }
+    game.towers.push(createMockTower({
+      type: TowerType.LIMIT,
+      x: 5,
+      y: 5,
+      configured: false,
+    }))
+    const renderer = new TowerRenderer()
+    const ctx = createCtxStub()
+    expect(() => renderer.render(makeRenderer(ctx), game)).not.toThrow()
+  })
+
+  // Phase 6 Q8 — Limit tower mid-charge paints both the charge-driven point
+  // height *and* the baseplate charge arc (partial sweep).
+  it('Limit tower paints the mid-charge arc branch', () => {
+    const game = createMockGame();
+    (game as unknown as { hud: { keyboardCursor: null } }).hud = { keyboardCursor: null }
+    game.towers.push(createMockTower({
+      type: TowerType.LIMIT,
+      x: 5,
+      y: 5,
+      configured: true,
+      cooldown: 3.0,
+      cooldownTimer: 1.5,
+    }))
+    const renderer = new TowerRenderer()
+    const ctx = createCtxStub()
+    expect(() => renderer.render(makeRenderer(ctx), game)).not.toThrow()
+  })
+
   // Visual Redesign Phase 5e — Calculus tower sheds `dx`/`dy` particles on
   // fire. Exercise the firing branch with an enemy in range so aimAngle is
   // populated (idle branch is covered by the parameterized loop above).

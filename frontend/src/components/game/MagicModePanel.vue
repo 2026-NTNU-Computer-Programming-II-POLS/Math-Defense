@@ -229,6 +229,24 @@ function toggleMode(mode: MagicMode) {
           @click="toggleMode('buff')"
         >Buff Towers</button>
       </div>
+      <!-- Phase 6 Q7 — surface the slow/DoT timing so players can plan around
+           the 2 s slow refreshing while the 1 s DoT ticks each cooldown. The
+           buff branch has its own one-line hint so the panel is informative
+           regardless of mode. -->
+      <p
+        v-if="tower.magicMode === 'debuff'"
+        class="mode-hint"
+        data-testid="magic-debuff-hint"
+      >
+        Inside the band: <strong>1 s DoT</strong> per cooldown and a <strong>2 s slow</strong> to 60% speed. Re-hits refresh the timers (no stronger stack).
+      </p>
+      <p
+        v-else-if="tower.magicMode === 'buff'"
+        class="mode-hint"
+        data-testid="magic-buff-hint"
+      >
+        Allied towers inside the wider band gain <strong>+25%</strong> damage while at least one Magic tower in this mode covers them.
+      </p>
     </div>
   </div>
 </template>
@@ -264,6 +282,17 @@ function toggleMode(mode: MagicMode) {
 .mode-btns { display: flex; gap: 6px; }
 .mode-btns .btn { flex: 1; font-size: var(--text-xs); padding: 6px; }
 .mode-btns .btn.active { background: var(--gold); color: var(--stone-dark); }
+.mode-hint {
+  font-size: var(--text-2xs);
+  color: var(--text-primary);
+  margin: 6px 0 0;
+  line-height: 1.4;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 2px solid var(--gold);
+  border-radius: 0 3px 3px 0;
+}
+.mode-hint strong { color: var(--gold); font-weight: bold; }
 .slider-fn-input { gap: 6px; }
 .slider-row { display: flex; flex-direction: column; gap: 4px; }
 .slider-cell { display: grid; grid-template-columns: 14px 1fr 28px; align-items: center; gap: 6px; }

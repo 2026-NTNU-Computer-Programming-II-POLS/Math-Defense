@@ -78,6 +78,17 @@ export interface TowerView {
    * Visual Redesign Phase 5c.
    */
   readonly matrixCells: readonly number[] | null
+  /**
+   * 0..1 charge progress for towers that gate their fire behind a cooldown
+   * "charge" window. Populated for LIMIT (Phase 6 Q8 burst design): 0 right
+   * after a burst, 1 just before the next burst. Null for tower types that
+   * do not telegraph charge state — those keep their time-driven idle anim.
+   *
+   * Derived from `1 - cooldownTimer / cooldown`, clamped to [0, 1]. Only
+   * populated when the tower is configured and active; unconfigured LIMIT
+   * towers project null so the renderer can keep its hint sawtooth.
+   */
+  readonly chargeProgress: number | null
 }
 
 // ── Enemy views ──────────────────────────────────────────────────────────────

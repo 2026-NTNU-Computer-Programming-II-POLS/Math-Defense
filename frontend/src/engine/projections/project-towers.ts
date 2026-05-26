@@ -51,6 +51,18 @@ function matrixCells(tower: Tower, time: number): number[] {
   return out
 }
 
+// Phase 6 Q8 — LIMIT's 3 s cooldown is the burst-charge window. The renderer
+// drives its asymptote-point ascent + baseplate charge arc from this ratio so
+// the visual matches gameplay tempo (vs. the prior time-driven sawtooth that
+// looked the same whether the tower was about to burst or had just fired).
+function chargeProgressFor(t: Tower): number | null {
+  if (t.type !== TowerType.LIMIT) return null
+  if (!t.configured || t.disabled) return null
+  if (!(t.cooldown > 0)) return null
+  const ratio = 1 - t.cooldownTimer / t.cooldown
+  return ratio < 0 ? 0 : ratio > 1 ? 1 : ratio
+}
+
 export function projectTowerScene(game: Game): TowerSceneView {
   const phase = game.state.phase
   const towers: TowerView[] = game.towers.map((t) => {
@@ -79,6 +91,7 @@ export function projectTowerScene(game: Game): TowerSceneView {
         ? (isRadar ? radarPrimaryTargetAngle(t, game.enemies) : nearestEnemyAngle(t, game.enemies))
         : null,
       matrixCells: t.type === TowerType.MATRIX ? matrixCells(t, game.time) : null,
+      chargeProgress: chargeProgressFor(t),
     }
   })
   return {

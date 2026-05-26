@@ -50,6 +50,13 @@ const MATRIX_BRACKET_SERIF = 3
 // gets arbitrarily close to the bound, then resets at the floor — telegraphing
 // the "limit but never reaches" intuition. On fire the point snaps to the
 // bound and the asymptotes pulse.
+//
+// Phase 6 Q8 wiring (2026-05-27): when `tower.chargeProgress` is non-null
+// (i.e. the tower is configured and the cooldown is acting as the burst-
+// charge window), the point ascends *from chargeProgress* instead of from a
+// free-running time sawtooth. That way the asymptote-approach visibly tracks
+// the actual burst cadence — a fully charged LIMIT visibly kisses the bound,
+// a freshly-fired one sits at the floor.
 const LIMIT_ASYMPTOTE_X = 9
 const LIMIT_TOP_Y = -8
 const LIMIT_BOUND_Y = -6
@@ -57,6 +64,11 @@ const LIMIT_FLOOR_Y = 6
 const LIMIT_BOTTOM_Y = 8
 const LIMIT_PERIOD = 2.4
 const LIMIT_APPROACH_GAMMA = 2.4
+// Baseplate charge arc — a thin tower-color arc spanning the bottom of the
+// octagon that sweeps clockwise as `chargeProgress` rises 0 → 1. At 1 the arc
+// is a full ring; on burst it flashes white and the ring fade-resets to 0.
+const LIMIT_CHARGE_ARC_RADIUS = TOWER_RADIUS + 3
+const LIMIT_CHARGE_ARC_START = Math.PI * 0.5  // start at "south" canvas pole
 // Visual Redesign Phase 5e — Calculus instrument: a large rotating ∫ sigil
 // centred over a thin "area under curve" gradient. On fire the tower sheds
 // small `dx` / `dy` glyph particles that fly outward along the aim vector,
@@ -659,17 +671,31 @@ export class TowerRenderer {
   // asymptote lines flank a point that ascends from below and gets
   // arbitrarily close to the upper bound without crossing it. On fire the
   // point briefly snaps to the bound and the asymptotes pulse.
+  //
+  // Phase 6 Q8: when `tower.chargeProgress` is non-null, the point's height
+  // is driven by the burst-charge ratio (configured-and-ticking branch);
+  // otherwise the original time-driven sawtooth runs as an idle hint for
+  // unconfigured / disabled LIMIT towers.
   private _drawLimitTower(ctx: CanvasRenderingContext2D, px: number, py: number, tower: TowerView): void {
     const color = tower.color
     const firing = tower.firingFlashAge < ANIM.TOWER_FIRE_FLASH
     const fireT = firing ? 1 - tower.firingFlashAge / ANIM.TOWER_FIRE_FLASH : 0
 
-    // Sawtooth approach: t cycles 0→1 across LIMIT_PERIOD seconds. The gap
-    // closes as (1 - t)^gamma so the point gets perceptibly closer to the
-    // bound near the end of each cycle, then resets — making the "never
-    // crosses" intuition legible at a glance.
-    const cycleT = ((this._time + tower.idleSeed) % LIMIT_PERIOD) / LIMIT_PERIOD
-    const gap = (LIMIT_FLOOR_Y - LIMIT_BOUND_Y) * Math.pow(1 - cycleT, LIMIT_APPROACH_GAMMA)
+    // Approach height. Two branches:
+    //   • Charge-driven (Phase 6 Q8): `chargeProgress` maps 0 → floor,
+    //     1 → bound, with the same gamma-eased gap so the visual still
+    //     reads as "limit but never reaches" — just with the cadence tied
+    //     to actual cooldown progress.
+    //   • Idle hint: original time sawtooth, used when chargeProgress is
+    //     null (LIMIT not configured yet, or non-LIMIT — but the type
+    //     dispatch keeps us inside the LIMIT branch here).
+    let approach: number
+    if (tower.chargeProgress !== null) {
+      approach = tower.chargeProgress
+    } else {
+      approach = ((this._time + tower.idleSeed) % LIMIT_PERIOD) / LIMIT_PERIOD
+    }
+    const gap = (LIMIT_FLOOR_Y - LIMIT_BOUND_Y) * Math.pow(1 - approach, LIMIT_APPROACH_GAMMA)
     const pointYRel = firing ? LIMIT_BOUND_Y : LIMIT_BOUND_Y + gap
 
     // Asymptotes — dashed vertical lines. On fire the asymptotes pulse: the
@@ -727,6 +753,43 @@ export class TowerRenderer {
     ctx.arc(px, py + pointYRel, 2.4, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
+
+    // Phase 6 Q8 — baseplate charge arc. Sweeps clockwise as chargeProgress
+    // rises so even a player not watching the asymptote knows when the next
+    // burst lands. Only painted when chargeProgress is non-null (configured,
+    // not disabled) so unconfigured LIMITs don't appear to be charging from
+    // nothing. The arc is drawn outside the body so it doesn't fight the
+    // asymptote silhouette for attention.
+    if (tower.chargeProgress !== null) {
+      const charge = tower.chargeProgress
+      ctx.save()
+      // Dark backing arc — full ring at low alpha so the player can read
+      // "this tower has a charge meter" even when nearly empty.
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)'
+      ctx.lineWidth = 2.4
+      ctx.beginPath()
+      ctx.arc(px, py, LIMIT_CHARGE_ARC_RADIUS, 0, Math.PI * 2)
+      ctx.stroke()
+
+      // Filled arc — clockwise from the south pole. Charge of 1 → full ring;
+      // brightens to white on fire so the burst reads visually.
+      const sweep = Math.PI * 2 * Math.max(0, Math.min(1, charge))
+      ctx.strokeStyle = firing
+        ? `rgba(255,255,255,${0.55 + fireT * 0.45})`
+        : color
+      ctx.lineWidth = firing ? 2.6 + fireT * 1.0 : 2.0
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.arc(
+        px,
+        py,
+        LIMIT_CHARGE_ARC_RADIUS,
+        LIMIT_CHARGE_ARC_START,
+        LIMIT_CHARGE_ARC_START + sweep,
+      )
+      ctx.stroke()
+      ctx.restore()
+    }
   }
 
   // Visual Redesign Phase 5e — Calculus instrument body. A slowly rotating

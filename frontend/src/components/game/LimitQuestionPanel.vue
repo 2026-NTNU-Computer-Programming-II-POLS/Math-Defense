@@ -122,6 +122,24 @@ function submitTyped(): void {
       <p class="result-text">
         Result: {{ outcomeLabel(tower.limitResult) }}
       </p>
+      <!-- Phase 6 Q8 — surface the burst-design contract so players know why
+           a +∞ answer "feels" so much stronger than +C: instakill bypasses
+           defensive caps (Bulwark mult, damage cap) and the multiplier path
+           entirely, while +C and chip damage stack 1.5× on every burst. -->
+      <p
+        v-if="tower.limitResult.outcome === '+inf'"
+        class="burst-hint burst-hint--instakill"
+        data-testid="limit-burst-hint"
+      >
+        +∞ instakills every enemy in range — bypasses Bulwark, caps, and the burst multiplier.
+      </p>
+      <p
+        v-else
+        class="burst-hint"
+        data-testid="limit-burst-hint"
+      >
+        Charges for {{ tower.cooldown?.toFixed(1) ?? '3.0' }}s, then bursts at <strong>1.5×</strong> damage on every enemy in range.
+      </p>
       <button
         class="btn change-btn"
         data-testid="limit-change-answer"
@@ -137,6 +155,18 @@ function submitTyped(): void {
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .choice-btn { font-size: var(--text-xs); padding: 8px; }
 .result-text { font-size: var(--text-xs); color: var(--gold); margin: 0; }
+.burst-hint {
+  font-size: var(--text-2xs);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.4;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 2px solid var(--gold);
+  border-radius: 0 3px 3px 0;
+}
+.burst-hint--instakill { border-left-color: #ffcb47; color: #ffe9a8; }
+.burst-hint strong { color: var(--gold); font-weight: bold; }
 .change-btn { font-size: var(--text-xs); padding: 6px 12px; align-self: flex-start; }
 .typed-entry { display: flex; gap: 6px; }
 .typed-input {
