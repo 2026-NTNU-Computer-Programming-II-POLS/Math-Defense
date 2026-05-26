@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.application.mappers import session_to_out
 from app.db.database import get_db
 from app.domain.user.aggregate import User
+from app.domain.user.value_objects import Role
 from app.factories import build_session_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user
@@ -40,6 +41,10 @@ def create_session(
         initial_answer=req.initial_answer,
         path_config=req.path_config,
         practice_mode=req.practice_mode,
+        # Server-derived: any non-student run is a preview (teacher previewing
+        # the game, admin smoke-testing). Excluded from leaderboards so it
+        # never pollutes the public ranking. Clients cannot override.
+        is_preview=current_user.role != Role.STUDENT,
         challenge_id=req.challenge_id,
         rng_seed=req.rng_seed,
         replay_version=req.replay_version,

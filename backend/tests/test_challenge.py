@@ -30,6 +30,17 @@ def _register_teacher(db_session, name: str) -> str:
     return token
 
 
+def _register_admin(db_session, name: str) -> str:
+    _user, token, _refresh = register_test_user(
+        db_session,
+        email=f"{name}@test.local",
+        password="xQ7!aPm2#vKz9",
+        player_name=name,
+        role="admin",
+    )
+    return token
+
+
 def _valid_constraints() -> dict:
     return {
         "allowed_towers": ["magic", "radarA"],
@@ -310,6 +321,50 @@ def test_only_owner_can_modify(client, db_session):
         headers=_auth(other_token),
     )
     assert res.status_code == 403
+
+
+def test_student_listing_my_challenges_is_forbidden(client):
+    """Pre-fix the endpoint returned [] for students, masking a permission
+    error as an empty result. Students must now see 403 so the SPA can render
+    the correct affordance."""
+    token = _register_student(client, "ch_s_list_forbid")
+    res = client.get("/api/challenges?mine=true", headers=_auth(token))
+    assert res.status_code == 403
+
+
+def test_admin_can_rename_other_teachers_challenge(client, db_session):
+    """ADMIN bypasses the ownership check so they can remediate any teacher's
+    challenge (e.g. abuse-report cleanup) without an out-of-band DB edit."""
+    teacher_token = _register_teacher(db_session, "ch_t_admin_rn_target")
+    admin_token = _register_admin(db_session, "ch_admin_rn")
+    cid = client.post(
+        "/api/challenges",
+        json={"title": "Authored", "description": "", "constraints": _valid_constraints()},
+        headers=_auth(teacher_token),
+    ).json()["id"]
+
+    res = client.patch(
+        f"/api/challenges/{cid}",
+        json={"title": "Remediated by admin", "description": "policy"},
+        headers=_auth(admin_token),
+    )
+    assert res.status_code == 200
+    assert res.json()["title"] == "Remediated by admin"
+
+
+def test_admin_can_delete_other_teachers_challenge(client, db_session):
+    teacher_token = _register_teacher(db_session, "ch_t_admin_del_target")
+    admin_token = _register_admin(db_session, "ch_admin_del")
+    cid = client.post(
+        "/api/challenges",
+        json={"title": "Doomed", "description": "", "constraints": _valid_constraints()},
+        headers=_auth(teacher_token),
+    ).json()["id"]
+    delete_res = client.delete(f"/api/challenges/{cid}", headers=_auth(admin_token))
+    assert delete_res.status_code == 204
+    # Soft-deleted; the original author no longer sees it either.
+    listing = client.get("/api/challenges?mine=true", headers=_auth(teacher_token)).json()
+    assert all(c["id"] != cid for c in listing)
 
 
 def test_soft_delete_hides_from_listing(client, db_session):

@@ -22,7 +22,7 @@ from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 from app.factories import build_study_service
 from app.limiter import limiter
-from app.middleware.auth import get_current_user, require_role
+from app.middleware.auth import require_role
 from app.schemas.study import (
     AffectSubmitRequest,
     EnrollResponse,
@@ -42,7 +42,7 @@ _STUDY_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 def enroll(
     request: Request,
     study_id: str = Query(..., min_length=1, max_length=64),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.STUDENT)),
     db: Session = Depends(get_db),
 ):
     if not _STUDY_ID_PATTERN.match(study_id):
@@ -58,7 +58,7 @@ def enroll(
 def submit_probe(
     request: Request,
     req: ProbeSubmitRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.STUDENT)),
     db: Session = Depends(get_db),
 ):
     score = build_study_service(db).submit_probe(
@@ -75,7 +75,7 @@ def submit_probe(
 def submit_affect(
     request: Request,
     req: AffectSubmitRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.STUDENT)),
     db: Session = Depends(get_db),
 ):
     build_study_service(db).submit_affect(

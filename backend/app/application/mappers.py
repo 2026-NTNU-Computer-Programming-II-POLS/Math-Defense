@@ -24,6 +24,7 @@ def session_to_out(
         started_at=session.started_at,
         ended_at=session.ended_at,
         practice_mode=getattr(session, "practice_mode", False),
+        is_preview=getattr(session, "is_preview", False),
         challenge_id=getattr(session, "challenge_id", None),
         # Backlog §24 — surfaced so the Replay player can re-seed the engine.
         rng_seed=getattr(session, "rng_seed", None),

@@ -54,6 +54,7 @@ erDiagram
         json    path_config              "nullable"
         boolean initial_answer           "DEFAULT false"
         boolean practice_mode            "DEFAULT false — excluded from leaderboard"
+        boolean is_preview               "DEFAULT false — teacher/admin run, excluded from leaderboard"
         string  status                   "enum: active|completed|abandoned"
         int     current_wave             "DEFAULT 0"
         int     gold                     "DEFAULT INITIAL_GOLD (200)"
@@ -381,6 +382,7 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `path_config` | `JSON` | YES | ≤ 10 240 bytes, app-layer validated |
 | `initial_answer` | `Boolean` | NO | DEFAULT `false` |
 | `practice_mode` | `Boolean` | NO | DEFAULT `false`; SERVER DEFAULT `false`. Set when slider-fallback is in use; the leaderboard query filters these out but achievement/talent awards still fire |
+| `is_preview` | `Boolean` | NO | DEFAULT `false`; SERVER DEFAULT `false`. Server-derived from the caller's role at create — true when a teacher or admin plays the game (preview / smoke-test). Same leaderboard-exclusion semantics as `practice_mode`; achievement/talent awards still fire. Clients cannot set this. |
 | `status` | `Enum` | NO | `active \| completed \| abandoned`; DEFAULT `active` |
 | `current_wave` | `Integer` | NO | DEFAULT `0` |
 | `gold` | `Integer` | NO | DEFAULT `INITIAL_GOLD` (200, from `shared/game-constants.json`) |
@@ -900,7 +902,8 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `w7f8a9b0c1d2` | Leaderboard challenge-cascade (B-BUG-4) — change `leaderboard_entries.challenge_id` FK from `SET NULL` to `CASCADE` so deleted challenges drop their (capped-scoring) rows instead of leaking them into the global/per-level board |
 | `x8a9b0c1d2e3f` | Territory ranking aggregation support — add composite index `ix_territory_occupations_student_slot (student_id, slot_id)` and new `territory_rankings_snapshot` table (+ `ix_snap_activity_time`, `ix_snap_activity_student_time`) so rankings endpoint computes rank deltas without a periodic worker |
 | `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK (BD-8) — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
-| `z0c1d2e3f4a5` | Create `audit_logs` table (C-01, current head) — the ORM model and `audit_logger` existed since early development but no migration ever created the table; all audit events were silently dropped. Adds composite indexes `(user_id, created_at)` and `(event_type, created_at)` |
+| `z0c1d2e3f4a5` | Create `audit_logs` table (C-01) — the ORM model and `audit_logger` existed since early development but no migration ever created the table; all audit events were silently dropped. Adds composite indexes `(user_id, created_at)` and `(event_type, created_at)` |
+| `aa1d2e3f4a6` | Server-derived preview flag (`game_sessions.is_preview`, current head) — true when a non-student (teacher/admin) created the session. `LeaderboardInsertHandler` skips these so they never reach public ranking tables; mirrors `practice_mode` exclusion semantics |
 
 > **Branched history**: After `q1f2a3b4c5d6` (gameplay branch — practice mode) and `a3b4c5d6e7f8` (auth branch — lockout backoff) shipped on parallel branches, `r2a3b4c5d6e7` is a merge migration whose `down_revision` is the tuple `(q1f2a3b4c5d6, a3b4c5d6e7f8)`. It also creates the `seasons` table in the same revision. Subsequent revisions (`s3b4c5d6e7f8`, `t4c5d6e7f8a9`, `u5d6e7f8a9b0`) form a linear chain on top.
 

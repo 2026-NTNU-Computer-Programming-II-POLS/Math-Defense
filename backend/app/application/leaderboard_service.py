@@ -121,6 +121,12 @@ class LeaderboardApplicationService:
                 raise SessionValidationError(
                     "Practice-mode sessions are not eligible for the leaderboard"
                 )
+            # Teacher/admin preview runs are leaderboard-ineligible for the
+            # same reason — they aren't real student gameplay.
+            if getattr(session, "is_preview", False):
+                raise SessionValidationError(
+                    "Preview sessions are not eligible for the leaderboard"
+                )
 
             # The leaderboard entry below uses the session's authoritative
             # kills / waves_survived (capped by GameSession.complete() at the

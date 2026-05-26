@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 class LeaderboardInsertHandler:
     """Idempotently insert a LeaderboardEntry for a completed session.
-    Practice-mode sessions are skipped (Backlog §20)."""
+    Practice-mode (Backlog §20) and teacher/admin preview runs are skipped."""
 
     def __init__(
         self,
@@ -48,7 +48,7 @@ class LeaderboardInsertHandler:
         self._uow = uow
 
     def __call__(self, event: SessionCompleted) -> None:
-        if event.practice_mode:
+        if event.practice_mode or event.is_preview:
             return
         try:
             with self._uow:

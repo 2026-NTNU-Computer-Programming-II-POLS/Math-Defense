@@ -422,6 +422,79 @@ def test_normal_session_after_practice_still_lands_on_leaderboard(client):
     assert 1000 not in scores
 
 
+# ── Teacher / admin preview runs (is_preview) ──
+
+
+def _register_teacher_token(db_session, name):
+    from tests.conftest import register_test_user
+    _u, token, _r = register_test_user(
+        db_session,
+        email=f"{name}@test.local",
+        password="xQ7!aPm2#vKz9",
+        player_name=name,
+        role="teacher",
+    )
+    return token
+
+
+def test_teacher_session_is_flagged_preview(client, db_session):
+    """A teacher who plays the game gets is_preview=True on the SessionOut so
+    the HUD can render a preview badge. Clients cannot set the flag themselves."""
+    token = _register_teacher_token(db_session, "teacher_preview")
+    res = client.post(
+        "/api/sessions",
+        json={"star_rating": 1},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 201
+    body = res.json()
+    assert body["is_preview"] is True
+    assert body["practice_mode"] is False
+
+
+def test_student_session_is_not_preview(client):
+    """Sanity: a student's session is the default-flagged path."""
+    token = _register_and_token(client, "student_preview_neg")
+    body = client.post(
+        "/api/sessions",
+        json={"star_rating": 1},
+        headers=_auth_headers(token),
+    ).json()
+    assert body["is_preview"] is False
+
+
+def test_preview_session_excluded_from_leaderboard(client, db_session):
+    """Teacher previews complete normally but produce no leaderboard entry —
+    the global ranking stays student-only."""
+    token = _register_teacher_token(db_session, "teacher_lb_excl")
+    sid = client.post(
+        "/api/sessions",
+        json={"star_rating": 1},
+        headers=_auth_headers(token),
+    ).json()["id"]
+    end_res = client.post(
+        f"/api/sessions/{sid}/end",
+        json={"score": 7777, "kills": 8, "waves_survived": 3},
+        headers=_auth_headers(token),
+    )
+    assert end_res.status_code == 200
+    assert end_res.json()["status"] == "completed"
+    board = client.get("/api/leaderboard").json()
+    assert all(e["score"] != 7777 for e in board["entries"])
+
+
+def test_preview_flag_cannot_be_set_by_client(client):
+    """SessionCreate uses extra='forbid'; a client sneaking is_preview into
+    the body must 422 even when authenticated as a student."""
+    token = _register_and_token(client, "preview_forbid")
+    res = client.post(
+        "/api/sessions",
+        json={"star_rating": 1, "is_preview": True},
+        headers=_auth_headers(token),
+    )
+    assert res.status_code == 422
+
+
 # ── Cross-user isolation ──
 
 def test_cannot_update_other_users_session(client):

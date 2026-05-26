@@ -75,14 +75,12 @@ def create_challenge(
 def list_my_challenges(
     request: Request,
     mine: bool = Query(False, description="If true, list challenges authored by the requester."),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    # v1 only supports the teacher-own view. Listing all public challenges is
-    # out-of-scope (challenges are link-shared, not discovered).
+    # v1 only supports the authored-by-requester view. Listing every public
+    # challenge is out-of-scope (challenges are link-shared, not discovered).
     if not mine:
-        return []
-    if user.role not in (Role.TEACHER, Role.ADMIN):
         return []
     return [
         _challenge_out(c)
@@ -113,12 +111,13 @@ def rename_challenge(
     request: Request,
     challenge_id: str,
     req: ChallengeRename,
-    user: User = Depends(require_role(Role.TEACHER)),
+    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     challenge = build_challenge_service(db).rename(
         challenge_id=challenge_id,
-        teacher_id=user.id,
+        requester_id=user.id,
+        requester_role=user.role,
         title=req.title,
         description=req.description,
     )
@@ -131,12 +130,13 @@ def update_constraints(
     request: Request,
     challenge_id: str,
     req: ChallengeConstraintsUpdate,
-    user: User = Depends(require_role(Role.TEACHER)),
+    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     challenge = build_challenge_service(db).replace_constraints(
         challenge_id=challenge_id,
-        teacher_id=user.id,
+        requester_id=user.id,
+        requester_role=user.role,
         new_constraints=_to_domain_constraints(req.constraints),
     )
     return _challenge_out(challenge)
@@ -147,7 +147,11 @@ def update_constraints(
 def delete_challenge(
     request: Request,
     challenge_id: str,
-    user: User = Depends(require_role(Role.TEACHER)),
+    user: User = Depends(require_role(Role.TEACHER, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    build_challenge_service(db).delete(challenge_id=challenge_id, teacher_id=user.id)
+    build_challenge_service(db).delete(
+        challenge_id=challenge_id,
+        requester_id=user.id,
+        requester_role=user.role,
+    )

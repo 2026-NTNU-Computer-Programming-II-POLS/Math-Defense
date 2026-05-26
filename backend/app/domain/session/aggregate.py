@@ -80,6 +80,7 @@ class GameSession:
         initial_answer: bool = False,
         path_config: dict | None = None,
         practice_mode: bool = False,
+        is_preview: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
         replay_version: int = 1,
@@ -102,6 +103,12 @@ class GameSession:
         # mode and must NOT appear on the global leaderboard. Achievements and
         # talent points still award (don't punish accessibility users twice).
         self.practice_mode = practice_mode
+        # Server-derived from the caller's role at session creation: True for
+        # any non-student session (teacher previewing the game, admin
+        # smoke-testing). Mirrors practice_mode in effect — excluded from the
+        # public leaderboard, achievements/talent still award. Clients cannot
+        # set this directly; the value is set by the router from user.role.
+        self.is_preview = is_preview
         # Backlog §23: when set, the session was started from a teacher-authored
         # challenge. The end-session handler reads this to route the leaderboard
         # entry to the challenge-specific ranking.
@@ -135,6 +142,7 @@ class GameSession:
         initial_answer: bool = False,
         path_config: dict | None = None,
         practice_mode: bool = False,
+        is_preview: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
         replay_version: int = 1,
@@ -147,6 +155,7 @@ class GameSession:
             initial_answer=initial_answer,
             path_config=path_config,
             practice_mode=practice_mode,
+            is_preview=is_preview,
             challenge_id=challenge_id,
             rng_seed=rng_seed,
             replay_version=replay_version,
@@ -296,6 +305,7 @@ class GameSession:
                 waves_survived=result.waves_survived,
                 challenge_id=self.challenge_id,
                 practice_mode=self.practice_mode,
+                is_preview=self.is_preview,
             )
         )
 

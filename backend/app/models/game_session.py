@@ -44,6 +44,14 @@ class GameSession(Base):
     practice_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false"),
     )
+    # Server-derived from user.role at session create: True when a teacher or
+    # admin played the game (not a real student run). Same exclusion semantics
+    # as practice_mode — skipped at leaderboard insert, achievements still
+    # award. Client cannot set this; the router computes it from the
+    # authenticated user's role.
+    is_preview: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false"),
+    )
     status: Mapped[str] = mapped_column(
         SAEnum(SessionStatus, values_callable=lambda e: [m.value for m in e]),
         default=SessionStatus.ACTIVE.value,

@@ -179,6 +179,11 @@ class SessionOut(BaseModel):
     # Backlog §20 — surfaced so the HUD can render the practice badge and the
     # ScoreResult view can warn that the run is leaderboard-ineligible.
     practice_mode: bool = False
+    # Server-derived from the caller's role at create. True when the player
+    # is a teacher or admin previewing the game — exposed so the HUD can
+    # render a "preview" badge and ScoreResult can suppress the leaderboard
+    # CTA. Client cannot set this; ignored by the SessionCreate schema.
+    is_preview: bool = False
     # Backlog §23 — surfaced so the client can hide the leaderboard CTA on
     # ScoreResult and instead deep-link to the challenge ranking.
     challenge_id: str | None = None

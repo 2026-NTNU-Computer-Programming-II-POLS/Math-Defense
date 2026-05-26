@@ -20,6 +20,10 @@ export interface SessionOut {
   // toggle on. The HUD renders a "Practice mode — leaderboard ineligible"
   // badge and the ScoreResult view shows a notice.
   practice_mode?: boolean
+  // Server-derived: true when a teacher or admin played the game (preview /
+  // smoke-test). Same leaderboard-exclusion semantics as practice_mode.
+  // Read-only — the client cannot set this at create time.
+  is_preview?: boolean
   // Backlog §23 — non-null when this session was launched from a teacher-
   // authored challenge deep-link. The ScoreResult view links back to the
   // challenge-specific leaderboard instead of the global one.

@@ -110,7 +110,7 @@ backend/
 │   │
 │   ├── models/                    SQLAlchemy ORM models
 │   │   ├── user.py                User (email, player_name, avatar_url, role, is_active, totp_*, ia_recent_accuracy, password_version)
-│   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields, reflection_text, practice_mode, rng_seed, replay_version, challenge_id)
+│   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields, reflection_text, practice_mode, is_preview, rng_seed, replay_version, challenge_id)
 │   │   ├── leaderboard.py         LeaderboardEntry (unique session_id; user_id nullable via SET NULL; challenge_id nullable)
 │   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline + lockout_count for backoff)
 │   │   ├── denied_token.py        DeniedToken (revoked JWT JTIs until natural expiry)
@@ -221,7 +221,7 @@ Use-case orchestration. One method per user intent. Services depend on the `Unit
 - **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / verify_email / resend_verification_email / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_avatar`.
 - **`SessionApplicationService`** — `create_session` (abandons stale sessions >2h and any existing active one, with one IntegrityError retry against the partial-unique index), `get_active_for_user`, `update_session`, `abandon_session`, `end_session` (transitions to COMPLETED and dispatches `SessionCompleted` through the event bus), `attach_reflection`, `has_correct_ia_session`.
 - **`SessionEventBus`** (in `session_event_handlers.py`) — dispatches `SessionCompleted` to three independent handlers, each in its own UoW so a downstream failure cannot roll back the durable session row:
-  1. `LeaderboardInsertHandler` — idempotent insert (skipped for `practice_mode=True`); `ConstraintViolationError` on the unique session-id constraint is the expected duplicate-delivery outcome.
+  1. `LeaderboardInsertHandler` — idempotent insert (skipped when `practice_mode` or `is_preview` is true); `ConstraintViolationError` on the unique session-id constraint is the expected duplicate-delivery outcome.
   2. `AchievementCheckHandler` — evaluates the achievement registry; when an `AssessmentApplicationService` is wired, Beta-evidence rows for the unlocked achievements are written inside the same UoW via `apply_evidence_in_open_uow()` (H3 atomicity).
   3. `IaAccuracyRefreshHandler` — recomputes the rolling Initial-Answer accuracy on the user aggregate.
 - **`LeaderboardApplicationService`** — per-level / class-scoped / challenge-scoped queries, personal-best timeline, manual `submit_score` fallback.
@@ -254,7 +254,7 @@ POST /end  ───>   end_session()
                     │
                     └─> bus.dispatch([SessionCompleted])
                               │
-                              ├─> LeaderboardInsertHandler   (own UoW; skip if practice_mode)
+                              ├─> LeaderboardInsertHandler   (own UoW; skip if practice_mode or is_preview)
                               ├─> AchievementCheckHandler    (own UoW; assessment evidence committed atomically)
                               └─> IaAccuracyRefreshHandler   (own UoW; updates user.ia_recent_accuracy)
 ```
@@ -415,11 +415,11 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | Method | Path | Rate | Description |
 |---|---|---|---|
 | POST | `/api/challenges` | 10/min | Create a constrained challenge (teacher/admin) |
-| GET | `/api/challenges?mine=true` | 60/min | List challenges authored by the caller (v1; non-`mine` returns `[]`) |
+| GET | `/api/challenges?mine=true` | 60/min | List challenges authored by the caller (teacher/admin; non-`mine` returns `[]`; students get `403`) |
 | GET | `/api/challenges/{id}` | 60/min | Fetch a single challenge by id (any authenticated user — deep-link sharing model) |
-| PATCH | `/api/challenges/{id}` | 20/min | Rename / update title or description |
-| PUT | `/api/challenges/{id}/constraints` | 10/min | Replace the challenge's constraint payload (rejected with `ChallengeImmutableError` once played) |
-| DELETE | `/api/challenges/{id}` | 10/min | Soft-delete (sets `deleted_at`); historical sessions/leaderboard rows still resolve `challenge_id` |
+| PATCH | `/api/challenges/{id}` | 20/min | Rename / update title or description (teacher-owner or admin) |
+| PUT | `/api/challenges/{id}/constraints` | 10/min | Replace the challenge's constraint payload (teacher-owner or admin; rejected with `ChallengeImmutableError` once played) |
+| DELETE | `/api/challenges/{id}` | 10/min | Soft-delete (teacher-owner or admin; sets `deleted_at`); historical sessions/leaderboard rows still resolve `challenge_id` |
 
 ### Replay & Spectate — `/api/sessions`
 
@@ -433,9 +433,9 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/study/enroll?study_id=` | 10/min | Idempotent enrollment; returns deterministic A/B group from `assign_group()` |
-| POST | `/api/study/probe` | 10/min | Submit a probe form (`form` ∈ `pre`/`post`/`delay`); returns the score |
-| POST | `/api/study/affect` | 10/min | Submit a Likert affect survey (`phase` ∈ `pre`/`post`); 204 No Content |
+| POST | `/api/study/enroll?study_id=` | 10/min | Idempotent enrollment (student-only); returns deterministic A/B group from `assign_group()` |
+| POST | `/api/study/probe` | 10/min | Submit a probe form (student-only; `form` ∈ `pre`/`post`/`delay`); returns the score |
+| POST | `/api/study/affect` | 10/min | Submit a Likert affect survey (student-only; `phase` ∈ `pre`/`post`); 204 No Content |
 | GET | `/api/study/export?study_id=` | 10/min | Admin-only CSV export — one row per participant; CSV-injection-safe |
 
 ### Territory — `/api/activities`
@@ -493,6 +493,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `total_score` | Float | Server-recomputed final score (K^(1/exp) formula) |
 | `reflection_text` | String(2000) | Free-text reflection captured after a winning wave |
 | `practice_mode` | Boolean | Excluded from the global leaderboard; achievement/talent awards still fire |
+| `is_preview` | Boolean | Server-derived from caller's role at create — true when a teacher or admin ran the session. Same leaderboard-exclusion semantics as `practice_mode`; client cannot set this |
 | `rng_seed` | BigInteger | Per-session deterministic RNG seed; replayed by `EventPlayer` |
 | `replay_version` | SmallInteger | `1` = legacy (mulberry32 + JS Math, ε=5e-4) / `2` = bit-exact (PCG + WASM, ε=1e-4 strict). v2 mismatch → `ReplayMismatchError → 422 replay_mismatch`; v2 with no WASM → `ReplayUnavailableError → 503` |
 | `challenge_id` | String (FK) | Non-NULL when launched from a challenge deep-link; FK to `challenges` (SET NULL on soft delete) |

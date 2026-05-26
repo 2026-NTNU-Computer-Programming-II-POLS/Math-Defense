@@ -69,6 +69,11 @@ class ClassApplicationService:
         return cls_
 
     def _verify_owner_or_admin(self, cls_: Class, user_id: str, user_role: Role, *, is_read_op: bool = False) -> None:
+        # ADMIN policy: read-only across class management. Write routers in
+        # routers/class_.py already gate to TEACHER, so an ADMIN never reaches
+        # this branch in production — the explicit raise is defence-in-depth
+        # for non-HTTP callers (scripts, future schedulers) and protects
+        # the invariant if the router gate is ever loosened by mistake.
         if user_role == Role.ADMIN:
             if not is_read_op:
                 raise PermissionDeniedError("Admins have read-only access and cannot perform mutations")

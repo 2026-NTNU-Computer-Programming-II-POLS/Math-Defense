@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from app.domain.challenge.aggregate import Challenge
 from app.domain.challenge.constraint_dsl import ChallengeConstraints
 from app.domain.errors import ChallengeNotFoundError
+from app.domain.user.value_objects import Role
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
@@ -23,6 +24,16 @@ class ChallengeApplicationService:
     ) -> None:
         self._repo = challenge_repo
         self._uow = uow
+
+    def _verify_owner_or_admin(
+        self, challenge: Challenge, requester_id: str, requester_role: Role
+    ) -> None:
+        # ADMIN bypasses the ownership check — mirrors the class/territory
+        # services so administrators can remediate any teacher's challenge
+        # (e.g. abuse-report cleanup) without an out-of-band DB edit.
+        if requester_role == Role.ADMIN:
+            return
+        challenge.assert_owned_by(requester_id)
 
     def create(
         self,
@@ -57,13 +68,14 @@ class ChallengeApplicationService:
     def rename(
         self,
         challenge_id: str,
-        teacher_id: str,
+        requester_id: str,
+        requester_role: Role,
         title: str,
         description: str,
     ) -> Challenge:
         with self._uow:
             challenge = self.get(challenge_id)
-            challenge.assert_owned_by(teacher_id)
+            self._verify_owner_or_admin(challenge, requester_id, requester_role)
             challenge.rename(title, description)
             self._repo.save(challenge)
             self._uow.commit()
@@ -72,12 +84,13 @@ class ChallengeApplicationService:
     def replace_constraints(
         self,
         challenge_id: str,
-        teacher_id: str,
+        requester_id: str,
+        requester_role: Role,
         new_constraints: ChallengeConstraints,
     ) -> Challenge:
         with self._uow:
             challenge = self.get(challenge_id)
-            challenge.assert_owned_by(teacher_id)
+            self._verify_owner_or_admin(challenge, requester_id, requester_role)
             played = self._repo.has_play_history(challenge_id)
             # The aggregate raises ChallengeImmutableError directly when
             # ``played`` is True, so no service-level translation is needed
@@ -89,14 +102,16 @@ class ChallengeApplicationService:
             self._uow.commit()
             return challenge
 
-    def delete(self, challenge_id: str, teacher_id: str) -> None:
+    def delete(
+        self, challenge_id: str, requester_id: str, requester_role: Role
+    ) -> None:
         with self._uow:
             challenge = self.get(challenge_id)
-            challenge.assert_owned_by(teacher_id)
+            self._verify_owner_or_admin(challenge, requester_id, requester_role)
             challenge.soft_delete()
             self._repo.save(challenge)
             self._uow.commit()
             logger.info(
-                "Challenge soft-deleted: id=%s teacher=%s",
-                challenge_id, teacher_id,
+                "Challenge soft-deleted: id=%s by=%s role=%s",
+                challenge_id, requester_id, requester_role.value,
             )

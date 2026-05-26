@@ -91,6 +91,17 @@ def _register_admin(db_session, name: str) -> str:
     return token
 
 
+def _register_teacher(db_session, name: str) -> str:
+    _u, token, _r = register_test_user(
+        db_session,
+        email=f"{name}@test.local",
+        password="xQ7!aPm2#vKz9",
+        player_name=name,
+        role="teacher",
+    )
+    return token
+
+
 def _register_student_via_service(db_session, name: str) -> str:
     """Register a student via the application service so no auth cookie is
     set on the TestClient. Necessary when a single test exercises multiple
@@ -208,6 +219,51 @@ def test_affect_rejects_out_of_range(client):
 def test_export_requires_admin(client):
     student_token = _register_student(client, "study_export_student")
     res = client.get("/api/study/export?study_id=demo", headers=_auth(student_token))
+    assert res.status_code == 403
+
+
+def test_teacher_cannot_enroll_in_study(client, db_session):
+    """Research samples must stay student-only; teacher submissions would
+    contaminate the export."""
+    token = _register_teacher(db_session, "study_teacher_enroll")
+    assert client.post(
+        "/api/study/enroll?study_id=demo", headers=_auth(token)
+    ).status_code == 403
+
+
+def test_admin_cannot_enroll_in_study(client, db_session):
+    token = _register_admin(db_session, "study_admin_enroll")
+    assert client.post(
+        "/api/study/enroll?study_id=demo", headers=_auth(token)
+    ).status_code == 403
+
+
+def test_teacher_cannot_submit_probe(client, db_session):
+    token = _register_teacher(db_session, "study_teacher_probe")
+    res = client.post(
+        "/api/study/probe",
+        json={
+            "study_id": "demo",
+            "form": "pre",
+            "responses": _ten_correct_responses("pre"),
+        },
+        headers=_auth(token),
+    )
+    assert res.status_code == 403
+
+
+def test_teacher_cannot_submit_affect(client, db_session):
+    token = _register_teacher(db_session, "study_teacher_affect")
+    res = client.post(
+        "/api/study/affect",
+        json={
+            "study_id": "demo",
+            "phase": "pre",
+            "anxiety_items": [3, 4],
+            "motivation_items": [4, 4],
+        },
+        headers=_auth(token),
+    )
     assert res.status_code == 403
 
 

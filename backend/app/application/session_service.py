@@ -126,6 +126,7 @@ class SessionApplicationService:
         initial_answer: bool = False,
         path_config: dict | None = None,
         practice_mode: bool = False,
+        is_preview: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
         replay_version: int = 1,
@@ -138,7 +139,7 @@ class SessionApplicationService:
             try:
                 return self._create_session_once(
                     user_id, level, initial_answer, path_config, practice_mode,
-                    challenge_id, rng_seed, replay_version,
+                    is_preview, challenge_id, rng_seed, replay_version,
                 )
             except ConstraintViolationError as e:
                 if attempt == 1 or e.constraint_name != _ACTIVE_SESSION_UNIQUE_INDEX:
@@ -153,6 +154,7 @@ class SessionApplicationService:
         initial_answer: bool = False,
         path_config: dict | None = None,
         practice_mode: bool = False,
+        is_preview: bool = False,
         challenge_id: str | None = None,
         rng_seed: int | None = None,
         replay_version: int = 1,
@@ -190,6 +192,7 @@ class SessionApplicationService:
                 initial_answer=initial_answer,
                 path_config=path_config,
                 practice_mode=practice_mode,
+                is_preview=is_preview,
                 challenge_id=challenge_id,
                 rng_seed=rng_seed,
                 replay_version=replay_version,
@@ -270,6 +273,7 @@ class SessionApplicationService:
                     total_score=session.total_score,
                     challenge_id=session.challenge_id,
                     practice_mode=session.practice_mode,
+                    is_preview=session.is_preview,
                 )
                 # Exiting without commit — __exit__ rolls back (releasing the
                 # FOR UPDATE lock) and replay_leaderboard runs below.

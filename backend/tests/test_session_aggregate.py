@@ -60,6 +60,26 @@ class TestCreate:
         session = GameSession.create("user-1", Level(1), practice_mode=True)
         assert session.practice_mode is True
 
+    def test_create_defaults_is_preview_false(self):
+        session = GameSession.create("user-1", Level(1))
+        assert session.is_preview is False
+
+    def test_create_with_is_preview(self):
+        session = GameSession.create("user-1", Level(1), is_preview=True)
+        assert session.is_preview is True
+
+    def test_complete_event_carries_is_preview(self):
+        from app.domain.value_objects import GameResult, Score
+
+        session = GameSession.create("user-1", Level(1), is_preview=True)
+        session.complete(GameResult(Score(100), kills=1, waves_survived=1))
+        completed = [
+            e for e in session.collect_events()
+            if e.__class__.__name__ == "SessionCompleted"
+        ]
+        assert len(completed) == 1
+        assert completed[0].is_preview is True
+
 
 # ── Update progress ──
 
