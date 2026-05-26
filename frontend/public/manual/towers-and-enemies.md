@@ -13,8 +13,8 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 60 / 8 / 10 / 1.0 s
 - **Math:** function curves (polynomial, trigonometric, log)
 - **Unlocked from:** Star 1
-- **Mechanic:** draws a math curve as a band-shaped zone. Toggle the band between **Debuff** (enemies inside take damage every tick) and **Buff** (towers inside fire faster and harder). Pick a curve that hugs the enemy path for damage; pick a curve that passes through your tower cluster for utility.
-- **Tip:** the right curve is the one your enemies will walk on.
+- **Mechanic:** draws a math curve as a band-shaped zone. Toggle the band between **Debuff** (enemies inside take damage-over-time and are slowed to 60% speed for 2 s — the slow refreshes on re-hit) and **Buff** (towers inside a wider band of the same curve gain damage). Pick a curve that hugs the enemy path for damage; pick a curve that passes through your tower cluster for utility.
+- **Tip:** the right curve is the one your enemies will walk on. The 2 s slow outlasts the 1 s damage tick, so a single Magic tower keeps enemies slowed continuously between ticks.
 - **Exam tie-in:** GSAT Math A polynomial/trig curves; AP Precalculus.
 
 ### Radar A — Sweep — ◐
@@ -61,18 +61,15 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 70 / 25 / 8 / 3.0 s
 - **Math:** limits, L'Hôpital's rule
 - **Unlocked from:** Star 3
-- **Mechanic:** the panel presents a multiple-choice `lim` question of the form `lim[x→a] f(x)/(x − a)`. Your answer determines the tower's effect on enemies in range:
+- **Mechanic:** charges for **3 s**, then releases an AoE burst that hits every enemy in range at **1.5×** the formula damage. The panel presents a multiple-choice `lim` question of the form `lim[x→a] f(x)/(x − a)`; your answer determines the formula:
 
 | Answer | Effect |
 |---|---|
-| `+∞` | maximum damage |
-| `+C` (finite positive) | scaled damage |
-| `0` | tower is **removed** (no refund — sized this way deliberately) |
-| any non-limit constant | tower **disabled** for the wave |
-| `−C` (finite negative) | heals your origin a little |
-| `−∞` | maximum heal |
+| `+∞` | **instakill** every enemy in range (bypasses defensive caps) |
+| `+C` (finite positive) | `effectiveDamage × |C| × 1.5` per enemy |
+| `0` / non-limit constant / `−C` / `−∞` | chip damage `effectiveDamage × 0.10 × 1.5` |
 
-- **Pick when:** you can reliably solve the shown `lim[x→a] f(x)/(x − a)` quickly, especially against long-lived high-HP enemies where a correct `±∞` result has time to swing the wave. If you're unsure, skip it — wrong picks are heavily punished.
+- **Pick when:** you can reliably solve the shown `lim[x→a] f(x)/(x − a)` quickly, especially against long-lived high-HP enemies where a correct `+∞` result has time to swing the wave. Wrong / degenerate answers no longer remove the tower or heal enemies — they just chip — but the lost burst on a 3 s cadence is still expensive.
 - **Exam tie-in:** AP Calculus AB one-sided / infinite limits; AST calculus subject test.
 
 ### Calculus Tower — ∫
@@ -89,12 +86,12 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 | Tower | Cost | DMG | Range | CD | Role |
 |---|---|---|---|---|---|
-| Magic | 60 | 8 | 10 | 1.0 | Curve zone (debuff or buff) |
+| Magic | 60 | 8 | 10 | 1.0 | Curve zone (debuff DoT + 2 s slow, or buff allies) |
 | Radar A — Sweep | 50 | 5 | 6 | 0.5 | AoE sweep |
 | Radar B — Rapid | 65 | 8 | 7 | 0.3 | Fast single target |
 | Radar C — Sniper | 90 | 40 | 12 | 2.5 | Slow heavy single target |
 | Matrix | 80 | 1* | 8 | 0.5 | Paired laser, 1 + dot-product damage |
-| Limit | 70 | 25 | 8 | 3.0 | Range effect from `lim` answer |
+| Limit | 70 | 25 | 8 | 3.0 | Charge-up AoE burst (1.5× damage) from `lim` answer |
 | Calculus | 100 | 0* | 10 | — | Spawns C·x^n pets |
 
 \* Effective damage comes from the tower's mechanic, not the base stat.

@@ -10,6 +10,12 @@ import type { Tower, LimitResult } from '@/entities/types'
 // enemies — it clamps the tower to a weak chip of its effective damage.
 const WRONG_ANSWER_CHIP = 0.10
 
+// Phase 6 Q8: LIMIT is a charge-up burst tower. The existing 3 s cooldown is
+// the charge window; when it elapses the tower releases an AoE blast at
+// BURST_MULTIPLIER × the formula damage. `+inf` is unaffected — multiplying
+// an instakill is meaningless and the bypass-everything path must stay clean.
+export const BURST_MULTIPLIER = 1.5
+
 export class LimitTowerSystem {
   private _unsubs: (() => void)[] = []
   private _questionSeed = 0
@@ -78,7 +84,7 @@ export class LimitTowerSystem {
         }
 
         if (dmg > 0) {
-          applyDamage(enemy, dmg, game, 'towerHit')
+          applyDamage(enemy, dmg * BURST_MULTIPLIER, game, 'towerHit')
         }
       }
     }

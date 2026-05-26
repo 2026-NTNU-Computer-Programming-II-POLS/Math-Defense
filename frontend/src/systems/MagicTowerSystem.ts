@@ -9,6 +9,13 @@ export const ZONE_WIDTH = 1.5
 // fixed grid so a tighter width would miss well-placed towers.
 export const BUFF_ZONE_MULTIPLIER = 2
 
+// Phase 6 Q7: slow lingers longer than the DoT tick window so consecutive
+// debuff hits keep the enemy slowed without a gap. Both still scale by the
+// `duration` talent mod (same surface as the DoT duration).
+export const SLOW_BASE_DURATION = 2.0
+export const DOT_BASE_DURATION = 1.0
+export const SLOW_FACTOR = 0.4
+
 export class MagicTowerSystem {
   private _unsubs: (() => void)[] = []
   private _curveCache = new Map<string, { expr: string; fn: CurveFunction }>()
@@ -91,7 +98,12 @@ export class MagicTowerSystem {
     const mods = tower.talentMods
     const zoneWidth = ZONE_WIDTH * (1 + (mods['zone_width'] ?? 0))
     const strengthMult = 1 + (mods['zone_strength'] ?? 0)
-    const dotDuration = 1.0 * (1 + (mods['duration'] ?? 0))
+    const durationMult = 1 + (mods['duration'] ?? 0)
+    // Phase 6 Q7: slow outlasts the DoT window. Refresh-on-rehit semantics
+    // — `max()` on the factor and overwrite the timer — mean stacking two
+    // MAGIC towers does not push the slow past SLOW_FACTOR.
+    const slowDuration = SLOW_BASE_DURATION * durationMult
+    const dotDuration = DOT_BASE_DURATION * durationMult
     const range = tower.effectiveRange
     // Curve is evaluated in world coordinates so students must compute the
     // translation `y = f(x − h) + k` themselves — but the influence is gated
@@ -102,8 +114,8 @@ export class MagicTowerSystem {
       if (Math.abs(enemy.x - tower.x) > range) continue
       const curveY = fn(enemy.x)
       if (Math.abs(enemy.y - curveY) < zoneWidth) {
-        enemy.slowFactor = Math.max(enemy.slowFactor, 0.4)
-        enemy.slowTimer = dotDuration
+        enemy.slowFactor = Math.max(enemy.slowFactor, SLOW_FACTOR)
+        enemy.slowTimer = slowDuration
         enemy.dotDamage = tower.effectiveDamage * strengthMult
         enemy.dotTimer = dotDuration
       }
