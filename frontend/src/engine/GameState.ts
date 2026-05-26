@@ -54,7 +54,12 @@ export interface GameState {
   // each absorbed hit. BuffSystem owns the writes (set on SHIELD_ACTIVATE,
   // reset on SHIELD_DEACTIVATE).
   shieldReductionFactor: number
+  // Q15: gold-multiplier buffs stack additively. `goldMultiplierBonus` is the
+  // accumulator owned by BuffSystem (each ×2 adds 1, each ×3 adds 2); consumers
+  // keep reading `goldMultiplier`, which is derived as 1 + bonus. Two stacked
+  // buffs (×2 + ×3) yield bonus 3 → multiplier 4 (was 6 under multiplicative).
   goldMultiplier: number
+  goldMultiplierBonus: number
   freeTowerNext: boolean
   freeTowerCharges: number
   enemySpeedMultiplier: number
@@ -100,6 +105,7 @@ export function createInitialState(): GameState {
     shieldHitsRemaining: 0,
     shieldReductionFactor: 1,
     goldMultiplier: 1,
+    goldMultiplierBonus: 0,
     freeTowerNext: false,
     freeTowerCharges: 0,
     enemySpeedMultiplier: 1,

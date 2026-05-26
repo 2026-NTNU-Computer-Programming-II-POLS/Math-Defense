@@ -391,7 +391,8 @@ interface GameState {
 
   // Buff flags
   shieldActive: boolean
-  goldMultiplier: number
+  goldMultiplier: number       // derived = 1 + goldMultiplierBonus (consumers read this)
+  goldMultiplierBonus: number  // additive accumulator owned by BuffSystem (Q15)
   freeTowerNext: boolean
   freeTowerCharges: number
   enemySpeedMultiplier: number

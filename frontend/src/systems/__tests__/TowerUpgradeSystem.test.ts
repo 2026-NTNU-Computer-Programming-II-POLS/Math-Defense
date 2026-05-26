@@ -141,6 +141,24 @@ describe('TowerUpgradeSystem', () => {
       expect(game.state.costTotal).toBe(0) // 100 - 100
     })
 
+    // Q15: refund uses the derived goldMultiplier, so two stacked buffs
+    // (×2 + ×3 → bonus 3 → multiplier 4) refund 4× the base — not 6× as the
+    // old multiplicative pipeline did.
+    it('refund honours the additive stacked multiplier (×2 + ×3 → 4×)', () => {
+      game.state.goldMultiplierBonus = 3
+      game.state.goldMultiplier = 1 + game.state.goldMultiplierBonus
+      const tower = createMockTower({ type: TowerType.MAGIC, cost: 100, level: 1 })
+      game.towers.push(tower)
+      game.state.costTotal = 100
+
+      game.eventBus.emit(Events.TOWER_REFUND, { towerId: tower.id })
+
+      // base = floor(100/2) = 50, refund = round(50 * 4) = 200 (was 300 under
+      // the old 2×*3× = 6× compounding).
+      expect(game.state.gold).toBe(500) // 300 starting + 200 refund
+      expect(game.state.costTotal).toBe(-100) // 100 - 200
+    })
+
     it('emits TOWER_REFUND_RESULT success when tower exists', () => {
       const tower = createMockTower({ type: TowerType.MAGIC, cost: 100, level: 1 })
       game.towers.push(tower)

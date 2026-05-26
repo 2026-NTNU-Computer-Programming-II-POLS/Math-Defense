@@ -35,7 +35,7 @@ export class MontyHallSystem implements GameSystem {
       }),
 
       game.eventBus.on(Events.MONTY_HALL_TRIGGER, ({ doorCount, thresholdIndex }) => {
-        this._startEvent(doorCount)
+        this._startEvent(doorCount, game.state.starRating)
         game.state.montyHallNextIndex = thresholdIndex + 1
         game.eventBus.emit(Events.MONTY_HALL_STATE_CHANGED, this._snapshot())
       }),
@@ -98,11 +98,15 @@ export class MontyHallSystem implements GameSystem {
     return { ...this.current, revealedDoors: [...this.current.revealedDoors] }
   }
 
-  private _startEvent(doorCount: number): void {
+  private _startEvent(doorCount: number, starRating: number): void {
     const prizeIndex = Math.floor(this._rng() * doorCount)
-    const reward = MONTY_HALL_REWARD_POOL[
-      Math.floor(this._rng() * MONTY_HALL_REWARD_POOL.length)
-    ]
+    // Q18: filter the pool by star tier so a 1★ run never offers Gold Rush
+    // (×3 gold) or Power Surge (×2 damage). `minStar` omitted is treated as 1.
+    // Safety fallback to the full pool if filtering somehow leaves nothing —
+    // keeps the event resolvable even if every reward had an unmet gate.
+    const available = MONTY_HALL_REWARD_POOL.filter((r) => (r.minStar ?? 1) <= starRating)
+    const pool = available.length > 0 ? available : MONTY_HALL_REWARD_POOL
+    const reward = pool[Math.floor(this._rng() * pool.length)]
     this.current = {
       doorCount,
       prizeIndex,

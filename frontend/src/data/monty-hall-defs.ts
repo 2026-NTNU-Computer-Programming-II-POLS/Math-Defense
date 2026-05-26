@@ -39,6 +39,11 @@ export interface MontyHallReward {
   effectId: string
   revertId?: string
   duration: number        // seconds (0 = instant)
+  // Q18: lowest star rating at which this reward is selectable. Omitted /
+  // undefined treated as 1 (available to everyone). Filtered in
+  // MontyHallSystem._startEvent so 1★ players never roll a game-trivializing
+  // reward like Power Surge or Gold Rush.
+  minStar?: number
 }
 
 export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
@@ -49,6 +54,7 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     effectId: 'ALL_TOWERS_DAMAGE_MULTIPLY_2',
     revertId: 'ALL_TOWERS_DAMAGE_DIVIDE_2',
     duration: 30,
+    minStar: 3,
   },
   {
     id: 'mh_range_up',
@@ -57,6 +63,7 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     effectId: 'ALL_TOWERS_RANGE_MULTIPLY_1_5',
     revertId: 'ALL_TOWERS_RANGE_DIVIDE_1_5',
     duration: 25,
+    minStar: 2,
   },
   {
     id: 'mh_slow_all',
@@ -65,6 +72,7 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     effectId: 'ENEMY_SPEED_MULTIPLIER_0_6',
     revertId: 'ENEMY_SPEED_MULTIPLIER_RESET',
     duration: 20,
+    minStar: 2,
   },
   {
     id: 'mh_gold_rush',
@@ -73,6 +81,7 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     effectId: 'GOLD_MULTIPLIER_TRIPLE',
     revertId: 'GOLD_MULTIPLIER_TRIPLE_REVERT',
     duration: 20,
+    minStar: 3,
   },
   {
     id: 'mh_heal_full',
@@ -80,6 +89,7 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     description: 'Restore HP to full',
     effectId: 'HEAL_FULL',
     duration: 0,
+    minStar: 1,
   },
   {
     id: 'mh_free_towers',
@@ -87,5 +97,6 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     description: 'Next 2 towers are free',
     effectId: 'FREE_TOWER_CHARGES_2',
     duration: 0,
+    minStar: 1,
   },
 ]

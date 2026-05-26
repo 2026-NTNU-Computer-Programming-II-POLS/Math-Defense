@@ -83,6 +83,22 @@ describe('EconomySystem', () => {
     expect(game.state.gold).toBe(130) // 100 + 15 * 2
   })
 
+  // Q15: stacked gold buffs land on `goldMultiplier` via BuffSystem
+  // recomputeGoldMult, not as direct writes. EconomySystem just reads the
+  // resolved value, so verify the read uses the derived (additive) figure.
+  it('reads the derived goldMultiplier when buffs stack additively', () => {
+    const { game } = setup()
+    // Simulate ×2 + ×3 → bonus 3 → multiplier 4 (BuffSystem's contract).
+    game.state.goldMultiplierBonus = 3
+    game.state.goldMultiplier = 1 + game.state.goldMultiplierBonus
+    const enemy = createMockEnemy({ reward: 15 })
+
+    game.eventBus.emit(Events.ENEMY_KILLED, enemy)
+
+    // 100 + round(15 * 4) = 160 (was 190 under the old multiplicative 6×)
+    expect(game.state.gold).toBe(160)
+  })
+
   it('increments kills and score on enemy killed', () => {
     const { game } = setup()
     const enemy = createMockEnemy()

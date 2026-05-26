@@ -187,16 +187,20 @@ Stack rules: each buff stacks **independently**. Two damage buffs are multiplica
 
 When you clear a kill-value threshold, the event opens. The chosen door grants one of:
 
-| Reward | Effect | Duration |
-|---|---|---|
-| Power Surge | Double tower damage | 30 s |
-| Eagle Eye | +50% tower range | 25 s |
-| Time Warp | -40% enemy speed | 20 s |
-| Gold Rush | Triple gold from kills | 20 s |
-| Divine Blessing | Restore HP to full | instant |
-| Master Builder | Next 2 towers are free | until used |
+| Reward | Effect | Duration | Min ★ |
+|---|---|---|---|
+| Divine Blessing | Restore HP to full | instant | 1 |
+| Master Builder | Next 2 towers are free | until used | 1 |
+| Eagle Eye | +50% tower range | 25 s | 2 |
+| Time Warp | -40% enemy speed | 20 s | 2 |
+| Power Surge | Double tower damage | 30 s | 3 |
+| Gold Rush | Triple gold from kills | 20 s | 3 |
+
+**Min ★** is the lowest star rating that can roll the reward. At 1★ only the two utility rewards appear; higher tiers unlock the damage- and economy-amplifying rewards as the difficulty rises.
 
 Reward strength is the same regardless of door count — the door count only changes the **probability** of picking the right door. Always switch after the reveal: at 3 doors, switching wins 2/3 of the time; at 5 doors, 4/5.
+
+Gold-multiplier rewards (Gold Rush) stack **additively** with shop buffs: a ×2 shop buff plus the ×3 Gold Rush yields 4× per kill (not 6×), so two stacked gold buffs can never make the run trivial.
 
 ---
 

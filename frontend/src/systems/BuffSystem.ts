@@ -19,6 +19,13 @@ function recalcRange(g: Game): void {
   g.towers.forEach((t) => { t.effectiveRange = t.baseRange * t.rangeBonus })
 }
 
+// Q15: gold buffs stack additively. The bonus accumulator lives on GameState
+// and the displayed multiplier is always 1 + bonus, so stacking ×2 + ×3 yields
+// 4× (not 6×) and reverts never overshoot below 1×.
+function recomputeGoldMult(g: Game): void {
+  g.state.goldMultiplier = 1 + g.state.goldMultiplierBonus
+}
+
 const effectStrategies: Record<string, EffectFn> = {
   // Tower damage modifiers
   ALL_TOWERS_DAMAGE_MULTIPLY_1_2: (g) => {
@@ -107,11 +114,11 @@ const effectStrategies: Record<string, EffectFn> = {
     g.state.shieldHitsRemaining = 0
     g.state.shieldReductionFactor = 1
   },
-  GOLD_MULTIPLIER_DOUBLE: (g) => { g.state.goldMultiplier *= 2 },
-  GOLD_MULTIPLIER_DOUBLE_REVERT: (g) => { g.state.goldMultiplier = Math.max(1, g.state.goldMultiplier / 2) },
-  GOLD_MULTIPLIER_TRIPLE: (g) => { g.state.goldMultiplier *= 3 },
-  GOLD_MULTIPLIER_TRIPLE_REVERT: (g) => { g.state.goldMultiplier = Math.max(1, g.state.goldMultiplier / 3) },
-  GOLD_MULTIPLIER_RESET: (g) => { g.state.goldMultiplier = 1 },
+  GOLD_MULTIPLIER_DOUBLE:        (g) => { g.state.goldMultiplierBonus += 1; recomputeGoldMult(g) },
+  GOLD_MULTIPLIER_DOUBLE_REVERT: (g) => { g.state.goldMultiplierBonus = Math.max(0, g.state.goldMultiplierBonus - 1); recomputeGoldMult(g) },
+  GOLD_MULTIPLIER_TRIPLE:        (g) => { g.state.goldMultiplierBonus += 2; recomputeGoldMult(g) },
+  GOLD_MULTIPLIER_TRIPLE_REVERT: (g) => { g.state.goldMultiplierBonus = Math.max(0, g.state.goldMultiplierBonus - 2); recomputeGoldMult(g) },
+  GOLD_MULTIPLIER_RESET:         (g) => { g.state.goldMultiplierBonus = 0; recomputeGoldMult(g) },
   FREE_TOWER_NEXT: (g) => { g.state.freeTowerNext = true },
   FREE_TOWER_CLEAR: (g) => { g.state.freeTowerNext = false },
   FREE_TOWER_CHARGES_2: (g) => { g.state.freeTowerCharges += 2 },
