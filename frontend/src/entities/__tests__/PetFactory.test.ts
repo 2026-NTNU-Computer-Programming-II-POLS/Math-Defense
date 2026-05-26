@@ -35,4 +35,58 @@ describe('PetFactory.spawnPets', () => {
       expect(pet.attackSpeed).toBeGreaterThan(0)
     })
   })
+
+  // Q12: previously `count = (isInteger ? coefficient : 1) + bonusCount`, so a
+  // 99x Calculus result spawned 99 pets. Log compression caps that at 6 while
+  // preserving the small-coefficient progression.
+  describe('Q12: pet count = floor(log2(max(1, coefficient) + 1)) + bonus', () => {
+    const cases: Array<[number, number]> = [
+      [1, 1],
+      [2, 1],
+      [3, 2],
+      [4, 2],
+      [7, 3],
+      [8, 3],
+      [15, 4],
+      [31, 5],
+      [99, 6],
+    ]
+    for (const [coefficient, expected] of cases) {
+      it(`coefficient ${coefficient} → ${expected} pets`, () => {
+        const pets = spawnPets('owner', 0, 0, coefficient, 1, {}, 1, 1)
+        expect(pets).toHaveLength(expected)
+      })
+    }
+
+    it('fractional coefficient (0.5) still spawns 1 pet (max(1, …) floor)', () => {
+      const pets = spawnPets('owner', 0, 0, 0.5, 1, {}, 1, 1)
+      expect(pets).toHaveLength(1)
+    })
+
+    it('bonusCount from pet_count talent stacks on top', () => {
+      const pets = spawnPets('owner', 0, 0, 7, 1, { pet_count: 2 }, 1, 1)
+      // base 3 + bonus 2 = 5
+      expect(pets).toHaveLength(5)
+    })
+  })
+
+  // Q10: Extended Reach (pet_range) widens the engagement radius by 20% per
+  // level. PetCombatSystem reads pet.range directly, so the value here is the
+  // authoritative source.
+  describe('Q10: pet_range talent widens attack radius', () => {
+    it('no talent → base range 1.0', () => {
+      const [pet] = spawnPets('owner', 0, 0, 1, 1, {}, 1, 1)
+      expect(pet.range).toBeCloseTo(1.0, 5)
+    })
+
+    it('pet_range = 0.20 (level 1) → range 1.20', () => {
+      const [pet] = spawnPets('owner', 0, 0, 1, 1, { pet_range: 0.20 }, 1, 1)
+      expect(pet.range).toBeCloseTo(1.2, 5)
+    })
+
+    it('pet_range = 0.60 (level 3 maxed) → range 1.60', () => {
+      const [pet] = spawnPets('owner', 0, 0, 1, 1, { pet_range: 0.60 }, 1, 1)
+      expect(pet.range).toBeCloseTo(1.6, 5)
+    })
+  })
 })

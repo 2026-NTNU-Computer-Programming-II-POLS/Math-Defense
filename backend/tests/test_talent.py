@@ -230,6 +230,56 @@ def test_reset_on_empty_tree_is_idempotent(client):
     assert data["points_spent"] == 0
 
 
+# ── Q10: calculus_pet_range replaces calculus_pet_hp ─────────────────────────
+
+
+def test_calculus_pet_hp_is_removed_from_registry():
+    """Phase 4 Q10: the old pet-HP talent must not appear in the definitions."""
+    assert "calculus_pet_hp" not in TALENT_NODE_DEFS
+
+
+def test_calculus_pet_range_definition_matches_spec():
+    """pet_range: maxLevel=3, cost=1/lv, +20%/lv, prereq calculus_pet_speed."""
+    node = TALENT_NODE_DEFS["calculus_pet_range"]
+    assert node.attribute == "pet_range"
+    assert node.max_level == 3
+    assert node.cost_per_level == 1
+    assert abs(node.effect_per_level - 0.20) < 1e-9
+    assert node.prerequisites == ("calculus_pet_speed",)
+
+
+def test_calculus_pet_range_requires_pet_speed_first(client):
+    """Allocating pet_range without pet_speed must fail with 409."""
+    token = _register(client, "tal_pet_range_prereq")
+    _earn_points(client, token, 1)
+
+    res = client.post("/api/talents/calculus_pet_range/allocate", headers=_auth(token))
+    assert res.status_code == 409
+
+
+def test_calculus_pet_range_allocates_after_prereq(client):
+    token = _register(client, "tal_pet_range_ok")
+    _earn_points(client, token, 2)
+
+    client.post("/api/talents/calculus_pet_speed/allocate", headers=_auth(token))
+    res = client.post("/api/talents/calculus_pet_range/allocate", headers=_auth(token))
+    assert res.status_code == 200
+    node = next(n for n in res.json()["nodes"] if n["id"] == "calculus_pet_range")
+    assert node["current_level"] == 1
+
+
+def test_calculus_pet_range_modifier_applied(client):
+    token = _register(client, "tal_pet_range_mod")
+    _earn_points(client, token, 2)
+
+    client.post("/api/talents/calculus_pet_speed/allocate", headers=_auth(token))
+    client.post("/api/talents/calculus_pet_range/allocate", headers=_auth(token))
+
+    mods = client.get("/api/talents/modifiers", headers=_auth(token)).json()["modifiers"]
+    assert "calculus" in mods
+    assert abs(mods["calculus"]["pet_range"] - 0.20) < 1e-9
+
+
 # ── Cross-user isolation ──────────────────────────────────────────────────────
 
 def test_talent_allocation_isolated_between_users(client):

@@ -44,7 +44,7 @@ export const TALENT_NODE_DEFS: Record<string, TalentNodeDef> = {
   // Calculus Tower
   calculus_pet_speed:  { id: 'calculus_pet_speed', towerType: TowerType.CALCULUS, attribute: 'pet_attack_speed', name: 'Quick Pets', description: 'Increase pet attack speed', maxLevel: 3, costPerLevel: 1, effectPerLevel: 0.10, prerequisites: [] },
   calculus_pet_damage: { id: 'calculus_pet_damage', towerType: TowerType.CALCULUS, attribute: 'pet_damage', name: 'Strong Pets', description: 'Increase pet damage', maxLevel: 3, costPerLevel: 1, effectPerLevel: 0.10, prerequisites: ['calculus_pet_speed'] },
-  calculus_pet_hp:     { id: 'calculus_pet_hp', towerType: TowerType.CALCULUS, attribute: 'pet_hp', name: 'Tough Pets', description: 'Increase pet HP', maxLevel: 3, costPerLevel: 1, effectPerLevel: 0.15, prerequisites: ['calculus_pet_speed'] },
+  calculus_pet_range:  { id: 'calculus_pet_range', towerType: TowerType.CALCULUS, attribute: 'pet_range', name: 'Extended Reach', description: 'Increase pet attack range', maxLevel: 3, costPerLevel: 1, effectPerLevel: 0.20, prerequisites: ['calculus_pet_speed'] },
 }
 
 export function getNodesByTower(towerType: TowerType): TalentNodeDef[] {

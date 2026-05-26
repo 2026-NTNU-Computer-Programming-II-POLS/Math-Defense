@@ -4,7 +4,7 @@ let _nextPetId = 0
 
 // Distances are in game units (UNIT_PX = 20 px/unit); the grid spans only ±14 units,
 // so these must be unit-scale values, not pixel-scale.
-const ATTACK_RANGE = 1
+const BASE_ATTACK_RANGE = 1
 const SPAWN_OFFSET = 1.25
 
 function traitFromExponent(n: number): PetTrait {
@@ -29,13 +29,18 @@ export function spawnPets(
   const trait = traitFromExponent(exponent)
   const isInteger = Number.isInteger(coefficient) && coefficient > 0
   const bonusCount = Math.floor(mods['pet_count'] ?? 0)
-  const count = (isInteger ? coefficient : 1) + bonusCount
+  // Q12: log-compress coefficient → pet count so a 99x Calculus result spawns
+  // 6 pets instead of 99. `max(1, …)` floors a fractional/zero coefficient at
+  // log2(2) = 1; bonusCount from talents stacks linearly on top.
+  const count = Math.floor(Math.log2(Math.max(1, coefficient) + 1)) + bonusCount
   const abilityMod = isInteger ? 1 : Math.abs(coefficient)
 
   // Mod multipliers from talents + upgrade extras
   const dmgMult       = (1 + (mods['pet_damage'] ?? 0)) * towerDamageMultiplier
   const atkSpdMult    = 1 - (mods['pet_attack_speed'] ?? 0)
   const moveSpdMod    = 1 + (mods['pet_speed'] ?? 0)
+  // Q10: pet_range talent (Extended Reach) widens the pet engagement radius.
+  const rangeMult     = 1 + (mods['pet_range'] ?? 0)
 
   // Level scaling: each level adds 30% dmg, 10% faster attack (linear, floored at 0.1), 20% faster movement
   const levelDmgMult  = 1 + 0.3 * (level - 1)
@@ -67,7 +72,7 @@ export function spawnPets(
       damage:      baseDmg * abilityMod * dmgMult * levelDmgMult * coeffDmgBonus,
       speed:       baseMoveSpd * levelMoveMult * expMoveBonus * moveSpdMod,
       attackSpeed: Math.max(0.1, baseAtkSpd * atkSpdMult * levelAtkMult),
-      range:       ATTACK_RANGE,
+      range:       BASE_ATTACK_RANGE * rangeMult,
       trait,
       abilityMod,
       cooldownTimer: 0,

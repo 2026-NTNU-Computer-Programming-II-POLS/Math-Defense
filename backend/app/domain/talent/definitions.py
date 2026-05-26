@@ -58,7 +58,7 @@ _reg(TalentNodeDef("limit_range", "limit", "range", "Extended Limit", "Increase 
 # ── Calculus Tower ──
 _reg(TalentNodeDef("calculus_pet_speed", "calculus", "pet_attack_speed", "Quick Pets", "Increase pet attack speed", 3, 1, 0.10))
 _reg(TalentNodeDef("calculus_pet_damage", "calculus", "pet_damage", "Strong Pets", "Increase pet damage", 3, 1, 0.10, ("calculus_pet_speed",)))
-_reg(TalentNodeDef("calculus_pet_hp", "calculus", "pet_hp", "Tough Pets", "Increase pet HP", 3, 1, 0.15, ("calculus_pet_speed",)))
+_reg(TalentNodeDef("calculus_pet_range", "calculus", "pet_range", "Extended Reach", "Increase pet attack range", 3, 1, 0.20, ("calculus_pet_speed",)))
 
 
 def get_all_nodes() -> list[TalentNodeDef]:

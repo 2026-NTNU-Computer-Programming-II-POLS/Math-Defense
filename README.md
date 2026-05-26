@@ -14,7 +14,7 @@ An educational tower defense where **math is the mechanic, not the gate**. The w
 | Radar C — Sniper | ◒ | Radian arcs | Slow, heavy single-target shots at long range; highest base damage | Star 2 |
 | Matrix | ⊞ | Vectors & dot product | **Paired** tower system — fires nothing alone; base damage = dot product of the pair's grid-coordinate vectors; laser ramps damage the longer it locks on | Star 2 |
 | Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; the answer drives the effect — `±∞` gives max damage / heal, `±C` scales, `0` removes the tower (no refund), any non-limit constant disables it | Star 3 |
-| Calculus | ∫ | Derivatives & integrals (power rule) | Player picks a polynomial and applies `d/dx` or `∫`; the resulting `C·xⁿ` spawns **C autonomous pets** whose behaviour is determined by `n` (homing, lifetime, AoE) | Star 3 |
+| Calculus | ∫ | Derivatives & integrals (power rule) | Player picks a polynomial and applies `d/dx` or `∫`; the resulting `C·xⁿ` spawns `floor(log2(C+1))` autonomous pets (capped log-curve, not raw C) whose behaviour is determined by `n` (homing, lifetime, AoE) | Star 3 |
 
 Each tower has Tier 2 / Tier 3 upgrades (+25%/+50% damage, +10%/+20% range, plus type-specific bonuses).
 
