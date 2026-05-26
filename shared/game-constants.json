@@ -34,7 +34,7 @@
   },
   "economy": {
     "startingGoldByStar": { "1": 200, "2": 230, "3": 260, "4": 290, "5": 320 },
-    "waveCompletionBonus": { "base": 25, "perStar": 8 },
+    "waveCompletionBonus": { "base": 10, "perStar": 20 },
     "bossCorrectAnswerBonus": 100
   }
 }

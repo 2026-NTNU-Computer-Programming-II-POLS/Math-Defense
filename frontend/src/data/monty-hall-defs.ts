@@ -28,7 +28,7 @@ export const MONTY_HALL_THRESHOLDS_BY_STAR: Record<number, MontyHallThreshold[]>
     { killValue: 200, doorCount: 4 },
     { killValue: 500, doorCount: 5 },
     { killValue: 900, doorCount: 5 },
-    { killValue: 1400, doorCount: 5 },
+    { killValue: 1000, doorCount: 5 },
   ],
 }
 

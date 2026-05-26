@@ -96,8 +96,10 @@ const rampPct = computed(() => {
 
 const damagePerSec = computed(() => {
   const dp = dotProduct.value
-  if (dp == null || dp <= 0) return 0
-  return dp * laserView.value.rampMultiplier
+  if (dp == null) return 0
+  const baseDamage = 1 + dp
+  if (baseDamage <= 0) return 0
+  return baseDamage * laserView.value.rampMultiplier
 })
 
 function pairWith(pairId: string) {
@@ -121,9 +123,12 @@ function pairWith(pairId: string) {
         Dot product: [{{ tower?.x }}, {{ tower?.y }}] · [{{ pair.x }}, {{ pair.y }}] =
         <strong>{{ dotProduct }}</strong>
       </p>
+      <p v-if="dotProduct !== null" class="info-line">
+        Base damage: 1 + {{ dotProduct }} = <strong>{{ 1 + dotProduct }}</strong>
+      </p>
 
-      <div v-if="dotProduct !== null && dotProduct <= 0" class="laser-status laser-status--invalid">
-        ⚠ Negative or zero dot product — laser disabled.
+      <div v-if="dotProduct !== null && (1 + dotProduct) <= 0" class="laser-status laser-status--invalid">
+        ⚠ Dot product too negative — laser disabled (base 1 + dot product ≤ 0).
         Reposition towers into the same quadrant.
       </div>
 
@@ -159,7 +164,11 @@ function pairWith(pairId: string) {
       </template>
     </div>
     <div v-else class="no-pair">
-      <p class="info-line">No pair — place another Matrix tower to auto-pair</p>
+      <div class="pairing-required-banner" role="status">
+        <span class="pairing-required-label">Pairing Required</span>
+        <span class="pairing-required-detail">This Matrix tower does not fire until paired.</span>
+      </div>
+      <p class="info-line">Place another Matrix tower to auto-pair</p>
       <div v-if="availablePairs.length > 0">
         <p class="section-label">Or pair manually:</p>
         <button
@@ -179,6 +188,29 @@ function pairWith(pairId: string) {
 .info-line strong { color: var(--gold); }
 .section-label { font-size: var(--text-2xs); color: var(--axis); margin: 4px 0 2px; }
 .no-pair .btn { font-size: var(--text-xs); margin-top: 4px; }
+
+.pairing-required-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(204, 153, 51, 0.12);
+  border: 1px solid rgba(204, 153, 51, 0.45);
+  margin-bottom: 4px;
+}
+.pairing-required-label {
+  font-size: var(--text-2xs);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  font-weight: bold;
+}
+.pairing-required-detail {
+  font-size: var(--text-2xs);
+  color: var(--text-primary);
+  line-height: 1.35;
+}
 
 .laser-status {
   font-size: var(--text-2xs);

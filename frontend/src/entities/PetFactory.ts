@@ -37,9 +37,9 @@ export function spawnPets(
   const atkSpdMult    = 1 - (mods['pet_attack_speed'] ?? 0)
   const moveSpdMod    = 1 + (mods['pet_speed'] ?? 0)
 
-  // Level scaling: each level adds 30% dmg, 15% faster attack, 20% faster movement
+  // Level scaling: each level adds 30% dmg, 10% faster attack (linear, floored at 0.1), 20% faster movement
   const levelDmgMult  = 1 + 0.3 * (level - 1)
-  const levelAtkMult  = Math.pow(0.85, level - 1)
+  const levelAtkMult  = Math.max(0.1, 1 - 0.1 * (level - 1))
   const levelMoveMult = 1 + 0.2 * (level - 1)
 
   // Calculus scaling: coefficient → damage bonus, exponent → movement bonus

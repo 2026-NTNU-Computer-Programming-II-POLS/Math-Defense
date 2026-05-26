@@ -66,7 +66,7 @@ Starting gold by star (`shared/game-constants.json → economy.startingGoldBySta
 |---|---|---|---|---|---|
 | Gold | 200 | 230 | 260 | 290 | 320 |
 
-Wave-clear bonus: `25 + 8 × starRating`. Answering the Boss Type-B Chain Rule correctly pays a one-off `+100` gold bonus (`bossCorrectAnswerBonus`).
+Wave-clear bonus: `10 + 20 × starRating`. Answering the Boss Type-B Chain Rule correctly pays a one-off `+100` gold bonus (`bossCorrectAnswerBonus`).
 
 ---
 
@@ -115,7 +115,7 @@ Thresholds and door counts by star (`monty-hall-defs.ts`):
 | 2 | 80→3, 200→4, 350→4 |
 | 3 | 120→3, 300→4, 500→5 |
 | 4 | 150→4, 400→4, 700→5, 1000→5 |
-| 5 | 200→4, 500→5, 900→5, 1400→5 |
+| 5 | 200→4, 500→5, 900→5, 1000→5 |
 
 Mathematically: **switching wins** P = (doors − 1) / doors after a reveal, so 2/3 at 3 doors, 3/4 at 4 doors, 4/5 at 5 doors. The game does not tell you that — it's the lesson.
 

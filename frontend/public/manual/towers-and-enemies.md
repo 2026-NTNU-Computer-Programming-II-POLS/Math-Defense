@@ -48,10 +48,10 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 ### Matrix Tower — ⊞
 
-- **Cost / Damage / Range / Cooldown:** 80 / 0 base / 8 / 0.5 s
+- **Cost / Damage / Range / Cooldown:** 80 / 1 base / 8 / 0.5 s
 - **Math:** vectors, dot product
 - **Unlocked from:** Star 2
-- **Mechanic:** Matrix towers fire **nothing** alone. Pair two Matrix towers via the panel and the **base damage = dot product of their grid-coordinate vectors**. A laser locks onto a target and ramps its damage the longer it stays locked.
+- **Mechanic:** Matrix towers fire **nothing** alone — pairing is required. Pair two Matrix towers via the panel and the **base damage = 1 + dot product of their grid-coordinate vectors**. A laser locks onto a target and ramps its damage the longer it stays locked.
 - **Tier 2/3:** lock-on ramp rate +20% / +40%; Tier 3 lets the laser sweep one extra target.
 - **Pick when:** you can place two towers whose coordinate vectors give you a useful dot product, and there's a single long-lived target (mini-boss, Bulwark, Boss).
 - **Exam tie-in:** AST 學測 linear algebra unit (2×2 matrices, dot product).
@@ -93,7 +93,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 | Radar A — Sweep | 50 | 5 | 6 | 0.5 | AoE sweep |
 | Radar B — Rapid | 65 | 8 | 7 | 0.3 | Fast single target |
 | Radar C — Sniper | 90 | 40 | 12 | 2.5 | Slow heavy single target |
-| Matrix | 80 | 0* | 8 | 0.5 | Paired laser, dot-product damage |
+| Matrix | 80 | 1* | 8 | 0.5 | Paired laser, 1 + dot-product damage |
 | Limit | 70 | 25 | 8 | 3.0 | Range effect from `lim` answer |
 | Calculus | 100 | 0* | 10 | — | Spawns C·x^n pets |
 
@@ -108,14 +108,14 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 | Enemy | HP | Speed | Reward | Damage | Kill value | Special |
 |---|---|---|---|---|---|---|
 | **General** | 30 | 2.0 | 15 | 1 | 10 | Baseline mob |
-| **Fast** | 15 | 4.0 | 10 | 1 | 5 | 2× speed, thin HP — sneaks past slow towers |
-| **Strong** | 120 | 1.0 | 40 | 2 | 25 | Tanky bruiser |
-| **Split** | 40 | 2.0 | 15 | 1 | 5 | On death, splits into 2 smaller General enemies (40% scale) |
-| **Helper** | 35 | 2.0 | 30 | 1 | 15 | Aura: heals nearby allies +5 HP/s and grants +20% speed within r=3 |
-| **Boss Type-A** | 500 | 0.8 | 200 | 99 | 100 | Shield 200 HP; spawns a General minion every 8 s |
-| **Boss Type-B** | 600 | 0.7 | 300 | 99 | 150 | Shield 250 HP; spawns a Fast every 8 s; triggers a **Chain Rule** challenge at ~50% HP |
-| **Regenerator** | 80 | 1.5 | 35 | 2 | 20 | Regenerates 18 HP/s constantly — burst-kill or it never dies |
-| **Bulwark** | 220 | 0.9 | 50 | 3 | 30 | Hard cap of **14 damage per single hit** — favours fast, weak shots or DoT |
+| **Fast** | 15 | 4.0 | 8 | 1 | 5 | 2× speed, thin HP — sneaks past slow towers |
+| **Strong** | 120 | 1.0 | 38 | 2 | 25 | Tanky bruiser |
+| **Split** | 40 | 2.0 | 8 | 1 | 5 | On death, splits into 2 smaller General enemies (40% scale) |
+| **Helper** | 35 | 2.0 | 23 | 1 | 15 | Aura: heals nearby allies +5 HP/s and grants +20% speed within r=3 |
+| **Boss Type-A** | 500 | 0.8 | 150 | 99 | 100 | Shield 200 HP; spawns a General minion every 8 s |
+| **Boss Type-B** | 600 | 0.7 | 225 | 99 | 150 | Shield 250 HP; spawns a Fast every 8 s; triggers a **Chain Rule** challenge at ~50% HP |
+| **Regenerator** | 80 | 1.5 | 30 | 2 | 20 | Regenerates 18 HP/s constantly — burst-kill or it never dies |
+| **Bulwark** | 220 | 0.9 | 45 | 3 | 30 | Hard cap of **14 damage per single hit** — favours fast, weak shots or DoT |
 | **Swarmling** | 12 | 3.2 | 6 | 1 | 4 | Takes **only 35% of tower damage**; pets bypass this. Spawns in tight bursts |
 
 ### Boss Mechanics (extra detail)

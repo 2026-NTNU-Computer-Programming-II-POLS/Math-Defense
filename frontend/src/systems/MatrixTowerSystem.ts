@@ -74,9 +74,11 @@ export class MatrixTowerSystem {
         this._lasers.set(pairKey, laser)
       }
 
-      // Dot-product mechanic: towers in opposite quadrants yield negative values and deactivate the laser.
-      // Towers near the origin produce near-zero damage. This is intentional game design.
-      const baseDamage = tower.x * pair.x + tower.y * pair.y
+      // Dot-product mechanic: damage = 1 (base) + dot product. Strongly negative
+      // dot products (opposite quadrants) still deactivate the laser; the +1 base
+      // lets pairs near the origin still contribute small damage.
+      const dotProduct = tower.x * pair.x + tower.y * pair.y
+      const baseDamage = 1 + dotProduct
       if (baseDamage <= 0) {
         laser.invalid = true
         laser.targetIds = []
