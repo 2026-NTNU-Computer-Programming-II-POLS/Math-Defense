@@ -23,13 +23,21 @@ export class EconomySystem implements GameSystem {
     this._game = game
     this._unsubs.push(
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, (enemy) => {
-        if (isShielded(game.state)) {
+        let dmg = enemy.damage ?? 1
+        // Q4+Q5: shield is a damage-reduction buff, not an immunity. Each of
+        // the 3 absorbed hits is multiplied by shieldReductionFactor (0.5)
+        // and rounded up so a 1-damage Swarmling still costs 1 HP. After the
+        // 3rd hit the shield deactivates and subsequent damage is full.
+        if (isShielded(game.state) && game.state.shieldHitsRemaining > 0) {
+          dmg = Math.ceil(dmg * game.state.shieldReductionFactor)
           game.state.shieldHitsRemaining = Math.max(0, game.state.shieldHitsRemaining - 1)
-          if (game.state.shieldHitsRemaining === 0) game.state.shieldActive = false
-          return
+          if (game.state.shieldHitsRemaining === 0) {
+            game.state.shieldActive = false
+            game.state.shieldReductionFactor = 1
+          }
         }
         if (game.state.hp <= 0) return
-        this.changeHp(-(enemy.damage ?? 1))
+        this.changeHp(-dmg)
       }),
 
       game.eventBus.on(Events.ENEMY_KILLED, (enemy) => {

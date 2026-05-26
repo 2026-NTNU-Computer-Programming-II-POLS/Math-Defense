@@ -93,8 +93,20 @@ const effectStrategies: Record<string, EffectFn> = {
   HEAL_5: (g) => { g.economy.changeHp(5) },
   HEAL_10: (g) => { g.economy.changeHp(10) },
   HEAL_FULL: (g) => { g.economy.changeHp(g.state.maxHp - g.state.hp) },
-  SHIELD_ACTIVATE: (g) => { g.state.shieldActive = true; g.state.shieldHitsRemaining = 3 },
-  SHIELD_DEACTIVATE: (g) => { g.state.shieldActive = false; g.state.shieldHitsRemaining = 0 },
+  // Q4+Q5: shield no longer grants full immunity. It absorbs the next 3 hits
+  // but each one only deals half its original damage (rounded up). The
+  // reductionFactor is the lever — set on activate, reset on deactivate so
+  // an expired shield never leaks the 0.5 multiplier into the next session.
+  SHIELD_ACTIVATE: (g) => {
+    g.state.shieldActive = true
+    g.state.shieldHitsRemaining = 3
+    g.state.shieldReductionFactor = 0.5
+  },
+  SHIELD_DEACTIVATE: (g) => {
+    g.state.shieldActive = false
+    g.state.shieldHitsRemaining = 0
+    g.state.shieldReductionFactor = 1
+  },
   GOLD_MULTIPLIER_DOUBLE: (g) => { g.state.goldMultiplier *= 2 },
   GOLD_MULTIPLIER_DOUBLE_REVERT: (g) => { g.state.goldMultiplier = Math.max(1, g.state.goldMultiplier / 2) },
   GOLD_MULTIPLIER_TRIPLE: (g) => { g.state.goldMultiplier *= 3 },

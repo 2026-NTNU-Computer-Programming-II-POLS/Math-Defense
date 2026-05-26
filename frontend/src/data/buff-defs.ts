@@ -99,7 +99,7 @@ export const PURCHASABLE_BUFFS: BuffDef[] = [
   {
     id: 'shop_shield',
     name: 'Ward Shield',
-    description: 'Absorb next 3 damage for 30s',
+    description: 'Halve the next 3 damage hits for 30s',
     category: 'defense',
     target: 'player',
     cost: 120,

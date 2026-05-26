@@ -2,7 +2,8 @@
  * V3 Phase 3 — end-to-end counter-enemy behavior. Wires the real EnemyFactory,
  * the real applyDamage damage-source contract, and the real EnemyAbilitySystem
  * regen tick together to confirm each counter-enemy's intended weakness:
- *   - Bulwark: capped by discrete hits, full damage from continuous sources.
+ *   - Bulwark (Balance-overhaul Phase 3 Q6): tower damage is multiplied by
+ *     0.4 from every source except pets / effects.
  *   - Swarmling: reduced damage from every source except pets.
  *   - Regenerator: out-regenerates sustained sub-regen burst DPS, dies to one big hit.
  */
@@ -30,21 +31,31 @@ function linearPath(): ReturnType<typeof createSegmentedPath> {
 
 const DT = 1 / 60
 
-describe('Bulwark — per-hit cap is discrete-only', () => {
-  it('a 40-damage towerHit reduces HP by exactly damageCapPerHit (14)', () => {
+describe('Bulwark — Q6 towerDamageMult applies to every tower source', () => {
+  it('a 40-damage towerHit reduces HP by 40 × 0.4 = 16', () => {
     const game = createMockGame({ phase: GamePhase.WAVE })
     const enemy = createEnemy(EnemyType.BULWARK, linearPath())
     const before = enemy.hp
     applyDamage(enemy, 40, game, 'towerHit')
-    expect(before - enemy.hp).toBe(14)
+    expect(before - enemy.hp).toBeCloseTo(16, 5)
   })
 
-  it('a 40-damage towerTick (Matrix laser) reduces HP by its full amount', () => {
+  it('a 40-damage towerTick (Matrix laser) is also scaled to 16', () => {
     const game = createMockGame({ phase: GamePhase.WAVE })
     const enemy = createEnemy(EnemyType.BULWARK, linearPath())
     const before = enemy.hp
     applyDamage(enemy, 40, game, 'towerTick')
-    expect(before - enemy.hp).toBe(40)
+    expect(before - enemy.hp).toBeCloseTo(16, 5)
+  })
+
+  it('pet and effect damage bypass towerDamageMult — full 40 lands', () => {
+    for (const source of ['pet', 'effect'] as const) {
+      const game = createMockGame({ phase: GamePhase.WAVE })
+      const enemy = createEnemy(EnemyType.BULWARK, linearPath())
+      const before = enemy.hp
+      applyDamage(enemy, 40, game, source)
+      expect(before - enemy.hp).toBe(40)
+    }
   })
 })
 

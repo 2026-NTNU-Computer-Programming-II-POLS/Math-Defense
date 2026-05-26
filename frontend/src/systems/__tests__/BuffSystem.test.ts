@@ -26,6 +26,17 @@ vi.mock('@/data/buff-defs', () => ({
       duration: 0,
       effectId: 'HEAL_5',
     },
+    {
+      id: 'test_shield',
+      name: 'Test Shield',
+      description: 'Halve next 3 hits for 30s',
+      category: 'defense',
+      target: 'player',
+      cost: 40,
+      duration: 30,
+      effectId: 'SHIELD_ACTIVATE',
+      revertId: 'SHIELD_DEACTIVATE',
+    },
   ],
   BUFF_MAP: new Map(),
 }))
@@ -94,6 +105,27 @@ describe('BuffSystem (V2 shop-based)', () => {
 
     game.eventBus.emit(Events.LEVEL_START, 1)
     expect(tower.damageBonus).toBeCloseTo(1.0)
+    expect(game.state.activeBuffs).toHaveLength(0)
+  })
+
+  // Q4+Q5: SHIELD_ACTIVATE sets factor 0.5 + 3 hits; SHIELD_DEACTIVATE
+  // (fired via the buff's revertId on expiry) must restore factor 1 so it
+  // does not leak into the next shield purchase.
+  it('shield buff sets factor 0.5 on activate and resets to 1 on expiry', () => {
+    expect(game.state.shieldActive).toBe(false)
+    expect(game.state.shieldReductionFactor).toBe(1)
+
+    game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_shield', cost: 40 })
+
+    expect(game.state.shieldActive).toBe(true)
+    expect(game.state.shieldHitsRemaining).toBe(3)
+    expect(game.state.shieldReductionFactor).toBe(0.5)
+
+    system.update(31, game)
+
+    expect(game.state.shieldActive).toBe(false)
+    expect(game.state.shieldHitsRemaining).toBe(0)
+    expect(game.state.shieldReductionFactor).toBe(1)
     expect(game.state.activeBuffs).toHaveLength(0)
   })
 

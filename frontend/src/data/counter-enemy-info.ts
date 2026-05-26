@@ -39,12 +39,13 @@ export const COUNTER_ENEMY_INFO: Partial<Record<EnemyType, CounterEnemyInfo>> = 
   [EnemyType.BULWARK]: {
     name: 'Bulwark',
     counterTower: 'Matrix tower',
-    warning: 'single big hits are capped — needs high-frequency or ramping damage (Matrix laser).',
+    warning: 'tower damage is reduced 60% — bypass with Calculus pets or the Matrix laser ramp.',
     explanation:
-      'The Bulwark caps the damage it takes from any single hit, so one huge '
-      + 'slow-firing shot is wasted — the excess is thrown away. Beat it with '
-      + 'damage that lands often or ramps up over time: the Matrix tower’s '
-      + 'sustained laser stays under the per-hit cap while still grinding it down.',
+      'The Bulwark only takes 40% of any tower damage, so heavy slow-firing '
+      + 'shots feel weak. Pets and player-cast effects bypass the reduction '
+      + 'entirely; the Matrix tower’s ramping laser is the next-best '
+      + 'option because its sustained damage stacks fast enough to grind '
+      + 'through even after the multiplier.',
   },
   [EnemyType.SWARMLING]: {
     name: 'Swarmling',

@@ -191,7 +191,7 @@ Tower mechanics call into the deterministic C/WASM core (see §11):
 | Split | 40 | 2.0 | 15 | 5 | Splits into 2 Generals on death |
 | Helper | 35 | 2.0 | 30 | 15 | Aura (r=3): +5 HP/s and +20% speed to allies |
 | Regenerator | 80 | 1.5 | 35 | 20 | Regenerates 18 HP/s |
-| Bulwark | 220 | 0.9 | 50 | 30 | Caps any single hit at 14 damage |
+| Bulwark | 220 | 0.9 | 50 | 30 | Takes only 40% of tower damage (pets and player effects bypass) |
 | Swarmling | 12 | 3.2 | 6 | 4 | Takes only 35% of tower damage (Calculus pets bypass) |
 | **Boss Type-A** | 500 | 0.8 | 200 | 100 | 200-HP shield; summons a General every 8 s |
 | **Boss Type-B** | 600 | 0.7 | 300 | 150 | 250-HP shield; summons a Fast every 8 s; triggers **Chain Rule** event at ~50% HP |
@@ -215,7 +215,7 @@ The historical "buff card draw" has been replaced by two distinct systems.
 
 ### 7.2 Shop Buffs (8) — bought during the Build Phase, time-based stacks
 
-Sharpen Blades (+20% damage), Overclock (+15% attack speed), Far Sight (+15% range), Quagmire (−15% enemy speed), Corrode Armor (+10% damage taken), Heal 5 / Heal 10, Ward Shield (absorb next 3 hits), Prospector (2× gold for the next wave).
+Sharpen Blades (+20% damage), Overclock (+15% attack speed), Far Sight (+15% range), Quagmire (−15% enemy speed), Corrode Armor (+10% damage taken), Heal 5 / Heal 10, Ward Shield (halve next 3 hits), Prospector (2× gold for the next wave).
 
 > The earlier "Rejuvenate" spell from the V1 draft is **not** implemented; no other documented mechanic depends on it.
 

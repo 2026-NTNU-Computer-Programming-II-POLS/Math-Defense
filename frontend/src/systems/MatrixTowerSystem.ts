@@ -159,8 +159,10 @@ export class MatrixTowerSystem {
   }
 
   private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    // The Matrix laser is continuous, dt-scaled damage — not a discrete hit,
-    // so the Bulwark per-hit cap never bites it.
+    // The Matrix laser is continuous, dt-scaled damage; routing it through
+    // 'towerTick' keeps any future discrete-only modifier (e.g. the cap
+    // mechanic kept on Enemy.damageCapPerHit for potential reuse) from
+    // biting it. Bulwark's towerDamageMult still applies here.
     applyDamage(enemy, amount, game, 'towerTick')
   }
 

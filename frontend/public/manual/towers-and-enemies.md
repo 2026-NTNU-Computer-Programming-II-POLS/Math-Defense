@@ -115,7 +115,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 | **Boss Type-A** | 500 | 0.8 | 150 | 99 | 100 | Shield 200 HP; spawns a General minion every 8 s |
 | **Boss Type-B** | 600 | 0.7 | 225 | 99 | 150 | Shield 250 HP; spawns a Fast every 8 s; triggers a **Chain Rule** challenge at ~50% HP |
 | **Regenerator** | 80 | 1.5 | 30 | 2 | 20 | Regenerates 18 HP/s constantly — burst-kill or it never dies |
-| **Bulwark** | 220 | 0.9 | 45 | 3 | 30 | Hard cap of **14 damage per single hit** — favours fast, weak shots or DoT |
+| **Bulwark** | 220 | 0.9 | 45 | 3 | 30 | Tower damage is reduced to **40%** — pets and player effects bypass it |
 | **Swarmling** | 12 | 3.2 | 6 | 1 | 4 | Takes **only 35% of tower damage**; pets bypass this. Spawns in tight bursts |
 
 ### Boss Mechanics (extra detail)
@@ -136,7 +136,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 | Threat | Why standard towers struggle | What to do |
 |---|---|---|
 | Regenerator | constant HP regen | Burst damage (Radar C, Lightning spell). Damage over Time (DoT) alone is unreliable. |
-| Bulwark | 14-damage hit cap | Many small hits — Radar B, Magic curve zone, Matrix laser tick |
+| Bulwark | takes only 40% tower damage | Calculus pets, Fireball/Lightning spells, and Monty-Hall power-ups bypass the cut. Matrix laser ramps through it. |
 | Swarmling | -65% tower damage; bursty | Calculus pets ignore the modifier. Frost Nova to slow the cluster. |
 | Helper | buffs nearby allies | Kill the Helper *first*. Radar C or a Lightning spell are reliable openers. |
 | Split | doubles into smaller mobs | Place AoE (Magic curve, Radar A sweep) where the children will spawn. |
@@ -176,7 +176,7 @@ When to cast:
 | Corrode Armor | 110 | 40 s | Enemies take +10% damage |
 | Heal 5 HP | 60 | instant | +5 HP |
 | Heal 10 HP | 100 | instant | +10 HP |
-| Ward Shield | 120 | 30 s | Absorb the next 3 incoming damage |
+| Ward Shield | 120 | 30 s | Halve the next 3 incoming damage hits (rounded up) |
 | Prospector | 50 | 30 s | Double gold from kills |
 
 Stack rules: each buff stacks **independently**. Two damage buffs are multiplicative.

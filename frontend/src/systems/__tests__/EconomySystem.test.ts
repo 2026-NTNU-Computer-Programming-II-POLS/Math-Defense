@@ -20,14 +20,48 @@ describe('EconomySystem', () => {
     expect(game.state.hp).toBe(19)
   })
 
-  it('does not decrease HP when shield is active', () => {
+  // Q4+Q5: shield halves (not blocks) each absorbed hit; rounded up so a
+  // 1-damage Swarmling still costs 1 HP, but a 2-damage Strong only costs 1.
+  it('halves an absorbed hit while the shield is active (ceil-rounded)', () => {
     const { game } = setup()
     game.state.shieldActive = true
-    const enemy = createMockEnemy()
+    game.state.shieldHitsRemaining = 3
+    game.state.shieldReductionFactor = 0.5
+    const enemy = createMockEnemy({ damage: 2 })
 
     game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, enemy)
 
-    expect(game.state.hp).toBe(20)
+    // ceil(2 * 0.5) = 1
+    expect(game.state.hp).toBe(19)
+    expect(game.state.shieldHitsRemaining).toBe(2)
+    expect(game.state.shieldActive).toBe(true)
+  })
+
+  it('1-damage enemies still cost 1 HP through the shield (ceil floor)', () => {
+    const { game } = setup()
+    game.state.shieldActive = true
+    game.state.shieldHitsRemaining = 3
+    game.state.shieldReductionFactor = 0.5
+    const enemy = createMockEnemy({ damage: 1 })
+
+    game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, enemy)
+
+    expect(game.state.hp).toBe(19)
+    expect(game.state.shieldHitsRemaining).toBe(2)
+  })
+
+  it('shield deactivates after the 3rd absorbed hit and resets the factor', () => {
+    const { game } = setup()
+    game.state.shieldActive = true
+    game.state.shieldHitsRemaining = 1
+    game.state.shieldReductionFactor = 0.5
+    const enemy = createMockEnemy({ damage: 2 })
+
+    game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, enemy)
+
+    expect(game.state.shieldActive).toBe(false)
+    expect(game.state.shieldHitsRemaining).toBe(0)
+    expect(game.state.shieldReductionFactor).toBe(1)
   })
 
   it('grants gold on enemy killed based on reward and multiplier', () => {
@@ -92,15 +126,27 @@ describe('EconomySystem', () => {
       expect(game.state.phase).toBe(GamePhase.GAME_OVER)
     })
 
-    it('shield absorbs the boss hit (no HP change, no GAME_OVER)', () => {
-      const { game } = bossSetup()
+    // Q4+Q5: shield halves boss damage instead of fully blocking it. With
+    // boss.damage=99 and factor=0.5 the player takes ceil(99 * 0.5) = 50 HP.
+    // Starting HP=100 → ends at 50 and the run continues (not GAME_OVER).
+    it('shield halves the boss hit — player survives at 50/100', () => {
+      // Override maxHp too: changeHp clamps to maxHp, and the mock defaults
+      // it to INITIAL_HP from createInitialState, which is 20 in test fixtures.
+      const game = createMockGame({ phase: GamePhase.WAVE, gold: 100, hp: 100, maxHp: 100 })
+      game.phase.forceTransition(GamePhase.WAVE)
+      const system = new EconomySystem()
+      system.init(game)
       game.state.shieldActive = true
+      game.state.shieldHitsRemaining = 3
+      game.state.shieldReductionFactor = 0.5
       const boss = createMockEnemy({ damage: 99 })
 
       game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, boss)
 
-      expect(game.state.hp).toBe(20)
+      // ceil(99 * 0.5) = 50 → hp 100 - 50 = 50
+      expect(game.state.hp).toBe(50)
       expect(game.state.phase).not.toBe(GamePhase.GAME_OVER)
+      expect(game.state.shieldHitsRemaining).toBe(2)
     })
 
     it('per-enemy damage is honoured (strong enemy damage=2)', () => {

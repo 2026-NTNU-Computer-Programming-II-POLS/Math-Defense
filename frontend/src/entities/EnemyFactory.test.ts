@@ -2,6 +2,9 @@
  * V3 Phase 2 — the three counter-enemy types instantiate via createEnemy with
  * the expected defensive-trait field values, and the pre-V3 enemies still get
  * inert defaults (regenPerSec 0 / damageCapPerHit 0 / towerDamageMult 1).
+ *
+ * Balance-overhaul Phase 3 (Q6): BULWARK migrated from `damageCapPerHit: 14`
+ * to `towerDamageMult: 0.4`; the test below pins the new shape.
  */
 import { describe, it, expect } from 'vitest'
 import { createEnemy } from './EnemyFactory'
@@ -31,11 +34,11 @@ describe('createEnemy — V3 counter-enemy defensive traits', () => {
     expect(e.maxHp).toBe(80)
   })
 
-  it('Bulwark carries damageCapPerHit and inert regen / mult', () => {
+  it('Bulwark carries towerDamageMult and inert regen / cap', () => {
     const e = createEnemy(EnemyType.BULWARK, linearPath())
-    expect(e.damageCapPerHit).toBe(14)
+    expect(e.towerDamageMult).toBe(0.4)
     expect(e.regenPerSec).toBe(0)
-    expect(e.towerDamageMult).toBe(1)
+    expect(e.damageCapPerHit).toBe(0)
     expect(e.maxHp).toBe(220)
   })
 

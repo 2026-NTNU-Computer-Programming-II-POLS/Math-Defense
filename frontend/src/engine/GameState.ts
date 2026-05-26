@@ -49,6 +49,11 @@ export interface GameState {
   // Buff flags
   shieldActive: boolean
   shieldHitsRemaining: number
+  // Per-hit multiplier applied while the shield absorbs damage from
+  // ENEMY_REACHED_ORIGIN. 1 = no reduction (inactive default); 0.5 halves
+  // each absorbed hit. BuffSystem owns the writes (set on SHIELD_ACTIVATE,
+  // reset on SHIELD_DEACTIVATE).
+  shieldReductionFactor: number
   goldMultiplier: number
   freeTowerNext: boolean
   freeTowerCharges: number
@@ -93,6 +98,7 @@ export function createInitialState(): GameState {
     montyHallPending: false,
     shieldActive: false,
     shieldHitsRemaining: 0,
+    shieldReductionFactor: 1,
     goldMultiplier: 1,
     freeTowerNext: false,
     freeTowerCharges: 0,

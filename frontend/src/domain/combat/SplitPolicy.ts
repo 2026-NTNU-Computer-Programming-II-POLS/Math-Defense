@@ -107,8 +107,11 @@ export type DamageSource =
   | 'spell'      // player-cast spell (Fireball / Lightning)
   | 'effect'     // power-up / event-driven damage (Monty Hall buff)
 
-// Discrete hits are subject to the Bulwark per-hit cap; continuous (dt-scaled)
-// sources are not — capping a per-frame slice would be meaningless.
+// Discrete hits are subject to the per-hit cap (damageCapPerHit); continuous
+// (dt-scaled) sources are not — capping a per-frame slice would be
+// meaningless. The cap is currently unused after Bulwark migrated to
+// towerDamageMult (balance-overhaul Phase 3, Q6); the mechanic is kept here
+// for any future enemy that wants a true hard cap.
 const DISCRETE_SOURCES: ReadonlySet<DamageSource> = new Set<DamageSource>([
   'towerHit', 'pet', 'spell', 'effect',
 ])
@@ -134,17 +137,21 @@ export function applyDamage(
   // "incoming hit → what landed".
   const preDefense = remaining
 
-  // Per-hit cap (Bulwark): clamps discrete hits only; applied before evasion so
-  // the limit is deterministic regardless of whether evasion also fires.
-  // Continuous towerTick / dot sources are dt-scaled and not capped — this is
-  // what makes a ramping continuous tower (Matrix) the counter to Bulwark.
+  // Per-hit cap: clamps discrete hits only; applied before evasion so the
+  // limit is deterministic regardless of whether evasion also fires.
+  // Continuous towerTick / dot sources are dt-scaled and not capped.
+  // No live enemy uses this after Q6 (Bulwark moved to towerDamageMult);
+  // kept as a reusable defensive primitive for future enemies.
   let capped = false
   if (enemy.damageCapPerHit > 0 && DISCRETE_SOURCES.has(source) && remaining > enemy.damageCapPerHit) {
     remaining = enemy.damageCapPerHit
     capped = true
   }
 
-  // Evasion (Swarmling): only pets and player-earned power-ups bypass it.
+  // Damage-mult reduction (Swarmling evasion + Bulwark Q6 armor): only pets
+  // and player-earned power-ups bypass it. Both enemies share the same field;
+  // semantics differ by design (Swarmling 0.35, Bulwark 0.4) but the math is
+  // identical, so a single branch covers both.
   let evaded = false
   if (enemy.towerDamageMult < 1 && source !== 'pet' && source !== 'effect') {
     remaining *= enemy.towerDamageMult

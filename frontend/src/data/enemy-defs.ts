@@ -166,7 +166,12 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     reward: 45,
     damage: 3,
     killValue: 30,
-    damageCapPerHit: 14,
+    // Q6: BULWARK now uses a 60% tower-damage reduction instead of the old
+    // 14-damage per-hit cap. The cap had a hard cliff (a 15-damage shot and
+    // a 100-damage shot both landed as 14); the multiplier scales with the
+    // incoming hit, so high-investment towers still gain something. Pets and
+    // power-up effects bypass the multiplier (see SplitPolicy.applyDamage).
+    towerDamageMult: 0.4,
   },
   [EnemyType.SWARMLING]: {
     type: EnemyType.SWARMLING,

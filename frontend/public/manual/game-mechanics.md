@@ -145,7 +145,7 @@ During Build Phase, the left utility column shows the **Shop**. Buffs you buy ru
 | Corrode Armor | 110 | 40 s | enemies take +10% damage |
 | Heal 5 HP | 60 | instant | restore 5 HP |
 | Heal 10 HP | 100 | instant | restore 10 HP |
-| Ward Shield | 120 | 30 s | absorb next 3 damage |
+| Ward Shield | 120 | 30 s | halve next 3 damage hits |
 | Prospector | 50 | 30 s | double gold from kills |
 
 Monty Hall rewards are stronger (e.g. *double* damage, *triple* gold, *full* heal) but you have to earn them by clearing kill-value thresholds.
