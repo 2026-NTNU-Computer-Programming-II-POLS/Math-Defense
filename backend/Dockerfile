@@ -1,3 +1,23 @@
+# ── Stage 1: rebuild math_engine.wasm from the C source ──
+# Server-side replay verification (session_service.recompute_total_score with
+# total_score_fn=get_total_score_fn) loads this .wasm and calls
+# compute_total_score on it. If we copied the committed binary directly, any
+# formula change in wasm/math_engine.c that hadn't been re-`make`d locally
+# would silently ship an outdated formula and disagree with the Python mirror
+# the parity tests check. Rebuilding here makes the binary a deterministic
+# function of the C source, the same way the GHA backend job does.
+#
+# Pin the emsdk tag (avoid `:latest`) so production builds are reproducible.
+# Bump in lock-step with whatever version the GHA setup-emsdk action installs.
+FROM emscripten/emsdk:3.1.74 AS wasm-builder
+WORKDIR /build
+COPY wasm/ /build/wasm/
+# Makefile writes outputs to ../frontend/src/math/wasm relative to wasm/, so
+# the target directory must exist before invoking emcc.
+RUN mkdir -p /build/frontend/src/math/wasm \
+    && cd /build/wasm && make
+
+# ── Stage 2: runtime image ──
 FROM python:3.13-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -15,7 +35,7 @@ COPY shared /shared
 # frontend ships, so wasmtime-py can recompute scores via musl pow and the
 # two figures agree bit-exactly. wasm_runtime.py looks here first.
 RUN mkdir -p /app/data
-COPY frontend/src/math/wasm/math_engine.wasm /app/data/math_engine.wasm
+COPY --from=wasm-builder /build/frontend/src/math/wasm/math_engine.wasm /app/data/math_engine.wasm
 
 # Drop root: a process escape or RCE inside the container should not land the
 # attacker in a root shell. Chown /app so the app can still write to log paths

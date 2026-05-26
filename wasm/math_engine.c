@@ -145,16 +145,22 @@ double compute_total_score(double kill_value,
     double s1 = kill_value / active_time;
     double s2 = (cost_total > 0.0) ? (kill_value / cost_total) : 0.0;
 
-    double k;
-    if (s1 >= s2) {
-        k = 0.7 * s1 + 0.3 * s2;
-    } else {
-        k = 0.5 * s1 + 0.5 * s2;
-    }
+    /* Q3: continuous K blend. The old piecewise weight (0.7/0.3 vs 0.5/0.5) had
+     * a discontinuity at s1 == s2 that produced visible score jumps for runs
+     * that crossed it. Weighting by alpha = s1/(s1+s2) interpolates smoothly:
+     * efficiency-dominant runs (s1 >> s2) tilt toward s1, cost-dominant runs
+     * toward s2, and the s1+s2 == 0 zero-kill case short-circuits to k=0. */
+    double denom_k = s1 + s2;
+    double alpha = (denom_k > 0.0) ? (s1 / denom_k) : 0.0;
+    double k = alpha * s1 + (1.0 - alpha) * s2;
 
+    /* Q1: sqrt-softened exponent. The old 1/denom punished HP loss too harshly
+     * (a 5-HP loss at HP-origin 10 dropped the exponent from 1/3 to 1/8, a
+     * brutal cliff). 1/sqrt(denom) gives a smoother curve that still rewards
+     * surviving but no longer crushes scores at high-difficulty plays. */
     double exponent_denom = 1.0 + (2.0 + health_origin - health_final - (double)initial_answer);
     if (exponent_denom < 1.0) exponent_denom = 1.0;
-    double exponent = 1.0 / exponent_denom;
+    double exponent = 1.0 / sqrt(exponent_denom);
 
     double base = (k < 0.0) ? 0.0 : k;
     return pow(base, exponent);

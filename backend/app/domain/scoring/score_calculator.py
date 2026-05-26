@@ -21,7 +21,9 @@ None when any required input is absent so callers can skip gracefully.
 
 Design notes:
   kill_value=0  → score is always 0 (0**x = 0). Zero-kill runs score nothing by design.
-  cost_total=0  → s2=0, k=0.7*s1 (no-tower penalty). Penalised 30% of s1 by design.
+  cost_total=0  → s2=0, alpha=1, k=s1 (no penalty; the dominant rate carries
+                  the blend). The pre-Q3 piecewise weight applied a 30% penalty
+                  here; the continuous alpha blend removes that cliff.
 """
 from __future__ import annotations
 import logging
@@ -84,10 +86,14 @@ def recompute_total_score(
     active_time = max(0.001, time_total - prep_sum)
     s1 = kill_value / active_time
     s2 = kill_value / cost_total if cost_total > 0 else 0.0
-    if s1 >= s2:
-        k = 0.7 * s1 + 0.3 * s2
-    else:
-        k = 0.5 * s1 + 0.5 * s2
+
+    # Q3: continuous K blend. The old piecewise weight (0.7/0.3 vs 0.5/0.5)
+    # had a discontinuity at s1 == s2 that produced visible score jumps for
+    # runs that crossed it. Weighting by alpha = s1/(s1+s2) interpolates
+    # smoothly; the s1+s2 == 0 zero-kill case short-circuits to k=0.
+    denom_k = s1 + s2
+    alpha = (s1 / denom_k) if denom_k > 0.0 else 0.0
+    k = alpha * s1 + (1.0 - alpha) * s2
 
     exponent_denom = 1 + (2 + health_origin - health_final - ia)
     if exponent_denom < 1:
@@ -98,5 +104,7 @@ def recompute_total_score(
             health_origin,
             exponent_denom,
         )
-    exponent = 1.0 / max(1, exponent_denom)
+    # Q1: sqrt-softened exponent (was 1/denom). Smooths the HP-loss penalty so
+    # high-difficulty plays are no longer crushed.
+    exponent = 1.0 / math.sqrt(max(1, exponent_denom))
     return float(pow_fn(max(0.0, k), exponent))

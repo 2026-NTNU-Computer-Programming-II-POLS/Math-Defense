@@ -3,25 +3,30 @@
     "input": {
       "kill_value": 100,
       "time_total": 120.0,
-      "time_exclude_prepare": [10.0],
+      "time_exclude_prepare": [
+        10.0
+      ],
       "cost_total": 50,
       "health_origin": 10,
       "health_final": 10,
       "initial_answer": true
     },
-    "expected": 1.2060453783110545
+    "expected": 1.430446758201972
   },
   {
     "input": {
       "kill_value": 200,
       "time_total": 200.0,
-      "time_exclude_prepare": [20.0, 5.0],
+      "time_exclude_prepare": [
+        20.0,
+        5.0
+      ],
       "cost_total": 100,
       "health_origin": 10,
       "health_final": 8,
       "initial_answer": false
     },
-    "expected": 1.0946087842231575
+    "expected": 1.2639209345001978
   },
   {
     "input": {
@@ -33,13 +38,15 @@
       "health_final": 10,
       "initial_answer": true
     },
-    "expected": 0.7637626158259734
+    "expected": 0.8790435749836025
   },
   {
     "input": {
       "kill_value": 0,
       "time_total": 120.0,
-      "time_exclude_prepare": [10.0],
+      "time_exclude_prepare": [
+        10.0
+      ],
       "cost_total": 50,
       "health_origin": 10,
       "health_final": 10,
@@ -51,12 +58,14 @@
     "input": {
       "kill_value": 300,
       "time_total": 180.0,
-      "time_exclude_prepare": [15.0],
+      "time_exclude_prepare": [
+        15.0
+      ],
       "cost_total": 200,
       "health_origin": 10,
       "health_final": 5,
       "initial_answer": false
     },
-    "expected": 1.0703530874827207
+    "expected": 1.1998894949475882
   }
 ]

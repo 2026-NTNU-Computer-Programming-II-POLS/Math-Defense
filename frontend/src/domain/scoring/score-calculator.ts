@@ -9,7 +9,9 @@
 //
 // Design notes:
 //   killValue=0  → totalScore is always 0 (0**x = 0). Zero-kill runs score nothing by design.
-//   costTotal=0  → s2=0, k=0.7*s1 (no-tower penalty). Penalised 30% of s1 by design.
+//   costTotal=0  → s2=0, alpha=1, k=s1 (no penalty; the dominant rate carries
+//                  the blend). The pre-Q3 piecewise weight applied a 30% penalty
+//                  here; the continuous alpha blend removes that cliff.
 //   mUsed is a debug field only; the backend anti-cheat verifier does not track it.
 import { computeTotalScoreWasm } from '@/math/WasmBridge'
 
@@ -40,15 +42,15 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
   const s1 = input.killValue / activeTime
   const s2 = input.costTotal > 0 ? input.killValue / input.costTotal : 0
 
-  let k: number
-  let mUsed: number
-  if (s1 >= s2) {
-    mUsed = 0.7
-    k = 0.7 * s1 + 0.3 * s2
-  } else {
-    mUsed = 0.5
-    k = 0.5 * s1 + 0.5 * s2
-  }
+  // Q3: continuous K blend. The old piecewise weight (0.7/0.3 vs 0.5/0.5) had
+  // a discontinuity at s1 == s2; alpha = s1/(s1+s2) interpolates smoothly.
+  // The zero-kill case (s1+s2 == 0) short-circuits to k=0 to keep 0**x = 0.
+  // mUsed (debug-only field) reports the s1-side weight so legacy tooltips
+  // still surface "how much of the score came from time vs cost".
+  const denomK = s1 + s2
+  const alpha = denomK > 0 ? s1 / denomK : 0
+  const k = alpha * s1 + (1 - alpha) * s2
+  const mUsed = alpha
 
   // Invariant: healthOrigin must equal INITIAL_HP (set by createInitialState in GameState.ts).
   // Under normal game rules healthFinal ≤ healthOrigin, so rawExponentDenom ≥ 2 and the clamp
@@ -62,7 +64,8 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
     )
   }
   const exponentDenom = Math.max(1, rawExponentDenom)
-  const exponent = 1 / exponentDenom
+  // Q1: sqrt-softened exponent (was 1/denom). Smooths the HP-loss penalty.
+  const exponent = 1 / Math.sqrt(exponentDenom)
   // Source-of-truth score lives in WASM (wasm/math_engine.c). The breakdown
   // above is recomputed locally only because ScoreResultView displays
   // intermediate fields; the value sent to/verified by the server is the

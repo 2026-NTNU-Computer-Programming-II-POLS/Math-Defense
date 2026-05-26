@@ -292,9 +292,13 @@ function _computeTotalScoreJsFallback(
   const activeTime = Math.max(0.001, timeTotal - prepSum)
   const s1 = killValue / activeTime
   const s2 = costTotal > 0 ? killValue / costTotal : 0
-  const k = s1 >= s2 ? 0.7 * s1 + 0.3 * s2 : 0.5 * s1 + 0.5 * s2
+  // Q3: continuous K blend (alpha-weighted) replaces the old piecewise weight.
+  const denomK = s1 + s2
+  const alpha = denomK > 0 ? s1 / denomK : 0
+  const k = alpha * s1 + (1 - alpha) * s2
+  // Q1: sqrt-softened exponent (was 1/denom).
   const exponentDenom = Math.max(1, 1 + (2 + healthOrigin - healthFinal - initialAnswer))
-  return powerF64(Math.max(0, k), 1 / exponentDenom)
+  return powerF64(Math.max(0, k), 1 / Math.sqrt(exponentDenom))
 }
 
 // ── Bit-deterministic PRNG (PCG XSL-RR 64/32) ──

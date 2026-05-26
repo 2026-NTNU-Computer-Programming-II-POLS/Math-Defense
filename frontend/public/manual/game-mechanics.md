@@ -192,19 +192,20 @@ Let:
 activeTime  = max(0.001, timeTotal − Σ(time spent in Build Phase))
 S1          = killValue / activeTime                    (kill rate)
 S2          = killValue / costTotal       if costTotal > 0 else 0
-K           = 0.7·S1 + 0.3·S2     if S1 ≥ S2            (efficiency-weighted)
-              0.5·S1 + 0.5·S2     otherwise             (balanced)
+alpha       = S1 / (S1 + S2)              if S1+S2 > 0 else 0
+K           = alpha·S1 + (1 − alpha)·S2                 (continuous blend)
 
-exponent    = 1 / max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer))
+exponent    = 1 / sqrt(max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer)))
 TotalScore  = max(0, K)^exponent           (killValue=0 → K=0 → score=0)
 ```
 
 In English:
 
 - More kills, faster, with cheaper towers → higher S1, S2, K.
-- Less HP lost and a correct IA → smaller exponent denominator → larger exponent → K is raised to a larger power.
+- Less HP lost and a correct IA → smaller exponent denominator → larger exponent → K is raised to a larger power. The `sqrt` softens this curve so HP loss is no longer brutally punished at the top end.
 - Sitting in Build Phase forever does not pad the timer — only active wave time counts toward S1.
-- Building no towers (`costTotal = 0`) zeroes S2 and applies a 30% penalty (`K = 0.7·S1`).
+- Building no towers (`costTotal = 0`) zeroes S2 and the blend collapses to `K = S1` (no penalty: the dominant rate carries the score).
+- The K blend is continuous (no jump at S1 = S2): runs that flip between efficiency- and cost-dominant no longer see a score discontinuity.
 
 ---
 
