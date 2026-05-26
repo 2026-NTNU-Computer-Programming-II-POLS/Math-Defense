@@ -41,7 +41,7 @@ Inputs: full HP retain (10 → 10), `initial_answer=True`, kill-value sums sized
 
 Realistic `K = max(s1, s2)` peaks in the hundreds. The caps would only be threatened by a kill-value sum on the order of tens of millions — impossible under the per-level kill bounds in `LEVEL_MAX_KILLS`. **Caps left unchanged.**
 
-Audit script: `C:\Users\Leolo\AppData\Local\Temp\phase8-score-audit.py` (not committed; reproducible by running `recompute_total_score` from the backend venv against the scenarios above).
+Audit script: [`scripts/audit_score_caps.py`](../../scripts/audit_score_caps.py) — reproducible from a clean checkout via `python scripts/audit_score_caps.py` (no venv activation needed; the script prepends `backend/` to `sys.path`).
 
 ---
 
@@ -64,7 +64,7 @@ This confirms the three implementations agree on every value the parity matrix c
 
 Delta over the overhaul:
 - Frontend: **+14 new tests** (Phase 7 talent crit/slow/burst/resonance/aoe + Phase 6 MAGIC/LIMIT, Phase 4 PetCombat, Phase 1 Matrix base damage, Phase 5 BuffSystem additive stacking).
-- Backend: **+6 Phase 7 talent tests** in `test_talent.py` (max-level prereq enforcement, total cost 42 TP, wire payload, modifier surface). The Phase 4 Alembic migration runs cleanly under the `_test_db` fixture.
+- Backend: **+11 talent tests** in `test_talent.py` (+5 Phase 4 Q10: pet_hp removal + pet_range prereq/modifier; +6 Phase 7 Q14: max-level prereq enforcement, total cost 42 TP, wire payload, modifier surface). The Phase 4 Alembic migration runs cleanly under the test-DB fixture.
 
 ---
 
@@ -151,12 +151,12 @@ Per the "audits must grep/trace" rule. Each row is the file:line where the chang
 | Q11 | Pet attack speed linear | `frontend/src/entities/PetFactory.ts:51` |
 | Q12 | Pet count `log2(c+1)` | `frontend/src/entities/PetFactory.ts:35` |
 | Q13 | 4 qualitative nodes at 3 TP/lv | `backend/app/domain/talent/definitions.py:38,47,52,56`, `frontend/src/data/talent-defs.ts:22,31,36,40` |
-| Q14 | 7 advanced tier-2 talent nodes | `backend/app/domain/talent/definitions.py:55-61` (in talent-defs.ts mirror) + `tree.py:117-124` enforcement |
+| Q14 | 7 advanced tier-2 talent nodes | `backend/app/domain/talent/definitions.py:72-92` (7 `_reg(...)` calls) + `backend/app/domain/talent/tree.py:117-124` (`prerequisite_max_levels` enforcement loop) + `frontend/src/data/talent-defs.ts:55-61` (mirror) |
 | Q15 | Additive gold stacking | `frontend/src/engine/GameState.ts:61-62`, `frontend/src/systems/BuffSystem.ts:117-121` |
 | Q16 | Wave bonus `10 + 20·star` | `shared/game-constants.json:37` |
-| Q17 | MH 5★ 4th threshold 1000 | `frontend/src/data/monty-hall-defs.ts:25` |
+| Q17 | MH 5★ 4th threshold 1000 | `frontend/src/data/monty-hall-defs.ts:31` (5★ 4th entry — was 1400) |
 | Q18 | MH per-star reward gating | `frontend/src/data/monty-hall-defs.ts:46`, `frontend/src/systems/MontyHallSystem.ts:107` |
-| Q19 | Unified `reward = round(kv × 1.5)` | `frontend/src/data/enemy-defs.ts:56,67,78,89,105,121,137,154,166,184` |
+| Q19 | Unified `reward = round(kv × 1.5)` | `frontend/src/data/enemy-defs.ts:56,67,78,89,105,121,137,154,166,183` (10 reward fields) |
 
 All 19 approved Q-items present in code at branch HEAD.
 
