@@ -89,3 +89,20 @@ class GameSessionRepository(Protocol):
         ordered ended_at DESC. Used by the territory recommender to
         compute per-level average scores."""
         pass
+
+    def aggregate_stats_for_users(self, user_ids: list[str]) -> dict[str, dict]:
+        """For each user_id, return aggregate completed-session stats.
+
+        Returns a dict keyed by user_id with shape:
+            {
+              "sessions_played": int,
+              "average_stars": float,   # 0.0 when no sessions
+              "total_score": int,
+              "last_played_at": datetime | None,
+              "reflections_count": int,  # sessions with non-empty reflection_text
+            }
+
+        Users absent from the result default to zero/None values at the
+        call site; this matches the existing bulk-count repository idiom.
+        """
+        pass

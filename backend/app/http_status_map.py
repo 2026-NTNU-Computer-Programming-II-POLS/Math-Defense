@@ -87,15 +87,29 @@ _STATUS_BY_CLASS: dict[type[DomainError], int] = {
 def _register_extra_mappings() -> None:
     """Late-import to avoid circulars during module init for sub-package errors."""
     from app.domain.class_.errors import (
+        CannotAddOwnerAsCoTeacherError,
+        ClassAlreadyArchivedError,
+        ClassArchivedError,
+        ClassCapacityReachedError,
         ClassNameConflictError,
         ClassNameInvalidError,
+        ClassNotArchivedError,
         ClassNotFoundError,
+        CoTeacherAlreadyExistsError,
+        CoTeacherNotFoundError,
+        GroupNameConflictError,
+        GroupNotFoundError,
         InvalidJoinCodeError,
+        InviteAlreadyExistsError,
+        InviteNotFoundError,
         NotAStudentError,
+        NotATeacherError,
         NotClassOwnerError,
         StudentAlreadyInClassError,
+        StudentAlreadyInGroupError,
         StudentEmailNotFoundError,
         StudentNotInClassError,
+        StudentNotInClassForGroupError,
         StudentRemovedFromClassError,
     )
     from app.domain.territory.errors import (
@@ -118,8 +132,26 @@ def _register_extra_mappings() -> None:
         NotClassOwnerError: 403,
         StudentEmailNotFoundError: 404,
         NotAStudentError: 400,
+        NotATeacherError: 400,
         StudentRemovedFromClassError: 403,
         ClassNameConflictError: 409,
+        # Class lifecycle / capacity
+        ClassArchivedError: 409,
+        ClassAlreadyArchivedError: 409,
+        ClassNotArchivedError: 409,
+        ClassCapacityReachedError: 409,
+        # Co-teacher
+        CoTeacherAlreadyExistsError: 409,
+        CoTeacherNotFoundError: 404,
+        CannotAddOwnerAsCoTeacherError: 400,
+        # Groups
+        GroupNotFoundError: 404,
+        GroupNameConflictError: 409,
+        StudentNotInClassForGroupError: 400,
+        StudentAlreadyInGroupError: 409,
+        # Invites
+        InviteAlreadyExistsError: 409,
+        InviteNotFoundError: 404,
 
         ActivityNotFoundError: 404,
         ActivityExpiredError: 409,

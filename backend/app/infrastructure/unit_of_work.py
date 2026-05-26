@@ -60,3 +60,14 @@ class SqlAlchemyUnitOfWork:
 
     def rollback(self) -> None:
         self._db.rollback()
+
+    def nested(self):
+        """Open a SAVEPOINT inside the current UoW.
+
+        Use when an inner operation may raise ConstraintViolationError but
+        the surrounding bulk operation should continue with subsequent rows.
+        Without a savepoint, PostgreSQL aborts the whole transaction on the
+        first constraint violation and every following statement errors with
+        "current transaction is aborted".
+        """
+        return self._db.begin_nested()

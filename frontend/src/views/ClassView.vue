@@ -1,9 +1,19 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
-import { classService, type ClassInfo, type Membership } from '@/services/classService'
+import {
+  classService,
+  type ClassInfo,
+  type Membership,
+  type CoTeacher,
+  type PendingInvite,
+  type ClassGroup,
+  type GroupMember,
+  type ClassLeaderboardEntry,
+  type BulkAddResult,
+} from '@/services/classService'
 
 const router = useRouter()
 const route = useRoute()
@@ -16,18 +26,43 @@ const error = ref('')
 
 const newClassName = ref('')
 const joinCode = ref('')
+const includeArchived = ref(true)
 
 const selectedClassId = ref<string | null>(null)
 const students = ref<Membership[]>([])
 const newStudentEmail = ref('')
+const bulkEmailsText = ref('')
+
+const coTeachers = ref<CoTeacher[]>([])
+const newCoTeacherEmail = ref('')
+
+const invites = ref<PendingInvite[]>([])
+
+const groups = ref<ClassGroup[]>([])
+const newGroupName = ref('')
+const newGroupColor = ref('')
+const selectedGroupId = ref<string | null>(null)
+const groupMembers = ref<GroupMember[]>([])
+
+const leaderboard = ref<ClassLeaderboardEntry[]>([])
+const showLeaderboard = ref(false)
+
+const qrCode = ref<{ code: string; join_url: string } | null>(null)
+const showQr = ref(false)
+
+const transferTeacherId = ref('')
+const transferringClassId = ref<string | null>(null)
 
 const creatingClass = ref(false)
 const joiningClass = ref(false)
 const addingStudent = ref(false)
+const bulkAdding = ref(false)
 const regeneratingId = ref<string | null>(null)
+const archivingId = ref<string | null>(null)
 const studentsLoading = ref(false)
 const studentsError = ref('')
 const copiedCode = ref<string | null>(null)
+const bulkResult = ref<BulkAddResult | null>(null)
 
 const renamingClassId = ref<string | null>(null)
 const renameNameDraft = ref('')
@@ -35,18 +70,30 @@ const renameSaving = ref(false)
 const deletingClassId = ref<string | null>(null)
 
 const isTeacherOrAdmin = computed(() => auth.isTeacher || auth.isAdmin)
+const selectedClass = computed(() =>
+  selectedClassId.value
+    ? classes.value.find((c) => c.id === selectedClassId.value) ?? null
+    : null,
+)
+const selectedIsOwner = computed(() => {
+  const c = selectedClass.value
+  if (!c || !auth.user) return false
+  return c.teacher_id === auth.user.id
+})
 
 async function loadClasses(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    classes.value = await classService.listClasses()
+    classes.value = await classService.listClasses(includeArchived.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load classes'
   } finally {
     loading.value = false
   }
 }
+
+watch(includeArchived, () => { void loadClasses() })
 
 async function createClass(): Promise<void> {
   if (!newClassName.value.trim()) {
@@ -90,10 +137,23 @@ async function selectClass(id: string): Promise<void> {
   selectedClassId.value = id
   studentsLoading.value = true
   studentsError.value = ''
+  bulkResult.value = null
+  showLeaderboard.value = false
+  showQr.value = false
+  selectedGroupId.value = null
   try {
-    students.value = await classService.listStudents(id)
+    const [stu, co, inv, grp] = await Promise.all([
+      classService.listStudents(id),
+      classService.listCoTeachers(id).catch(() => [] as CoTeacher[]),
+      classService.listInvites(id).catch(() => [] as PendingInvite[]),
+      classService.listGroups(id).catch(() => [] as ClassGroup[]),
+    ])
+    students.value = stu
+    coTeachers.value = co
+    invites.value = inv
+    groups.value = grp
   } catch (e) {
-    studentsError.value = e instanceof Error ? e.message : 'Failed to load students'
+    studentsError.value = e instanceof Error ? e.message : 'Failed to load class detail'
     students.value = []
   } finally {
     studentsLoading.value = false
@@ -119,6 +179,30 @@ async function addStudent(): Promise<void> {
   }
 }
 
+async function bulkAddStudents(): Promise<void> {
+  if (!selectedClassId.value) return
+  const emails = bulkEmailsText.value
+    .split(/[\s,;\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (emails.length === 0) {
+    error.value = 'Enter at least one email'
+    return
+  }
+  if (bulkAdding.value) return
+  error.value = ''
+  bulkAdding.value = true
+  try {
+    bulkResult.value = await classService.bulkAddStudents(selectedClassId.value, emails)
+    bulkEmailsText.value = ''
+    await selectClass(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Bulk add failed'
+  } finally {
+    bulkAdding.value = false
+  }
+}
+
 async function removeStudent(studentId: string, displayName: string): Promise<void> {
   if (!selectedClassId.value) return
   const ok = await ui.showConfirm('Remove student', `Remove student "${displayName}"?`, { confirmLabel: 'Remove' })
@@ -135,7 +219,7 @@ async function regenerateCode(classId: string): Promise<void> {
   if (regeneratingId.value) return
   const ok = await ui.showConfirm(
     'Regenerate join code',
-    'Regenerate join code? The current code will stop working.',
+    'Regenerate join code? Existing students remain enrolled; only the old code stops working for new joiners.',
     { confirmLabel: 'Regenerate' },
   )
   if (!ok) return
@@ -177,12 +261,10 @@ function startRename(c: ClassInfo): void {
   renamingClassId.value = c.id
   renameNameDraft.value = c.name
 }
-
 function cancelRename(): void {
   renamingClassId.value = null
   renameNameDraft.value = ''
 }
-
 async function saveRename(classId: string): Promise<void> {
   if (!renameNameDraft.value.trim() || renameSaving.value) return
   renameSaving.value = true
@@ -202,7 +284,7 @@ async function deleteClass(classId: string, className: string): Promise<void> {
   if (deletingClassId.value) return
   const ok = await ui.showConfirm(
     'Delete class',
-    `Delete class "${className}"? This cannot be undone.`,
+    `Delete class "${className}"? This cannot be undone. Consider archiving instead.`,
     { confirmLabel: 'Delete' },
   )
   if (!ok) return
@@ -222,13 +304,187 @@ async function deleteClass(classId: string, className: string): Promise<void> {
   }
 }
 
+async function toggleArchive(c: ClassInfo): Promise<void> {
+  if (archivingId.value) return
+  const action = c.archived_at ? 'unarchive' : 'archive'
+  const ok = await ui.showConfirm(
+    action === 'archive' ? 'Archive class' : 'Unarchive class',
+    action === 'archive'
+      ? `Archive "${c.name}"? Students stay enrolled but new joins are blocked.`
+      : `Unarchive "${c.name}"? It will accept new joins again.`,
+    { confirmLabel: action === 'archive' ? 'Archive' : 'Unarchive' },
+  )
+  if (!ok) return
+  archivingId.value = c.id
+  try {
+    if (action === 'archive') {
+      await classService.archiveClass(c.id)
+    } else {
+      await classService.unarchiveClass(c.id)
+    }
+    await loadClasses()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : `Failed to ${action} class`
+  } finally {
+    archivingId.value = null
+  }
+}
+
+async function transferClass(classId: string): Promise<void> {
+  if (!transferTeacherId.value.trim()) {
+    error.value = 'Enter the new teacher user ID'
+    return
+  }
+  const ok = await ui.showConfirm(
+    'Transfer ownership',
+    `Transfer this class to teacher ID "${transferTeacherId.value}"? You will lose owner permissions.`,
+    { confirmLabel: 'Transfer' },
+  )
+  if (!ok) return
+  try {
+    await classService.transferOwnership(classId, transferTeacherId.value.trim())
+    transferTeacherId.value = ''
+    transferringClassId.value = null
+    await loadClasses()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to transfer ownership'
+  }
+}
+
+async function loadQr(classId: string): Promise<void> {
+  try {
+    qrCode.value = await classService.joinQr(classId)
+    showQr.value = true
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to load QR'
+  }
+}
+
+async function addCoTeacher(): Promise<void> {
+  if (!selectedClassId.value || !newCoTeacherEmail.value.trim()) return
+  try {
+    await classService.addCoTeacher(selectedClassId.value, newCoTeacherEmail.value.trim())
+    newCoTeacherEmail.value = ''
+    coTeachers.value = await classService.listCoTeachers(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to add co-teacher'
+  }
+}
+
+async function removeCoTeacher(teacherId: string): Promise<void> {
+  if (!selectedClassId.value) return
+  const ok = await ui.showConfirm('Remove co-teacher', 'Remove this co-teacher?', { confirmLabel: 'Remove' })
+  if (!ok) return
+  try {
+    await classService.removeCoTeacher(selectedClassId.value, teacherId)
+    coTeachers.value = await classService.listCoTeachers(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to remove co-teacher'
+  }
+}
+
+async function revokeInvite(email: string): Promise<void> {
+  if (!selectedClassId.value) return
+  try {
+    await classService.revokeInvite(selectedClassId.value, email)
+    invites.value = await classService.listInvites(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to revoke invite'
+  }
+}
+
+async function createGroup(): Promise<void> {
+  if (!selectedClassId.value || !newGroupName.value.trim()) return
+  try {
+    await classService.createGroup(
+      selectedClassId.value,
+      newGroupName.value.trim(),
+      newGroupColor.value.trim() || null,
+    )
+    newGroupName.value = ''
+    newGroupColor.value = ''
+    groups.value = await classService.listGroups(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to create group'
+  }
+}
+
+async function deleteGroup(groupId: string): Promise<void> {
+  if (!selectedClassId.value) return
+  const ok = await ui.showConfirm('Delete group', 'Delete this group? Members will be unassigned.', { confirmLabel: 'Delete' })
+  if (!ok) return
+  try {
+    await classService.deleteGroup(selectedClassId.value, groupId)
+    if (selectedGroupId.value === groupId) {
+      selectedGroupId.value = null
+      groupMembers.value = []
+    }
+    groups.value = await classService.listGroups(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to delete group'
+  }
+}
+
+async function selectGroup(groupId: string): Promise<void> {
+  if (!selectedClassId.value) return
+  selectedGroupId.value = groupId
+  try {
+    groupMembers.value = await classService.listGroupMembers(selectedClassId.value, groupId)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to load group members'
+  }
+}
+
+async function assignToGroup(studentId: string): Promise<void> {
+  if (!selectedClassId.value || !selectedGroupId.value) return
+  try {
+    await classService.addGroupMember(selectedClassId.value, selectedGroupId.value, studentId)
+    groupMembers.value = await classService.listGroupMembers(selectedClassId.value, selectedGroupId.value)
+    groups.value = await classService.listGroups(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to assign student'
+  }
+}
+
+async function unassignFromGroup(studentId: string): Promise<void> {
+  if (!selectedClassId.value || !selectedGroupId.value) return
+  try {
+    await classService.removeGroupMember(selectedClassId.value, selectedGroupId.value, studentId)
+    groupMembers.value = await classService.listGroupMembers(selectedClassId.value, selectedGroupId.value)
+    groups.value = await classService.listGroups(selectedClassId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to unassign student'
+  }
+}
+
+async function loadLeaderboard(): Promise<void> {
+  if (!selectedClassId.value) return
+  try {
+    leaderboard.value = await classService.leaderboard(selectedClassId.value)
+    showLeaderboard.value = true
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to load leaderboard'
+  }
+}
+
+function downloadReport(): void {
+  if (!selectedClassId.value) return
+  window.open(classService.reportCsvUrl(selectedClassId.value), '_blank')
+}
+
 onMounted(async () => {
+  // Auto-claim pending invites silently so students sent an invite before
+  // signing up get their classes attached without an extra click.
+  try { await classService.claimInvites() } catch { /* best effort */ }
   await loadClasses()
   const preselect = route.query.select as string | undefined
-  if (preselect && isTeacherOrAdmin.value) {
-    if (classes.value.some((c) => c.id === preselect)) {
-      await selectClass(preselect)
-    }
+  if (preselect && isTeacherOrAdmin.value && classes.value.some((c) => c.id === preselect)) {
+    await selectClass(preselect)
+  }
+  // Deep-link join: /classes?code=ABCD1234
+  const codeFromUrl = route.query.code as string | undefined
+  if (codeFromUrl && auth.isStudent) {
+    joinCode.value = codeFromUrl
   }
 })
 </script>
@@ -240,7 +496,6 @@ onMounted(async () => {
 
       <div v-if="error" class="class-error">{{ error }}</div>
 
-      <!-- Teacher: create class -->
       <div v-if="isTeacherOrAdmin" class="section">
         <h3 class="section-title">Create Class</h3>
         <form class="inline-form" @submit.prevent="createClass">
@@ -251,20 +506,23 @@ onMounted(async () => {
         </form>
       </div>
 
-      <!-- Student: join class -->
       <div v-if="auth.isStudent" class="section">
         <h3 class="section-title">Join Class</h3>
         <form class="inline-form" @submit.prevent="joinClass">
-          <input v-model="joinCode" class="rune-input" type="text" placeholder="Join code" />
+          <input v-model="joinCode" class="rune-input" type="text" placeholder="Join code (8 chars)" maxlength="8" />
           <button class="btn" type="submit" :disabled="joiningClass">
             {{ joiningClass ? 'Joining…' : 'Join' }}
           </button>
         </form>
       </div>
 
-      <!-- Class list -->
       <div class="section">
-        <h3 class="section-title">My Classes</h3>
+        <div class="row-between">
+          <h3 class="section-title">My Classes</h3>
+          <label v-if="isTeacherOrAdmin" class="toggle-label">
+            <input v-model="includeArchived" type="checkbox" /> Show archived
+          </label>
+        </div>
         <div v-if="loading" class="loading">Loading…</div>
         <div v-else-if="classes.length === 0" class="empty">No classes yet</div>
         <ul v-else class="class-list">
@@ -272,7 +530,7 @@ onMounted(async () => {
             v-for="c in classes"
             :key="c.id"
             class="class-item"
-            :class="{ selected: selectedClassId === c.id }"
+            :class="{ selected: selectedClassId === c.id, archived: c.archived_at }"
           >
             <div class="class-item-header" @click="isTeacherOrAdmin ? selectClass(c.id) : undefined">
               <template v-if="renamingClassId === c.id">
@@ -290,7 +548,10 @@ onMounted(async () => {
                 </div>
               </template>
               <template v-else>
-                <span class="class-name">{{ c.name }}</span>
+                <span class="class-name">
+                  {{ c.name }}
+                  <span v-if="c.archived_at" class="archived-tag">archived</span>
+                </span>
                 <span v-if="c.teacher_player_name && !isTeacherOrAdmin" class="teacher-name">{{ c.teacher_player_name }}</span>
                 <span
                   v-if="c.join_code"
@@ -304,14 +565,14 @@ onMounted(async () => {
               </template>
             </div>
             <div v-if="isTeacherOrAdmin" class="class-actions">
-              <button
-                class="btn-sm"
-                :disabled="regeneratingId === c.id"
-                @click="regenerateCode(c.id)"
-              >
+              <button class="btn-sm" :disabled="!!c.archived_at || regeneratingId === c.id" @click.stop="regenerateCode(c.id)">
                 {{ regeneratingId === c.id ? 'Generating…' : 'New Code' }}
               </button>
+              <button class="btn-sm" @click.stop="loadQr(c.id)">QR</button>
               <button class="btn-sm" @click.stop="startRename(c)">Rename</button>
+              <button class="btn-sm" :disabled="archivingId === c.id" @click.stop="toggleArchive(c)">
+                {{ c.archived_at ? 'Unarchive' : 'Archive' }}
+              </button>
               <button
                 class="btn-sm danger"
                 :disabled="deletingClassId === c.id"
@@ -324,15 +585,44 @@ onMounted(async () => {
         </ul>
       </div>
 
-      <!-- Students in selected class (teacher view) -->
-      <div v-if="isTeacherOrAdmin && selectedClassId" class="section">
-        <h3 class="section-title">Students</h3>
+      <div v-if="showQr && qrCode" class="section qr-block">
+        <h3 class="section-title">Join Code QR</h3>
+        <div class="qr-payload" :title="qrCode.join_url">
+          <code>{{ qrCode.join_url }}</code>
+        </div>
+        <p class="hint">Share this link or have students enter code <strong>{{ qrCode.code }}</strong>.</p>
+        <button class="btn-sm" @click="showQr = false">Close</button>
+      </div>
+
+      <div v-if="isTeacherOrAdmin && selectedClassId && selectedClass" class="section">
+        <h3 class="section-title">Students — {{ selectedClass.name }}</h3>
+
         <form class="inline-form" @submit.prevent="addStudent">
           <input v-model="newStudentEmail" class="rune-input" type="email" placeholder="Student email" />
           <button class="btn" type="submit" :disabled="addingStudent">
             {{ addingStudent ? 'Adding…' : 'Add' }}
           </button>
         </form>
+
+        <details class="details-block">
+          <summary>Bulk add by email</summary>
+          <textarea
+            v-model="bulkEmailsText"
+            class="rune-input bulk-textarea"
+            placeholder="Paste emails — separated by commas, spaces, or newlines"
+            rows="4"
+          />
+          <button class="btn-sm" :disabled="bulkAdding" @click="bulkAddStudents">
+            {{ bulkAdding ? 'Adding…' : 'Bulk Add' }}
+          </button>
+          <div v-if="bulkResult" class="bulk-result">
+            <div>Added: {{ bulkResult.added.length }}, Invited: {{ bulkResult.invited.length }}, Skipped: {{ bulkResult.skipped.length }}</div>
+            <ul v-if="bulkResult.skipped.length" class="skipped-list">
+              <li v-for="(s, idx) in bulkResult.skipped" :key="idx">{{ s.email }} — {{ s.reason }}</li>
+            </ul>
+          </div>
+        </details>
+
         <div v-if="studentsLoading" class="loading">Loading…</div>
         <div v-else-if="studentsError" class="class-error">{{ studentsError }}</div>
         <ul v-else-if="students.length > 0" class="student-list">
@@ -341,10 +631,102 @@ onMounted(async () => {
               <span class="student-name">{{ s.player_name || s.student_id }}</span>
               <span class="student-email">{{ s.email }}</span>
             </div>
-            <button class="btn-sm danger" @click="removeStudent(s.student_id, s.player_name || s.student_id)">Remove</button>
+            <div class="student-actions">
+              <button
+                v-if="selectedGroupId"
+                class="btn-sm"
+                @click="assignToGroup(s.student_id)"
+              >
+                → Group
+              </button>
+              <button class="btn-sm danger" @click="removeStudent(s.student_id, s.player_name || s.student_id)">Remove</button>
+            </div>
           </li>
         </ul>
         <div v-else class="empty">No students yet</div>
+
+        <!-- Pending invites -->
+        <div v-if="invites.length" class="subsection">
+          <h4 class="subsection-title">Pending Invites</h4>
+          <ul class="invite-list">
+            <li v-for="inv in invites" :key="inv.id" class="invite-item">
+              <span>{{ inv.email }}</span>
+              <button class="btn-sm danger" @click="revokeInvite(inv.email)">Revoke</button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Co-teachers -->
+        <div v-if="selectedIsOwner" class="subsection">
+          <h4 class="subsection-title">Co-teachers</h4>
+          <form class="inline-form" @submit.prevent="addCoTeacher">
+            <input v-model="newCoTeacherEmail" class="rune-input" type="email" placeholder="Co-teacher email" />
+            <button class="btn-sm" type="submit">Add</button>
+          </form>
+          <ul v-if="coTeachers.length" class="invite-list">
+            <li v-for="co in coTeachers" :key="co.id" class="invite-item">
+              <span>{{ co.player_name }} <small>({{ co.email }})</small></span>
+              <button class="btn-sm danger" @click="removeCoTeacher(co.teacher_id)">Remove</button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Transfer ownership -->
+        <div v-if="selectedIsOwner" class="subsection">
+          <h4 class="subsection-title">Transfer Ownership</h4>
+          <form class="inline-form" @submit.prevent="transferClass(selectedClassId)">
+            <input v-model="transferTeacherId" class="rune-input" type="text" placeholder="New teacher user ID" />
+            <button class="btn-sm danger" type="submit">Transfer</button>
+          </form>
+        </div>
+
+        <!-- Groups -->
+        <div class="subsection">
+          <h4 class="subsection-title">Groups</h4>
+          <form class="inline-form" @submit.prevent="createGroup">
+            <input v-model="newGroupName" class="rune-input" type="text" placeholder="Group name" />
+            <input v-model="newGroupColor" class="rune-input color-input" type="text" placeholder="#color" />
+            <button class="btn-sm" type="submit">Create</button>
+          </form>
+          <ul v-if="groups.length" class="invite-list">
+            <li v-for="g in groups" :key="g.id" class="invite-item" :class="{ selected: selectedGroupId === g.id }">
+              <span
+                :style="g.color ? `color: ${g.color}` : ''"
+                class="group-name"
+                @click="selectGroup(g.id)"
+              >
+                {{ g.name }} <small>({{ g.member_count }})</small>
+              </span>
+              <button class="btn-sm danger" @click="deleteGroup(g.id)">Delete</button>
+            </li>
+          </ul>
+          <div v-if="selectedGroupId">
+            <h5 class="subsection-title">Group Members</h5>
+            <ul v-if="groupMembers.length" class="invite-list">
+              <li v-for="gm in groupMembers" :key="gm.student_id" class="invite-item">
+                <span>{{ gm.player_name || gm.student_id }}</span>
+                <button class="btn-sm danger" @click="unassignFromGroup(gm.student_id)">Remove</button>
+              </li>
+            </ul>
+            <div v-else class="empty">No members</div>
+          </div>
+        </div>
+
+        <!-- Leaderboard + Report -->
+        <div class="subsection">
+          <h4 class="subsection-title">Class Reports</h4>
+          <div class="row-between">
+            <button class="btn-sm" @click="loadLeaderboard">Show Leaderboard</button>
+            <button class="btn-sm" @click="downloadReport">Download CSV</button>
+          </div>
+          <ol v-if="showLeaderboard && leaderboard.length" class="leaderboard-list">
+            <li v-for="(r, idx) in leaderboard" :key="r.student_id">
+              <span class="lb-rank">#{{ idx + 1 }}</span>
+              <span class="lb-name">{{ r.player_name || r.student_id }}</span>
+              <span class="lb-score">{{ r.total_score }} pts · ★{{ r.average_stars.toFixed(1) }} · {{ r.sessions_played }} runs</span>
+            </li>
+          </ol>
+        </div>
       </div>
 
       <button class="btn back-btn" @click="router.push('/')">← Back to Menu</button>
@@ -363,7 +745,7 @@ onMounted(async () => {
 }
 
 .class-panel {
-  width: 420px;
+  width: 480px;
   max-width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
@@ -372,7 +754,6 @@ onMounted(async () => {
 
 .class-title {
   font-size: var(--text-base);
-  /* Rune-themed title: keep mono after Phase 1 swapped --font-main to system-ui. */
   font-family: var(--font-mono);
   color: var(--gold);
   text-shadow: var(--gold-shadow);
@@ -383,12 +764,21 @@ onMounted(async () => {
 .class-error { font-size: var(--text-xs); color: var(--enemy-red); }
 
 .section { display: flex; flex-direction: column; gap: 8px; }
+.subsection { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; border-top: 1px dashed var(--axis); padding-top: 8px; }
 .section-title { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); margin: 0; }
+.subsection-title { font-size: var(--text-xs); color: var(--axis); margin: 0; text-shadow: var(--gold-shadow); }
+
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+.toggle-label { font-size: var(--text-xs); color: var(--axis); display: flex; align-items: center; gap: 6px; }
 
 .inline-form { display: flex; gap: 8px; }
 .inline-form .rune-input { flex: 1; }
+.color-input { max-width: 80px; }
 
-.class-list, .student-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.class-list, .student-list, .invite-list, .leaderboard-list, .skipped-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
 
 .class-item {
   border: 1px solid var(--axis);
@@ -400,6 +790,15 @@ onMounted(async () => {
 }
 
 .class-item.selected { border-color: var(--gold); }
+.class-item.archived { opacity: 0.55; }
+
+.archived-tag {
+  font-size: var(--text-2xs);
+  color: var(--axis);
+  margin-left: 6px;
+  padding: 1px 4px;
+  border: 1px dashed var(--axis);
+}
 
 .class-item-header {
   display: flex;
@@ -419,7 +818,7 @@ onMounted(async () => {
 }
 
 .join-code {
-  font-family: monospace;
+  font-family: var(--font-mono);
   color: var(--axis);
   text-shadow: var(--gold-shadow);
   cursor: pointer;
@@ -428,24 +827,40 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.join-code:hover { color: var(--gold); text-shadow: var(--gold-shadow); }
-.join-code.copied { color: var(--gold); text-shadow: var(--gold-shadow); }
+.join-code:hover, .join-code.copied { color: var(--gold); }
 
 .rename-input { flex: 1; font-size: var(--text-xs); }
 .rename-btns { display: flex; gap: 4px; }
+.class-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 
-.class-actions { display: flex; gap: 4px; }
-
-.student-item {
+.student-item, .invite-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: var(--text-sm);
+  gap: 8px;
 }
-
+.invite-item.selected { background: rgba(199, 157, 80, 0.08); }
 .student-info { display: flex; flex-direction: column; gap: 2px; }
 .student-name { color: var(--gold); text-shadow: var(--gold-shadow); }
 .student-email { font-size: var(--text-2xs); color: var(--axis); text-shadow: var(--gold-shadow); opacity: 0.6; }
+.student-actions { display: flex; gap: 4px; }
+.group-name { cursor: pointer; }
+
+.details-block { font-size: var(--text-xs); border: 1px dashed var(--axis); padding: 6px; }
+.details-block summary { cursor: pointer; color: var(--axis); text-shadow: var(--gold-shadow); }
+.bulk-textarea { width: 100%; font-family: var(--font-mono); font-size: var(--text-xs); }
+.bulk-result { font-size: var(--text-xs); color: var(--axis); margin-top: 6px; }
+
+.qr-block { border: 1px solid var(--axis); padding: 8px; }
+.qr-payload code { font-family: var(--font-mono); font-size: var(--text-xs); word-break: break-all; }
+.hint { font-size: var(--text-xs); color: var(--axis); }
+
+.leaderboard-list { font-size: var(--text-xs); }
+.leaderboard-list li { display: flex; gap: 8px; }
+.lb-rank { color: var(--gold); width: 32px; font-family: var(--font-mono); }
+.lb-name { flex: 1; }
+.lb-score { color: var(--axis); font-family: var(--font-mono); }
 
 .btn-sm {
   font-size: var(--text-xs);
@@ -459,7 +874,6 @@ onMounted(async () => {
   text-shadow: var(--gold-shadow);
   cursor: pointer;
 }
-
 .btn-sm:hover:not(:disabled) { background: var(--axis); color: var(--stone-dark); }
 .btn-sm.danger { border-color: var(--enemy-red); color: var(--enemy-red); }
 .btn-sm.danger:hover { background: var(--enemy-red); color: var(--stone-dark); }
@@ -474,6 +888,5 @@ onMounted(async () => {
   color: var(--axis);
   text-shadow: var(--gold-shadow);
 }
-
 .back-btn:hover { background: var(--axis); color: var(--stone-dark); }
 </style>

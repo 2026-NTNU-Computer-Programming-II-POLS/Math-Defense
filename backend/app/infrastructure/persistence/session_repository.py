@@ -240,6 +240,58 @@ class SqlAlchemySessionRepository:
             stars_played=stars_played,
         )
 
+    def aggregate_stats_for_users(self, user_ids: list[str]) -> dict[str, dict]:
+        if not user_ids:
+            return {}
+        completed = SessionStatus.COMPLETED.value
+
+        # Per-user aggregate over completed sessions.
+        agg_rows = (
+            self._db.query(
+                GameSessionModel.user_id,
+                func.count(GameSessionModel.id).label("sessions_played"),
+                func.coalesce(func.avg(GameSessionModel.star_rating), 0.0).label("avg_stars"),
+                func.coalesce(func.sum(GameSessionModel.score), 0).label("total_score"),
+                func.max(GameSessionModel.ended_at).label("last_played_at"),
+            )
+            .filter(
+                GameSessionModel.user_id.in_(user_ids),
+                GameSessionModel.status == completed,
+            )
+            .group_by(GameSessionModel.user_id)
+            .all()
+        )
+
+        # Reflection counts as a separate query — adding a CASE WHEN to the
+        # main aggregate would prevent the planner from using the
+        # (user_id, status) index path cleanly.
+        refl_rows = (
+            self._db.query(
+                GameSessionModel.user_id,
+                func.count(GameSessionModel.id).label("reflections_count"),
+            )
+            .filter(
+                GameSessionModel.user_id.in_(user_ids),
+                GameSessionModel.status == completed,
+                GameSessionModel.reflection_text.isnot(None),
+                func.length(GameSessionModel.reflection_text) > 0,
+            )
+            .group_by(GameSessionModel.user_id)
+            .all()
+        )
+        refl_by_user = {uid: cnt for uid, cnt in refl_rows}
+
+        out: dict[str, dict] = {}
+        for row in agg_rows:
+            out[row.user_id] = {
+                "sessions_played": int(row.sessions_played),
+                "average_stars": float(row.avg_stars) if row.avg_stars is not None else 0.0,
+                "total_score": int(row.total_score),
+                "last_played_at": _ensure_utc(row.last_played_at),
+                "reflections_count": int(refl_by_user.get(row.user_id, 0)),
+            }
+        return out
+
     @staticmethod
     def _to_domain(row: GameSessionModel) -> GameSession:
         session = GameSession(

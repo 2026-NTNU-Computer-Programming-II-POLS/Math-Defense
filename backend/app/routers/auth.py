@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.database import get_db
 from app.domain.user.aggregate import User
-from app.factories import build_auth_service, build_session_service
+from app.factories import build_auth_service, build_class_service, build_session_service
 from app.limiter import limiter, login_email_throttle_exceeded
 from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAME
 from app.middleware.csrf import mint_csrf_cookie
@@ -108,6 +108,19 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
     if is_new_user:
         logger.info("User registered: anon=%s", _anon(str(user.id)))
         record_audit_event(request, "REGISTER", user.id, {"email_anon": _anon(req.email), "role": user.role.value})
+        # Attach any pending class invites that targeted this email before
+        # the account existed. Best-effort: a failure here must not block
+        # the M-05 enumeration-safe 202 response, since invite-attachment
+        # is internal-only and the user can retry via POST /claim-invites.
+        try:
+            build_class_service(db).claim_pending_invites(
+                user_id=user.id, email=user.email, role=user.role,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Pending-invite claim failed on register for anon=%s: %s",
+                _anon(str(user.id)), type(exc).__name__,
+            )
     else:
         logger.info("Registration attempt for existing account: anon=%s", _anon(req.email))
         record_audit_event(request, "REGISTER_EXISTING", user.id, {"email_anon": _anon(req.email)})
