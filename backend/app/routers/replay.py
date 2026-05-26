@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
@@ -174,43 +175,64 @@ async def spectate_session(websocket: WebSocket, session_id: UUID) -> None:
     # past revocation.
     from app.domain.errors import DomainError
 
-    # M-07: WS cookies are captured at handshake and never refreshed by the
-    # browser mid-connection.  A revoked user can therefore spectate for up to
-    # _SPECTATE_REAUTH_INTERVAL more seconds until the next re-auth cycle
-    # below detects the stale/invalid token.  Acceptable for an educational
-    # context; stricter environments should pass fresh tokens in WS messages.
+    # M-07 / M-3: WS cookies are captured at handshake and never refreshed by
+    # the browser mid-connection. A revoked user can therefore spectate for up
+    # to _SPECTATE_REAUTH_INTERVAL more seconds until the next re-auth fires.
+    # Acceptable for an educational context; stricter environments should pass
+    # fresh tokens in WS messages.
+    #
+    # The interval is enforced on wall-clock time, NOT just on the queue
+    # timeout. A previous revision only re-auth'd inside the asyncio.wait_for
+    # TimeoutError branch, so a session that kept emitting events faster than
+    # the interval would never re-auth at all — a revoked viewer could observe
+    # indefinitely as long as the recorder kept flushing.
     _SPECTATE_REAUTH_INTERVAL = 60
 
+    def _close_revoked() -> bool:
+        """Return True iff the spectator's auth has been revoked."""
+        revalidate_db = SessionLocal()
+        try:
+            try:
+                reauth_token = websocket.cookies.get(AUTH_COOKIE_NAME)
+                re_user = build_auth_service(revalidate_db).authenticate_token(reauth_token)
+                # Guard against a cookie swap: if the token now belongs to a
+                # different user the original spectator's session must close.
+                return re_user.id != user.id
+            except DomainError:
+                # Covers all revocation cases: AccountDisabledError (banned),
+                # InvalidTokenError (JTI denied / password-rotated / expired),
+                # UserNotFoundError (deleted). A successfully returned user is
+                # always active — no redundant is_active check needed.
+                return True
+        finally:
+            revalidate_db.close()
+
     queue = await spectate_hub.subscribe(str(session_id))
+    last_reauth = time.monotonic()
     try:
         while True:
-            try:
-                event = await asyncio.wait_for(
-                    queue.get(), timeout=_SPECTATE_REAUTH_INTERVAL,
-                )
-            except asyncio.TimeoutError:
-                event = None
+            # Re-auth at the TOP of the loop whenever the interval has
+            # elapsed. Doing the check before consuming the next event means
+            # a just-revoked viewer is dropped before receiving one more
+            # frame past the interval.
+            if (time.monotonic() - last_reauth) >= _SPECTATE_REAUTH_INTERVAL:
+                if _close_revoked():
+                    await websocket.close(code=4401, reason="auth revoked")
+                    return
+                last_reauth = time.monotonic()
 
-            if event is None:
-                revalidate_db = SessionLocal()
-                try:
-                    try:
-                        reauth_token = websocket.cookies.get(AUTH_COOKIE_NAME)
-                        re_user = build_auth_service(revalidate_db).authenticate_token(reauth_token)
-                        # Guard against a cookie swap: if the token now belongs to a
-                        # different user the original spectator's session must close.
-                        if re_user.id != user.id:
-                            await websocket.close(code=4401, reason="auth revoked")
-                            return
-                    except DomainError:
-                        # Covers all revocation cases: AccountDisabledError (banned),
-                        # InvalidTokenError (JTI denied / password-rotated / expired),
-                        # UserNotFoundError (deleted). A successfully returned user is
-                        # always active — no redundant is_active check needed.
-                        await websocket.close(code=4401, reason="auth revoked")
-                        return
-                finally:
-                    revalidate_db.close()
+            # Cap the wait at the remaining budget so a steady event stream
+            # cannot starve the periodic check. Floor at 0.1 s so
+            # asyncio.wait_for never sees timeout=0 — on some Python versions
+            # that can race-cancel a queue item that was ready synchronously.
+            wait_budget = max(
+                0.1, _SPECTATE_REAUTH_INTERVAL - (time.monotonic() - last_reauth)
+            )
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=wait_budget)
+            except asyncio.TimeoutError:
+                # No event in the budgeted window — loop back to the re-auth
+                # check at the top.
                 continue
 
             await websocket.send_json({"kind": "event", **event})

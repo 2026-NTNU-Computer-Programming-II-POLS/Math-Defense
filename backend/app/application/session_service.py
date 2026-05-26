@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.exc import OperationalError
 
 from app.domain.errors import (
+    ChallengeNotFoundError,
     ConstraintViolationError,
     DomainValueError,
     ReplayMismatchError,
@@ -172,6 +173,17 @@ class SessionApplicationService:
             # docstring on app.application.territory_service for the carve-out.
             if level == 5 and not self._session_repo.has_correct_ia_session(user_id):
                 raise Star5LockedError()
+
+            # M-2: validate challenge_id at creation time. Without this an
+            # arbitrary uuid (or a soft-deleted challenge) silently produces
+            # a session whose end-of-run leaderboard row links to a phantom
+            # challenge and whose challenge wave-cap override is skipped.
+            # _challenge_repo is optional so legacy unit-test constructions
+            # without the dep are unaffected.
+            if challenge_id is not None and self._challenge_repo is not None:
+                challenge = self._challenge_repo.find_by_id(challenge_id)
+                if challenge is None or challenge.is_deleted:
+                    raise ChallengeNotFoundError("Challenge not found")
 
             # 1. Abandon stale sessions
             stale = self._session_repo.find_stale_sessions(user_id)
