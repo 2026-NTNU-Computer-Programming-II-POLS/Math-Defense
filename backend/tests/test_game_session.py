@@ -474,13 +474,13 @@ def test_preview_session_excluded_from_leaderboard(client, db_session):
     ).json()["id"]
     end_res = client.post(
         f"/api/sessions/{sid}/end",
-        json={"score": 7777, "kills": 8, "waves_survived": 3},
+        json={"score": 4321, "kills": 8, "waves_survived": 3},
         headers=_auth_headers(token),
     )
     assert end_res.status_code == 200
     assert end_res.json()["status"] == "completed"
     board = client.get("/api/leaderboard").json()
-    assert all(e["score"] != 7777 for e in board["entries"])
+    assert all(e["score"] != 4321 for e in board["entries"])
 
 
 def test_preview_flag_cannot_be_set_by_client(client):
