@@ -1,4 +1,4 @@
-"""Regenerate shared/score_parity_fixtures.json from the Python score formula.
+"""Regenerate shared/score_parity_fixtures.json from the canonical score formula.
 
 Workflow when the V2 score formula changes:
 
@@ -8,6 +8,14 @@ Workflow when the V2 score formula changes:
   4. Edit frontend/src/domain/scoring/score-calculator.ts (TS mirror)
   5. python scripts/regenerate_score_fixtures.py    (refresh expected values)
   6. Run backend + frontend parity tests — both should now agree.
+
+The canonical source of `expected` values is the WASM build (musl pow inside
+the .wasm bytecode), because that is the implementation the frontend parity
+test calls directly. We try to load it via ``wasm_runtime.get_total_score_fn``
+first; if wasmtime isn't installed or the binary hasn't been rebuilt yet, we
+fall back to the Python mirror (``recompute_total_score``). The script prints
+which path it used so a reviewer can sanity-check the fixture diff against the
+expected source of truth.
 
 The input list below is the canonical representative coverage matrix: each
 row exercises a distinct branch of the formula (zero-kill, no-tower path,
@@ -81,19 +89,35 @@ CASES: list[dict] = [
 ]
 
 
-def _compute(case: dict) -> float | None:
-    return recompute_total_score(**case)
+def _resolve_total_score_fn():
+    """Return (callable, source_label).
+
+    Prefer the WASM-backed compute_total_score so the fixture pins the same
+    bit-pattern the frontend parity test verifies. Fall back to None (which
+    drives recompute_total_score's Python branch) when wasmtime is unavailable
+    or the .wasm hasn't been rebuilt with the export yet.
+    """
+    try:
+        from app.infrastructure.wasm_runtime import get_total_score_fn
+    except ImportError:
+        return None, "python (wasm_runtime import failed)"
+    fn = get_total_score_fn()
+    if fn is None:
+        return None, "python (wasmtime missing or compute_total_score not exported)"
+    return fn, "wasm (compute_total_score via wasmtime)"
 
 
 def main() -> int:
+    total_score_fn, source = _resolve_total_score_fn()
     out: list[dict] = []
     for case in CASES:
-        expected = _compute(case)
+        expected = recompute_total_score(**case, total_score_fn=total_score_fn)
         out.append({"input": case, "expected": expected})
 
     text = json.dumps(out, indent=2, ensure_ascii=False) + "\n"
     _FIXTURES_PATH.write_text(text, encoding="utf-8")
     print(f"Wrote {len(out)} fixtures to {_FIXTURES_PATH.relative_to(_ROOT)}")
+    print(f"Source of `expected` values: {source}")
     return 0
 
 

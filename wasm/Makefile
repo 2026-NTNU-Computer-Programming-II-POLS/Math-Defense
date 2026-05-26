@@ -50,12 +50,13 @@ FLAGS = -sEXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
 
 all: $(OUT) $(DTS)
 
-# Refresh shared/score_parity_fixtures.json from the current Python mirror.
+# Refresh shared/score_parity_fixtures.json from the canonical score formula.
 # Run after editing compute_total_score in any of {C, Python, TS}. Inputs are
 # canonical and live inside scripts/regenerate_score_fixtures.py; this target
-# just re-evaluates the `expected` column against the live formula.
+# just re-evaluates the `expected` column against the live formula. The script
+# itself prepends backend/ to sys.path, so no `cd` shuffle is needed.
 regenerate-fixtures:
-	cd $(MAKEFILE_DIR)../backend && python ../scripts/regenerate_score_fixtures.py
+	python $(MAKEFILE_DIR)../scripts/regenerate_score_fixtures.py
 
 $(OUT): $(SRC)
 	$(CC) $(SRC) -o $(OUT) $(FLAGS)
