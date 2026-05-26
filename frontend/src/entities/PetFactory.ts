@@ -41,6 +41,10 @@ export function spawnPets(
   const moveSpdMod    = 1 + (mods['pet_speed'] ?? 0)
   // Q10: pet_range talent (Extended Reach) widens the pet engagement radius.
   const rangeMult     = 1 + (mods['pet_range'] ?? 0)
+  // Phase 7 (Q14): pet_crit talent — per-pet crit chance baked at spawn so
+  // PetCombatSystem can roll game.rng() without re-walking the talent tree.
+  // Clamp to [0, 1] in case future stacking pushes the raw mod past 1.
+  const critChance    = Math.min(1, Math.max(0, mods['pet_crit'] ?? 0))
 
   // Level scaling: each level adds 30% dmg, 10% faster attack (linear, floored at 0.1), 20% faster movement
   const levelDmgMult  = 1 + 0.3 * (level - 1)
@@ -78,6 +82,7 @@ export function spawnPets(
       cooldownTimer: 0,
       targetId: null,
       active: true,
+      critChance,
     })
   }
   return pets

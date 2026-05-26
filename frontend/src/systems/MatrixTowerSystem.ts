@@ -78,8 +78,8 @@ export class MatrixTowerSystem {
       // dot products (opposite quadrants) still deactivate the laser; the +1 base
       // lets pairs near the origin still contribute small damage.
       const dotProduct = tower.x * pair.x + tower.y * pair.y
-      const baseDamage = 1 + dotProduct
-      if (baseDamage <= 0) {
+      const rawBase = 1 + dotProduct
+      if (rawBase <= 0) {
         laser.invalid = true
         laser.targetIds = []
         continue
@@ -87,6 +87,11 @@ export class MatrixTowerSystem {
       laser.invalid = false
 
       const mods = tower.talentMods
+      // Phase 7 (Q14): `resonance` is a multiplicative bonus on the paired
+      // base damage. Applied *after* the rawBase > 0 gate so it never
+      // resurrects an opposite-quadrant pair.
+      const resonanceMod = 1 + (mods['resonance'] ?? 0)
+      const baseDamage = rawBase * resonanceMod
       const upgradeRamp = tower.upgradeExtras?.['rampRate'] ?? 0
       const rampRate = 0.5 * (1 + (mods['damage_ramp'] ?? 0) + upgradeRamp)
       const count = 1 + Math.floor(mods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)

@@ -88,3 +88,137 @@ describe('RadarTowerSystem — RADAR_A focus-sector bonus', () => {
     expect(damageTaken(inArc)).toBeGreaterThan(0)
   })
 })
+
+// Phase 7 (Q14) — RADAR_A `aoe_width` advanced talent. The sweep band's
+// half-width is the only gating value for whether an off-needle enemy is
+// struck; the talent is additive on top of the upgrade extra so the two
+// routes do not double-apply.
+describe('RadarTowerSystem — RADAR_A aoe_width talent', () => {
+  let game: ReturnType<typeof createMockGame>
+  let system: RadarTowerSystem
+
+  beforeEach(() => {
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+  })
+
+  it('widens the sweep band so a previously-missed enemy is now struck', () => {
+    // Needle parks at 0.7 (= 2.0 rad/s × 0.35). Enemy at 1.3 sits 0.6 rad
+    // off-needle, just past the default 0.5 half-width. With +0.2 talent
+    // mod (2 levels × 0.10) the new half-width is 0.7 and the enemy lands
+    // inside the band.
+    const baseTower = createMockTower({ type: TowerType.RADAR_A, x: 0, y: 0 })
+    const enemyOutside = enemyAtAngle(1.3)
+    game.towers.push(baseTower)
+    game.enemies.push(enemyOutside)
+    system.update(0.35, game)
+    expect(damageTaken(enemyOutside)).toBe(0)
+
+    // Fresh game with the talent mod and an identically-positioned enemy.
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+    const wideTower = createMockTower({
+      type: TowerType.RADAR_A, x: 0, y: 0,
+      talentMods: { aoe_width: 0.20 },
+    })
+    const enemyNowHit = enemyAtAngle(1.3)
+    game.towers.push(wideTower)
+    game.enemies.push(enemyNowHit)
+    system.update(0.35, game)
+    expect(damageTaken(enemyNowHit)).toBeGreaterThan(0)
+  })
+})
+
+// Phase 7 (Q14) — RADAR_B `crit_chance` advanced talent. Crits use game.rng
+// so a recorded replay reproduces hit-for-hit. crit_chance=1 guarantees the
+// crit so we don't need to reach into the RNG to assert the damage scaling.
+describe('RadarTowerSystem — RADAR_B crit_chance talent', () => {
+  let game: ReturnType<typeof createMockGame>
+  let system: RadarTowerSystem
+
+  beforeEach(() => {
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+  })
+
+  // Enemy at (2, 0) lands inside the default arc [0, π/2] of RADAR_B, so
+  // the ×1.5 focus-sector bonus applies. Each expected-damage assertion
+  // bakes the 1.5 in explicitly so a future arc-bonus tweak is loud.
+  it('crit_chance=1 doubles the projectile damage on every fire', () => {
+    const tower = createMockTower({
+      type: TowerType.RADAR_B, x: 0, y: 0,
+      effectiveDamage: 10, effectiveRange: 5,
+      cooldown: 1.0, cooldownTimer: 0,
+      talentMods: { crit_chance: 1.0 },
+    })
+    game.towers.push(tower)
+    game.enemies.push(createMockEnemy({ x: 2, y: 0 }))
+
+    system.update(0.016, game)
+
+    expect(game.projectiles.length).toBe(1)
+    expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5 * 2, 5)  // eff × arc × crit
+  })
+
+  it('crit_chance=0 fires at base damage (no crit roll)', () => {
+    const tower = createMockTower({
+      type: TowerType.RADAR_B, x: 0, y: 0,
+      effectiveDamage: 10, effectiveRange: 5,
+      cooldown: 1.0, cooldownTimer: 0,
+    })
+    game.towers.push(tower)
+    game.enemies.push(createMockEnemy({ x: 2, y: 0 }))
+
+    system.update(0.016, game)
+
+    expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5, 5)  // eff × arc, no crit
+  })
+})
+
+// Phase 7 (Q14) — RADAR_C `crit_damage` talent stacks ADDITIVELY with the
+// existing upgrade-extra critDamage; the base multiplier (2×) is untouched.
+describe('RadarTowerSystem — RADAR_C crit_damage talent', () => {
+  let game: ReturnType<typeof createMockGame>
+  let system: RadarTowerSystem
+
+  beforeEach(() => {
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+  })
+
+  it('crit_damage talent additively raises the crit multiplier above 2.0', () => {
+    const tower = createMockTower({
+      type: TowerType.RADAR_C, x: 0, y: 0,
+      effectiveDamage: 10, effectiveRange: 5,
+      cooldown: 1.0, cooldownTimer: 0,
+      upgradeExtras: { critChance: 1.0 },
+      talentMods: { crit_damage: 1.0 },  // 2 levels × 0.5 = +1.0 → 3× crit
+    })
+    game.towers.push(tower)
+    game.enemies.push(createMockEnemy({ x: 2, y: 0 }))
+
+    system.update(0.016, game)
+
+    expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5 * 3, 5)  // eff × arc × crit (2+1.0)
+  })
+
+  it('crit_damage stacks with upgrade extra critDamage (both additive)', () => {
+    const tower = createMockTower({
+      type: TowerType.RADAR_C, x: 0, y: 0,
+      effectiveDamage: 10, effectiveRange: 5,
+      cooldown: 1.0, cooldownTimer: 0,
+      upgradeExtras: { critChance: 1.0, critDamage: 0.5 },  // +0.5 → 2.5×
+      talentMods: { crit_damage: 1.0 },                      // +1.0 → 3.5×
+    })
+    game.towers.push(tower)
+    game.enemies.push(createMockEnemy({ x: 2, y: 0 }))
+
+    system.update(0.016, game)
+
+    expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5 * 3.5, 5)  // eff × arc × crit
+  })
+})

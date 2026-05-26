@@ -14,7 +14,13 @@ export const BUFF_ZONE_MULTIPLIER = 2
 // `duration` talent mod (same surface as the DoT duration).
 export const SLOW_BASE_DURATION = 2.0
 export const DOT_BASE_DURATION = 1.0
+// slowFactor = fraction of speed REMOVED (see MovementSystem:84 — final speed =
+// base × (1 − slowFactor)). So 0.4 → 60% of normal speed.
 export const SLOW_FACTOR = 0.4
+// Phase 7 (Q14): the deepest the `slow_strength` talent can push the slow.
+// Capped at 0.90 (≥ 10% of normal speed) so a future stacked modifier cannot
+// drive slowFactor to ≥ 1 and freeze enemies outright.
+export const SLOW_FACTOR_CEIL = 0.90
 
 export class MagicTowerSystem {
   private _unsubs: (() => void)[] = []
@@ -104,6 +110,11 @@ export class MagicTowerSystem {
     // MAGIC towers does not push the slow past SLOW_FACTOR.
     const slowDuration = SLOW_BASE_DURATION * durationMult
     const dotDuration = DOT_BASE_DURATION * durationMult
+    // Phase 7 (Q14): `slow_strength` deepens the slow. slowFactor is the
+    // amount of speed REMOVED, so a bigger factor = stronger slow. Cap at
+    // SLOW_FACTOR_CEIL so future stacking cannot freeze enemies (≥ 1.0).
+    const slowDepthMod = mods['slow_strength'] ?? 0
+    const slowFactor = Math.min(SLOW_FACTOR_CEIL, SLOW_FACTOR + slowDepthMod)
     const range = tower.effectiveRange
     // Curve is evaluated in world coordinates so students must compute the
     // translation `y = f(x − h) + k` themselves — but the influence is gated
@@ -114,7 +125,7 @@ export class MagicTowerSystem {
       if (Math.abs(enemy.x - tower.x) > range) continue
       const curveY = fn(enemy.x)
       if (Math.abs(enemy.y - curveY) < zoneWidth) {
-        enemy.slowFactor = Math.max(enemy.slowFactor, SLOW_FACTOR)
+        enemy.slowFactor = Math.max(enemy.slowFactor, slowFactor)
         enemy.slowTimer = slowDuration
         enemy.dotDamage = tower.effectiveDamage * strengthMult
         enemy.dotTimer = dotDuration

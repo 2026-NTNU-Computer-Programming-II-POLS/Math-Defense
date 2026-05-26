@@ -18,6 +18,11 @@ class TalentNodeDef:
     cost_per_level: int
     effect_per_level: float
     prerequisites: tuple[str, ...] = ()
+    # Phase 7 (Q14): advanced "tier-2" nodes require their parent at the
+    # parent's max_level (not just level >= 1). The id of each entry is
+    # resolved against TALENT_NODE_DEFS at allocation time and the user's
+    # current level on that node must equal that node's max_level.
+    prerequisite_max_levels: tuple[str, ...] = ()
 
 
 TALENT_NODE_DEFS: dict[str, TalentNodeDef] = {}
@@ -59,6 +64,32 @@ _reg(TalentNodeDef("limit_range", "limit", "range", "Extended Limit", "Increase 
 _reg(TalentNodeDef("calculus_pet_speed", "calculus", "pet_attack_speed", "Quick Pets", "Increase pet attack speed", 3, 1, 0.10))
 _reg(TalentNodeDef("calculus_pet_damage", "calculus", "pet_damage", "Strong Pets", "Increase pet damage", 3, 1, 0.10, ("calculus_pet_speed",)))
 _reg(TalentNodeDef("calculus_pet_range", "calculus", "pet_range", "Extended Reach", "Increase pet attack range", 3, 1, 0.20, ("calculus_pet_speed",)))
+
+# ── Advanced "tier-2" nodes (Phase 7 / Q14) ──
+# Each requires its parent at max level. Sized at 2 lv × 3 TP = 6 TP/tower,
+# 42 TP total — comfortably exceeds the 55 TP achievement pool so a fully-
+# achievement-loaded player can still aspire to one more node.
+_reg(TalentNodeDef("magic_slow_strength", "magic", "slow_strength", "Deeper Chill",
+                   "Magic debuff slow is stronger (subtracts from the slow factor)",
+                   2, 3, 0.10, (), ("magic_zone_width",)))
+_reg(TalentNodeDef("radar_a_aoe_width", "radarA", "aoe_width", "Wider Sweep",
+                   "Sweep beam covers a wider arc",
+                   2, 3, 0.10, (), ("radar_a_speed",)))
+_reg(TalentNodeDef("radar_b_crit_chance", "radarB", "crit_chance", "Lucky Shots",
+                   "Chance to crit for 2× damage",
+                   2, 3, 0.10, (), ("radar_b_targets",)))
+_reg(TalentNodeDef("radar_c_crit_damage", "radarC", "crit_damage", "Devastating Crits",
+                   "Crit damage bonus (adds to the 2× base multiplier)",
+                   2, 3, 0.50, (), ("radar_c_targets",)))
+_reg(TalentNodeDef("matrix_resonance", "matrix", "resonance", "Pair Resonance",
+                   "Paired-tower base damage multiplied by (1 + resonance)",
+                   2, 3, 0.15, (), ("matrix_ramp",)))
+_reg(TalentNodeDef("limit_burst_bonus", "limit", "burst_bonus", "Greater Burst",
+                   "Each burst hits for more (adds to the 1.5× base multiplier)",
+                   2, 3, 0.25, (), ("limit_range",)))
+_reg(TalentNodeDef("calculus_pet_crit", "calculus", "pet_crit", "Pet Fervor",
+                   "Pet attacks have a chance to crit for 2× damage",
+                   2, 3, 0.10, (), ("calculus_pet_damage",)))
 
 
 def get_all_nodes() -> list[TalentNodeDef]:

@@ -111,6 +111,18 @@ class TalentTree:
                     f"Prerequisite not met: {prereq_def.name}"
                 )
 
+        # Phase 7 (Q14): advanced nodes require the parent at max level.
+        # Checked separately from the legacy "level >= 1" prerequisites so
+        # existing tree shape is preserved verbatim.
+        for prereq_id in node_def.prerequisite_max_levels:
+            prereq_def = TALENT_NODE_DEFS.get(prereq_id)
+            if prereq_def is None:
+                continue
+            if self._level_of(prereq_id) < prereq_def.max_level:
+                raise PrerequisiteNotMetError(
+                    f"Prerequisite not met: {prereq_def.name} must be at max level"
+                )
+
         existing = self._find(talent_node_id)
         if existing is not None:
             existing.upgrade(node_def.max_level)

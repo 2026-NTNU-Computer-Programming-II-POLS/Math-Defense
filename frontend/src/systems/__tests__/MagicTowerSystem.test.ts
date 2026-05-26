@@ -18,6 +18,7 @@ import {
   SLOW_BASE_DURATION,
   DOT_BASE_DURATION,
   SLOW_FACTOR,
+  SLOW_FACTOR_CEIL,
 } from '../MagicTowerSystem'
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { createMockGame, createMockEnemy, createMockTower } from './helpers'
@@ -304,6 +305,62 @@ describe('MagicTowerSystem — event handlers', () => {
 
     expect(tower.magicExpression).toBeUndefined()
     expect(tower.configured).toBe(false)
+  })
+
+  // Phase 7 (Q14): slow_strength advanced talent. Pinned to the additive
+  // factor semantics (slowFactor is the speed amount REMOVED, so bigger =
+  // slower) and the ceiling that keeps a future stacked mod from freezing
+  // enemies.
+  it('slow_strength talent additively deepens the slow factor', () => {
+    const game = createMockGame({ phase: GamePhase.WAVE })
+    const system = new MagicTowerSystem()
+    system.init(game)
+    const tower = createMockTower({
+      type: TowerType.MAGIC,
+      x: 0, y: 0,
+      effectiveDamage: 8,
+      effectiveRange: 5,
+      cooldown: 1.0,
+      cooldownTimer: 0,
+      magicMode: 'debuff',
+      magicExpression: '0',
+      configured: true,
+      talentMods: { slow_strength: 0.20 },  // = 2 levels at 0.10/lv
+    })
+    game.towers.push(tower)
+    const enemy = createMockEnemy({ x: 2, y: 0 })
+    game.enemies.push(enemy)
+
+    system.update(0.016, game)
+
+    expect(enemy.slowFactor).toBeCloseTo(SLOW_FACTOR + 0.20, 5)
+  })
+
+  it('slow_strength clamps to SLOW_FACTOR_CEIL so enemies never freeze', () => {
+    const game = createMockGame({ phase: GamePhase.WAVE })
+    const system = new MagicTowerSystem()
+    system.init(game)
+    const tower = createMockTower({
+      type: TowerType.MAGIC,
+      x: 0, y: 0,
+      effectiveDamage: 8,
+      effectiveRange: 5,
+      cooldown: 1.0,
+      cooldownTimer: 0,
+      magicMode: 'debuff',
+      magicExpression: '0',
+      configured: true,
+      // Absurdly large mod (impossible from talents alone) — clamp must hold.
+      talentMods: { slow_strength: 5.0 },
+    })
+    game.towers.push(tower)
+    const enemy = createMockEnemy({ x: 2, y: 0 })
+    game.enemies.push(enemy)
+
+    system.update(0.016, game)
+
+    expect(enemy.slowFactor).toBe(SLOW_FACTOR_CEIL)
+    expect(SLOW_FACTOR_CEIL).toBeLessThan(1)
   })
 
   it('MAGIC_MODE_CHANGED flips the tower mode', () => {

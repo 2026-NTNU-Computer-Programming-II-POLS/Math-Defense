@@ -69,7 +69,11 @@ export class RadarTowerSystem {
     this._sweepAngles.set(tower.id, angle)
 
     const range = tower.effectiveRange
-    const aoeWidth = 0.5 + (tower.upgradeExtras?.['aoeWidth'] ?? 0)
+    // Phase 7 (Q14): `aoe_width` talent adds to the sweep arc half-width in
+    // radians. Additive on top of the upgrade extra so both routes contribute.
+    const aoeWidth = 0.5
+      + (tower.upgradeExtras?.['aoeWidth'] ?? 0)
+      + (tower.talentMods['aoe_width'] ?? 0)
 
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
@@ -96,10 +100,17 @@ export class RadarTowerSystem {
     tower.cooldownTimer = tower.cooldown
 
     const count = radarTargetCount(tower)
+    // Phase 7 (Q14): `crit_chance` talent on RADAR_B. Crits fixed at 2× — the
+    // tower's identity is "rapid fire," so the variance comes from chance
+    // rather than crit magnitude (that's RADAR_C's lane). Uses game.rng so
+    // recorded runs replay byte-identical (Backlog §24 determinism contract).
+    const critChance = Math.min(1, tower.talentMods['crit_chance'] ?? 0)
     const targets = selectRadarTargets(tower, game.enemies, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)
-      this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus, game)
+      const isCrit = critChance > 0 && game.rng() < critChance
+      const critMult = isCrit ? 2.0 : 1.0
+      this._fireProjectile(tower, target, tower.effectiveDamage * arcBonus * critMult, game)
     }
   }
 
@@ -110,7 +121,10 @@ export class RadarTowerSystem {
 
     const count = radarTargetCount(tower)
     const critChance = Math.min(1, tower.upgradeExtras?.['critChance'] ?? 0)
-    const critDmgBonus = tower.upgradeExtras?.['critDamage'] ?? 0
+    // Phase 7 (Q14): `crit_damage` talent stacks additively with the upgrade
+    // extra. Final crit multiplier = 2.0 + (upgrade) + (talent).
+    const critDmgBonus = (tower.upgradeExtras?.['critDamage'] ?? 0)
+      + (tower.talentMods['crit_damage'] ?? 0)
     const targets = selectRadarTargets(tower, game.enemies, count)
     for (const target of targets) {
       const arcBonus = this._getArcBonusForTarget(tower, target)

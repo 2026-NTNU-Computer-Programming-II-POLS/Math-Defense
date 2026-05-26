@@ -280,6 +280,94 @@ def test_calculus_pet_range_modifier_applied(client):
     assert abs(mods["calculus"]["pet_range"] - 0.20) < 1e-9
 
 
+# ── Q14: Phase 7 advanced "tier-2" talent nodes ──────────────────────────────
+
+
+PHASE7_NODES = [
+    ("magic_slow_strength", "magic_zone_width"),
+    ("radar_a_aoe_width", "radar_a_speed"),
+    ("radar_b_crit_chance", "radar_b_targets"),
+    ("radar_c_crit_damage", "radar_c_targets"),
+    ("matrix_resonance", "matrix_ramp"),
+    ("limit_burst_bonus", "limit_range"),
+    ("calculus_pet_crit", "calculus_pet_damage"),
+]
+
+
+def test_phase7_nodes_registered_with_max_level_prereq():
+    """Each advanced node must declare its parent in prerequisite_max_levels
+    (NOT plain prerequisites), and the parent must exist in the registry."""
+    for node_id, parent_id in PHASE7_NODES:
+        node = TALENT_NODE_DEFS[node_id]
+        assert node.max_level == 2, node_id
+        assert node.cost_per_level == 3, node_id
+        assert node.prerequisites == (), node_id
+        assert node.prerequisite_max_levels == (parent_id,), node_id
+        assert parent_id in TALENT_NODE_DEFS, parent_id
+
+
+def test_phase7_total_cost_leaves_headroom_after_achievement_pool():
+    """Sized to 42 TP total so the 55 TP achievement pool still requires the
+    player to pick & choose — never enough to fully complete the tree."""
+    total = sum(
+        TALENT_NODE_DEFS[node_id].cost_per_level * TALENT_NODE_DEFS[node_id].max_level
+        for node_id, _ in PHASE7_NODES
+    )
+    assert total == 42
+
+
+def test_advanced_node_rejected_when_parent_only_partially_allocated(client):
+    """magic_slow_strength requires magic_zone_width at MAX level (3). Allocating
+    after only 1 level of zone_width must still 409."""
+    token = _register(client, "tal_adv_partial")
+    # zone_strength is needed first (prereq for zone_width)
+    _earn_points(client, token, 5)
+    client.post("/api/talents/magic_zone_strength/allocate", headers=_auth(token))
+    client.post("/api/talents/magic_zone_width/allocate", headers=_auth(token))
+    # zone_width is at lv 1 but max_level is 3
+    res = client.post("/api/talents/magic_slow_strength/allocate", headers=_auth(token))
+    assert res.status_code == 409
+
+
+def test_advanced_node_accepted_when_parent_fully_allocated(client):
+    """Bringing magic_zone_width to lv 3 should unlock magic_slow_strength."""
+    token = _register(client, "tal_adv_max")
+    _earn_points(client, token, 10)
+    client.post("/api/talents/magic_zone_strength/allocate", headers=_auth(token))
+    for _ in range(3):
+        client.post("/api/talents/magic_zone_width/allocate", headers=_auth(token))
+
+    res = client.post("/api/talents/magic_slow_strength/allocate", headers=_auth(token))
+    assert res.status_code == 200
+    node = next(n for n in res.json()["nodes"] if n["id"] == "magic_slow_strength")
+    assert node["current_level"] == 1
+
+
+def test_advanced_node_modifier_applied_under_new_attribute(client):
+    """The modifier surface must expose the new attribute keys so frontend
+    talentMods reads (e.g. tower.talentMods['slow_strength']) resolve."""
+    token = _register(client, "tal_adv_mod")
+    _earn_points(client, token, 10)
+    client.post("/api/talents/magic_zone_strength/allocate", headers=_auth(token))
+    for _ in range(3):
+        client.post("/api/talents/magic_zone_width/allocate", headers=_auth(token))
+    client.post("/api/talents/magic_slow_strength/allocate", headers=_auth(token))
+
+    mods = client.get("/api/talents/modifiers", headers=_auth(token)).json()["modifiers"]
+    assert "magic" in mods
+    assert abs(mods["magic"].get("slow_strength", 0) - 0.10) < 1e-9
+
+
+def test_advanced_node_tree_payload_surfaces_max_level_prereq(client):
+    """The /api/talents payload must include prerequisite_max_levels so the
+    frontend canAllocate gate can render the node as locked without a 409
+    round-trip."""
+    token = _register(client, "tal_adv_payload")
+    tree = client.get("/api/talents", headers=_auth(token)).json()
+    node = next(n for n in tree["nodes"] if n["id"] == "magic_slow_strength")
+    assert node["prerequisite_max_levels"] == ["magic_zone_width"]
+
+
 # ── Cross-user isolation ──────────────────────────────────────────────────────
 
 def test_talent_allocation_isolated_between_users(client):

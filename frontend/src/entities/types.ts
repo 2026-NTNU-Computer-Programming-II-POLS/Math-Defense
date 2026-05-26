@@ -98,6 +98,10 @@ export interface Pet {
   cooldownTimer: number
   targetId: string | null
   active: boolean
+  // Phase 7 (Q14): per-pet crit chance baked at spawn from the owner tower's
+  // `pet_crit` talent mod. 0 = no crit (default for non-Calculus or
+  // unallocated). Crit multiplier is fixed at 2× in PetCombatSystem.
+  critChance: number
 }
 
 // ── Enemy ──

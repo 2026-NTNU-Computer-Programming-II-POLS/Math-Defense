@@ -53,3 +53,51 @@ describe('PetCombatSystem — pet.range gates damage', () => {
     expect(enemy.hp).toBeLessThan(100)
   })
 })
+
+// Phase 7 (Q14) — `pet_crit` talent is baked into Pet.critChance at spawn so
+// PetCombatSystem can roll game.rng() at attack time. critChance=1 guarantees
+// the crit so we sidestep the RNG and verify the 2× multiplier directly.
+describe('PetCombatSystem — pet_crit talent', () => {
+  function spawnAt(petCritMod: number) {
+    const game = createMockGame({ phase: GamePhase.WAVE })
+    const system = new PetCombatSystem()
+    const pets = spawnPets('owner', 0, 0, 1, 1, { pet_crit: petCritMod }, 1, 1)
+    game.pets.push(...pets)
+    return { game, system, pet: pets[0] }
+  }
+
+  it('PetFactory bakes critChance from mods.pet_crit (clamped to [0,1])', () => {
+    const { pet } = spawnAt(0.20)
+    expect(pet.critChance).toBeCloseTo(0.20, 5)
+
+    const { pet: clamped } = spawnAt(5.0)  // absurd → must clamp
+    expect(clamped.critChance).toBe(1)
+  })
+
+  it('critChance=1 doubles pet damage on every attack', () => {
+    const { game, system, pet } = spawnAt(1.0)
+    const enemy = createMockEnemy({
+      x: pet.homeX + 0.5, y: pet.homeY,
+      hp: 500, maxHp: 500, damage: 0,
+    })
+    game.enemies.push(enemy)
+
+    system.update(0.5, game)
+
+    // damage dealt is exactly 2 × pet.damage (one crit hit this frame).
+    expect(500 - enemy.hp).toBeCloseTo(pet.damage * 2, 5)
+  })
+
+  it('critChance=0 deals base damage (no double, no RNG read)', () => {
+    const { game, system, pet } = spawnAt(0)
+    const enemy = createMockEnemy({
+      x: pet.homeX + 0.5, y: pet.homeY,
+      hp: 500, maxHp: 500, damage: 0,
+    })
+    game.enemies.push(enemy)
+
+    system.update(0.5, game)
+
+    expect(500 - enemy.hp).toBeCloseTo(pet.damage, 5)
+  })
+})

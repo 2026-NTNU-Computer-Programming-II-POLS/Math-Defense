@@ -43,7 +43,11 @@ export class PetCombatSystem {
         pet.cooldownTimer -= dt
         if (pet.cooldownTimer <= 0) {
           pet.cooldownTimer = pet.attackSpeed
-          this._dealDamage(target, pet.damage, game)
+          // Phase 7 (Q14): pet_crit talent — roll the seeded RNG so a
+          // recorded run replays bit-identical. Crit mult fixed at 2×.
+          const isCrit = pet.critChance > 0 && game.rng() < pet.critChance
+          const dmg = isCrit ? pet.damage * 2 : pet.damage
+          this._dealDamage(target, dmg, game)
         }
       }
     }

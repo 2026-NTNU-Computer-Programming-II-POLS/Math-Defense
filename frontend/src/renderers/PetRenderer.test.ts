@@ -82,6 +82,7 @@ function makePet(trait: PetTrait): Pet {
     cooldownTimer: 0,
     targetId: null,
     active: true,
+    critChance: 0,
   }
 }
 

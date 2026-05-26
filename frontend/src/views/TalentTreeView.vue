@@ -69,6 +69,13 @@ function canAllocate(node: TalentNodeOut): boolean {
     const prereqNode = tree.value.nodes.find(n => n.id === prereq)
     if (!prereqNode || prereqNode.current_level < 1) return false
   }
+  // Phase 7 (Q14): advanced "tier-2" nodes require parent at max level.
+  // Mirror backend tree.allocate so locked nodes render dimmed instead of
+  // surfacing a 409 only after click.
+  for (const prereq of node.prerequisite_max_levels ?? []) {
+    const prereqNode = tree.value.nodes.find(n => n.id === prereq)
+    if (!prereqNode || prereqNode.current_level < prereqNode.max_level) return false
+  }
   return true
 }
 
@@ -181,7 +188,17 @@ onMounted(async () => {
             }]"
             @click="canAllocate(node) && allocate(node.id)"
           >
-            <div class="node-name">{{ node.name }}</div>
+            <div class="node-name">
+              {{ node.name }}
+              <!-- Phase 7 (Q14): tier-2 badge so advanced nodes are visually
+                   distinct from base nodes. Driven from the same field the
+                   gate above uses, so badge + gate cannot drift apart. -->
+              <span
+                v-if="(node.prerequisite_max_levels?.length ?? 0) > 0"
+                class="tier-badge"
+                aria-label="Tier 2 talent — requires parent at max level"
+              >T2</span>
+            </div>
             <div class="node-level">
               {{ allocatingNodeId === node.id ? '…' : `${node.current_level} / ${node.max_level}` }}
             </div>
@@ -308,7 +325,26 @@ onMounted(async () => {
 
 .rec-dismiss:hover { opacity: 0.7; }
 
-.node-name { font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: 4px; }
+.node-name {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: space-between;
+}
+
+.tier-badge {
+  font-size: var(--text-2xs);
+  font-family: var(--font-mono);
+  color: var(--gold);
+  text-shadow: var(--gold-shadow);
+  border: 1px solid var(--gold);
+  border-radius: 2px;
+  padding: 0 4px;
+  letter-spacing: 1px;
+}
 .node-level { font-size: var(--text-sm); color: var(--gold); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
 .node-desc { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); margin-bottom: 4px; }
 .node-effect { font-size: var(--text-xs); color: var(--gold); text-shadow: var(--gold-shadow); opacity: 0.8; }

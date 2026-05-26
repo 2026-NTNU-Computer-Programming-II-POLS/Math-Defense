@@ -126,6 +126,52 @@ describe('LimitTowerSystem — V3 de-fear', () => {
     expect(BURST_MULTIPLIER).toBe(1.5)
   })
 
+  // Phase 7 (Q14) — `burst_bonus` talent additively raises the burst
+  // multiplier (1.5 → up to 2.0 at lv 2). +inf instakills must still bypass.
+  it('burst_bonus talent additively raises the burst multiplier', () => {
+    const game = createMockGame({ phase: GamePhase.WAVE })
+    const sys = new LimitTowerSystem()
+    sys.init(game)
+
+    const tower = createMockTower({
+      type: TowerType.LIMIT,
+      limitResult: resultFor('+c'),  // value=3
+      effectiveDamage: 20,
+      x: 0, y: 0,
+      talentMods: { burst_bonus: 0.50 },  // 2 lv × 0.25 → mult = 2.0
+    })
+    game.towers.push(tower)
+    const enemy = createMockEnemy({ hp: 200, maxHp: 200, x: 0, y: 0 })
+    game.enemies.push(enemy)
+
+    sys.update(1, game)
+
+    // 20 (eff) × 3 (value) × 2.0 (burst+bonus) = 120 damage.
+    expect(enemy.hp).toBeCloseTo(200 - 60 * 2.0, 5)
+    sys.destroy()
+  })
+
+  it('burst_bonus does not leak into +inf instakill path', () => {
+    const game = createMockGame({ phase: GamePhase.WAVE })
+    const sys = new LimitTowerSystem()
+    sys.init(game)
+
+    const tower = createMockTower({
+      type: TowerType.LIMIT,
+      limitResult: resultFor('+inf'),
+      effectiveDamage: 1,
+      x: 0, y: 0,
+      talentMods: { burst_bonus: 999 },  // absurd — instakill must still bypass
+    })
+    game.towers.push(tower)
+    const enemy = createMockEnemy({ hp: 9999, maxHp: 9999, x: 0, y: 0 })
+    game.enemies.push(enemy)
+
+    sys.update(1, game)
+    expect(enemy.alive).toBe(false)
+    sys.destroy()
+  })
+
   // Phase 6 Q8: +inf bypasses the multiplier path (it's an instakill via
   // killEnemy, not applyDamage), so the multiplier change must not leak in.
   it('+inf kills bypass damage scaling entirely', () => {

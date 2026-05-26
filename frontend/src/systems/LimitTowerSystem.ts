@@ -59,6 +59,11 @@ export class LimitTowerSystem {
 
       const result = tower.limitResult
 
+      // Phase 7 (Q14): `burst_bonus` talent adds directly to the burst
+      // multiplier (1.5 → up to 2.0 at lv2). `+inf` instakills bypass this
+      // entirely (the bypass-everything path stays clean per Phase 6 design).
+      const burstBonus = tower.talentMods['burst_bonus'] ?? 0
+      const burstMult = BURST_MULTIPLIER + burstBonus
       const range = tower.effectiveRange
       for (const enemy of game.enemies) {
         if (!enemy.alive) continue
@@ -84,7 +89,7 @@ export class LimitTowerSystem {
         }
 
         if (dmg > 0) {
-          applyDamage(enemy, dmg * BURST_MULTIPLIER, game, 'towerHit')
+          applyDamage(enemy, dmg * burstMult, game, 'towerHit')
         }
       }
     }

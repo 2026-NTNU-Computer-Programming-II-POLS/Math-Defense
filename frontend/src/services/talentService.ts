@@ -10,6 +10,9 @@ export interface TalentNodeOut {
   cost_per_level: number
   effect_per_level: number
   prerequisites: string[]
+  // Phase 7 (Q14): advanced-tier prereqs requiring parent at max level.
+  // Optional + defaults to [] for older payloads / pre-Phase-7 nodes.
+  prerequisite_max_levels?: string[]
   current_level: number
 }
 

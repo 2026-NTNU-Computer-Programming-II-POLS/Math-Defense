@@ -47,6 +47,7 @@ class TalentApplicationService:
                 "cost_per_level": n.cost_per_level,
                 "effect_per_level": n.effect_per_level,
                 "prerequisites": list(n.prerequisites),
+                "prerequisite_max_levels": list(n.prerequisite_max_levels),
                 "current_level": allocations.get(n.id, 0),
             })
 

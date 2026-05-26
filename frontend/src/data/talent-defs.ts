@@ -10,6 +10,9 @@ export interface TalentNodeDef {
   costPerLevel: number
   effectPerLevel: number
   prerequisites: string[]
+  // Phase 7 (Q14): advanced "tier-2" prereqs requiring the parent at its
+  // max_level. Optional + defaults to [] so existing nodes stay unchanged.
+  prerequisiteMaxLevels?: string[]
 }
 
 export const TALENT_NODE_DEFS: Record<string, TalentNodeDef> = {
@@ -45,6 +48,17 @@ export const TALENT_NODE_DEFS: Record<string, TalentNodeDef> = {
   calculus_pet_speed:  { id: 'calculus_pet_speed', towerType: TowerType.CALCULUS, attribute: 'pet_attack_speed', name: 'Quick Pets', description: 'Increase pet attack speed', maxLevel: 3, costPerLevel: 1, effectPerLevel: 0.10, prerequisites: [] },
   calculus_pet_damage: { id: 'calculus_pet_damage', towerType: TowerType.CALCULUS, attribute: 'pet_damage', name: 'Strong Pets', description: 'Increase pet damage', maxLevel: 3, costPerLevel: 1, effectPerLevel: 0.10, prerequisites: ['calculus_pet_speed'] },
   calculus_pet_range:  { id: 'calculus_pet_range', towerType: TowerType.CALCULUS, attribute: 'pet_range', name: 'Extended Reach', description: 'Increase pet attack range', maxLevel: 3, costPerLevel: 1, effectPerLevel: 0.20, prerequisites: ['calculus_pet_speed'] },
+
+  // Phase 7 (Q14) — advanced "tier-2" nodes. Each requires its parent at
+  // max level; sized at 2 lv × 3 TP = 6 TP per tower (42 TP total) so the
+  // 55 TP achievement pool still leaves headroom to specialize.
+  magic_slow_strength:  { id: 'magic_slow_strength', towerType: TowerType.MAGIC, attribute: 'slow_strength', name: 'Deeper Chill', description: 'Magic debuff slow is stronger', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.10, prerequisites: [], prerequisiteMaxLevels: ['magic_zone_width'] },
+  radar_a_aoe_width:    { id: 'radar_a_aoe_width', towerType: TowerType.RADAR_A, attribute: 'aoe_width', name: 'Wider Sweep', description: 'Sweep beam covers a wider arc', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.10, prerequisites: [], prerequisiteMaxLevels: ['radar_a_speed'] },
+  radar_b_crit_chance:  { id: 'radar_b_crit_chance', towerType: TowerType.RADAR_B, attribute: 'crit_chance', name: 'Lucky Shots', description: 'Chance to crit for 2× damage', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.10, prerequisites: [], prerequisiteMaxLevels: ['radar_b_targets'] },
+  radar_c_crit_damage:  { id: 'radar_c_crit_damage', towerType: TowerType.RADAR_C, attribute: 'crit_damage', name: 'Devastating Crits', description: 'Crit damage bonus (adds to the 2× base multiplier)', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.50, prerequisites: [], prerequisiteMaxLevels: ['radar_c_targets'] },
+  matrix_resonance:     { id: 'matrix_resonance', towerType: TowerType.MATRIX, attribute: 'resonance', name: 'Pair Resonance', description: 'Paired-tower base damage multiplied by (1 + resonance)', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.15, prerequisites: [], prerequisiteMaxLevels: ['matrix_ramp'] },
+  limit_burst_bonus:    { id: 'limit_burst_bonus', towerType: TowerType.LIMIT, attribute: 'burst_bonus', name: 'Greater Burst', description: 'Each burst hits for more (adds to the 1.5× base multiplier)', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.25, prerequisites: [], prerequisiteMaxLevels: ['limit_range'] },
+  calculus_pet_crit:    { id: 'calculus_pet_crit', towerType: TowerType.CALCULUS, attribute: 'pet_crit', name: 'Pet Fervor', description: 'Pet attacks have a chance to crit for 2× damage', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.10, prerequisites: [], prerequisiteMaxLevels: ['calculus_pet_damage'] },
 }
 
 export function getNodesByTower(towerType: TowerType): TalentNodeDef[] {

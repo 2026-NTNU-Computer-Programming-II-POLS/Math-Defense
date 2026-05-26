@@ -85,6 +85,32 @@ describe('MatrixTowerSystem', () => {
       expect(enemy.hp).toBe(100)
     })
 
+    // Phase 7 (Q14): `resonance` talent multiplies (1 + dotProduct) AFTER the
+    // > 0 gate, so it never resurrects an opposite-quadrant pair and never
+    // changes the "invalid laser" outcome — it only scales valid laser damage.
+    it('resonance talent multiplicatively scales paired damage', () => {
+      const { a } = placePair(2, 3, 1, 1)  // rawBase = 1 + (2+3) = 6
+      a.talentMods = { resonance: 0.30 }   // 2 lv × 0.15 → baseDamage = 6 × 1.3 = 7.8
+      const enemy = createMockEnemy({ hp: 200, maxHp: 200, x: 2, y: 3, alive: true })
+      game.enemies.push(enemy)
+
+      const dt = 1.0
+      system.update(dt, game)
+
+      // baseDamage 7.8 × rampMul 1.5 × dt 1.0 = 11.7
+      expect(enemy.hp).toBeCloseTo(200 - 7.8 * 1.5, 5)
+    })
+
+    it('resonance does not resurrect an opposite-quadrant pair', () => {
+      const { a } = placePair(2, 0, -2, 0)  // rawBase = -3 → invalid
+      a.talentMods = { resonance: 5.0 }     // huge mod should be irrelevant
+      const enemy = createMockEnemy({ hp: 100, maxHp: 100, x: 0, y: 0, alive: true })
+      game.enemies.push(enemy)
+
+      system.update(1.0, game)
+      expect(enemy.hp).toBe(100)
+    })
+
     it('unpaired MATRIX tower does not fire', () => {
       const lone = createMockTower({
         type: TowerType.MATRIX,

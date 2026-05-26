@@ -13,6 +13,9 @@ class TalentNodeOut(BaseModel):
     cost_per_level: int
     effect_per_level: float
     prerequisites: list[str]
+    # Phase 7 (Q14): advanced-tier prereqs requiring the parent at max level.
+    # Default keeps the wire format additive — older nodes serialize as [].
+    prerequisite_max_levels: list[str] = []
     current_level: int
 
 
