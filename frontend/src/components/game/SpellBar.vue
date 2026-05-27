@@ -166,11 +166,15 @@ defineExpose({ castingSpell, castAtPosition })
   z-index: 2;
 }
 
+/* Compact cost badge tucked into the top-right corner so it stays clear of
+   the centred glyph (a 3-digit cost no longer covers the icon). */
 .spell-cost {
   position: absolute;
   top: 2px;
-  right: 4px;
-  font-size: var(--text-2xs);
+  right: 3px;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: -0.2px;
   color: var(--gold-deep);
   font-weight: 700;
   z-index: 2;
