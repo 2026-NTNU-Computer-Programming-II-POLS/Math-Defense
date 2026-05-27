@@ -618,13 +618,15 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-sm);
 }
 
-/* Section label (mockup): centered mono caps, muted. */
+/* Section label (mockup): centered mono caps, muted. Sized + tracked so the
+   longer "ACTIVE BUFFS" label fits the narrow rail on a single line. */
 .left-utility-stack .lb-label {
   text-align: center;
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: 3px;
+  font-size: 10px;
+  letter-spacing: 1px;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--charcoal-soft);
   margin-bottom: 2px;
 }
