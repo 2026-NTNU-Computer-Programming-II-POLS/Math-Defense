@@ -13,9 +13,13 @@ const manualOpen = ref(false)
 <template>
   <div class="menu-view">
     <div class="menu-hero">
-      <span class="title-eyebrow">FINAL PROJECT · 2026</span>
-      <h1 class="title-main">Math Defense</h1>
-      <div class="title-divider"></div>
+      <img
+        class="menu-logo"
+        src="/logo.png"
+        alt="Math Defense"
+        width="1069"
+        height="1389"
+      />
       <p class="motto">Math is magic — defend the origin.</p>
     </div>
 
@@ -143,36 +147,17 @@ const manualOpen = ref(false)
 .menu-hero {
   text-align: center;
   margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.title-eyebrow {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 5px;
-  color: var(--terracotta-deep);
-  padding: 5px 12px;
-  border: 1px solid rgba(111, 138, 161, 0.5);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.title-main {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xl);
-  font-weight: 800;
-  color: var(--charcoal);
-  letter-spacing: 5px;
-  line-height: 1.1;
-  margin-top: 14px;
-}
-
-.title-divider {
-  width: 64px;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, var(--terracotta), transparent);
-  margin: 14px auto;
-  border-radius: 2px;
+.menu-logo {
+  display: block;
+  width: 220px;
+  height: auto;
+  max-width: 70vw;
+  margin-bottom: 14px;
 }
 
 /* `.card`, `.motto` and the `.btn` family are shared primitives in

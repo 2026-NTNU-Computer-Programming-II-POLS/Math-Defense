@@ -300,7 +300,7 @@ frontend/
 │   ├── audio/                      WAV assets — procedurally synthesised by `scripts/synth-audio.py`
 │   ├── avatars/                    SVG avatars (alchemist / archer / knight / mage / scholar / wizard)
 │   ├── manual/                     In-game manual markdown (`game-mechanics.md`, `towers-and-enemies.md`)
-│   ├── favicon.svg
+│   ├── logo.png                    Brand mark used as favicon + MenuView/AuthView hero
 │   └── icons.svg
 │
 ├── scripts/                        Repo tooling (run via `npm run …`)

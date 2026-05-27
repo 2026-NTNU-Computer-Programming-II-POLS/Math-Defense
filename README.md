@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Logo.png" alt="Math Defense logo" width="220" />
+</p>
+
 # Math Defense
 
 An educational tower defense game that teaches mathematics through gameplay. Players build mathematical towers — each embodying a different math concept — to defeat enemies following a procedurally generated path.

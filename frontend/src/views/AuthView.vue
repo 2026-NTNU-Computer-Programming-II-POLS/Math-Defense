@@ -161,6 +161,13 @@ async function submit(): Promise<void> {
 <template>
   <div class="auth-view">
     <div class="card auth-card">
+      <img
+        class="auth-logo"
+        src="/logo.png"
+        alt="Math Defense"
+        width="1069"
+        height="1389"
+      />
       <!-- Two-factor verification (no mockup design — themed to palette) -->
       <template v-if="mfaRequired">
         <h2 class="auth-title">Two-Factor Authentication</h2>
@@ -337,6 +344,13 @@ async function submit(): Promise<void> {
   max-width: 460px;
   width: 100%;
   margin: 0 auto;
+}
+
+.auth-logo {
+  display: block;
+  width: 96px;
+  height: auto;
+  margin: 0 auto 18px;
 }
 
 /* ── Tabs ── */
