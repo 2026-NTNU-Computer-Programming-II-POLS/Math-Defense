@@ -596,10 +596,10 @@ onBeforeUnmount(() => {
 
 .left-utility-stack {
   position: absolute;
-  left: 8px;
-  /* Start below the HUD sub-bar (MH/spells row) so it never covers it, and
-     stretch down to just above the tower panel — a fixed-length sidebar. */
-  top: calc(var(--hud-height, 56px) + 68px + 8px);
+  left: 0;
+  /* Flush against the left edge and the bottom of the HUD sub-bar (MH/spells
+     row) so it never covers it; stretch down to just above the tower panel. */
+  top: calc(var(--hud-height, 56px) + 68px);
   bottom: calc(var(--tower-bar-height, 64px) + 8px);
   z-index: var(--z-chrome);
   width: 168px;
