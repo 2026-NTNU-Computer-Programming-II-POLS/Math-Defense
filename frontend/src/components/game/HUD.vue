@@ -181,7 +181,6 @@ onBeforeUnmount(() => {
   <div ref="hudRef" class="hud">
     <!-- Phase pill: status dot + current phase + star rating -->
     <div class="hud-item phase-label">
-      <span class="dot" aria-hidden="true"></span>
       <span
         :key="phasePulseKey"
         class="hud-value phase phase-pulse"
@@ -396,14 +395,6 @@ onBeforeUnmount(() => {
   background: rgba(168, 188, 203, 0.24);
   border: 1px solid rgba(168, 188, 203, 0.45);
   border-radius: 999px;
-}
-.phase-label .dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--teal-deep);
-  box-shadow: 0 0 0 3px rgba(143, 168, 163, 0.25);
-  flex-shrink: 0;
 }
 .gh-stars {
   display: inline-flex;
