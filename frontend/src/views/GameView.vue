@@ -146,6 +146,12 @@ async function returnToLevelSelect(): Promise<void> {
 // so _generatedLevel is always non-null here.
 onBeforeRouteLeave(async () => {
   if (bypassLeaveConfirm.value) return true
+  // When api.ts has exhausted its refresh-and-retry budget on a 401, the
+  // auth store drives navigation to /auth itself via a sticky
+  // "Session expired" modal. Popping a second "Leave game?" confirm on top
+  // would be both misleading (the player didn't ask to leave) and stack
+  // two modals on screen — let the auth flow through silently.
+  if (authStore.sessionExpired) return true
   if (activePhases.includes(gameStore.phase)) {
     return await uiStore.showConfirm(
       'Leave game',

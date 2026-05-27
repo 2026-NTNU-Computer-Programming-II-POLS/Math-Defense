@@ -43,6 +43,11 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const initializing = ref(false)
   const probe = useTokenProbe(user)
+  // Set by handleSessionExpiry() once api.ts has exhausted its refresh-and-retry
+  // budget on a 401. GameView.onBeforeRouteLeave reads this to suppress the
+  // misleading "Leave game?" confirmation when the navigation is being driven
+  // by expiry, not by a user clicking Exit Run.
+  const sessionExpired = ref(false)
 
   let _initResolve: (() => void) | null = null
   const initPromise = ref<Promise<void> | null>(null)
@@ -59,6 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await authService.me()
       user.value = mapMeResponseToUser(res)
+      sessionExpired.value = false
       probe.start()
     } catch {
       user.value = null
@@ -72,6 +78,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setUser(u: User): void {
     user.value = u
+    sessionExpired.value = false
     probe.start()
   }
 
@@ -81,16 +88,40 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Called by the api.ts 401 interceptor. Clears local auth state and
-   * redirects without making any API call — avoids recursive logout loops
-   * when authService.logout() itself uses the api wrapper.
+   * Called by the api.ts 401 interceptor after a single refresh-and-retry has
+   * already failed — i.e. the refresh cookie is gone too and the session is
+   * truly over. Idempotent: concurrent 401s (e.g. probe + WAVE_END push) all
+   * land here but only the first one shows the modal and clears auth.
+   *
+   * Shows a sticky "Session expired" modal instead of silently redirecting
+   * to /auth. Without this, a mid-game expiry would trigger the GameView
+   * `onBeforeRouteLeave` guard and pop a misleading "Leave game?" confirm —
+   * the player has no idea their session is the actual cause.
    */
   function handleSessionExpiry(): void {
+    if (sessionExpired.value) return
+    sessionExpired.value = true
     clearAuth()
     const meta = router.currentRoute.value.meta
-    if (meta.requiresAuth) {
-      router.push({ name: 'auth' }).catch(() => {})
-    }
+    if (!meta.requiresAuth) return
+
+    void (async () => {
+      try {
+        const { useUiStore } = await import('@/stores/uiStore')
+        useUiStore().showModal(
+          'Session expired',
+          'Your session has expired. Please sign in again. Any in-progress run will not be saved.',
+          () => {
+            router.push({ name: 'auth' }).catch(() => {})
+          },
+          { sticky: true },
+        )
+      } catch {
+        // uiStore unavailable (very early bootstrap) — fall back to a
+        // silent redirect so the user isn't stranded on a protected page.
+        router.push({ name: 'auth' }).catch(() => {})
+      }
+    })()
   }
 
   async function refreshProfile(): Promise<void> {
@@ -167,6 +198,7 @@ export const useAuthStore = defineStore('auth', () => {
     isStudent,
     initializing,
     initPromise,
+    sessionExpired,
     setUser,
     clearAuth,
     handleSessionExpiry,

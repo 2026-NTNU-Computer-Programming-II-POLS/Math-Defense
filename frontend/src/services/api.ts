@@ -39,6 +39,55 @@ const CREDENTIAL_CHECK_PATHS = new Set([
   '/api/auth/register',
 ])
 
+// Backend mints a refresh cookie scoped to this path; calling it rotates the
+// short-lived access cookie without forcing the user to re-authenticate.
+const REFRESH_PATH = '/api/auth/refresh'
+
+// Coalesce concurrent refresh attempts: when several in-flight requests all
+// hit 401 at once (e.g. token probe + wave-end push), they share a single
+// /refresh round-trip instead of racing and rotating the refresh cookie
+// multiple times.
+let _refreshInFlight: Promise<boolean> | null = null
+
+async function tryRefresh(): Promise<boolean> {
+  if (_refreshInFlight) return _refreshInFlight
+  _refreshInFlight = (async () => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const csrf = readCookie(CSRF_COOKIE_NAME)
+    if (csrf) headers[CSRF_HEADER_NAME] = csrf
+    const url = API_BASE_URL ? `${API_BASE_URL}${REFRESH_PATH}` : REFRESH_PATH
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        signal: controller.signal,
+      })
+      return res.ok
+    } catch {
+      return false
+    } finally {
+      clearTimeout(timer)
+    }
+  })()
+  try {
+    return await _refreshInFlight
+  } finally {
+    _refreshInFlight = null
+  }
+}
+
+async function notifySessionExpired(): Promise<void> {
+  try {
+    const { useAuthStore } = await import('@/stores/authStore')
+    useAuthStore().handleSessionExpiry()
+  } catch {
+    // Pinia not installed yet (very early bootstrap) — best-effort
+  }
+}
+
 export function readCookie(name: string): string | null {
   // document.cookie is "k=v; k2=v2"; pick by exact name.
   if (typeof document === 'undefined') return null
@@ -123,12 +172,44 @@ async function request<T>(
 ): Promise<T> {
   let lastErr: unknown
   let csrfRefreshed = false
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  let authRefreshAttempted = false
+  let attempt = 0
+  while (attempt <= MAX_RETRIES) {
     try {
       return await requestOnce<T>(path, options)
     } catch (e) {
       lastErr = e
       const method = (options.method ?? 'GET').toUpperCase()
+      // 401 refresh-and-retry: the backend's access cookie is short-lived
+      // (15 min default) but the refresh cookie lives much longer. Before
+      // treating the session as expired and bouncing the user to /auth —
+      // which would mid-run pop a "Leave game?" prompt — try rotating the
+      // access cookie once. Skip for the refresh endpoint itself (would
+      // recurse) and for credential-check paths (401 there means "wrong
+      // password", not session expiry).
+      const is401Recoverable =
+        e instanceof ApiError
+        && e.status === 401
+        && !CREDENTIAL_CHECK_PATHS.has(path)
+        && path !== REFRESH_PATH
+      if (is401Recoverable && !authRefreshAttempted) {
+        authRefreshAttempted = true
+        const refreshed = await tryRefresh()
+        if (refreshed) {
+          // Don't bump `attempt`: a successful refresh always deserves one
+          // retry, even if the original request already burned its retry
+          // budget on a flaky network earlier.
+          continue
+        }
+        await notifySessionExpired()
+        throw e
+      }
+      if (is401Recoverable) {
+        // Refresh was attempted and the retry still 401'd — session is
+        // genuinely gone.
+        await notifySessionExpired()
+        throw e
+      }
       // Single-shot CSRF refresh-and-retry. Bypasses the GET-only retry guard
       // because the original request was rejected pre-server-state-change, so
       // re-issuing it is safe even for unsafe methods.
@@ -146,6 +227,7 @@ async function request<T>(
         // retries from different tabs/components.
         const delay = RETRY_BASE_DELAY_MS * 2 ** attempt + Math.random() * 100
         try { await wait(delay, options.signal ?? undefined) } catch { throw e }
+        attempt++
         continue
       }
       throw e
@@ -218,22 +300,8 @@ async function requestOnce<T>(
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
     const detail = formatErrorDetail(body?.detail) ?? res.statusText
-    // 401 interceptor: access token expired / rejected by server. Clear local
-    // auth state and (if on a protected route) navigate to /auth so the user
-    // isn't stranded on a blank panel with repeating errors.
-    // Skip for credential-check endpoints (login, MFA challenge, register):
-    // a 401 there is "wrong password", not session expiry, and clearing state
-    // would log out a previously-authenticated user who mistyped on /auth.
-    if (res.status === 401 && !CREDENTIAL_CHECK_PATHS.has(path)) {
-      try {
-        const { useAuthStore } = await import('@/stores/authStore')
-        // Call handleSessionExpiry (sync, no API call) to avoid recursive logout
-        // when authService.logout() itself uses the api wrapper.
-        useAuthStore().handleSessionExpiry()
-      } catch {
-        // Pinia not installed yet (very early bootstrap) — best-effort
-      }
-    }
+    // 401 handling has moved up to `request()` so a refresh-and-retry can run
+    // before the session is declared expired.
     throw new ApiError(res.status, detail)
   }
 
