@@ -101,42 +101,48 @@ defineExpose({ castingSpell, castAtPosition })
 <style scoped>
 .spell-bar {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 
+/* White rounded-square buttons (mockup): subtle neutral border, the spell's
+   glyph centred, cooldown seconds in muted text below. */
 .spell-btn {
   position: relative;
   width: 44px;
   height: 44px;
-  border: 2px solid var(--spell-color, #888);
-  border-radius: 6px;
-  background: var(--overlay-panel-bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
   color: var(--spell-color, #888);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
   font-weight: bold;
   overflow: hidden;
-  transition: background 120ms, transform 80ms;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition: background 120ms, border-color 120ms, transform 80ms;
 }
 
 .spell-btn:hover:not(:disabled) {
-  background: var(--overlay-cell-hover);
-  transform: scale(1.05);
+  background: #fff;
+  border-color: var(--spell-color, var(--terracotta));
+  transform: translateY(-1px);
 }
 
 .spell-btn.casting {
-  background: var(--overlay-cell-active);
-  box-shadow: 0 0 8px var(--spell-color);
+  border-color: var(--spell-color, var(--gold-deep));
+  box-shadow: 0 0 8px var(--spell-color, var(--gold-soft));
 }
 
 .spell-btn.on-cooldown {
-  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .spell-btn.unaffordable {
-  opacity: 0.3;
+  opacity: 0.4;
 }
 
 .cd-overlay {
@@ -144,7 +150,7 @@ defineExpose({ castingSpell, castAtPosition })
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(95, 118, 142, 0.12);
   transition: height 200ms linear;
 }
 
@@ -154,17 +160,19 @@ defineExpose({ castingSpell, castAtPosition })
   left: 0;
   right: 0;
   text-align: center;
-  font-size: var(--text-xs);
-  color: #fff;
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
+  font-weight: 700;
   z-index: 2;
 }
 
 .spell-cost {
   position: absolute;
-  top: 1px;
-  right: 2px;
-  font-size: var(--text-xs);
+  top: 2px;
+  right: 4px;
+  font-size: var(--text-2xs);
   color: var(--gold-deep);
+  font-weight: 700;
   z-index: 2;
 }
 
