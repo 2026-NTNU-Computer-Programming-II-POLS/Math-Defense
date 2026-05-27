@@ -69,6 +69,21 @@ const montyHallPct = computed(() => {
   return Math.min(100, ((g.montyHallProgress - prevThreshold) / range) * 100)
 })
 
+// Monty Hall readout — current kill-value vs the next reward threshold, e.g.
+// "42 / 100 KV". Once every threshold is cleared, just show the total.
+const montyHallLabel = computed(() => {
+  const thresholds = MONTY_HALL_THRESHOLDS_BY_STAR[g.starRating] ?? []
+  const progress = g.montyHallProgress
+  let nextThreshold = 0
+  for (const t of thresholds) {
+    if (progress < t.killValue) {
+      nextThreshold = t.killValue
+      break
+    }
+  }
+  return nextThreshold === 0 ? `${progress} KV` : `${progress} / ${nextThreshold} KV`
+})
+
 // Phase pulse animation
 const phasePulseKey = ref(0)
 watch(() => g.phase, () => { phasePulseKey.value++ })
@@ -248,6 +263,7 @@ onBeforeUnmount(() => {
       <span class="mh-bar">
         <span class="mh-bar-fill" :style="{ width: `${montyHallPct}%` }" />
       </span>
+      <span class="hud-value mh-val">{{ montyHallLabel }}</span>
     </div>
 
     <!-- Spell bar -->
@@ -458,13 +474,18 @@ onBeforeUnmount(() => {
   transition: width 180ms ease-out;
 }
 
-/* Monty Hall progress (plum) */
+/* Monty Hall progress — light pill: MH label + bar + "42 / 100 KV" readout. */
 .mh-progress {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(245, 250, 254, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 999px;
 }
 .mh-progress .hud-label { color: var(--plum-deep); }
+.mh-val { font-size: var(--text-sm); color: var(--charcoal-soft); }
 .mh-bar {
   display: inline-block;
   width: 96px;
