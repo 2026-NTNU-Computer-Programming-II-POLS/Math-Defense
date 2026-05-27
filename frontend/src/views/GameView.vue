@@ -607,7 +607,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
-  overflow-y: auto;
+  /* Visible (not auto) so the Shop dropdown can extend past the sidebar at its
+     full width instead of being clipped to the sidebar's narrow column. */
+  overflow: visible;
   /* Light-blue sidebar surface behind the tools + active buffs. */
   padding: 14px 12px;
   background: rgba(214, 226, 238, 0.88);
