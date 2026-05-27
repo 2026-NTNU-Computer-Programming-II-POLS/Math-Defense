@@ -15,7 +15,7 @@ REST API server for Math Defense: authentication (incl. refresh-token rotation, 
 | Rate Limiting | slowapi (per-IP) + per-account login throttle |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
 | WASM host | wasmtime-py 44.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
-| Testing | pytest 9 + pytest-asyncio (≈196 tests / 27 files) |
+| Testing | pytest 9 + pytest-asyncio (28 test files) |
 
 ---
 
@@ -51,7 +51,7 @@ backend/
 │   │   │   ├── constraints.py     Per-field length / regex bounds
 │   │   │   └── repository.py      Repository Protocol
 │   │   ├── achievement/           Achievement definitions + aggregate + policy (season-multiplier hooks)
-│   │   ├── talent/                Talent tree aggregate + definitions + tree-builder (19 nodes, 7 tower types, prereq chains)
+│   │   ├── talent/                Talent tree aggregate + definitions + tree-builder (26 nodes: 19 base + 7 tier-2, 7 tower types, prereq chains including `prerequisite_max_levels` for tier-2)
 │   │   ├── class_/                Class aggregate + ClassMembership + join_code + class-scoped errors
 │   │   ├── auth/                  Auth-specific domain helpers (refresh-token repository protocol)
 │   │   ├── scoring/               score_calculator.py — server-side S1/S2/K/TotalScore formula
@@ -83,7 +83,7 @@ backend/
 │   │
 │   ├── infrastructure/            ── INFRASTRUCTURE LAYER ──
 │   │   ├── unit_of_work.py        SqlAlchemyUnitOfWork — explicit commit; auto-rollback on exit; raises ConstraintViolationError with constraint_name on unique/FK violations
-│   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers exponential-backoff lockout (5m → 15m → 1h → 24h); `purge_stale()` used by the janitor
+│   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers exponential-backoff lockout (5m → 15m → 60m cap; tracked via `login_attempts.lockout_count`); `purge_stale()` used by the janitor
 │   │   ├── token_denylist.py      DB-backed JWT deny-list for server-side logout (jti → expiry); `purge_expired()` used by the janitor
 │   │   ├── audit_logger.py        record_audit_event() — writes to its own SQLAlchemy session so audit rows commit independently of the surrounding business txn
 │   │   ├── email_service.py       Thin SMTP wrapper for verification/MFA mail; no-op when SMTP env is unset
@@ -119,6 +119,9 @@ backend/
 │   │   ├── talent.py              TalentAllocation (user_id + node_id + level, unique)
 │   │   ├── class_.py              Class (join_code, teacher_id)
 │   │   ├── class_membership.py    ClassMembership (class_id + student_id)
+│   │   ├── class_co_teacher.py    Co-teacher grants on a class
+│   │   ├── class_group.py         Named student sub-groups within a class
+│   │   ├── class_pending_invite.py  Pending email invites awaiting acceptance
 │   │   ├── removed_class_membership.py  Re-join blocklist
 │   │   ├── email_verification_token.py  One-use email tokens
 │   │   ├── territory.py           GrabbingTerritoryActivity + TerritorySlot + TerritoryOccupation
@@ -161,10 +164,10 @@ backend/
 ├── data/
 │   └── math_engine.wasm           Shipped WASM blob (mirrors frontend/public/wasm) — backs wasm_runtime singleton
 │
-├── alembic/                       Alembic migration environment (versions/ + env.py) — 40 revisions through z0c1d2e3f4a5_create_audit_logs_table
+├── alembic/                       Alembic migration environment (versions/ + env.py) — 43 revisions through cc3d4e5f6a8b_remove_calculus_pet_hp_allocations (current head)
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
-├── tests/                         27 files / ≈196 tests
+├── tests/                         28 files
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py                       — register / login / me / logout
 │   ├── test_auth_lockout.py               — per-account lockout window + exponential backoff
@@ -181,8 +184,10 @@ backend/
 │   ├── test_score_verify.py               — server-side score recomputation vs client claim
 │   ├── test_score_calculator_parity.py    — backend ↔ frontend S1/S2/K score formula parity
 │   ├── test_achievement.py                — achievement unlock / summary / isolation / seasonal multiplier
+│   ├── test_achievement_parity.py         — backend ↔ frontend achievement registry parity
 │   ├── test_talent.py                     — talent tree allocate / reset / modifiers
 │   ├── test_class.py                      — class CRUD, join, rename, student management
+│   ├── test_class_extensions.py           — co-teachers, groups, pending invites
 │   ├── test_territory.py                  — activity lifecycle, seize/counter-seize, cap, settlement
 │   ├── test_avatar_parity.py              — backend ↔ frontend avatar whitelist parity
 │   ├── test_q_matrix.py                   — Q-matrix lookup + competency mapping
@@ -193,9 +198,10 @@ backend/
 │   ├── test_recommender.py                — adaptive recommendation against synthetic posteriors
 │   └── test_wasm_runtime.py               — wasmtime-py singleton load + ReplayUnavailableError + thread-safety (FU-A); v2 strict-rejection lives in test_score_verify.py
 │
-├── requirements.txt               Runtime dependencies
-├── requirements-dev.txt           Includes runtime + pytest / pytest-asyncio
-└── Dockerfile
+├── requirements.txt               Runtime dependencies (FastAPI 0.136, SQLAlchemy 2.0, psycopg v3, Alembic 1.18, PyJWT, slowapi, bcrypt, pyotp, wasmtime 44, etc.)
+├── requirements-dev.txt           Includes runtime + pytest 9 / pytest-asyncio 1.3
+├── postgres/                      Helper scripts for the postgres service (init / role bootstrap)
+└── Dockerfile                     Two-stage build (emsdk wasm-builder → python:3.13-slim runtime)
 ```
 
 ---
@@ -293,7 +299,7 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 | POST | `/api/auth/mfa/disable` | 5/min | Require current password + TOTP code, then disable |
 | POST | `/api/auth/mfa/challenge` | 10/min | Complete the MFA-required login leg using the short-lived `mfa_token` |
 
-Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`); claims include `sub`, `jti`, `pv` (password version), `exp`, `iat`, `iss`, `aud`. Passwords: bcrypt, ≥8 chars with letter + digit, zxcvbn strength gate. Login defence-in-depth: per-IP slowapi rate limit + per-email throttle (`login_email_throttle_exceeded`) + per-account `login_guard` (5 failures/5 min → 5 m lockout, exponential to 24 h; surfaces `AccountLockedError` → `429` with `Retry-After`).
+Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`); claims include `sub`, `jti`, `pv` (password version), `exp`, `iat`, `iss`, `aud`. Passwords: bcrypt, ≥8 chars with letter + digit, zxcvbn strength gate. Login defence-in-depth: per-IP slowapi rate limit + per-email throttle (`login_email_throttle_exceeded`) + per-account `login_guard` (5 failures/5 min → 5 m lockout, then 15 m, then 60 m cap on subsequent lockouts; surfaces `AccountLockedError` → `429` with `Retry-After`).
 
 ### Game Sessions — `/api/sessions`
 
@@ -523,8 +529,14 @@ Unique on `session_id` — guarantees one leaderboard entry per completed sessio
 
 ```bash
 cd backend
+python -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS/Linux:        source .venv/bin/activate
 pip install -r requirements-dev.txt    # includes pytest; use requirements.txt for prod
-cp ../.env.example ../.env             # then fill in SECRET_KEY
+cp ../.env.example ../.env             # then fill in SECRET_KEY, DATABASE_URL, POSTGRES_PASSWORD, TOTP_ENCRYPTION_KEY
+# Alembic upgrade head runs automatically from FastAPI lifespan on first boot.
+# To run migrations manually (e.g. before launching workers):
+#   alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -576,7 +588,6 @@ docker-compose up backend        # from project root
 | `COOKIE_SECURE` | No | Default `true`. Sets `Secure` flag on auth + refresh cookies. Only `false` is honoured under CI/pytest — outside tests, startup aborts so plain-HTTP deployments cannot silently leak cookies. |
 | `CSRF_ENABLED` | No | Default `true` outside the pytest/CI harness. `CsrfMiddleware` enforces a double-submit cookie on unsafe methods whenever the auth cookie is present. |
 | `DEBUG` | No | Default `false`. When `true`, mounts `/docs`, `/redoc`, `/openapi.json`. |
-| SMTP settings | No | Optional — `email_service` becomes a no-op when SMTP env is unset, useful for local dev. |
 
 > Schema is managed exclusively by Alembic — `lifespan` runs `alembic upgrade head` on boot. There is no `AUTO_CREATE_TABLES` toggle (removed during the PostgreSQL-only migration).
 
@@ -585,7 +596,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                       # ≈196 tests across 27 files
+pytest                                       # 28 test files
 pytest tests/test_session_aggregate.py -v    # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v        # audit-driven edge cases
 pytest tests/test_territory.py -v            # territory integration tests

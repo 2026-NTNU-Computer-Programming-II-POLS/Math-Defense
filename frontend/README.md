@@ -37,7 +37,7 @@ frontend/
 │   │   ├── LeaderboardView.vue     Score table
 │   │   ├── ProfileView.vue         User profile + achievement/talent summary cards
 │   │   ├── AchievementView.vue     Achievement gallery (5 categories, season multipliers)
-│   │   ├── TalentTreeView.vue      Talent tree allocation UI (21 nodes, 7 tower types)
+│   │   ├── TalentTreeView.vue      Talent tree allocation UI (26 nodes, 7 tower types)
 │   │   ├── ClassView.vue           Student: list/join classes; Teacher: create/manage classes
 │   │   ├── AdminView.vue           Admin dashboards for teachers / classes / students / seasons
 │   │   ├── TeacherDashboard.vue    Teacher overview of activity results + per-student competency posteriors
@@ -289,7 +289,7 @@ frontend/
 │   │   ├── spell-defs.ts           4 spell definitions (Fireball/Frost Nova/Lightning/Haste)
 │   │   ├── monty-hall-defs.ts      Kill-value thresholds per star rating; door reward pool
 │   │   ├── achievement-defs.ts     Achievement definitions (5 categories) — lint-tested against trait-praise vocabulary
-│   │   ├── talent-defs.ts          19 talent node definitions (7 tower types, prereq chains)
+│   │   ├── talent-defs.ts          26 talent node definitions (19 base + 7 tier-2 advanced, prereq chains across 7 tower types)
 │   │   ├── principle-defs.ts       7 mathematical-principle definitions surfaced by `PrincipleOverlay` after the matching gameplay moment
 │   │   ├── path-segment-types.ts   Piecewise path segment type constants
 │   │   └── ui-defs.ts              Panel layout, colour palette
@@ -300,7 +300,7 @@ frontend/
 │   ├── audio/                      WAV assets — procedurally synthesised by `scripts/synth-audio.py`
 │   ├── avatars/                    SVG avatars (alchemist / archer / knight / mage / scholar / wizard)
 │   ├── manual/                     In-game manual markdown (`game-mechanics.md`, `towers-and-enemies.md`)
-│   ├── logo.png                    Brand mark used as favicon + MenuView/AuthView hero
+│   ├── logo.png                    Math Defense brand mark — used as favicon + MenuView/AuthView hero
 │   └── icons.svg
 │
 ├── scripts/                        Repo tooling (run via `npm run …`)
@@ -656,7 +656,7 @@ generateLevelDeterministic(starRating, prngHandle, multiset)  // full rejection-
 ```bash
 cd frontend
 npm install
-npm run dev          # Vite dev server at http://localhost:5173
+npm run dev          # Vite dev server at http://localhost:5173 (proxies /api → VITE_API_TARGET, default http://localhost:8000)
 npm run build        # prebuild → `cd ../wasm && make`; then vue-tsc -b + vite build
 npm run preview      # Preview the production build
 npm test             # arch-check + event-registry-check + Vitest (default test command)
@@ -666,7 +666,20 @@ npm run bench        # Run Vitest benchmarks under dev/vitest.bench.config.ts
 npm run verify-wasm  # Verifies the WASM binary loads and matches the JS-fallback parity surface
 ```
 
-Type-check only (no emit): `npx vue-tsc -b`.
+Type-check only (no emit): `npx vue-tsc -b` (there is no dedicated `npm run typecheck` script).
+
+There is also no `npm run lint` script — repo-wide lints are split across
+`arch-check`, `event-registry-check`, `lint-chinese-comments`,
+`lint-determinism`, and `no-raw-px` (all bundled under `npm run ci`).
+
+### Backend wiring
+
+`vite.config.ts` proxies `/api` to `process.env.VITE_API_TARGET ?? 'http://localhost:8000'`.
+For local non-Docker development, run `backend/app/main.py` (FastAPI/uvicorn) on
+`:8000` and the default works. Under `docker-compose.yml`, the `frontend`
+service sets `VITE_API_TARGET=http://backend:8000` so the dev container reaches
+the backend on the compose network instead of `localhost`. Both backend and
+frontend dev ports are bound to `127.0.0.1` only in compose.
 
 ### Repo lints / guards (`scripts/`)
 
@@ -691,7 +704,7 @@ Type-check only (no emit): `npx vue-tsc -b`.
 
 ## Testing
 
-Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships ~77 test files spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships ~83 test files spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
 
 - **Engine units** — `EventBus`, `Game`, `PhaseStateMachine`, `Renderer`, `level-context`, `engine/audio/AssetManager`, `engine/projections/project-path-panel`, `engine/projections/project-enemies`, `engine/render-helpers/tile-style`, `engine/__tests__/determinism` (replay reproducibility from `rng_seed`).
 - **Domain** — `domain/combat/SplitPolicy`, `domain/level/{level-generator, level-layout-service, placement-policy, checkpoint}`, `domain/movement/{vertical, x-driven}-movement-strategy`, `domain/path/{path-builder, path-progress-tracker, path-validator, segmented-path}`, `domain/scoring/score-calculator.parity` (frontend ↔ backend formula parity), `domain/wave/wave-generator`.
