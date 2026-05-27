@@ -393,8 +393,8 @@ onBeforeUnmount(() => {
           title="Exit run early. This run will not be recorded."
           @click="returnToLevelSelect"
         >
-          <span aria-hidden="true">←</span>
-          Exit Run
+          <span aria-hidden="true">&#8856;</span>
+          Exit
         </button>
       </div>
       <!-- Backlog §20 — practice-mode badge persists for the entire
@@ -585,9 +585,9 @@ onBeforeUnmount(() => {
   background: rgba(185, 134, 116, 0.18);
   color: var(--clay-deep);
   font-family: var(--font-main);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
 }
