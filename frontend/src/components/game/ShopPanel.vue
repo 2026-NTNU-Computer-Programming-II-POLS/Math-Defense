@@ -209,7 +209,9 @@ function purchase(itemId: string, cost: number): void {
 
 .shop-panel.collapsed {
   width: auto;
-  padding: 4px;
+  /* No padding so the Shop trigger fills the rail at the same width as the
+     active-buff cards below it. */
+  padding: 0;
   background: transparent;
   border-color: transparent;
   box-shadow: none;
