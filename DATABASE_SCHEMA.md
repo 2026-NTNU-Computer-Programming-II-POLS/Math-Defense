@@ -23,10 +23,10 @@ erDiagram
         string  password_hash       "NOT NULL"
         int     password_version    "DEFAULT 0"
         boolean is_email_verified   "DEFAULT false"
-        string  totp_secret         "nullable"
+        string  totp_secret         "nullable — Fernet ciphertext, ≤255 chars"
         boolean mfa_enabled         "DEFAULT false"
         datetime totp_last_used_at  "nullable — TOTP replay guard"
-        float   ia_recent_accuracy  "DEFAULT 0.0 — last-10 IA fraction"
+        float   ia_recent_accuracy  "DEFAULT 0.0; CHECK 0–1 — last-10 IA fraction"
         datetime created_at
         datetime updated_at         "auto-update"
     }
@@ -36,7 +36,43 @@ erDiagram
         string  name            "NOT NULL"
         string  teacher_id  FK  "→ users.id RESTRICT"
         string  join_code    UK  "8-char UPPER"
+        string  description     "nullable, ≤500"
+        string  subject         "nullable, ≤80"
+        string  school_year     "nullable, ≤40"
+        int     capacity        "nullable, CHECK > 0"
+        string  color           "nullable, ≤16"
+        string  icon            "nullable, ≤40"
+        datetime archived_at    "nullable — soft-delete"
         datetime created_at
+    }
+
+    class_co_teachers {
+        string  id          PK  "UUID"
+        string  class_id    FK  "→ classes.id CASCADE"
+        string  teacher_id  FK  "→ users.id CASCADE"
+        datetime added_at
+    }
+
+    class_pending_invites {
+        string  id          PK  "UUID"
+        string  class_id    FK  "→ classes.id CASCADE"
+        string  email           "≤320, UNIQUE per class"
+        datetime invited_at
+    }
+
+    class_groups {
+        string  id          PK  "UUID"
+        string  class_id    FK  "→ classes.id CASCADE"
+        string  name            "≤80, UNIQUE per class"
+        string  color           "nullable, ≤16"
+        datetime created_at
+    }
+
+    class_group_members {
+        string  group_id    PK,FK "→ class_groups.id CASCADE — composite PK"
+        string  student_id  PK,FK "→ users.id CASCADE — composite PK"
+        string  class_id    FK    "→ classes.id CASCADE — UNIQUE(class_id, student_id)"
+        datetime joined_at
     }
 
     class_memberships {
@@ -83,6 +119,7 @@ erDiagram
         int     score
         int     kills
         int     waves_survived
+        float   total_score        "nullable — V2 floating-point score"
         string  session_id     FK  "→ game_sessions.id SET NULL, UNIQUE"
         string  challenge_id   FK  "→ challenges.id CASCADE, nullable"
         datetime created_at
@@ -134,7 +171,7 @@ erDiagram
     }
 
     territory_session_uses {
-        string  session_id  PK,FK  "→ game_sessions.id RESTRICT — durable replay-guard"
+        string  session_id  PK,FK  "→ game_sessions.id CASCADE — replay-guard while session exists"
     }
 
     territory_rankings_snapshot {
@@ -291,6 +328,12 @@ erDiagram
     classes                         ||--o{ class_memberships               : "enrolls (class_id)"
     classes                         |o--o{ grabbing_territory_activities   : "hosts (class_id)"
     classes                         ||--o{ removed_class_memberships       : "removal_log (class_id)"
+    classes                         ||--o{ class_co_teachers               : "co-taught (class_id)"
+    classes                         ||--o{ class_pending_invites           : "pre-invites (class_id)"
+    classes                         ||--o{ class_groups                    : "groups (class_id)"
+    class_groups                    ||--o{ class_group_members             : "members (group_id)"
+    users                           ||--o{ class_co_teachers               : "co-teaches (teacher_id)"
+    users                           ||--o{ class_group_members             : "grouped (student_id)"
 
     %% ── Session → scoring/territory (one session → 0 or 1) ─────────────────
     game_sessions                   |o--o| leaderboard_entries             : "logged_as (session_id)"
@@ -324,14 +367,14 @@ Central identity table. Stores authentication credentials, MFA state, and profil
 | `password_hash` | `String(255)` | NO | — |
 | `password_version` | `Integer` | NO | DEFAULT `0` |
 | `is_email_verified` | `Boolean` | NO | DEFAULT `false` |
-| `totp_secret` | `String(64)` | YES | — |
+| `totp_secret` | `String(255)` | YES | Widened from `String(64)` in `a1_widen_totp` to fit Fernet ciphertext |
 | `mfa_enabled` | `Boolean` | NO | DEFAULT `false` |
 | `totp_last_used_at` | `DateTime(tz)` | YES | TOTP step-replay guard — set on every accepted code |
-| `ia_recent_accuracy` | `Float` | NO | DEFAULT `0.0`; rolling fraction of last 10 IA-correct sessions (drives Star-1 concrete-fading on the path renderer) |
+| `ia_recent_accuracy` | `Float` | NO | SERVER DEFAULT `0.0`; `CHECK(0.0 ≤ ia_recent_accuracy ≤ 1.0)` (`ck_user_ia_accuracy_range`). Rolling fraction of last 10 IA-correct sessions; drives Star-1 concrete-fading on the path renderer |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
-| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated on write |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated on write by a PG `BEFORE UPDATE` trigger (`users_update_timestamp`, created in `b2_fix_h06_h07_h10`) |
 
-**Constraints:** `UNIQUE(username)`, `UNIQUE(email)`  
+**Constraints:** `UNIQUE(username)`, `UNIQUE(email)`, `CHECK(ia_recent_accuracy BETWEEN 0.0 AND 1.0)` (`ck_user_ia_accuracy_range`)  
 **Indexes:** None beyond PK + unique columns
 
 ---
@@ -346,10 +389,17 @@ A classroom created by a teacher. Students join via an 8-character uppercase `jo
 | `name` | `String(100)` | NO | — |
 | `teacher_id` | `String` (FK) | NO | → `users.id` ON DELETE **RESTRICT** |
 | `join_code` | `String(8)` | NO | UNIQUE; `CHECK (join_code = upper(join_code))` |
+| `description` | `String(500)` | YES | Tier-C metadata (`bb2c3d4e5f7a`) |
+| `subject` | `String(80)` | YES | Tier-C metadata |
+| `school_year` | `String(40)` | YES | Tier-C metadata |
+| `capacity` | `Integer` | YES | `CHECK(capacity IS NULL OR capacity > 0)` (`ck_classes_capacity_positive`) |
+| `color` | `String(16)` | YES | Tier-C metadata |
+| `icon` | `String(40)` | YES | Tier-C metadata |
+| `archived_at` | `DateTime(tz)` | YES | NULL = active; non-NULL = soft-archived (audit B2/M1/O8) |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
-**Constraints:** `UNIQUE(join_code)` (`uq_classes_join_code`), `UNIQUE(teacher_id, name)` (`uq_classes_teacher_name`), `CHECK(join_code = upper(join_code))` (`ck_classes_join_code_upper`)  
-**Indexes:** `ix_classes_teacher_id`
+**Constraints:** `UNIQUE(join_code)` (`uq_classes_join_code`), `UNIQUE(teacher_id, name)` (`uq_classes_teacher_name`), `CHECK(join_code = upper(join_code))` (`ck_classes_join_code_upper`), `CHECK(capacity IS NULL OR capacity > 0)` (`ck_classes_capacity_positive`)  
+**Indexes:** `ix_classes_teacher_id`, `ix_classes_archived_at`
 
 ---
 
@@ -369,6 +419,71 @@ Enrolment join table — maps students to classes. Soft-deleted students are tra
 
 ---
 
+### `class_co_teachers`
+
+Many-to-many supplement: secondary teachers attached to a class. Added by `bb2c3d4e5f7a` for Tier-C class management.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `String` (UUID) | NO | PK |
+| `class_id` | `String` (FK) | NO | → `classes.id` ON DELETE **CASCADE** |
+| `teacher_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
+| `added_at` | `DateTime(tz)` | NO | SERVER DEFAULT `CURRENT_TIMESTAMP` |
+
+**Constraints:** `UNIQUE(class_id, teacher_id)` (`uq_class_co_teachers_class_teacher`)  
+**Indexes:** `ix_class_co_teachers_class_id`, `ix_class_co_teachers_teacher_id`
+
+---
+
+### `class_pending_invites`
+
+Pre-registration invites that auto-attach the user to a class on signup. Added by `bb2c3d4e5f7a`.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `String` (UUID) | NO | PK |
+| `class_id` | `String` (FK) | NO | → `classes.id` ON DELETE **CASCADE** |
+| `email` | `String(320)` | NO | UNIQUE per class |
+| `invited_at` | `DateTime(tz)` | NO | SERVER DEFAULT `CURRENT_TIMESTAMP` |
+
+**Constraints:** `UNIQUE(class_id, email)` (`uq_class_invites_class_email`)  
+**Indexes:** `ix_class_pending_invites_email`
+
+---
+
+### `class_groups`
+
+Within-class student grouping for group-targeted activities. Added by `bb2c3d4e5f7a`.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `id` | `String` (UUID) | NO | PK |
+| `class_id` | `String` (FK) | NO | → `classes.id` ON DELETE **CASCADE** |
+| `name` | `String(80)` | NO | UNIQUE per class |
+| `color` | `String(16)` | YES | — |
+| `created_at` | `DateTime(tz)` | NO | SERVER DEFAULT `CURRENT_TIMESTAMP` |
+
+**Constraints:** `UNIQUE(class_id, name)` (`uq_class_groups_class_name`)  
+**Indexes:** `ix_class_groups_class_id`
+
+---
+
+### `class_group_members`
+
+Join table — which students belong to which class group. `class_id` is denormalised onto the row so the per-class single-group invariant can fire without joining `class_groups`. Composite PK `(group_id, student_id)`.
+
+| Column | Type | Nullable | Constraints / Default |
+|---|---|---|---|
+| `group_id` | `String` (FK) | NO | PK component; → `class_groups.id` ON DELETE **CASCADE** |
+| `class_id` | `String` (FK) | NO | → `classes.id` ON DELETE **CASCADE** (denormalised for unique check) |
+| `student_id` | `String` (FK) | NO | PK component; → `users.id` ON DELETE **CASCADE** |
+| `joined_at` | `DateTime(tz)` | NO | SERVER DEFAULT `CURRENT_TIMESTAMP` |
+
+**Constraints:** `PRIMARY KEY(group_id, student_id)`, `UNIQUE(class_id, student_id)` (`uq_group_members_class_student`) — a student may be in at most one group per class  
+**Indexes:** `ix_group_members_class_id`, `ix_group_members_student_id`
+
+---
+
 ### `game_sessions`
 
 Active and historical game runs. A **partial unique index** (`WHERE status = 'active'`) enforces at most one active session per user.
@@ -380,7 +495,7 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **SET NULL** — non-NULL only when launched from a challenge deep-link |
 | `star_rating` | `Integer` | NO | `CHECK (1 ≤ star_rating ≤ 5)` |
 | `path_config` | `JSON` | YES | ≤ 10 240 bytes, app-layer validated |
-| `initial_answer` | `Boolean` | NO | DEFAULT `false` |
+| `initial_answer` | `Boolean` | YES | SERVER DEFAULT `false` (legacy nullable) |
 | `practice_mode` | `Boolean` | NO | DEFAULT `false`; SERVER DEFAULT `false`. Set when slider-fallback is in use; the leaderboard query filters these out but achievement/talent awards still fire |
 | `is_preview` | `Boolean` | NO | DEFAULT `false`; SERVER DEFAULT `false`. Server-derived from the caller's role at create — true when a teacher or admin plays the game (preview / smoke-test). Same leaderboard-exclusion semantics as `practice_mode`; achievement/talent awards still fire. Clients cannot set this. |
 | `status` | `Enum` | NO | `active \| completed \| abandoned`; DEFAULT `active` |
@@ -403,8 +518,8 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `started_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `ended_at` | `DateTime(tz)` | YES | set on completion / abandonment |
 
-**Constraints:** `CHECK(1 ≤ star_rating ≤ 5)` (`ck_game_session_star_range`)  
-**Indexes:** `ix_game_session_user_id`, `uq_one_active_per_user` (partial UNIQUE on `user_id WHERE status = 'active'`)
+**Constraints:** `CHECK(1 ≤ star_rating ≤ 5)` (`ck_game_session_star_range`), `CHECK(score ≥ 0)` (`ck_game_session_score_nonneg`), `CHECK(kills ≥ 0)` (`ck_game_session_kills_nonneg`), `CHECK(waves_survived ≥ 0)` (`ck_game_session_waves_nonneg`), `CHECK(hp ≥ 0)` (`ck_game_session_hp_nonneg`), `CHECK(gold ≥ 0)` (`ck_game_session_gold_nonneg`) — non-negativity checks added in `c3_add_check_constraints`  
+**Indexes:** `ix_game_session_user_id`, `ix_game_sessions_challenge_id` (added in `b2_fix_h06_h07_h10`), `uq_one_active_per_user` (partial UNIQUE on `user_id WHERE status = 'active'`)
 
 ---
 
@@ -420,6 +535,7 @@ Top scores per user per difficulty level. `user_id` and `session_id` use `SET NU
 | `score` | `Integer` | NO | — |
 | `kills` | `Integer` | NO | — |
 | `waves_survived` | `Integer` | NO | — |
+| `total_score` | `Float` | YES | M-02 V2 floating-point score (kill_value/time/efficiency/health factors). Rankings prefer this when present and fall back to raw `score` for legacy rows. Added in `b2_fix_h06_h07_h10` |
 | `session_id` | `String` (FK) | YES | → `game_sessions.id` ON DELETE **SET NULL**; UNIQUE |
 | `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **CASCADE**; non-NULL when the originating session was launched from a challenge. Per-challenge ranks are served by `query_ranked_by_challenge` so global / per-level boards still work. Cascade ensures deleted challenges do not leak score-capped rows back into the global leaderboard (migration `w7f8a9b0c1d2`) |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
@@ -456,10 +572,12 @@ Stores the invested level for each talent node per user. Points are derived from
 | `user_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
 | `talent_node_id` | `String(100)` | NO | — |
 | `current_level` | `Integer` | NO | DEFAULT `1`; `CHECK(current_level ≥ 1)` |
-| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; PG `BEFORE UPDATE` trigger `talent_allocations_update_timestamp` (`b2_fix_h06_h07_h10`) refreshes on every write |
 
 **Constraints:** `UNIQUE(user_id, talent_node_id)` (`uq_user_talent_node`), `CHECK(current_level ≥ 1)` (`ck_talent_level_min`)  
 **Indexes:** `ix_talent_allocation_user_id`
+
+> **Data note:** Migration `cc3d4e5f6a8b` (Balance Overhaul Phase 4 / Q10) `DELETE`s all rows where `talent_node_id = 'calculus_pet_hp'` — the node was renamed `calculus_pet_range` and `compute_remaining_talent_points` reads the missing allocations as available TP, so no application-level refund is needed.
 
 ---
 
@@ -514,17 +632,20 @@ Records which student currently holds each slot, and via which game session. Bot
 | `occupied_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `UNIQUE(slot_id)` (`uq_territory_occupation_slot`), `UNIQUE(session_id)` (`uq_territory_occupation_session`)  
-**Indexes:** `ix_territory_occupations_student_id`, `ix_territory_occupations_slot_id`, `ix_territory_occupations_student_slot (student_id, slot_id)` (added in `x8a9b0c1d2e3f` to support per-student per-slot lookups during ranking aggregation)
+**Indexes:** `ix_territory_occupations_student_id`, `ix_territory_occupations_student_slot (student_id, slot_id)` (created in `x8a9b0c1d2e3f`; present in the DB but **not declared on the ORM model**, so Alembic autogenerate will flag it).  
+The standalone `ix_territory_occupations_slot_id` was dropped in `d4_drop_redundant_constraints` (L-21) — the `uq_territory_occupation_slot` unique constraint already creates a B-tree index that covers single-column `slot_id` lookups.
 
 ---
 
 ### `territory_session_uses`
 
-**Session replay guard.** A durable record of every `session_id` ever used for a territory capture. Kept separate from `territory_occupations` so displaced occupations (deleted on counter-seize) cannot un-mark a session as used. Migration `y9b0c1d2e3f4` (BD-8) adds a **RESTRICT** FK to `game_sessions.id` — this blocks deleting a `game_session` whose id is in the uses table (CASCADE would re-open the replay window, SET NULL is impossible since `session_id` is the primary key).
+**Session replay guard.** A durable record of every `session_id` ever used for a territory capture. Kept separate from `territory_occupations` so displaced occupations (deleted on counter-seize) cannot un-mark a session as used.
+
+The FK was added as **RESTRICT** in `y9b0c1d2e3f4` (BD-8), but was later relaxed to **CASCADE** in `e5_territory_session_use_cascade` (2026-05-21). Rationale: `GameSession.user_id` is `ON DELETE CASCADE`, so deleting a user cascades into `game_sessions`; a RESTRICT here blocked deleting any user who ever captured territory. CASCADE is safe because once the `game_session` row is gone there is no `rng_seed` or `session_events` left to replay, so the use-record has nothing left to protect.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
-| `session_id` | `String` (FK) | NO | PK (`pk_territory_session_uses`); → `game_sessions.id` ON DELETE **RESTRICT** (`fk_territory_session_uses_session_id`) |
+| `session_id` | `String` (FK) | NO | PK; → `game_sessions.id` ON DELETE **CASCADE** (`fk_territory_session_uses_session_id`) |
 
 ---
 
@@ -571,7 +692,7 @@ Per-account brute-force lockout tracker. Persisted in Postgres so lockouts survi
 | `failures` | `Integer` | NO | SERVER DEFAULT `0` |
 | `window_started_at` | `DateTime(tz)` | NO | — |
 | `locked_until` | `DateTime(tz)` | YES | `NULL` = not locked |
-| `lockout_count` | `Integer` | NO | SERVER DEFAULT `0`; counts consecutive lockouts to drive the exponential-backoff window (5 min → 15 min → 1 h → 24 h) |
+| `lockout_count` | `Integer` | NO | SERVER DEFAULT `0`; counts consecutive lockouts to drive the exponential-backoff window (5 min → 15 min → 60 min cap for every subsequent lockout) |
 
 **Indexes:** `ix_login_attempts_locked_until`
 
@@ -631,9 +752,11 @@ Bayesian stealth-assessment posteriors. One Beta distribution per (user, compete
 |---|---|---|---|
 | `user_id` | `String` (FK) | NO | PK component; → `users.id` ON DELETE **CASCADE** |
 | `competency` | `String(32)` | NO | PK component — competency code (e.g. `polynomial_curves`, `radar_targeting`) |
-| `alpha` | `Float` | NO | DEFAULT `1.0` (uniform prior) |
-| `beta` | `Float` | NO | DEFAULT `1.0` (uniform prior) |
-| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated |
+| `alpha` | `Float` | NO | DEFAULT `1.0` (uniform prior); `CHECK(alpha > 0)` (`ck_competency_alpha_positive`) |
+| `beta` | `Float` | NO | DEFAULT `1.0` (uniform prior); `CHECK(beta > 0)` (`ck_competency_beta_positive`) |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; PG trigger `user_competency_state_update_timestamp` (`b2_fix_h06_h07_h10`) auto-bumps on every UPDATE |
+
+**Constraints:** Composite `PRIMARY KEY(user_id, competency)`, `CHECK(alpha > 0)`, `CHECK(beta > 0)` (both added in `c3_add_check_constraints`)
 
 ---
 
@@ -703,7 +826,7 @@ Empirical Validity Probe enrollment cache. One row per (user, study). `group` is
 | `dosage_seconds` | `Integer` | NO | SERVER DEFAULT `0` |
 | `enrolled_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
-**Constraints:** `UNIQUE(user_id, study_id)` (`uq_study_enrollment`)
+**Constraints:** Composite `PRIMARY KEY(user_id, study_id)`. The redundant explicit `UNIQUE(user_id, study_id)` (`uq_study_enrollment`) was dropped in `d4_drop_redundant_constraints` (L-22) — the PK index already enforces it.
 
 ---
 
@@ -793,8 +916,16 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | Index Name | Table | Columns | Type |
 |---|---|---|---|
 | `ix_classes_teacher_id` | `classes` | `teacher_id` | BTREE |
+| `ix_classes_archived_at` | `classes` | `archived_at` | BTREE |
 | `ix_class_memberships_student_id` | `class_memberships` | `student_id` | BTREE |
+| `ix_class_co_teachers_class_id` | `class_co_teachers` | `class_id` | BTREE |
+| `ix_class_co_teachers_teacher_id` | `class_co_teachers` | `teacher_id` | BTREE |
+| `ix_class_pending_invites_email` | `class_pending_invites` | `email` | BTREE |
+| `ix_class_groups_class_id` | `class_groups` | `class_id` | BTREE |
+| `ix_group_members_class_id` | `class_group_members` | `class_id` | BTREE |
+| `ix_group_members_student_id` | `class_group_members` | `student_id` | BTREE |
 | `ix_game_session_user_id` | `game_sessions` | `user_id` | BTREE |
+| `ix_game_sessions_challenge_id` | `game_sessions` | `challenge_id` | BTREE |
 | `uq_one_active_per_user` | `game_sessions` | `user_id` WHERE `status = 'active'` | UNIQUE partial |
 | `ix_leaderboard_user_id` | `leaderboard_entries` | `user_id` | BTREE |
 | `ix_leaderboard_level_score` | `leaderboard_entries` | `(level, score)` | BTREE |
@@ -807,9 +938,8 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `ix_gt_activities_class_id` | `grabbing_territory_activities` | `class_id` | BTREE |
 | `ix_gt_activities_deadline` | `grabbing_territory_activities` | `deadline` | BTREE |
 | `ix_territory_slots_activity_id` | `territory_slots` | `activity_id` | BTREE |
-| `ix_territory_occupations_slot_id` | `territory_occupations` | `slot_id` | BTREE |
 | `ix_territory_occupations_student_id` | `territory_occupations` | `student_id` | BTREE |
-| `ix_territory_occupations_student_slot` | `territory_occupations` | `(student_id, slot_id)` | BTREE |
+| `ix_territory_occupations_student_slot` | `territory_occupations` | `(student_id, slot_id)` | BTREE (DB-only, not on ORM) |
 | `ix_snap_activity_time` | `territory_rankings_snapshot` | `(activity_id, snapshot_at)` | BTREE |
 | `ix_snap_activity_student_time` | `territory_rankings_snapshot` | `(activity_id, student_id, snapshot_at)` | BTREE |
 | `ix_removed_memberships_student_id` | `removed_class_memberships` | `student_id` | BTREE |
@@ -830,9 +960,9 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 
 | Policy | Used for | Rationale |
 |---|---|---|
-| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id`; `leaderboard_entries.challenge_id`; `territory_rankings_snapshot.activity_id` / `.student_id` | Deleting a parent cleans up all child rows automatically. `leaderboard_entries.challenge_id` was changed from SET NULL to CASCADE in `w7f8a9b0c1d2` (B-BUG-4) to stop score-capped rows leaking into the global board |
+| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id`; `leaderboard_entries.challenge_id`; `territory_rankings_snapshot.activity_id` / `.student_id`; **`territory_session_uses.session_id`** (relaxed from RESTRICT in `e5_territory_session_use_cascade`); the new `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` all CASCADE on `classes.id` / `users.id` | Deleting a parent cleans up all child rows automatically. `leaderboard_entries.challenge_id` was changed from SET NULL to CASCADE in `w7f8a9b0c1d2` (B-BUG-4). `territory_session_uses.session_id` was changed from RESTRICT to CASCADE in `e5_territory_session_use_cascade` because RESTRICT blocked user-deletion cascades; the replay risk is already gone once the parent `game_session` row is deleted |
 | **SET NULL** | `leaderboard_entries.user_id`, `leaderboard_entries.session_id`, `game_sessions.challenge_id`, `territory_occupations.session_id`, `grabbing_territory_activities.settled_by` | Preserve history / audit trail when the referenced entity is removed |
-| **RESTRICT** | `classes.teacher_id`, `territory_session_uses.session_id` | Prevents deleting a parent that has dependent durable records. For `territory_session_uses` (added in `y9b0c1d2e3f4`), RESTRICT keeps the replay-prevention record intact — CASCADE would re-open the replay window |
+| **RESTRICT** | `classes.teacher_id` | Prevents deleting a teacher who still owns classes — operator must reassign first |
 | *(none / soft)* | `audit_logs.user_id` | Intentionally unlinked — must survive user deletion |
 
 ---
@@ -903,8 +1033,17 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `x8a9b0c1d2e3f` | Territory ranking aggregation support — add composite index `ix_territory_occupations_student_slot (student_id, slot_id)` and new `territory_rankings_snapshot` table (+ `ix_snap_activity_time`, `ix_snap_activity_student_time`) so rankings endpoint computes rank deltas without a periodic worker |
 | `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK (BD-8) — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
 | `z0c1d2e3f4a5` | Create `audit_logs` table (C-01) — the ORM model and `audit_logger` existed since early development but no migration ever created the table; all audit events were silently dropped. Adds composite indexes `(user_id, created_at)` and `(event_type, created_at)` |
-| `aa1d2e3f4a6` | Server-derived preview flag (`game_sessions.is_preview`, current head) — true when a non-student (teacher/admin) created the session. `LeaderboardInsertHandler` skips these so they never reach public ranking tables; mirrors `practice_mode` exclusion semantics |
+| `aa1d2e3f4a6` | Server-derived preview flag (`game_sessions.is_preview`) — true when a non-student (teacher/admin) created the session. `LeaderboardInsertHandler` skips these so they never reach public ranking tables; mirrors `practice_mode` exclusion semantics. Branches off `z0c1d2e3f4a5` in parallel with the `a1_widen_totp` chain |
+| `a1_widen_totp` | Widen `users.totp_secret` from `String(64)` → `String(255)` to fit Fernet-encrypted ciphertext (H-01). Linear chain on top of `z0c1d2e3f4a5` |
+| `b2_fix_h06_h07_h10` | Fix H-06 / H-07 / H-10 / M-02: adds `ix_game_sessions_challenge_id`; adds Postgres `BEFORE UPDATE` triggers on `users`, `talent_allocations`, `user_competency_state` to keep `updated_at` current; backfills `NOT NULL` on `game_sessions.status / current_wave / gold / hp / score`; adds `leaderboard_entries.total_score Float NULL` |
+| `c3_add_check_constraints` | M-15/M-16/M-17 CHECK constraints — non-negativity on `game_sessions.score / kills / waves_survived / hp / gold`; `alpha > 0`, `beta > 0` on `user_competency_state`; `ia_recent_accuracy BETWEEN 0.0 AND 1.0` on `users` |
+| `d4_drop_redundant_constraints` | L-21/L-22 cleanup — drop `ix_territory_occupations_slot_id` (covered by `uq_territory_occupation_slot`) and `uq_study_enrollment` (covered by composite PK) |
+| `e5_territory_session_use_cascade` | Relax `territory_session_uses.session_id` FK from RESTRICT → CASCADE. RESTRICT blocked user-deletion cascades (`GameSession.user_id` is CASCADE), and the replay risk is moot once the parent session row is deleted |
+| `bb2c3d4e5f7a` | **Merge migration** for the two heads `aa1d2e3f4a6` and `e5_territory_session_use_cascade`. Also expands `classes` for Tier-C class management: adds `description / subject / school_year / capacity / color / icon / archived_at` plus `ck_classes_capacity_positive` and `ix_classes_archived_at`; creates `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` |
+| `cc3d4e5f6a8b` | **Current head.** Balance Overhaul Phase 4 (Q10): `DELETE FROM talent_allocations WHERE talent_node_id = 'calculus_pet_hp'`. Node was renamed `calculus_pet_range`; orphaned allocations are removed so spent-TP recovery (`achievement_service.compute_remaining_talent_points`) reflects the rename automatically |
 
-> **Branched history**: After `q1f2a3b4c5d6` (gameplay branch — practice mode) and `a3b4c5d6e7f8` (auth branch — lockout backoff) shipped on parallel branches, `r2a3b4c5d6e7` is a merge migration whose `down_revision` is the tuple `(q1f2a3b4c5d6, a3b4c5d6e7f8)`. It also creates the `seasons` table in the same revision. Subsequent revisions (`s3b4c5d6e7f8`, `t4c5d6e7f8a9`, `u5d6e7f8a9b0`) form a linear chain on top.
+> **Branched history**: Two parallel merges exist in the chain.
+> 1. After `q1f2a3b4c5d6` (gameplay — practice mode) and `a3b4c5d6e7f8` (auth — lockout backoff), `r2a3b4c5d6e7` merges them and also creates the `seasons` table.
+> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `cc3d4e5f6a8b` is the current single head.
 
 > **Earlier history**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create.
