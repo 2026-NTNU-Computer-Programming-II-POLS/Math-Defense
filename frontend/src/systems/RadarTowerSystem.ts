@@ -2,6 +2,7 @@ import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
 import { interceptPoint, radarProjectileSpeed, selectRadarTargets, radarTargetCount, isAngleInArc } from '@/domain/combat/RadarTargeting'
+import { effectiveCooldown } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy, Projectile, TargetingMode } from '@/entities/types'
 
@@ -97,7 +98,7 @@ export class RadarTowerSystem {
   private _updateRapid(tower: Tower, dt: number, game: Game): void {
     tower.cooldownTimer -= dt
     if (tower.cooldownTimer > 0) return
-    tower.cooldownTimer = tower.cooldown
+    tower.cooldownTimer = effectiveCooldown(tower, game.state)
 
     const count = radarTargetCount(tower)
     // Phase 7 (Q14): `crit_chance` talent on RADAR_B. Crits fixed at 2× — the
@@ -117,7 +118,7 @@ export class RadarTowerSystem {
   private _updateSniper(tower: Tower, dt: number, game: Game): void {
     tower.cooldownTimer -= dt
     if (tower.cooldownTimer > 0) return
-    tower.cooldownTimer = tower.cooldown
+    tower.cooldownTimer = effectiveCooldown(tower, game.state)
 
     const count = radarTargetCount(tower)
     const critChance = Math.min(1, tower.upgradeExtras?.['critChance'] ?? 0)

@@ -18,18 +18,18 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 
 | Path | Role |
 |---|---|
-| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~68 Vitest files. |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (34 migrations), ~26 pytest files. |
-| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). |
+| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~83 Vitest files. |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (43 migrations), ~28 pytest files. |
+| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). Sources: `math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`, `Makefile`. |
 | `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
-| `shared/` | `game-constants.json` — single source of truth for canvas/grid/economy values. |
+| `shared/` | `game-constants.json` (canvas/grid/economy single source of truth) + `score_parity_fixtures.json` (cross-language score-formula fixtures). |
 | `assets/` | Sprites, audio, fonts (referenced as `frontend/public/`). |
 | `docs/` | Project documentation (analysis, audit, educational theory). |
 | `docker-compose.yml` | Dev orchestration: Postgres + backend (hot reload) + Vite dev server. |
 | `docker-compose.prod.yml` | Production: self-contained images, nginx + TLS termination. |
-| `nginx.conf`, `nginx-tls.conf` | SPA fallback + `/api` reverse proxy + CSP headers. |
+| `nginx.conf`, `nginx-tls.conf`, `security-headers.conf` | SPA fallback + `/api` reverse proxy + shared security/CSP header snippet (included by both nginx configs). |
 | `Math_Defense_Spec.md` | V1 design spec (superseded but retained for V2 lineage). |
-| `DATABASE_SCHEMA.md` | Full ERD: 30+ tables, constraints, indexes, migration history. |
+| `DATABASE_SCHEMA.md` | Full ERD: ~23 tables, constraints, indexes, migration history. |
 | `SECURITY.md` | Auth flow, JWT/bcrypt, lockout, MFA, CSRF, CSP, audit logging. |
 
 ---
@@ -63,7 +63,7 @@ flowchart TB
         Infra --> Domain
     end
 
-    DB[("PostgreSQL 16<br/>Alembic: 34 migrations<br/>25 tables")]
+    DB[("PostgreSQL 16<br/>Alembic: 43 migrations<br/>~23 tables")]
     Shared[/"shared/game-constants.json<br/>(parity-tested)"/]
 
     Client -- HTTPS --> Nginx
@@ -115,21 +115,23 @@ flowchart LR
         Mappers[mappers.py<br/>Aggregate → DTO]
     end
 
-    subgraph Domain["Domain Layer<br/>backend/app/domain/"]
-        SessAgg[Session Aggregate<br/>+ Events + Repo Protocol]
-        UserAgg[User Aggregate]
-        LbAgg[Leaderboard Aggregate / View]
-        AchAgg[Achievement<br/>definitions · policy]
-        TalentAgg[Talent Tree]
-        ClassAgg[Class · Membership]
-        TerrAgg[Territory · Slot · Occupation]
-        ChalAgg[Challenge<br/>+ constraint DSL]
-        SeasonAgg[Season]
-        Assess[Assessment<br/>Q-matrix · Beta-Bernoulli]
-        Scoring[Scoring Calculator<br/>S1 / S2 / K / TotalScore]
-        VO["Value Objects<br/>SessionStatus · Level · Score · GameResult"]
-        Errors["Domain Errors<br/>(status_code attribute)"]
-        Constraints["constraints.py<br/>numeric bounds"]
+    subgraph Domain["Domain Layer<br/>backend/app/domain/<br/>(per-aggregate folders: aggregate.py + policy/definitions + repository protocol)"]
+        SessAgg["session/<br/>aggregate · events · events_log · repository"]
+        UserAgg["user/<br/>aggregate · value_objects · constraints · repository"]
+        LbAgg["leaderboard/<br/>aggregate · view · repository"]
+        AchAgg["achievement/<br/>aggregate · definitions · policy · repository"]
+        TalentAgg["talent/<br/>aggregate · tree · definitions · repository"]
+        ClassAgg["class_/<br/>aggregate · errors · repository"]
+        TerrAgg["territory/<br/>aggregate · errors · recommendation · repository"]
+        ChalAgg["challenge/<br/>aggregate · constraint_dsl · tower_types · repository"]
+        SeasonAgg["season/<br/>aggregate · repository"]
+        Assess["assessment/<br/>competencies · q_matrix · competency_state ·<br/>competency_estimator · suggestions"]
+        StudyAgg["study/<br/>group_assignment · probe_keys"]
+        AuthAgg["auth/<br/>repository (cross-cutting auth protocols)"]
+        Scoring["scoring/<br/>score_calculator (S1 / S2 / K / TotalScore)"]
+        VO["Top-level: value_objects.py<br/>SessionStatus · Level · Score · GameResult"]
+        Errors["Top-level: errors.py<br/>(status_code attribute)"]
+        Constraints["Top-level: constraints.py<br/>numeric bounds"]
     end
 
     subgraph Infra["Infrastructure Layer<br/>backend/app/infrastructure/"]
@@ -169,7 +171,7 @@ flowchart LR
 
 **Layering rules**
 
-- **Domain** has zero imports from FastAPI, Pydantic, or SQLAlchemy. Repository interfaces are `typing.Protocol`s.
+- **Domain** has zero imports from FastAPI, Pydantic, or SQLAlchemy. Each aggregate lives in its own folder under `backend/app/domain/<aggregate>/` containing `aggregate.py` (root + entities), `policy.py`/`definitions.py`/`tree.py` (pure rules), and `repository.py` (the repository protocol). Cross-aggregate primitives live at the root: `value_objects.py`, `constraints.py`, `errors.py`. Repository interfaces are `typing.Protocol`s.
 - **Application** orchestrates use cases and accepts repository protocols via constructor (DI). Mappers convert aggregates to Pydantic DTOs at the boundary.
 - **Infrastructure** is the only place SQLAlchemy lives. Repositories implement the domain protocols. `SqlAlchemyUnitOfWork` is a context manager with explicit `.commit()` and auto-rollback.
 - **Routers** are thin: validate input, call one application method, return DTO. Domain errors carry `status_code`; a global exception handler maps them to HTTP responses (so routers never translate exceptions).
@@ -197,7 +199,7 @@ flowchart TB
 
     subgraph Ach["Achievement / Progression"]
         UA[UserAchievement]
-        TA[TalentAllocation<br/>21 nodes · 7 tower types]
+        TA[TalentAllocation<br/>26 nodes · 7 tower types]
         SE2[Season<br/>windowed multipliers]
     end
 
@@ -342,16 +344,16 @@ flowchart TB
     subgraph Components["Reusable Components (6 subdirs)"]
         Common[common/<br/>Modal · MathDisplay · markdown helpers]
         Layout[layout/<br/>app chrome]
-        GameCmp["game/ (26 .vue files)<br/>HUD · TowerBar · BuildPanel · BuildHint · ShopPanel ·<br/>SpellBar · SpellIcon · StartWaveButton · GameSpeedPanel ·<br/>MagicModePanel · RadarConfigPanel · MatrixPairPanel ·<br/>MatrixInputPanel · LimitQuestionPanel · CalculusPanel ·<br/>IntegralPanel · FunctionPanel · ChainRulePanel ·<br/>MontyHallPanel · TargetingModePanel · TowerInfoPanel ·<br/>BuffCardPanel · WaveForecast · FirstEncounterCard ·<br/>AchievementToast · PrincipleOverlay"]
+        GameCmp["game/ (28 .vue files)<br/>HUD · TowerBar · BuildPanel · BuildHint · ShopPanel ·<br/>SpellBar · SpellIcon · StartWaveButton · GameSpeedPanel ·<br/>MagicModePanel · RadarConfigPanel · MatrixPairPanel ·<br/>MatrixInputPanel · LimitQuestionPanel · CalculusPanel ·<br/>IntegralPanel · FunctionPanel · ChainRulePanel ·<br/>MontyHallPanel · TargetingModePanel · TowerInfoPanel ·<br/>BuffCardPanel · WaveForecast · FirstEncounterCard ·<br/>AchievementToast · PrincipleOverlay ·<br/>PhaseFader · WaveBanner"]
         Teacher[teacher/CompetencyBar]
         TerritoryCmp[territory/TerritorySlotCard]
         LbCmp[leaderboard/PersonalTimeline]
     end
 
-    subgraph Composables["Composables (~16 .ts)"]
+    subgraph Composables["Composables (~20 use*.ts)"]
         Lifecycle["useGameLoop · useSessionSync · useStartRun · useEngineUiBridges · useEngineAudio · useUiAudio"]
         Auth["useAuth · useTokenProbe"]
-        UI["useCanvasPlot · useKeyboardPlacement · useCountdown · useFirstEncounterCards · usePrincipleOverlay · useChallengePreviewPreference"]
+        UI["useCanvasPlot · useKeyboardPlacement · useCountdown · useFirstEncounterCards · usePrincipleOverlay · useChallengePreviewPreference · useManual · useReducedMotion · useValuePop"]
         Data["useLeaderboard · usePolling · useTerritoryRecommendation"]
     end
 
@@ -413,7 +415,7 @@ flowchart TB
 
     subgraph Math["math/ (frontend/src/math)"]
         Bridge["WasmBridge.ts<br/>RAII float buffers · JS fallback"]
-        Wasm[("math_engine.wasm<br/>16 exported C functions")]
+        Wasm[("math_engine.wasm<br/>17 exported C functions + malloc/free")]
         Utils[MathUtils · RandomUtils · curve-evaluator ·<br/>intersection-solver · limit-evaluator ·<br/>chain-rule-generator · expressionParser]
     end
 
@@ -427,6 +429,10 @@ flowchart TB
         PetR[PetRenderer]
         SER[SpellEffectRenderer]
         CFR[CombatFeedbackRenderer]
+        IER[ImpactEffectRenderer]
+        DPR[DeathParticleRenderer]
+        TLR[TowerLifecycleRenderer]
+        Prim[primitives.ts<br/>shared draw helpers]
     end
 
     subgraph Replay["replay/"]
@@ -470,7 +476,7 @@ flowchart TB
 
 ## 5. WebAssembly Math Kernel
 
-C99 sources in `wasm/`, compiled by Emscripten (`wasm/Makefile`) to `frontend/src/math/wasm/math_engine.{js,wasm,d.ts}`. The bridge layer (`WasmBridge.ts`) provides:
+C99 sources in `wasm/` (`math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`), compiled by Emscripten (`wasm/Makefile`, invoked as `make -f wasm/Makefile` after activating the vendored `emsdk/`) to `frontend/src/math/wasm/math_engine.{js,wasm}` plus an auto-generated `frontend/src/math/wasm-exports.d.ts`. The bridge layer (`WasmBridge.ts`) provides:
 
 - **RAII float-buffer helpers** that allocate via `malloc`, hand a typed view to the caller, and `free` on disposal.
 - **JS fallbacks** for every export, gated by `setUseWasm(false)` for diagnostics.
@@ -725,8 +731,8 @@ Normal · Fast · Tank · Split · Invisible · Boss-A (airborne, spawns minions
 
 | System | Mechanism | Persistence |
 |---|---|---|
-| Achievements | 27 definitions across 6 categories (combat, scoring, survival, efficiency, exploration, territory) | `user_achievements` (talent points awarded) |
-| Talent Tree | 19 nodes / 7 tower types / prereq chains | `talent_allocations` |
+| Achievements | 29 definitions across 6 categories (combat, scoring, survival, efficiency, exploration, territory) | `user_achievements` (talent points awarded) |
+| Talent Tree | 26 nodes (19 base + 7 tier-2) / 7 tower types / prereq chains (incl. `prerequisite_max_levels` for tier-2) | `talent_allocations` |
 | Seasons | Time-windowed multipliers on talent points | `seasons` |
 | Leaderboard | Per-star DENSE_RANK + global rank | `leaderboard_entries` |
 | Grabbing Territory | Teacher activity, students seize slots by score | `territory_*` (optimistic locking) |
@@ -762,7 +768,7 @@ sequenceDiagram
         App->>App: bcrypt verify
         alt Bad password
             App->>LG: register_failure(email)
-            LG->>DB: UPDATE login_attempts (5m→15m→1h→24h)
+            LG->>DB: UPDATE login_attempts (5m→15m→60m cap)
             App-->>R: 401
         else OK
             App->>LG: clear(email)
@@ -779,7 +785,7 @@ sequenceDiagram
 - **Access tokens**: HS256 JWT, 15-minute TTL (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`), claims include `sub`, `jti`, `pv` (password_version), `exp`, `iat`, `iss`, `aud`. Changing the password increments `pv`, globally invalidating outstanding tokens.
 - **Refresh tokens**: rotating; SHA-256 hashed at rest; `used` flag flips on rotation; `revoked` flag for logout-all.
 - **Token denylist**: `denied_tokens.jti` set on logout; pruned at natural expiry by the auth janitor (every 10 min).
-- **Brute-force lockout**: per-account 5 failures / 5 min → 5m, 15m, 1h, 24h backoff. Returns `429` + `Retry-After`.
+- **Brute-force lockout**: per-account 5 failures / 5 min → 5m → 15m → 60m cap backoff (tracked via `login_attempts.lockout_count`). Returns `429` + `Retry-After`.
 - **CSRF**: double-submit cookie + `X-CSRF-Token` header on unsafe methods (opt-out only under pytest/CI).
 - **Rate limiting**: slowapi per route (auth tighter than gameplay endpoints).
 - **MFA**: optional TOTP, with step-replay guard via `totp_last_used_at`.
@@ -845,14 +851,14 @@ All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~26 test files)
+### Backend (pytest, ~28 test files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
 - **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
 
-### Frontend (Vitest + happy-dom, ~68 test files)
+### Frontend (Vitest + happy-dom, ~83 test files)
 
 - Engine systems, GameState and PhaseStateMachine.
 - Domain policies (split, level-generator, path-validator, placement-policy).
@@ -901,11 +907,11 @@ backend/
     db/                          # engine, SessionLocal
     middleware/                  # auth.py, csrf.py
     utils/                       # security.py (JWT, bcrypt), totp.py, integrity.py
-    domain/                      # aggregates, value objects, errors, policies
+    domain/                      # per-aggregate folders (aggregate root + policy + repository protocol)
       session/   user/   leaderboard/   achievement/   talent/   class_/
       territory/   challenge/   season/   assessment/   study/   scoring/   auth/
       value_objects.py   constraints.py   errors.py
-    application/                 # use-case services + ports.py + mappers.py
+    application/                 # 15 *_service.py + ports.py + mappers.py
                                  # session_event_handlers.py wires SessionCompleted consumers
     infrastructure/
       persistence/               # SqlAlchemy*Repository (15 files)
@@ -913,11 +919,13 @@ backend/
       login_guard.py   token_denylist.py   audit_logger.py
       email_service.py   scheduler.py   spectate_hub.py
       wasm_runtime.py            # wasmtime-py singleton, hosts math_engine.wasm
-    models/                      # SQLAlchemy ORM models (19 files / 25 tables)
-    routers/                     # FastAPI routers (13 thin adapters)
+    models/                      # SQLAlchemy ORM models (23 files, ~23 tables)
+    routers/                     # FastAPI routers (13 thin adapters: achievement, admin, assessment,
+                                 # auth, challenge, class_, game_session, leaderboard, recommendation,
+                                 # replay, study, talent, territory)
     schemas/                     # Pydantic DTOs
-  alembic/                       # 34 migrations
-  tests/                         # ~26 pytest files
+  alembic/                       # 43 migrations
+  tests/                         # ~28 pytest files
 
 frontend/
   src/
@@ -925,30 +933,30 @@ frontend/
     router/                      # RBAC-aware routes
     stores/                      # Pinia: auth, game, talent, territory, ui
     views/                       # 26 page-level .vue files
-    components/                  # common, layout, game (26), teacher, territory, leaderboard
-    composables/                 # ~16 use*.ts (lifecycle, auth, UI, data)
-    services/                    # api.ts + ~18 per-domain clients
+    components/                  # common, layout, game (28 .vue), teacher, territory, leaderboard
+    composables/                 # ~20 use*.ts (lifecycle, auth, UI, data)
+    services/                    # api.ts + 17 per-domain clients
     engine/                      # Game.ts, GameState, PhaseStateMachine, EventBus,
                                  # Renderer, InputManager, register-systems,
                                  # audio/, event-handlers/, projections/,
                                  # render-helpers/, replay/
     systems/                     # 17 ECS-style systems (sibling of engine/)
-    renderers/                   # 9 canvas renderers + primitives.ts
+    renderers/                   # 12 canvas renderers + primitives.ts
     domain/                      # pure rules: combat, level, movement, path, placement,
-                                 # scoring, study, tower, wave
+                                 # scoring, study, wave
     math/                        # WasmBridge, MathUtils, evaluators, wasm/
     entities/                    # Tower/Enemy/Projectile/Pet types + factories
     data/                        # tower-defs, enemy-defs, achievement-defs, talent-defs, ...
     lib/   utils/   styles/      # misc helpers, shared utilities, global CSS
-  tests/                         # Vitest suites (~68 files including in-tree *.test.ts)
+  tests/                         # Vitest suites (~83 files including in-tree *.test.ts)
 
-wasm/                            # C99 sources + Makefile (Emscripten)
+wasm/                            # C99 sources (math_engine.c, prng.c/h, curve.c/h, level_gen.c/h) + Makefile (Emscripten)
 emsdk/                           # vendored toolchain
-shared/game-constants.json       # parity-tested constants
+shared/                          # game-constants.json + score_parity_fixtures.json
 docs/                            # this file + analysis docs
 docker-compose.yml               # dev
 docker-compose.prod.yml          # prod
-nginx.conf  nginx-tls.conf       # reverse proxy + TLS
+nginx.conf  nginx-tls.conf  security-headers.conf  # reverse proxy + TLS + shared headers
 DATABASE_SCHEMA.md   SECURITY.md   Math_Defense_Spec.md   README.md
 ```
 

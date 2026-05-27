@@ -87,7 +87,7 @@ export class TowerInterferenceSystem implements GameSystem {
         factor = Math.max(INTERFERENCE_FLOOR, 1 - PER_NEIGHBOR_PENALTY * neighbours)
       }
       tower.interferenceFactor = factor
-      recomputeEffectiveDamage(tower)
+      recomputeEffectiveDamage(tower, game.state)
     }
   }
 }

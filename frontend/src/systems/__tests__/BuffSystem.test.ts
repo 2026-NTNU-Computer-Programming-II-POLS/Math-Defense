@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { BuffSystem } from '../BuffSystem'
-import { Events } from '@/data/constants'
+import { Events, GamePhase } from '@/data/constants'
 import { createMockGame, createMockTower } from './helpers'
 
 vi.mock('@/data/buff-defs', () => ({
@@ -68,7 +68,10 @@ describe('BuffSystem (V2 shop-based)', () => {
   let system: BuffSystem
 
   beforeEach(() => {
-    game = createMockGame({ gold: 200 })
+    // Bug #5: BuffSystem.update is gated on GamePhase.WAVE. Tests that
+    // exercise the timer path must start in WAVE; the LEVEL_START / purchase
+    // paths don't read phase so they work either way.
+    game = createMockGame({ gold: 200, phase: GamePhase.WAVE })
     system = new BuffSystem()
     system.init(game)
   })
@@ -81,7 +84,11 @@ describe('BuffSystem (V2 shop-based)', () => {
 
     expect(game.state.gold).toBe(150)
     expect(game.state.costTotal).toBe(50)
-    expect(tower.damageBonus).toBeCloseTo(1.2)
+    // Bug #1 fix: buff lives on state.towerDamageBonus (not on the tower).
+    // tower.damageBonus stays at its talent value; effectiveDamage folds in
+    // the +20% from the buff at compute time.
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.2)
+    expect(tower.damageBonus).toBeCloseTo(1.0)
     expect(tower.effectiveDamage).toBeCloseTo(24)
     expect(game.state.activeBuffs).toHaveLength(1)
     expect(game.state.activeBuffs[0].remainingTime).toBe(60)
@@ -96,6 +103,9 @@ describe('BuffSystem (V2 shop-based)', () => {
   })
 
   it('instant buff (duration=0) does not track in activeBuffs', () => {
+    // HEAL_5 requires hp < maxHp (Bug #3 guard) — drop hp so the purchase
+    // goes through, otherwise it's a no-op.
+    game.state.hp = game.state.maxHp - 5
     game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_heal', cost: 30 })
 
     expect(game.state.gold).toBe(170)
@@ -107,14 +117,16 @@ describe('BuffSystem (V2 shop-based)', () => {
     game.towers.push(tower)
 
     game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_atk', cost: 50 })
-    expect(tower.damageBonus).toBeCloseTo(1.2)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.2)
+    expect(tower.effectiveDamage).toBeCloseTo(24)
 
     system.update(59, game)
-    expect(tower.damageBonus).toBeCloseTo(1.2)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.2)
     expect(game.state.activeBuffs).toHaveLength(1)
 
     system.update(2, game)
-    expect(tower.damageBonus).toBeCloseTo(1.0)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0)
+    expect(tower.effectiveDamage).toBeCloseTo(20)
     expect(game.state.activeBuffs).toHaveLength(0)
   })
 
@@ -123,10 +135,10 @@ describe('BuffSystem (V2 shop-based)', () => {
     game.towers.push(tower)
 
     game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_atk', cost: 50 })
-    expect(tower.damageBonus).toBeCloseTo(1.2)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.2)
 
     game.eventBus.emit(Events.LEVEL_START, 1)
-    expect(tower.damageBonus).toBeCloseTo(1.0)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0)
     expect(game.state.activeBuffs).toHaveLength(0)
   })
 
@@ -229,10 +241,68 @@ describe('BuffSystem (V2 shop-based)', () => {
       game,
     )
 
-    expect(tower.damageBonus).toBeCloseTo(1.5)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.5)
+    expect(tower.effectiveDamage).toBeCloseTo(30)
     expect(game.state.activeBuffs).toHaveLength(1)
 
     system.update(11, game)
-    expect(tower.damageBonus).toBeCloseTo(1.0)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0)
+    expect(tower.effectiveDamage).toBeCloseTo(20)
+  })
+
+  // Bug #5 regression: BuffSystem.update must NOT decrement remainingTime
+  // outside WAVE phase. Without this guard, a 60s buff bought in BUILD phase
+  // (the only place the shop is open) drains while the player sets up towers.
+  it('does not tick buff timer outside WAVE phase', () => {
+    game.state.phase = GamePhase.BUILD
+    const tower = createMockTower({ damageBonus: 1, baseDamage: 20, effectiveDamage: 20 })
+    game.towers.push(tower)
+
+    game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_atk', cost: 50 })
+    const initialRemaining = game.state.activeBuffs[0].remainingTime
+
+    system.update(30, game)
+    expect(game.state.activeBuffs).toHaveLength(1)
+    expect(game.state.activeBuffs[0].remainingTime).toBe(initialRemaining)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.2)
+  })
+
+  // Bug #1 regression: a tower built mid-buff must be buffed too, and a
+  // buff revert must not weaken it below baseline.
+  it('a new tower built during an active buff respects the buff and is not weakened on revert', () => {
+    const old = createMockTower({ damageBonus: 1, baseDamage: 20, effectiveDamage: 20 })
+    game.towers.push(old)
+
+    game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_atk', cost: 50 })
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.2)
+    expect(old.effectiveDamage).toBeCloseTo(24)
+
+    // Simulate placing a fresh tower mid-buff (TowerFactory reads state).
+    const fresh = createMockTower({ damageBonus: 1, baseDamage: 20, effectiveDamage: 24 })
+    game.towers.push(fresh)
+
+    system.update(61, game) // expire
+    expect(game.state.towerDamageBonus).toBeCloseTo(0)
+    // Both old and fresh return to baseline 20 — fresh is NOT divided to 16.67.
+    expect(old.effectiveDamage).toBeCloseTo(20)
+  })
+
+  // Bug #3 regression: buying a HEAL while at full HP would deduct gold but
+  // leave HP unchanged because changeHp clamps to maxHp.
+  it('refuses HEAL purchase when at full HP', () => {
+    game.state.hp = game.state.maxHp
+    const initialGold = game.state.gold
+    game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_heal', cost: 30 })
+    expect(game.state.gold).toBe(initialGold)
+    expect(game.state.hp).toBe(game.state.maxHp)
+  })
+
+  // Bug #4 regression: the SHOP_PURCHASE event's `cost` payload is now
+  // ignored — the catalog cost is authoritative. A spoofed lower cost must
+  // not actually deduct less gold.
+  it('ignores spoofed cost in the SHOP_PURCHASE payload', () => {
+    const initialGold = game.state.gold
+    game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_atk', cost: 1 })
+    expect(game.state.gold).toBe(initialGold - 50) // catalog cost, not 1
   })
 })

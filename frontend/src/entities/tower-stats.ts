@@ -7,13 +7,33 @@ import type { Tower } from './types'
  * factors can never drift apart across call sites.
  *
  *   effectiveDamage = baseDamage * damageBonus * magicBuff * interferenceFactor
+ *                     * (1 + state.towerDamageBonus)
  *
  * `magicBuff` is owned per-frame by MagicTowerSystem; `interferenceFactor` is
- * owned per-frame by TowerInterferenceSystem. Both go through this helper, so
- * a tower that is simultaneously magic-buffed and interfered-with folds both
- * factors in with no double-application.
+ * owned per-frame by TowerInterferenceSystem. The optional buff bonus comes
+ * from BuffSystem (additive accumulator on GameState). Test fixtures that
+ * don't track game state can omit `state` and get a neutral 1× multiplier.
  */
-export function recomputeEffectiveDamage(tower: Tower): void {
+export function recomputeEffectiveDamage(
+  tower: Tower,
+  state?: { towerDamageBonus: number },
+): void {
+  const buffMult = 1 + (state?.towerDamageBonus ?? 0)
   tower.effectiveDamage =
-    tower.baseDamage * tower.damageBonus * tower.magicBuff * tower.interferenceFactor
+    tower.baseDamage * tower.damageBonus * tower.magicBuff * tower.interferenceFactor * buffMult
+}
+
+/**
+ * Cooldown read at attack-timer reset time. `tower.cooldown` is the
+ * talent/upgrade-adjusted base reload; the buff bonus (towerSpeedBonus) is
+ * applied here so new towers and upgraded towers pick up the current value
+ * without per-tower mutation. Floor at 1ms to keep timers monotonic.
+ */
+export function effectiveCooldown(
+  tower: Tower,
+  state?: { towerSpeedBonus: number },
+): number {
+  const bonus = state?.towerSpeedBonus ?? 0
+  const denom = 1 + bonus
+  return denom > 0 ? tower.cooldown / denom : tower.cooldown
 }

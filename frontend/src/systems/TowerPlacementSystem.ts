@@ -94,7 +94,7 @@ export class TowerPlacementSystem {
     }
 
     const mods = game.towerModifierProvider?.(selectedType) ?? {}
-    const tower = createTower(selectedType, gx, gy, mods)
+    const tower = createTower(selectedType, gx, gy, mods, game.state)
     const isFree = game.state.freeTowerNext || game.state.freeTowerCharges > 0
     const cost = isFree ? 0 : tower.cost
 

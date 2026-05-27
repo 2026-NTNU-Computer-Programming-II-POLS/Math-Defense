@@ -62,7 +62,7 @@ Passwords are hashed with bcrypt at a cost factor of 12. Input is truncated to 7
 
 ### Multi-Factor Authentication (TOTP)
 
-Users may optionally enrol a TOTP authenticator (`totp_secret`, `mfa_enabled` columns). When a user with MFA enabled completes the password check, the login route does not issue an access cookie directly; instead it returns a short-lived **MFA challenge JWT** (5-minute TTL) that the client must exchange for an access token by submitting a fresh TOTP code to `/api/auth/mfa/verify`.
+Users may optionally enrol a TOTP authenticator (`totp_secret`, `mfa_enabled` columns). The `totp_secret` column stores the user's TOTP seed encrypted at rest with **AES-128-CBC + HMAC-SHA256** via `cryptography`'s Fernet, keyed by `TOTP_ENCRYPTION_KEY` (32 url-safe base64 bytes). The key is validated at startup by `verify_key_configured()` in the lifespan handler, so a missing or malformed key aborts boot rather than failing on the first MFA-related request. Decryption failures raise loudly rather than silently returning the ciphertext, so a rotated or corrupt key surfaces immediately instead of locking users out of MFA without diagnostics. When a user with MFA enabled completes the password check, the login route does not issue an access cookie directly; instead it returns a short-lived **MFA challenge JWT** (5-minute TTL) that the client must exchange for an access token by submitting a fresh TOTP code to `/api/auth/mfa/challenge`.
 
 Two guards protect this flow:
 
@@ -136,6 +136,12 @@ Per-IP rate limits are enforced via `slowapi`. The auth-critical endpoints are l
 | `POST /api/auth/register` | 5 requests/minute |
 | `POST /api/auth/login` | 10 requests/minute |
 | `POST /api/auth/logout` | 30 requests/minute |
+| `POST /api/auth/refresh` | 30 requests/minute |
+| `POST /api/auth/change-password` | 5 requests/minute |
+| `POST /api/auth/mfa/setup` \| `mfa/confirm` \| `mfa/disable` | 5 requests/minute |
+| `POST /api/auth/mfa/challenge` | 10 requests/minute |
+| `GET /api/auth/verify-email` | 10 requests/minute |
+| `POST /api/auth/resend-verification` | 3 requests/minute |
 | `GET /api/auth/me` | 30 requests/minute |
 
 ---
@@ -176,7 +182,10 @@ The following values must be set via environment variables or an `.env` file and
 | `DATABASE_URL` | Must use the `postgresql+psycopg` scheme; the application rejects URLs containing the literal password `changeme` in non-test environments |
 | `CORS_ORIGINS` | One or more valid HTTP/HTTPS origins |
 | `FRONTEND_URL` | Absolute `http://` or `https://` URL used in outbound email links |
-| `POSTGRES_PASSWORD` | Used by Docker Compose; should be a strong random value |
+| `POSTGRES_PASSWORD` | Used by Docker Compose for the admin role; must be a strong random value |
+| `POSTGRES_APP_PASSWORD` | Used by `pg_init_roles.sh` to create the least-privilege `mathdefense_app` role on first DB init; required even when not yet wired into a runtime `DATABASE_URL_APP` |
+| `TOTP_ENCRYPTION_KEY` | Fernet key (32 url-safe base64-encoded bytes) encrypting TOTP secrets at rest. Validated by `verify_key_configured()` at startup; boot fails fast if missing or malformed |
+| `PROXY_MODE` / `TRUSTED_PROXY_IPS` | When the backend runs behind nginx, set `PROXY_MODE=true` and list the proxy's IPs/CIDR blocks (e.g. `172.16.0.0/12`) so the rate limiter keys on the real client IP via `X-Forwarded-For` |
 
 The application logs which source supplied `SECRET_KEY` (environment variable or `.env` file) at startup so that operators can confirm the correct secret was loaded. Changing the secret key invalidates all issued JWTs immediately.
 
@@ -190,7 +199,9 @@ Security-relevant events (login success/failure, registration, password change, 
 
 - Each event is written on its own SQLAlchemy session and committed independently of the surrounding request transaction, so a business-logic rollback does not also discard the audit trail.
 - The captured user-agent is truncated to 512 characters to prevent a malicious client from exhausting storage by sending an oversized header.
-- If the insert fails (typically because the `audit_logs` table has not yet been provisioned — see Known Limitations) the failure is logged as a warning rather than allowed to break the request.
+- If the insert fails the failure is logged as a warning rather than allowed to break the request, so a transient database issue cannot take down the auth path.
+
+The `audit_logs` table is provisioned by Alembic revision `z0c1d2e3f4a5_create_audit_logs_table.py`, with composite indexes on `(user_id, created_at)` and `(event_type, created_at)` to support forensic queries. `user_id` deliberately has no FK to `users.id` so audit rows survive user deletion.
 
 Separately, the application logger uses a `_anon()` helper that emits only a 10-character SHA-256 prefix of user IDs and email addresses, so failed-login and similar log lines that are shipped off-host do not leak account identifiers in plaintext. The `audit_logs` rows themselves do hold the raw user_id, since they are intended for in-database forensic queries.
 
@@ -212,7 +223,7 @@ These constraints mean that a bug that lets a negative score or a duplicate jti 
 
 ## Dependency Auditing
 
-CI runs `pip-audit` against backend dependencies and `npm audit --audit-level=high` against frontend dependencies on every pull request. Dependencies are pinned to specific versions in `requirements.txt` and `package.json`.
+CI (`.github/workflows/ci.yml`) runs `pip-audit -r requirements.txt` against backend dependencies and `npm audit --audit-level=high` against frontend dependencies on every push to `main` and every pull request. Dependencies are pinned to specific versions in `requirements.txt` and `package.json`/`package-lock.json`. Three PyJWT/wasmtime advisories are explicitly suppressed in the workflow with inline rationale (`PYSEC-2025-183`, `PYSEC-2024-311`, `PYSEC-2026-151`); each suppression is annotated with the reason it does not apply to this deployment and is expected to be revisited when an actionable fix is published. GitHub Actions versions are pinned by commit SHA, not tag, to defend against tag-mutation supply-chain attacks.
 
 ---
 
@@ -242,9 +253,7 @@ The following are areas where this project makes deliberate trade-offs given its
 
 **MFA is optional and not enforced at registration**: TOTP-based MFA is implemented (`totp_secret`, `mfa_enabled`, `totp_last_used_at` columns; step-replay guard active). However, enabling MFA is the user's choice — registration does not require it. Accounts that have not enrolled TOTP rely entirely on password strength and account lockout.
 
-**Audit log table requires manual provisioning**: The `audit_logs` table, the ORM model, and the writer infrastructure (`audit_logger.record_audit_event`) are all implemented and write via an isolated transaction that survives surrounding rollbacks. However, no Alembic migration creates the table — on a freshly migrated database the writer swallows insertion errors as warnings, so audit events are silently dropped until the table is created out-of-band. A follow-up migration is needed to bring this fully online.
-
-**Rate limiting is per-IP**: Account lockout is per email address, but rate limiting is per client IP. A single user connecting from multiple IPs can exceed per-user expectations, and a shared IP (e.g., a NAT gateway) can trigger rate limits for multiple users.
+**Rate limiting is per-IP (with proxy awareness)**: Account lockout is per email address, but `slowapi` rate limiting is per client IP. A single user connecting from multiple IPs can exceed per-user expectations, and a shared IP (e.g., a NAT gateway) can trigger rate limits for multiple users. When `PROXY_MODE=true` and `TRUSTED_PROXY_IPS` is configured, the limiter walks `X-Forwarded-For` right-to-left and picks the first hop outside the trusted-proxy set, so a client cannot forge the keyed IP by prepending entries to the header. Outside proxy mode the raw socket IP is used.
 
 **Debug mode exposes API schema**: When `DEBUG=true`, FastAPI serves `/docs` and `/redoc`. In production this should be disabled (it is `false` by default in non-CI environments).
 
@@ -256,7 +265,10 @@ Before deploying to a publicly accessible environment:
 
 - [ ] Generate a strong, random `SECRET_KEY` (at least 32 characters of random bytes).
 - [ ] Set a strong, random `POSTGRES_PASSWORD` and confirm it is reflected in `DATABASE_URL`.
-- [ ] Set `CORS_ORIGINS` to only the origins your frontend is served from.
+- [ ] Set a strong, random `POSTGRES_APP_PASSWORD` for the least-privilege application role created by `pg_init_roles.sh`.
+- [ ] Generate `TOTP_ENCRYPTION_KEY` with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`; back it up — losing it makes every enrolled TOTP secret unrecoverable.
+- [ ] If deploying behind nginx (the default production topology), set `PROXY_MODE=true` and populate `TRUSTED_PROXY_IPS` with the proxy's IP or CIDR so per-IP rate limits key on the real client address.
+- [ ] Set `CORS_ORIGINS` to only the origins your frontend is served from, and keep `CORS_ORIGIN_1` / `CORS_ORIGIN_2` (consumed by nginx via `envsubst`) in sync.
 - [ ] Confirm `COOKIE_SECURE=true` (the default) is not overridden.
 - [ ] Confirm `CSRF_ENABLED=true` (the default) is not overridden.
 - [ ] Deploy behind the provided nginx TLS configuration and obtain a valid TLS certificate.

@@ -61,8 +61,12 @@ export class TowerUpgradeSystem {
     tower.baseRange = tower.baseRange * (1 + tier.rangeBonus)
     tower.damageBonus = talentDmg
     tower.rangeBonus = talentRange
-    recomputeEffectiveDamage(tower)
-    tower.effectiveRange = tower.baseRange * tower.rangeBonus
+    // Bug #2 fix: recomputeEffectiveDamage now folds in state.towerDamageBonus
+    // and effectiveRange picks up state.towerRangeBonus — an upgrade during an
+    // active buff no longer wipes the buff (per-tower fields hold talent +
+    // upgrade only; buff lives on game.state).
+    recomputeEffectiveDamage(tower, game.state)
+    tower.effectiveRange = tower.baseRange * tower.rangeBonus * (1 + game.state.towerRangeBonus)
     tower.talentMods = mods
     let cd = def.cooldown
     for (let i = 0; i < oldLevel; i++) {

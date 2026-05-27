@@ -3,6 +3,7 @@ import { distance } from '@/math/MathUtils'
 import { hashStr } from '@/math/RandomUtils'
 import { generateLimitQuestion } from '@/math/limit-evaluator'
 import { applyDamage, killEnemy } from '@/domain/combat/SplitPolicy'
+import { effectiveCooldown } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower, LimitResult } from '@/entities/types'
 
@@ -55,7 +56,7 @@ export class LimitTowerSystem {
 
       tower.cooldownTimer -= dt
       if (tower.cooldownTimer > 0) continue
-      tower.cooldownTimer = tower.cooldown
+      tower.cooldownTimer = effectiveCooldown(tower, game.state)
 
       const result = tower.limitResult
 

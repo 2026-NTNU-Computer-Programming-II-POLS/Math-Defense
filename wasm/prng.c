@@ -35,9 +35,13 @@ static uint32_t pcg32_step(prng_t *r) {
 }
 
 /**
- * Seed a PRNG state. `stream` selects an independent output sequence; values
- * 0 and 1 yield the same `inc` after the `(stream<<1)|1` mixing, so callers
- * that want two truly distinct streams (level vs gameplay) should use 0 and 1.
+ * Seed a PRNG state. `stream` selects an independent output sequence by
+ * choosing the odd increment `inc = (stream << 1) | 1`. The cast to uint64_t
+ * happens before the shift, so all 32 bits of `stream` are preserved and the
+ * stream → inc mapping is injective over the full uint32_t domain. Conventional
+ * usage is stream=0 for level_rng and stream=1 for gameplay_rng, which map to
+ * inc=1 and inc=3 respectively — two distinct odd increments yielding fully
+ * independent sequences.
  *
  * The two-step warmup (advance then add seed then advance) follows O'Neill's
  * reference and ensures the first emitted draw already depends on every bit
