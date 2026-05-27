@@ -106,7 +106,11 @@ function purchase(itemId: string, cost: number): void {
       aria-expanded="false"
       @click="collapsed = false"
     >
-      <span aria-hidden="true">🏪</span>
+      <span class="shop-ico" aria-hidden="true">⌂</span>
+      <span class="shop-trigger-text">
+        <span class="shop-trigger-title">Shop</span>
+        <span class="shop-trigger-sub">Buffs</span>
+      </span>
       <span v-if="hasNotice" class="notice-dot" aria-hidden="true"></span>
     </button>
     <template v-else>
@@ -211,19 +215,18 @@ function purchase(itemId: string, cost: number): void {
   box-shadow: none;
 }
 
+/* Collapsed Shop trigger — wide card (mockup): house icon chip + Shop label. */
 .shop-icon-btn {
   position: relative;
-  width: 40px;
-  height: 40px;
-  padding: 0;
+  width: 100%;
+  padding: 8px 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: rgba(245, 250, 254, 0.86);
-  font-size: var(--text-xl);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
   box-shadow: var(--shadow-sm);
   transition:
     background 120ms,
@@ -233,6 +236,36 @@ function purchase(itemId: string, cost: number): void {
 .shop-icon-btn:hover {
   background: #fff;
   border-color: var(--terracotta);
+}
+
+.shop-ico {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-md);
+  color: var(--charcoal-soft);
+}
+.shop-trigger-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+.shop-trigger-title {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--charcoal);
+}
+.shop-trigger-sub {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 1px;
+  color: var(--charcoal-soft);
 }
 
 .notice-dot {
