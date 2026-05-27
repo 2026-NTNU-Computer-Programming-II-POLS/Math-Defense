@@ -16,7 +16,7 @@ const GLYPH: Record<string, string> = {
 const glyph = computed(() => GLYPH[props.spellId] ?? '?')
 // Single-shape glyphs sit at a fixed size within the 32-unit viewBox.
 // Values are SVG user units (unitless number), not CSS pixels.
-const fontSize = computed(() => 20)
+const fontSize = computed(() => 24)
 </script>
 
 <template>
@@ -37,8 +37,8 @@ const fontSize = computed(() => 20)
   position: relative;
   z-index: 1;
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   color: var(--spell-color, #888);
   font-weight: 900;
 }
