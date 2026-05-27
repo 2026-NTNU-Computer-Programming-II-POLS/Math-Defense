@@ -31,7 +31,6 @@ const phaseLabel = computed(() => {
   }
 })
 
-const goldStr = computed(() => String(g.gold).padStart(4, '0'))
 const hpStr   = computed(() => `${g.hp} / ${g.healthOrigin}`)
 
 const iaLabel = computed(() => {
@@ -178,62 +177,65 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <!-- Gold -->
-    <div class="hud-item" role="group" :aria-label="`Gold: ${g.gold}`">
-      <span class="hud-label">Gold</span>
-      <span
-        class="hud-value gold"
-        :class="{ 'value-pop': goldPop.popping.value, [`pop-${goldPop.direction.value}`]: goldPop.direction.value }"
+    <!-- Vitals — centered: HP · Gold · Kills · (Enemies) · Score -->
+    <div class="gh-vitals">
+      <!-- HP -->
+      <div class="hud-item" role="group" :aria-label="`Hit points: ${g.hp} of ${g.healthOrigin}`">
+        <span class="hud-label">HP</span>
+        <span
+          class="hud-value"
+          :class="{ 'hp-low': g.hp <= 5, 'value-pop': hpPop.popping.value, [`pop-${hpPop.direction.value}`]: hpPop.direction.value }"
+        >
+          <span v-if="g.hp <= 5" aria-hidden="true" class="hp-warn-icon">&#9888;</span>
+          {{ hpStr }}
+        </span>
+        <span class="hp-mini" aria-hidden="true">
+          <span :style="{ width: `${g.healthOrigin > 0 ? Math.max(0, Math.min(100, (g.hp / g.healthOrigin) * 100)) : 0}%` }" />
+        </span>
+      </div>
+
+      <!-- Gold -->
+      <div class="hud-item" role="group" :aria-label="`Gold: ${g.gold}`">
+        <span class="hud-label">Gold</span>
+        <span
+          class="hud-value gold"
+          :class="{ 'value-pop': goldPop.popping.value, [`pop-${goldPop.direction.value}`]: goldPop.direction.value }"
+        >{{ g.gold }}</span>
+      </div>
+
+      <!-- Kills -->
+      <div class="hud-item">
+        <span class="hud-label">Kills</span>
+        <span class="hud-value kill-value">{{ g.cumulativeKillValue }}</span>
+      </div>
+
+      <!-- Wave progress -->
+      <div
+        v-if="g.isWave"
+        class="hud-item wave-progress"
+        role="group"
+        :aria-label="`Enemies remaining: ${g.enemiesAlive}`"
       >
-        <span aria-hidden="true">&#x2B21;</span> {{ goldStr }}
-      </span>
+        <span class="hud-label">Enemies</span>
+        <span class="hud-value enemies-val">{{ g.enemiesAlive }}</span>
+        <span class="wave-bar" aria-hidden="true">
+          <span class="wave-bar-fill" :style="{ width: `${waveFillPct}%` }" />
+        </span>
+      </div>
+
+      <!-- Score -->
+      <div class="hud-item">
+        <span class="hud-label">Score</span>
+        <span
+          class="hud-value score"
+          :class="{ 'value-pop': scorePop.popping.value, [`pop-${scorePop.direction.value}`]: scorePop.direction.value }"
+        >{{ formatScore(g.score) }}</span>
+      </div>
     </div>
 
-    <!-- HP -->
-    <div class="hud-item" role="group" :aria-label="`Hit points: ${g.hp} of ${g.healthOrigin}`">
-      <span class="hud-label">HP</span>
-      <span
-        class="hud-value"
-        :class="{ 'hp-low': g.hp <= 5, 'value-pop': hpPop.popping.value, [`pop-${hpPop.direction.value}`]: hpPop.direction.value }"
-      >
-        <span aria-hidden="true">&#9829;</span>
-        <span v-if="g.hp <= 5" aria-hidden="true" class="hp-warn-icon">&#9888;</span>
-        {{ hpStr }}
-      </span>
-    </div>
-
-    <!-- Kill Value -->
-    <div class="hud-item">
-      <span class="hud-label">Kills</span>
-      <span class="hud-value kill-value">{{ g.cumulativeKillValue }}</span>
-    </div>
-
-    <!-- IA Indicator -->
+    <!-- IA Indicator (right cluster styling lands in the next commit) -->
     <div class="hud-item">
       <span class="hud-value ia-indicator" :class="iaClass">{{ iaLabel }}</span>
-    </div>
-
-    <!-- Wave progress -->
-    <div
-      v-if="g.isWave"
-      class="hud-item wave-progress"
-      role="group"
-      :aria-label="`Enemies remaining: ${g.enemiesAlive}`"
-    >
-      <span class="hud-label">Enemies</span>
-      <span class="hud-value enemies-val">{{ g.enemiesAlive }}</span>
-      <span class="wave-bar" aria-hidden="true">
-        <span class="wave-bar-fill" :style="{ width: `${waveFillPct}%` }" />
-      </span>
-    </div>
-
-    <!-- Score -->
-    <div class="hud-item score-item">
-      <span class="hud-label">Score</span>
-      <span
-        class="hud-value score"
-        :class="{ 'value-pop': scorePop.popping.value, [`pop-${scorePop.direction.value}`]: scorePop.direction.value }"
-      >{{ formatScore(g.score) }}</span>
     </div>
   </div>
 
@@ -346,6 +348,30 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+/* Centered vitals cluster (mockup .gh-vitals): HP · Gold · Kills · Score in a
+   single row, centred between the phase pill and the right cluster. */
+.gh-vitals {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  margin: 0 auto;
+}
+
+/* HP mini health bar beside the HP readout (sage gradient). */
+.hp-mini {
+  display: inline-block;
+  width: 56px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(79, 74, 72, 0.10);
+  overflow: hidden;
+}
+.hp-mini > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--sage-deep), var(--sage));
+}
+
 /* Phase rendered as a Morandi pill: status dot + phase + star rating */
 .phase-label {
   gap: 12px;
@@ -387,12 +413,11 @@ onBeforeUnmount(() => {
 .hp-low   { color: var(--clay-deep); font-weight: 900; }
 .hp-warn-icon { margin: 0 2px; color: var(--clay-deep); }
 .score    { color: var(--teal-deep); }
-.score-item { margin-left: auto; }
 
-.star-icons { display: flex; gap: 1px; }
 .star-filled { color: var(--terracotta); font-size: var(--text-sm); }
 
-.kill-value { color: var(--charcoal); font-size: var(--text-xs); }
+/* Kills matches the other vitals at --text-lg (mockup). */
+.kill-value { color: var(--charcoal); }
 
 /* IA pill — sage (correct) / clay (wrong) */
 .ia-indicator {
