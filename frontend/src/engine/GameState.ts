@@ -65,6 +65,15 @@ export interface GameState {
   enemySpeedMultiplier: number
   enemyVulnerability: number        // damage multiplier on enemies (default 1.0)
 
+  // Tower buff bonuses — additive accumulators (mirror goldMultiplierBonus
+  // pattern). Effective multiplier = 1 + bonus. Reads happen in tower-stats
+  // (damage), BuffSystem.recalcRange (range), and effectiveCooldown (speed),
+  // so new towers built during an active buff pick up the current multiplier
+  // and reverts can never overshoot below 1× via Math.max clamping.
+  towerDamageBonus: number
+  towerRangeBonus: number
+  towerSpeedBonus: number
+
   // Active buffs (time-based)
   activeBuffs: ActiveBuffEntry[]
 
@@ -110,6 +119,9 @@ export function createInitialState(): GameState {
     freeTowerCharges: 0,
     enemySpeedMultiplier: 1,
     enemyVulnerability: 1,
+    towerDamageBonus: 0,
+    towerRangeBonus: 0,
+    towerSpeedBonus: 0,
     activeBuffs: [],
     spellCooldowns: {},
   }
