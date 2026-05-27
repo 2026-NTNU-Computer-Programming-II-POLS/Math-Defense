@@ -390,37 +390,32 @@ function canAfford(cost: number): boolean {
   font-style: italic;
 }
 
-/* Tower card row (mockup .tcard-row) */
+/* Tower cards laid out in a 3-row grid that fills the bar width so every
+   tower shows at once with no horizontal scrollbar. grid-auto-flow:column
+   fills top-to-bottom in 3 rows; auto columns are equal width (1fr). */
 .tower-list {
-  display: flex;
-  gap: 6px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
   border-left: 1px dashed var(--line);
   padding-left: 10px;
   margin-left: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(111, 132, 151, 0.5) transparent;
-}
-.tower-list::-webkit-scrollbar { height: 6px; }
-.tower-list::-webkit-scrollbar-track { background: transparent; }
-.tower-list::-webkit-scrollbar-thumb {
-  background: rgba(111, 132, 151, 0.45);
-  border-radius: 3px;
 }
 
 /* Tower card (mockup .tcard) — fixed 10px radius. No rule competes for the
    tower-btn border-radius, so no !important specificity hack is needed. */
 .tower-btn {
   display: flex; flex-direction: column; align-items: center;
-  gap: 3px; padding: 8px 12px;
+  gap: 1px; padding: 3px 8px;
   background: rgba(245, 250, 254, 0.86);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  min-width: 90px;
-  flex: 0 0 auto;
+  min-width: 0;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
 }
 
@@ -471,12 +466,12 @@ function canAfford(cost: number): boolean {
 }
 
 .tower-icon {
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 16px;
+  width: 20px;
+  height: 14px;
 }
 .tower-icon-svg { width: 100%; height: 100%; }
 .tower-name { font-size: var(--text-xs); color: #222; letter-spacing: 0.5px; font-weight: 700; }
