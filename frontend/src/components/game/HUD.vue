@@ -165,20 +165,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="hudRef" class="hud">
-    <!-- Phase -->
+    <!-- Phase pill: status dot + current phase + star rating -->
     <div class="hud-item phase-label">
-      <span class="hud-label">Phase</span>
+      <span class="dot" aria-hidden="true"></span>
       <span
         :key="phasePulseKey"
         class="hud-value phase phase-pulse"
         :class="{ 'value-pop': wavePop.popping.value, [`pop-${wavePop.direction.value}`]: wavePop.direction.value }"
       >{{ phaseLabel }}</span>
-    </div>
-
-    <!-- Star Rating -->
-    <div class="hud-item">
-      <span class="hud-label">Star</span>
-      <span class="hud-value star-icons">
+      <span class="gh-stars" aria-hidden="true">
         <span v-for="i in g.starRating" :key="i" class="star-filled">&#9733;</span>
       </span>
     </div>
@@ -351,13 +346,26 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-/* Phase rendered as a Morandi pill */
+/* Phase rendered as a Morandi pill: status dot + phase + star rating */
 .phase-label {
-  gap: 10px;
-  padding: 6px 14px;
+  gap: 12px;
+  padding: 7px 16px;
   background: rgba(168, 188, 203, 0.24);
   border: 1px solid rgba(168, 188, 203, 0.45);
   border-radius: 999px;
+}
+.phase-label .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--teal-deep);
+  box-shadow: 0 0 0 3px rgba(143, 168, 163, 0.25);
+  flex-shrink: 0;
+}
+.gh-stars {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 2px;
 }
 
 .hud-label {
