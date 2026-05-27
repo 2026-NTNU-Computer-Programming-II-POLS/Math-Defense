@@ -1,4 +1,4 @@
-import { Events, TowerType } from '@/data/constants'
+import { Events, GamePhase, TowerType } from '@/data/constants'
 import { PURCHASABLE_BUFFS } from '@/data/buff-defs'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
 import { recomputeEffectiveDamage } from '@/entities/tower-stats'
@@ -12,11 +12,12 @@ function snap(v: number): number {
 }
 
 function recalcDamage(g: Game): void {
-  g.towers.forEach(recomputeEffectiveDamage)
+  g.towers.forEach((t) => recomputeEffectiveDamage(t, g.state))
 }
 
 function recalcRange(g: Game): void {
-  g.towers.forEach((t) => { t.effectiveRange = t.baseRange * t.rangeBonus })
+  const buffMult = 1 + g.state.towerRangeBonus
+  g.towers.forEach((t) => { t.effectiveRange = t.baseRange * t.rangeBonus * buffMult })
 }
 
 // Q15: gold buffs stack additively. The bonus accumulator lives on GameState
@@ -26,64 +27,72 @@ function recomputeGoldMult(g: Game): void {
   g.state.goldMultiplier = 1 + g.state.goldMultiplierBonus
 }
 
+// Bug #1+#2 fix: tower buffs no longer mutate per-tower damageBonus/rangeBonus/
+// cooldown. They mutate global state.tower*Bonus accumulators (mirroring the
+// gold-multiplier pattern from Q15). Effective stats are read from the
+// accumulator at consumption sites — so a new tower built during an active
+// buff is buffed without ever being divided back on revert, and an upgrade
+// that overwrites damageBonus/rangeBonus/cooldown still leaves the buff in
+// place (it lives on state, not on the tower).
 const effectStrategies: Record<string, EffectFn> = {
   // Tower damage modifiers
   ALL_TOWERS_DAMAGE_MULTIPLY_1_2: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 1.2) })
+    g.state.towerDamageBonus = snap(g.state.towerDamageBonus + 0.2)
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_1_2: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 1.2) })
+    g.state.towerDamageBonus = snap(Math.max(0, g.state.towerDamageBonus - 0.2))
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_MULTIPLY_2: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 2) })
+    g.state.towerDamageBonus = snap(g.state.towerDamageBonus + 1)
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_2: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 2) })
+    g.state.towerDamageBonus = snap(Math.max(0, g.state.towerDamageBonus - 1))
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_MULTIPLY_1_5: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 1.5) })
+    g.state.towerDamageBonus = snap(g.state.towerDamageBonus + 0.5)
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_1_5: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 1.5) })
+    g.state.towerDamageBonus = snap(Math.max(0, g.state.towerDamageBonus - 0.5))
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_MULTIPLY_0_8: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus * 0.8) })
+    // -20% debuff: bonus goes negative but stays > -1 (clamped at -0.99).
+    g.state.towerDamageBonus = snap(Math.max(-0.99, g.state.towerDamageBonus - 0.2))
     recalcDamage(g)
   },
   ALL_TOWERS_DAMAGE_DIVIDE_0_8: (g) => {
-    g.towers.forEach((t) => { t.damageBonus = snap(t.damageBonus / 0.8) })
+    g.state.towerDamageBonus = snap(g.state.towerDamageBonus + 0.2)
     recalcDamage(g)
   },
 
-  // Tower speed modifiers
+  // Tower speed modifiers (cooldown read via effectiveCooldown helper).
   ALL_TOWERS_SPEED_MULTIPLY_1_15: (g) => {
-    g.towers.forEach((t) => { t.cooldown = snap(t.cooldown / 1.15) })
+    g.state.towerSpeedBonus = snap(g.state.towerSpeedBonus + 0.15)
   },
   ALL_TOWERS_SPEED_DIVIDE_1_15: (g) => {
-    g.towers.forEach((t) => { t.cooldown = snap(t.cooldown * 1.15) })
+    g.state.towerSpeedBonus = snap(Math.max(0, g.state.towerSpeedBonus - 0.15))
   },
 
   // Tower range modifiers
   ALL_TOWERS_RANGE_MULTIPLY_1_15: (g) => {
-    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus * 1.15) })
+    g.state.towerRangeBonus = snap(g.state.towerRangeBonus + 0.15)
     recalcRange(g)
   },
   ALL_TOWERS_RANGE_DIVIDE_1_15: (g) => {
-    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus / 1.15) })
+    g.state.towerRangeBonus = snap(Math.max(0, g.state.towerRangeBonus - 0.15))
     recalcRange(g)
   },
   ALL_TOWERS_RANGE_MULTIPLY_1_5: (g) => {
-    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus * 1.5) })
+    g.state.towerRangeBonus = snap(g.state.towerRangeBonus + 0.5)
     recalcRange(g)
   },
   ALL_TOWERS_RANGE_DIVIDE_1_5: (g) => {
-    g.towers.forEach((t) => { t.rangeBonus = snap(t.rangeBonus / 1.5) })
+    g.state.towerRangeBonus = snap(Math.max(0, g.state.towerRangeBonus - 0.5))
     recalcRange(g)
   },
 
@@ -163,14 +172,21 @@ function applyEffect(effectId: string, game: Game): void {
   console.warn(msg)
 }
 
+// HEAL effects only have value while hp < maxHp. _purchaseBuff guards on these
+// effectIds so a full-HP player can't waste gold on a no-op. The set is the
+// single source of truth — both purchase guard and ShopPanel disable use it.
+const HEAL_EFFECT_IDS = new Set(['HEAL_3', 'HEAL_5', 'HEAL_10', 'HEAL_FULL'])
+
 export class BuffSystem implements GameSystem {
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
     this.destroy()
     this._unsubs.push(
-      game.eventBus.on(Events.SHOP_PURCHASE, ({ itemId, cost }) => {
-        this._purchaseBuff(itemId, cost, game)
+      // Bug #4 fix: the event no longer carries `cost` — _purchaseBuff reads
+      // it from the catalog so a stray emitter can't spoof a cheaper price.
+      game.eventBus.on(Events.SHOP_PURCHASE, ({ itemId }) => {
+        this._purchaseBuff(itemId, game)
       }),
 
       game.eventBus.on(Events.LEVEL_START, () => {
@@ -191,9 +207,7 @@ export class BuffSystem implements GameSystem {
   }
 
   purchaseBuffDirect(buffId: string, game: Game): boolean {
-    const def = PURCHASABLE_BUFFS.find((b) => b.id === buffId)
-    if (!def) return false
-    return this._purchaseBuff(buffId, def.cost, game)
+    return this._purchaseBuff(buffId, game)
   }
 
   applyExternalBuff(effectId: string, revertId: string | undefined, duration: number, name: string, game: Game, survivesLevelStart = false): void {
@@ -212,13 +226,16 @@ export class BuffSystem implements GameSystem {
     }
   }
 
-  private _purchaseBuff(itemId: string, cost: number, game: Game): boolean {
+  private _purchaseBuff(itemId: string, game: Game): boolean {
     const def = PURCHASABLE_BUFFS.find((b) => b.id === itemId)
     if (!def) return false
-    if (game.state.gold < cost) return false
+    if (game.state.gold < def.cost) return false
+    // Bug #3 fix: refuse heal purchases at full HP. changeHp() clamps to
+    // maxHp anyway, so without this guard the gold is spent for no effect.
+    if (HEAL_EFFECT_IDS.has(def.effectId) && game.state.hp >= game.state.maxHp) return false
 
-    game.economy.changeGold(-cost)
-    game.economy.addCost(cost)
+    game.economy.changeGold(-def.cost)
+    game.economy.addCost(def.cost)
     applyEffect(def.effectId, game)
 
     if (def.duration > 0) {
@@ -237,6 +254,13 @@ export class BuffSystem implements GameSystem {
   }
 
   update(dt: number, game: Game): void {
+    // Bug #5 fix: only tick buff timers during WAVE phase. The shop is only
+    // open during BUILD, and BUILD/MONTY_HALL/CHAIN_RULE are excluded from
+    // scoring via timeExcludePrepare — keeping the buff clock in lockstep
+    // with that "active time" definition prevents the case where a 60s buff
+    // bought at the start of BUILD expires before the wave even starts.
+    if (game.state.phase !== GamePhase.WAVE) return
+
     const buffs = game.state.activeBuffs
     let changed = false
     for (let i = buffs.length - 1; i >= 0; i--) {
@@ -263,3 +287,5 @@ export class BuffSystem implements GameSystem {
   onTowerRemoved(_game: Game, _towerId: string): void {}
 
 }
+
+export { HEAL_EFFECT_IDS }

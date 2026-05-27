@@ -11,6 +11,7 @@ export function createTower(
   x: number,
   y: number,
   modifiers?: Record<string, number>,
+  buffState?: { towerDamageBonus: number; towerRangeBonus: number },
 ): Tower {
   const def = TOWER_DEFS[type]
   if (!def) throw new Error(`Unknown tower type: ${type}`)
@@ -24,6 +25,12 @@ export function createTower(
   const damageBonus = 1 + (mods['damage'] ?? 0)
   const rangeBonus = 1 + (mods['range'] ?? 0)
   const speedBonus = mods['attack_speed'] ?? 0
+
+  // Bug #1 fix: pick up current global tower buff state so a tower built
+  // during an active range/damage buff starts with the right effective stats.
+  // Cooldown is read on-the-fly via effectiveCooldown(); range is cached on
+  // the tower so renderers/targeting can read it without state in scope.
+  const buffRangeMult = 1 + (buffState?.towerRangeBonus ?? 0)
 
   const tower: Tower = {
     id: `tower_${++_nextId}`,
@@ -40,7 +47,7 @@ export function createTower(
     baseDamage: def.damage,
     baseRange: def.range,
     effectiveDamage: 0,
-    effectiveRange: def.range * rangeBonus,
+    effectiveRange: def.range * rangeBonus * buffRangeMult,
     cooldown: def.cooldown * (1 - speedBonus),
     cooldownTimer: 0,
 
@@ -51,7 +58,7 @@ export function createTower(
     interferenceFactor: 1,
     color: def.color,
   }
-  recomputeEffectiveDamage(tower)
+  recomputeEffectiveDamage(tower, buffState)
 
   if (type === TowerType.MAGIC) {
     tower.magicMode = 'debuff'

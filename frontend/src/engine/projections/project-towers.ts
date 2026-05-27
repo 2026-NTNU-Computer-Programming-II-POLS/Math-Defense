@@ -7,6 +7,7 @@ import { GamePhase, ANIM, TowerType } from '@/data/constants'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { seedFor } from '@/math/seededRandom'
 import { selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
+import { effectiveCooldown } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy } from '@/entities/types'
 import type { TowerSceneView, TowerView } from './views'
@@ -55,11 +56,14 @@ function matrixCells(tower: Tower, time: number): number[] {
 // drives its asymptote-point ascent + baseplate charge arc from this ratio so
 // the visual matches gameplay tempo (vs. the prior time-driven sawtooth that
 // looked the same whether the tower was about to burst or had just fired).
-function chargeProgressFor(t: Tower): number | null {
+function chargeProgressFor(t: Tower, game: Game): number | null {
   if (t.type !== TowerType.LIMIT) return null
   if (!t.configured || t.disabled) return null
-  if (!(t.cooldown > 0)) return null
-  const ratio = 1 - t.cooldownTimer / t.cooldown
+  // Use the buff-adjusted cooldown so the HUD charge arc matches the actual
+  // tempo when towerSpeedBonus is non-zero (Bug #1 fix).
+  const cd = effectiveCooldown(t, game.state)
+  if (!(cd > 0)) return null
+  const ratio = 1 - t.cooldownTimer / cd
   return ratio < 0 ? 0 : ratio > 1 ? 1 : ratio
 }
 
@@ -91,7 +95,7 @@ export function projectTowerScene(game: Game): TowerSceneView {
         ? (isRadar ? radarPrimaryTargetAngle(t, game.enemies) : nearestEnemyAngle(t, game.enemies))
         : null,
       matrixCells: t.type === TowerType.MATRIX ? matrixCells(t, game.time) : null,
-      chargeProgress: chargeProgressFor(t),
+      chargeProgress: chargeProgressFor(t, game),
     }
   })
   return {

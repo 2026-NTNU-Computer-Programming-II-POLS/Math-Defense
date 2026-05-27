@@ -13,6 +13,11 @@ const CATEGORY_LABELS: Record<Category, string> = {
   defense: 'Defense',
   economy: 'Gold',
 }
+
+// HEAL effects no-op at full HP because changeHp clamps to maxHp. The shop
+// guards on these effectIds so the player can't waste gold (mirrored by the
+// purchase-time guard in BuffSystem._purchaseBuff for Bug #3 defence-in-depth).
+const HEAL_EFFECT_IDS = new Set(['HEAL_3', 'HEAL_5', 'HEAL_10', 'HEAL_FULL'])
 const CATEGORY_ORDER: ReadonlyArray<Category> = ['all', 'tower', 'enemy', 'defense', 'economy']
 
 const STORAGE_KEY = 'mg.shopPanel.category'
@@ -61,10 +66,12 @@ const items = computed(() =>
     .map((b) => {
       const entry = activeByEffectId.value.get(b.effectId)
       const remaining = entry ? liveRemaining(entry.remainingTime) : null
+      const wastedHeal = HEAL_EFFECT_IDS.has(b.effectId) && g.hp >= g.maxHp
       return {
         ...b,
         affordable: g.gold >= b.cost,
         alreadyActive: remaining !== null,
+        wastedHeal,
         remaining,
         progressPct: remaining !== null && b.duration > 0
           ? Math.min(100, (remaining / b.duration) * 100)
@@ -81,7 +88,12 @@ const items = computed(() =>
 const expiringSoonSeconds = 5
 const hasNotice = computed(() => {
   for (const b of PURCHASABLE_BUFFS) {
-    if (g.gold >= b.cost && !activeByEffectId.value.has(b.effectId)) return true
+    if (g.gold < b.cost) continue
+    if (activeByEffectId.value.has(b.effectId)) continue
+    // A full-HP heal is affordable but wasted — don't ping the player to open
+    // the shop for it (Bug #3).
+    if (HEAL_EFFECT_IDS.has(b.effectId) && g.hp >= g.maxHp) continue
+    return true
   }
   for (const ab of g.activeBuffs) {
     if (liveRemaining(ab.remainingTime) <= expiringSoonSeconds) return true
@@ -145,9 +157,10 @@ function purchase(itemId: string, cost: number): void {
           :class="{
             unaffordable: !item.affordable,
             active: item.alreadyActive,
+            'wasted-heal': item.wastedHeal,
           }"
-          :disabled="!item.affordable || item.alreadyActive"
-          :title="item.description"
+          :disabled="!item.affordable || item.alreadyActive || item.wastedHeal"
+          :title="item.wastedHeal ? 'Already at full HP' : item.description"
           @click="purchase(item.id, item.cost)"
         >
           <span class="item-name">{{ item.name }}</span>
@@ -366,6 +379,13 @@ function purchase(itemId: string, cost: number): void {
 
 .shop-item.unaffordable {
   opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Heal items at full HP — grayed but distinct from "can't afford" so the
+   player can tell why the button is disabled (Bug #3 UI hint). */
+.shop-item.wasted-heal {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 

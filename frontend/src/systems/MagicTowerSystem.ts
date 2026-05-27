@@ -1,6 +1,6 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { parseExpression, type CurveFunction } from '@/math/expressionParser'
-import { recomputeEffectiveDamage } from '@/entities/tower-stats'
+import { recomputeEffectiveDamage, effectiveCooldown } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 
@@ -75,7 +75,7 @@ export class MagicTowerSystem {
     for (const t of game.towers) {
       if (t.magicBuff !== 1) {
         t.magicBuff = 1
-        recomputeEffectiveDamage(t)
+        recomputeEffectiveDamage(t, game.state)
       }
     }
 
@@ -90,7 +90,7 @@ export class MagicTowerSystem {
         // Debuff: cooldown-gated so DoT doesn't stack every frame.
         tower.cooldownTimer -= dt
         if (tower.cooldownTimer > 0) continue
-        tower.cooldownTimer = tower.cooldown
+        tower.cooldownTimer = effectiveCooldown(tower, game.state)
         this._applyDebuff(tower, fn, game)
       } else {
         // Buff: applied every frame as a persistent zone — effect lasts as
@@ -145,7 +145,7 @@ export class MagicTowerSystem {
       const curveY = fn(other.x)
       if (Math.abs(other.y - curveY) < zoneWidth * BUFF_ZONE_MULTIPLIER) {
         other.magicBuff = Math.max(other.magicBuff, buffAmount)
-        recomputeEffectiveDamage(other)
+        recomputeEffectiveDamage(other, game.state)
       }
     }
   }
