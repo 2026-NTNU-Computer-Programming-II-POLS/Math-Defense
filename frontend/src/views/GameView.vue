@@ -604,6 +604,12 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
+  /* Light-blue sidebar surface behind the tools + active buffs. */
+  padding: 14px 12px;
+  background: rgba(214, 226, 238, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 /* Section label (mockup): centered mono caps, muted. */
