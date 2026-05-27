@@ -413,8 +413,9 @@ onBeforeUnmount(() => {
       <WaveBanner />
       <PhaseFader />
       <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
+        <!-- Shop is a build-phase tool; Speed is meaningful only mid-wave. -->
         <ShopPanel v-if="gameStore.isBuilding" />
-        <GameSpeedPanel />
+        <GameSpeedPanel v-if="gameStore.isWave" />
       </div>
 
       <!-- Build Phase -->
