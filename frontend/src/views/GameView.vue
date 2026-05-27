@@ -376,17 +376,15 @@ onBeforeUnmount(() => {
            overlap the HUD buff-countdown rings or the FunctionPanel, and
            bottom-LEFT (not bottom-right) so they clear the TowerInfoPanel.
            Anchored above the TowerBar — same idiom as StartWaveButton. -->
-      <div class="corner-controls">
+      <!-- Top-right HUD actions: Manual (?) + Exit, beside the IA pill. -->
+      <div class="hud-actions">
         <button
           type="button"
           class="manual-btn"
           aria-label="Open field reference manual"
           title="Field reference (towers, enemies, spells)"
           @click="manualOpen = true"
-        >
-          <span aria-hidden="true">◇</span>
-          Manual
-        </button>
+        >?</button>
         <button
           v-if="activePhases.includes(gameStore.phase)"
           type="button"
@@ -398,11 +396,12 @@ onBeforeUnmount(() => {
           <span aria-hidden="true">←</span>
           Exit Run
         </button>
-        <!-- Backlog §20 — practice-mode badge persists for the entire
-             WAVE/BUILD session so the player never forgets the run is
-             leaderboard-ineligible. -->
+      </div>
+      <!-- Backlog §20 — practice-mode badge persists for the entire
+           WAVE/BUILD session so the player never forgets the run is
+           leaderboard-ineligible. -->
+      <div v-if="isPracticeMode" class="corner-controls">
         <div
-          v-if="isPracticeMode"
           class="practice-badge"
           role="status"
           aria-live="polite"
@@ -544,8 +543,22 @@ onBeforeUnmount(() => {
   gap: 8px;
   pointer-events: none;
 }
-.corner-controls .manual-btn,
-.corner-controls .return-level-btn {
+/* Top-right HUD actions row — Manual (?) + Exit, sitting in the top HUD band
+   beside the IA pill (the HUD reserves .gh-right margin-right for this slot).
+   Click-through container; only the buttons catch pointer events. */
+.game-overlay > .hud-actions {
+  position: absolute;
+  top: 0;
+  right: 16px;
+  height: var(--hud-height, 56px);
+  z-index: var(--z-action);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.hud-actions .manual-btn,
+.hud-actions .return-level-btn {
   pointer-events: auto;
 }
 
@@ -562,15 +575,11 @@ onBeforeUnmount(() => {
 
 /* Exit Run — clay-tinted labelled pill (mockup .gh-icon-btn.exit) */
 .return-level-btn {
-  position: absolute;
-  top: calc(var(--hud-height, 56px) + 56px);
-  right: 12px;
-  z-index: var(--z-action);
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 16px;
   border: 1px solid rgba(185, 134, 116, 0.45);
   border-radius: 10px;
   background: rgba(185, 134, 116, 0.18);
@@ -594,23 +603,19 @@ onBeforeUnmount(() => {
   outline-offset: 2px;
 }
 
-/* Manual — light icon button (mockup .gh-icon-btn) */
+/* Manual — square "?" icon button (mockup .gh-icon-btn) */
 .manual-btn {
-  position: absolute;
-  top: calc(var(--hud-height, 56px) + 12px);
-  right: 12px;
-  z-index: var(--z-action);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding: 0 14px;
+  justify-content: center;
+  width: 40px;
+  height: 38px;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background: rgba(245, 250, 254, 0.7);
+  background: rgba(245, 250, 254, 0.85);
   color: var(--charcoal-soft);
   font-family: var(--font-main);
-  font-size: var(--text-xs);
+  font-size: var(--text-md);
   font-weight: 700;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
