@@ -219,14 +219,14 @@ function purchase(itemId: string, cost: number): void {
 .shop-icon-btn {
   position: relative;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
   box-shadow: var(--shadow-sm);
   transition:
     background 120ms,
@@ -239,25 +239,25 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .shop-ico {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--cream);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   color: var(--charcoal-soft);
 }
 .shop-trigger-text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .shop-trigger-title {
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: 700;
   color: var(--charcoal);
 }
