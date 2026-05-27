@@ -413,6 +413,7 @@ onBeforeUnmount(() => {
       <WaveBanner />
       <PhaseFader />
       <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
+        <div class="lb-label">Tools</div>
         <!-- Shop is a build-phase tool; Speed is meaningful only mid-wave. -->
         <ShopPanel v-if="gameStore.isBuilding" />
         <GameSpeedPanel v-if="gameStore.isWave" />
@@ -568,10 +569,22 @@ onBeforeUnmount(() => {
   left: 8px;
   top: 100px;
   z-index: var(--z-chrome);
+  width: 196px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* Section label (mockup): centered mono caps, muted. */
+.left-utility-stack .lb-label {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--charcoal-soft);
+  margin-bottom: 2px;
 }
 
 /* Exit Run — clay-tinted labelled pill (mockup .gh-icon-btn.exit) */
