@@ -662,14 +662,14 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .left-utility-stack .b-info .nm {
-  font-size: var(--text-xs);
+  /* Mono to match the TOOLS label; small enough to show the full buff name on
+     one line in the narrow rail (no wrap, no ellipsis). */
+  font-family: var(--font-mono);
+  font-size: 9px;
   font-weight: 700;
   color: var(--charcoal);
-  /* Wrap so the full buff name shows instead of being clipped with an
-     ellipsis in the narrow rail. */
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.15;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 .left-utility-stack .b-info .ct {
   font-family: var(--font-mono);
