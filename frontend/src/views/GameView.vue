@@ -602,7 +602,7 @@ onBeforeUnmount(() => {
   top: calc(var(--hud-height, 56px) + 68px);
   bottom: calc(var(--tower-bar-height, 64px) + 8px);
   z-index: var(--z-chrome);
-  width: 168px;
+  width: 210px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -623,8 +623,8 @@ onBeforeUnmount(() => {
 .left-utility-stack .lb-label {
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 1px;
+  font-size: var(--text-2xs);
+  letter-spacing: 2px;
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--charcoal-soft);
@@ -642,8 +642,8 @@ onBeforeUnmount(() => {
   border-radius: 10px;
 }
 .left-utility-stack .b-ico {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--sage-deep);
   color: #fff;
@@ -651,7 +651,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-2xs);
   font-weight: 800;
   flex-shrink: 0;
 }
@@ -662,10 +662,10 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .left-utility-stack .b-info .nm {
-  /* Mono to match the TOOLS label; small enough to show the full buff name on
-     one line in the narrow rail (no wrap, no ellipsis). */
+  /* Mono to match the TOOLS label; shows the full buff name on one line in the
+     widened rail (no wrap, no ellipsis). */
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--charcoal);
   white-space: nowrap;
