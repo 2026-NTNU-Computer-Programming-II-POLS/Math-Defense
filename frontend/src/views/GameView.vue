@@ -599,7 +599,7 @@ onBeforeUnmount(() => {
   left: 8px;
   top: 100px;
   z-index: var(--z-chrome);
-  width: 196px;
+  width: 168px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -627,15 +627,15 @@ onBeforeUnmount(() => {
 .left-utility-stack .lb-buff {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 5px 8px;
   background: rgba(173, 187, 166, 0.20);
   border: 1px solid rgba(126, 144, 119, 0.40);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .left-utility-stack .b-ico {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--sage-deep);
   color: #fff;
@@ -643,18 +643,18 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: 9px;
   font-weight: 800;
   flex-shrink: 0;
 }
 .left-utility-stack .b-info {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.15;
   min-width: 0;
 }
 .left-utility-stack .b-info .nm {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--charcoal);
   white-space: nowrap;
