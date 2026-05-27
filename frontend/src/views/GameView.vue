@@ -597,18 +597,22 @@ onBeforeUnmount(() => {
 .left-utility-stack {
   position: absolute;
   left: 8px;
-  top: 100px;
+  /* Start below the HUD sub-bar (MH/spells row) so it never covers it, and
+     stretch down to just above the tower panel — a fixed-length sidebar. */
+  top: calc(var(--hud-height, 56px) + 68px + 8px);
+  bottom: calc(var(--tower-bar-height, 64px) + 8px);
   z-index: var(--z-chrome);
   width: 168px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
+  overflow-y: auto;
   /* Light-blue sidebar surface behind the tools + active buffs. */
   padding: 14px 12px;
   background: rgba(214, 226, 238, 0.88);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 0;
   box-shadow: var(--shadow-sm);
 }
 
