@@ -665,9 +665,11 @@ onBeforeUnmount(() => {
   font-size: var(--text-xs);
   font-weight: 700;
   color: var(--charcoal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Wrap so the full buff name shows instead of being clipped with an
+     ellipsis in the narrow rail. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
 }
 .left-utility-stack .b-info .ct {
   font-family: var(--font-mono);
