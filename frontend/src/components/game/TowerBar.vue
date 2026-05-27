@@ -297,7 +297,7 @@ function canAfford(cost: number): boolean {
           {{ def.nameEn }}
         </span>
         <span class="tower-cost" :class="{ 'cost-red': !canAfford(def.cost) }">
-          {{ def.cost > 0 ? `⬡ ${def.cost}` : 'Free' }}
+          {{ def.cost > 0 ? `◆ ${def.cost}` : 'Free' }}
         </span>
       </button>
       <p v-if="availableTowers.length === 0" class="empty-msg">
