@@ -8,6 +8,19 @@ import { TowerType } from '@/data/constants'
 const gameStore = useGameStore()
 const uiStore = useUiStore()
 
+// Per-tower card accent (mockup). Muted Morandi hues — softer than the bright
+// on-canvas Colors.* / def.color. The icon takes this colour on an idle card;
+// a selected card fills with it and flips its text/icon to white.
+const TOWER_CARD_COLOR: Record<TowerType, string> = {
+  [TowerType.MAGIC]:    '#9C8BB0',
+  [TowerType.RADAR_A]:  '#8FAA77',
+  [TowerType.RADAR_B]:  '#7D9BBE',
+  [TowerType.RADAR_C]:  '#B07E5C',
+  [TowerType.MATRIX]:   '#C9BB6E',
+  [TowerType.LIMIT]:    '#C9A99E',
+  [TowerType.CALCULUS]: '#9C958D',
+}
+
 const barRef = ref<HTMLDivElement | null>(null)
 let ro: ResizeObserver | null = null
 // Declared up here so onBeforeUnmount (which sits before selectTower) can
@@ -184,6 +197,9 @@ function canAfford(cost: number): boolean {
         :aria-label="`${def.nameEn}, ${def.mathConcept}, cost ${def.cost} gold${canAfford(def.cost) ? '' : ', unaffordable'}`"
         :aria-pressed="uiStore.selectedTowerType === def.type"
         :aria-disabled="!canAfford(def.cost)"
+        :style="uiStore.selectedTowerType === def.type
+          ? { background: TOWER_CARD_COLOR[def.type], borderColor: TOWER_CARD_COLOR[def.type] }
+          : null"
         @click="selectTower(def.type, def)"
       >
         <!-- Visual Redesign Phase 5a/5b: each tower type shows a miniature
@@ -191,7 +207,10 @@ function canAfford(cost: number): boolean {
              sinusoid; Radar A = sextant; Radar B = astrolabe rings;
              Radar C = brass telescope on tripod. Other tower types keep
              the hexagon until their own 5c–5e sub-phases land. -->
-        <span class="tower-icon" :style="{ color: def.color }">
+        <span
+          class="tower-icon"
+          :style="{ color: uiStore.selectedTowerType === def.type ? '#fff' : TOWER_CARD_COLOR[def.type] }"
+        >
           <svg
             v-if="def.type === TowerType.MAGIC"
             class="tower-icon-svg"
@@ -417,12 +436,9 @@ function canAfford(cost: number): boolean {
   outline-offset: 2px;
 }
 
-/* Selected cue — terracotta gradient + white text (Morandi). Per-tower
-   colour still reads from .tower-icon (def.color); a per-tower-tinted
-   selected card would need a template style-binding (out of scope here). */
+/* Selected cue — the card fills with the tower's own colour (inline :style
+   binding) and flips its text + icon to white. */
 .tower-btn.selected {
-  border-color: var(--terracotta-deep);
-  background: linear-gradient(135deg, var(--terracotta) 0%, var(--terracotta-soft) 100%);
   box-shadow: 0 4px 12px rgba(79, 74, 72, 0.24);
 }
 
@@ -463,7 +479,7 @@ function canAfford(cost: number): boolean {
   height: 16px;
 }
 .tower-icon-svg { width: 100%; height: 100%; }
-.tower-name { font-size: var(--text-xs); color: var(--charcoal); letter-spacing: 0.5px; font-weight: 600; }
+.tower-name { font-size: var(--text-xs); color: #222; letter-spacing: 0.5px; font-weight: 700; }
 /* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
    colour-blind players can identify tower type without relying on the
    colour of .tower-icon. Lives inline with the label. */
