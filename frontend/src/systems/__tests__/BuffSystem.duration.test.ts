@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { BuffSystem } from '../BuffSystem'
-import { Events } from '@/data/constants'
+import { Events, GamePhase } from '@/data/constants'
 import { createMockGame, createMockTower } from './helpers'
 
 vi.mock('@/data/buff-defs', () => ({
@@ -25,7 +25,8 @@ describe('BuffSystem — time-based duration', () => {
   let system: BuffSystem
 
   beforeEach(() => {
-    game = createMockGame({ gold: 200 })
+    // Bug #5: BuffSystem.update only ticks during WAVE.
+    game = createMockGame({ gold: 200, phase: GamePhase.WAVE })
     system = new BuffSystem()
     system.init(game)
   })
@@ -35,15 +36,17 @@ describe('BuffSystem — time-based duration', () => {
     game.towers.push(tower)
 
     game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'short_buff', cost: 50 })
-    expect(tower.damageBonus).toBeCloseTo(1.5)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.5)
+    expect(tower.effectiveDamage).toBeCloseTo(30)
 
     system.update(1.5, game)
-    expect(tower.damageBonus).toBeCloseTo(1.5)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0.5)
     expect(game.state.activeBuffs).toHaveLength(1)
     expect(game.state.activeBuffs[0].remainingTime).toBeCloseTo(0.5)
 
     system.update(0.6, game)
-    expect(tower.damageBonus).toBeCloseTo(1.0)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0)
+    expect(tower.effectiveDamage).toBeCloseTo(20)
     expect(game.state.activeBuffs).toHaveLength(0)
   })
 
@@ -53,10 +56,12 @@ describe('BuffSystem — time-based duration', () => {
 
     game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'short_buff', cost: 50 })
     system.update(3, game) // expire
-    expect(tower.damageBonus).toBeCloseTo(1.0)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0)
+    expect(tower.effectiveDamage).toBeCloseTo(20)
 
     system.update(1, game) // no buff to revert
-    expect(tower.damageBonus).toBeCloseTo(1.0)
+    expect(game.state.towerDamageBonus).toBeCloseTo(0)
+    expect(tower.effectiveDamage).toBeCloseTo(20)
   })
 
   it('emits ACTIVE_BUFFS_CHANGED when a buff expires', () => {
