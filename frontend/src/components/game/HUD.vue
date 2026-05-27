@@ -34,8 +34,8 @@ const phaseLabel = computed(() => {
 const hpStr   = computed(() => `${g.hp} / ${g.healthOrigin}`)
 
 const iaLabel = computed(() => {
-  if (g.initialAnswer === 1) return 'IA: Correct'
-  return 'IA: Wrong'
+  if (g.initialAnswer === 1) return 'IA · Correct'
+  return 'IA · Wrong'
 })
 const iaClass = computed(() => g.initialAnswer === 1 ? 'ia-correct' : 'ia-wrong')
 
@@ -233,8 +233,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- IA Indicator (right cluster styling lands in the next commit) -->
-    <div class="hud-item">
+    <!-- Right cluster: IA pill. GameView floats the ? (Manual) and Exit
+         buttons over the HUD's right edge beside it. -->
+    <div class="gh-right">
       <span class="hud-value ia-indicator" :class="iaClass">{{ iaLabel }}</span>
     </div>
   </div>
@@ -419,11 +420,20 @@ onBeforeUnmount(() => {
 /* Kills matches the other vitals at --text-lg (mockup). */
 .kill-value { color: var(--charcoal); }
 
+/* Right cluster (mockup .gh-right) — IA pill; GameView floats ?/Exit over the
+   right edge, so reserve room so the IA pill clears that slot. */
+.gh-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 156px;
+}
+
 /* IA pill — sage (correct) / clay (wrong) */
 .ia-indicator {
   font-size: var(--text-2xs);
   letter-spacing: 1.5px;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 999px;
 }
 .ia-correct { background: rgba(126, 144, 119, 0.18); color: var(--sage-deep); border: 1px solid rgba(126, 144, 119, 0.4); }
