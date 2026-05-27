@@ -257,8 +257,10 @@ function purchase(itemId: string, cost: number): void {
   line-height: 1.15;
 }
 .shop-trigger-title {
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: 700;
+  letter-spacing: 1px;
   color: var(--charcoal);
 }
 .shop-trigger-sub {
