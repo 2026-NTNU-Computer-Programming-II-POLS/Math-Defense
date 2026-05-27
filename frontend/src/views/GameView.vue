@@ -432,21 +432,21 @@ onBeforeUnmount(() => {
         <ShopPanel v-if="gameStore.isBuilding" />
         <GameSpeedPanel v-if="gameStore.isWave" />
 
-        <template v-if="gameStore.activeBuffs.length > 0">
-          <div class="lb-label">Active Buffs</div>
-          <div
-            v-for="buff in gameStore.activeBuffs"
-            :key="buff.id"
-            class="lb-buff"
-            :title="`${buff.name} — ${liveBuffSeconds(buff)}s left`"
-          >
-            <span class="b-ico" aria-hidden="true">{{ buffInitials(buff.name) }}</span>
-            <span class="b-info">
-              <span class="nm">{{ buff.name }}</span>
-              <span class="ct">{{ liveBuffSeconds(buff) }} s</span>
-            </span>
-          </div>
-        </template>
+        <!-- ACTIVE BUFFS label always shows; the token cards appear as buffs
+             are acquired. -->
+        <div class="lb-label">Active Buffs</div>
+        <div
+          v-for="buff in gameStore.activeBuffs"
+          :key="buff.id"
+          class="lb-buff"
+          :title="`${buff.name} — ${liveBuffSeconds(buff)}s left`"
+        >
+          <span class="b-ico" aria-hidden="true">{{ buffInitials(buff.name) }}</span>
+          <span class="b-info">
+            <span class="nm">{{ buff.name }}</span>
+            <span class="ct">{{ liveBuffSeconds(buff) }} s</span>
+          </span>
+        </div>
       </div>
 
       <!-- Build Phase -->
