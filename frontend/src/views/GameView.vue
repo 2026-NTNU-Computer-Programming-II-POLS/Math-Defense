@@ -36,6 +36,20 @@ const gameStore = useGameStore()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 
+// Active-buff tokens in the left rail. `remainingTime` is a snapshot from the
+// last ACTIVE_BUFFS_CHANGED, so interpolate against timeTotal for a smooth
+// countdown. Initials use the buff's word-initials (e.g. "Sharpen Blades" → SB).
+function liveBuffSeconds(buff: { remainingTime: number }): number {
+  return Math.ceil(
+    Math.max(0, buff.remainingTime - (gameStore.timeTotal - gameStore.activeBuffsSnapshotTime)),
+  )
+}
+function buffInitials(name: string): string {
+  const words = name.trim().split(/\s+/)
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
+
 // Concrete-fading on Star-1 path rendering (spec §17): the curve renderer
 // reads gameStore.pathLabelOpacity at draw time. Star ≥ 2 always renders
 // without labels — that matches pre-§17 behaviour. New players see full
@@ -417,6 +431,22 @@ onBeforeUnmount(() => {
         <!-- Shop is a build-phase tool; Speed is meaningful only mid-wave. -->
         <ShopPanel v-if="gameStore.isBuilding" />
         <GameSpeedPanel v-if="gameStore.isWave" />
+
+        <template v-if="gameStore.activeBuffs.length > 0">
+          <div class="lb-label">Active Buffs</div>
+          <div
+            v-for="buff in gameStore.activeBuffs"
+            :key="buff.id"
+            class="lb-buff"
+            :title="`${buff.name} — ${liveBuffSeconds(buff)}s left`"
+          >
+            <span class="b-ico" aria-hidden="true">{{ buffInitials(buff.name) }}</span>
+            <span class="b-info">
+              <span class="nm">{{ buff.name }}</span>
+              <span class="ct">{{ liveBuffSeconds(buff) }} s</span>
+            </span>
+          </div>
+        </template>
       </div>
 
       <!-- Build Phase -->
@@ -585,6 +615,50 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
   color: var(--charcoal-soft);
   margin-bottom: 2px;
+}
+
+/* Active-buff token card (mockup): circular initials avatar + name + seconds. */
+.left-utility-stack .lb-buff {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(173, 187, 166, 0.20);
+  border: 1px solid rgba(126, 144, 119, 0.40);
+  border-radius: 12px;
+}
+.left-utility-stack .b-ico {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--sage-deep);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.left-utility-stack .b-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+.left-utility-stack .b-info .nm {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--charcoal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.left-utility-stack .b-info .ct {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
 }
 
 /* Exit Run — clay-tinted labelled pill (mockup .gh-icon-btn.exit) */
