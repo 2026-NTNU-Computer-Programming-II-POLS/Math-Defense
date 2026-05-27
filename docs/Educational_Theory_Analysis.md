@@ -31,7 +31,7 @@ This document maps each mechanic to the relevant theory, identifies both strengt
 | Event | Monty Hall | Conditional probability, expected value |
 | Pre-wave | Initial Answer | Function recognition (graph ↔ algebraic form) |
 | Meta | Star rating 1–5 | Difficulty scaffolding |
-| Meta | Achievements (25, six categories) + Talents (19 nodes) | Long-horizon goal pursuit, stealth-assessment evidence |
+| Meta | Achievements (29, six categories) + Talents (26 nodes) | Long-horizon goal pursuit, stealth-assessment evidence |
 | Meta | Leaderboards (Global / Class / Internal / External) | Bounded vs. open social comparison |
 | Class | Grabbing Territory | Teacher-curated competitive activity, scarce-slot strategic choice |
 
@@ -210,7 +210,7 @@ Deci and Ryan's (2000) self-determination theory identifies three innate psychol
 | Competence | Star rating provides graded challenge; achievements provide explicit competence feedback; the K-formula's S1 (kill efficiency) and S2 (cost efficiency) make competence multidimensional |
 | Relatedness | Class system + four leaderboards (Global / Class / Internal / External); teacher-led Class aggregate from V2 Phase 0 |
 
-> **Green flag.** Ryan et al. (2006) report that *meaningful choice* (rather than choice volume) predicts autonomy satisfaction. The talent tree's prerequisite chains (19 nodes across the 7 tower types, gated effects) ensure that each allocation decision has consequences.
+> **Green flag.** Ryan et al. (2006) report that *meaningful choice* (rather than choice volume) predicts autonomy satisfaction. The talent tree's prerequisite chains (26 nodes — 19 base + 7 tier-2 — across the 7 tower types, with tier-2 nodes gated behind their parent at max level) ensure that each allocation decision has consequences.
 
 > **Risk → resolved.** The Global leaderboard is by raw score, and SDT (Deci & Ryan, 2000) and the achievement-goal literature (Elliot, 1999) caution that pure social-comparison feedback can shift learners from *mastery goals* to *performance-avoidance goals*. `LeaderboardView.vue` now exposes a **Personal** tab alongside Global (with Personal listed first, on the reading that self-referential framing is the healthier default per Ames (1992)); the back-end repository method `get_user_history(user_id, star_rating?)` and `GET /api/leaderboard/me` deliver the timeline, and `components/leaderboard/PersonalTimeline.vue` renders score deltas per star with personal-best markers. An empty history surfaces "Play a session to populate this view" rather than zero-state social comparison.
 
@@ -476,6 +476,28 @@ This satisfies the conditions the cognitive-apprenticeship literature (Collins e
 
 > **Note.** This dimension belongs in the Report's *reflection* section — both because it is unusual and because it is the part most directly assessable by the course instructor.
 
+### 10.5 Subsystem-to-Theory Index
+
+This index summarises, for each of the back-end and front-end subsystems that carry pedagogical weight, the primary theoretical commitments they discharge. Each row points to the in-text section where the claim is argued in full. The intent is to make it possible to read the codebase and the document against one another without re-scanning §§3–10 in full.
+
+| Subsystem | Code / migration anchor | Primary theory mapping | In-text section |
+|---|---|---|---|
+| Competency state (Beta posteriors per user × competency) | `backend/app/models/competency_state.py`; `backend/app/domain/assessment/competency_state.py`; migration `o9d0e1f2a3b4_add_competency_state` | Evidence-Centred Design (Mislevy et al., 2003); stealth assessment (Shute & Ventura, 2013) | §8.1 |
+| Adaptive assessment endpoint | `backend/app/routers/assessment.py`; `application/assessment_service.py`; Q-matrix (`domain/assessment/q_matrix.py`, `q_matrix_defs.py`) | Q-matrix theory (Tatsuoka, 1983); formative feedback (Hattie & Timperley, 2007); DI surfacing (Tomlinson, 2014) | §8.1, §10.2 |
+| Recommendation engine | `backend/app/routers/recommendation.py`; `application/recommender_service.py` | Targeted ZPD support (Vygotsky, 1978; Wood, Bruner, & Ross, 1976); autonomy-preserving suggestion (Deci & Ryan, 2000) | §7.1.3 |
+| IA rolling accuracy (concrete-fading driver) | `backend/app/models/user.py::ia_recent_accuracy`; migration `p0e1f2a3b4c5_add_ia_rolling_accuracy`; `frontend/src/math/curve-renderer.ts::labelOpacity` | Concrete fading (Goldstone & Son, 2005); Matthew-effect mitigation (Stanovich, 1986) | §12.6 |
+| Reflection text (post-wave articulation) | `domain/session/aggregate.py::record_reflection`; `models/game_session.py::reflection_text`; migration `n8c9d0e1f2a3_add_reflection_text` | Cognitive apprenticeship — articulation step (Collins, Brown, & Newman, 1989); elaborated-explanation effect (Webb, 1991) | §7.4 |
+| Study / probe runner (pre, post, delayed transfer, affect) | `backend/app/routers/study.py`; `application/study_service.py`; `domain/study/group_assignment.py`; migration `u5d6e7f8a9b0_add_study_tables`; front-end `StudyProbeView.vue`, `AffectSurveyView.vue` | Design-based research (Anderson & Shattuck, 2012); far-transfer measurement (Barnett & Ceci, 2002); math-anxiety / IMI instrumentation (Ashcraft, 2002; Ryan et al., 2006) | §13 |
+| Practice-mode flag (leaderboard-ineligible accommodations) | `models/game_session.py::practice_mode`; migration `q1f2a3b4c5d6_add_practice_mode_to_sessions`; `leaderboard_service` filter | Working-memory-respecting accommodation (Ashcraft & Krause, 2007); accessibility (W3C WCAG 2.2) | §6.6, §12.3 |
+| Achievements (29 entries, six categories) | `frontend/src/data/achievement-defs.ts`; `backend/app/domain/achievement/definitions.py`; `application/achievement_service.py` | Goal-setting theory (Locke & Latham, 2002); MUSIC — Success (Jones, 2009); evidence variables for stealth assessment (Shute & Ventura, 2013) | §6.3, §6.4, §8.1 |
+| Talents (26 nodes — 19 base + 7 tier-2 — across 7 tower roots) | `frontend/src/data/talent-defs.ts`; `backend/app/application/talent_service.py`; `frontend/src/stores/talentStore.ts` | SDT autonomy via meaningful choice (Ryan et al., 2006); goal-setting (Locke & Latham, 2002). **Not** Vygotskian scaffolding — see §7.1.2 item 4 for the recategorisation. | §6.2, §6.4, §7.1.2 |
+| Challenges (teacher-authored constraint sandbox) | `domain/challenge/`; `application/challenge_service.py`; `routers/challenge.py`; migration `s3b4c5d6e7f8_add_challenges` | Bloom — Create at the teacher layer (Anderson & Krathwohl, 2001); anti-novelty mitigation (Hamari et al., 2014) | §8.3, §12.5 |
+| Replay / spectate (versioned, deterministic) | `models/session_event.py`; `domain/session/events_log.py`; `infrastructure/spectate_hub.py`; migrations `t4c5d6e7f8a9_add_rng_seed_and_session_events`, `v6e7f8a9b0c1_add_replay_version` | Cognitive apprenticeship — modelling step (Collins et al., 1989); legitimate peripheral participation (Lave & Wenger, 1991) | §7.4, §12.5 |
+| Session events (fine-grained telemetry substrate) | `models/session_event.py`; `domain/session/events_log.py`; migration `t4c5d6e7f8a9_add_rng_seed_and_session_events` | Evidence model layer of ECD (Mislevy et al., 2003); telemetry substrate for stealth assessment (Shute, 2011) | §8.1, §12.5 |
+| Seasonal achievement sets | `domain/season/`; `application/season_service.py`; migration `r2a3b4c5d6e7_add_seasons` | Anti-novelty mitigation (Hamari et al., 2014; Connolly et al., 2012) | §12.5 |
+
+> **Reading note.** Two subsystems do double duty: the Q-matrix / competency-state stack supplies both the *evidence model* for stealth assessment (§8.1) and the *diagnostic signal* the recommender consumes to deliver targeted ZPD support (§7.1.3); the session-event log is both the audit substrate for `_verify_score()` (§8.4) and the persistence layer for Replay / Spectate (§12.5). The single-direction citations in the table above reflect the primary load-bearing claim for each subsystem; the secondary uses are surfaced in the linked sections.
+
 ---
 
 ## 11. Cross-Cutting Audit
@@ -544,7 +566,7 @@ Slavin's (2014) review, summarising decades of meta-analytic evidence on coopera
 
 ### 12.5 Long-Horizon Engagement
 
-Hamari et al. (2014) and Connolly et al. (2012) both flag *novelty effects* as the dominant threat to gamified-learning evidence. After a semester of *Math Defense* a student would historically have unlocked all 25 achievements and most of the 19 talent nodes, with little new content to pursue. The current build addresses this with three structural mitigations:
+Hamari et al. (2014) and Connolly et al. (2012) both flag *novelty effects* as the dominant threat to gamified-learning evidence. After a semester of *Math Defense* a student would historically have unlocked all 29 achievements and most of the 26 talent nodes, with little new content to pursue. The current build addresses this with three structural mitigations:
 
 - **Seasonal achievement sets** (`domain/season/`, `application/season_service.py`, migration `add_seasons`). Admins promote a set of achievements as "seasonal" with a start/end window; while the season is active, unlocking a seasonal achievement awards 2× talent points (`achievement_service.evaluate` applies the multiplier when `season_active`). `AchievementView.vue` exposes a Seasonal tab with the end-date banner; `AdminView.vue` hosts the management surface; past seasons are archived but visible.
 - **Generative challenge mode** (§8.3). Teachers compose a typed constraint schema (`allowed_towers`, `magic_param_bounds`, `forbidden_mechanics ⊆ {calculus_pet, monty_hall, chain_rule, buffs, spells}`, `wave_count ∈ [1,6]`, `target_score`) in `domain/challenge/constraint_dsl.py` and publish a public-with-link challenge at `/challenge/{id}`. Students enter through `ChallengeView.vue`; their session carries `challenge_id` end-to-end, so the leaderboard at `GET /api/leaderboard?challenge_id={id}` is isolated from the global ranking. Constraints are immutable after the first leaderboard entry (router returns 409); the engine soft-enforces forbidden towers and clamped coefficient bounds client-side, while `end_session` hard-enforces the wave-count override server-side so a tampered client cannot inflate the challenge ranking.
