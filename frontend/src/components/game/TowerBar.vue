@@ -474,7 +474,7 @@ function canAfford(cost: number): boolean {
   height: 14px;
 }
 .tower-icon-svg { width: 100%; height: 100%; }
-.tower-name { font-size: var(--text-xs); color: #222; letter-spacing: 0.5px; font-weight: 700; }
+.tower-name { font-size: var(--text-xs); color: #222; letter-spacing: 0.5px; font-weight: 700; white-space: nowrap; }
 /* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
    colour-blind players can identify tower type without relying on the
    colour of .tower-icon. Lives inline with the label. */
