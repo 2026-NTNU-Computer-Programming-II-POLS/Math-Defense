@@ -24,6 +24,12 @@ interface Paginated<T> {
   total: number
 }
 
+export interface CreateTeacherPayload {
+  email: string
+  password: string
+  player_name: string
+}
+
 export const adminService = {
   async getTeachers(signal?: AbortSignal): Promise<UserSummary[]> {
     const res = await api.get<Paginated<UserSummary>>('/api/admin/teachers', { signal })
@@ -36,5 +42,8 @@ export const adminService = {
   async getStudents(signal?: AbortSignal): Promise<UserSummary[]> {
     const res = await api.get<Paginated<UserSummary>>('/api/admin/students', { signal })
     return res.items
+  },
+  async createTeacher(payload: CreateTeacherPayload): Promise<UserSummary> {
+    return await api.post<UserSummary>('/api/admin/teachers', payload)
   },
 }

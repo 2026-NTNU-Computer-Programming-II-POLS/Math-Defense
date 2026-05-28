@@ -28,6 +28,11 @@ const seasonForm = ref({ season_id: '', name: '', starts_at: '', ends_at: '' })
 const seasonFormError = ref('')
 const seasonFormSubmitting = ref(false)
 
+const teacherForm = ref({ email: '', password: '', player_name: '' })
+const teacherFormError = ref('')
+const teacherFormSuccess = ref('')
+const teacherFormSubmitting = ref(false)
+
 function matchesSearch(text: string): boolean {
   if (!searchQuery.value) return true
   return text.toLowerCase().includes(searchQuery.value.toLowerCase())
@@ -62,6 +67,37 @@ async function loadData(): Promise<void> {
     error.value = e instanceof Error ? e.message : 'Failed to load data'
   } finally {
     loading.value = false
+  }
+}
+
+async function submitTeacher(): Promise<void> {
+  teacherFormError.value = ''
+  teacherFormSuccess.value = ''
+  const email = teacherForm.value.email.trim()
+  const playerName = teacherForm.value.player_name.trim()
+  const password = teacherForm.value.password
+  if (!email || !password || !playerName) {
+    teacherFormError.value = 'All fields required'
+    return
+  }
+  if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    teacherFormError.value = 'Password must be ≥8 characters with letters and digits'
+    return
+  }
+  teacherFormSubmitting.value = true
+  try {
+    const created = await adminService.createTeacher({
+      email,
+      password,
+      player_name: playerName,
+    })
+    teacherForm.value = { email: '', password: '', player_name: '' }
+    teacherFormSuccess.value = `Created teacher ${created.player_name} (${created.email})`
+    await loadData()
+  } catch (e) {
+    teacherFormError.value = e instanceof Error ? e.message : 'Failed to create teacher'
+  } finally {
+    teacherFormSubmitting.value = false
   }
 }
 
@@ -134,15 +170,47 @@ watch(activeTab, loadData, { immediate: true })
       <div v-if="loading" class="loading">Loading…</div>
 
       <!-- Teachers -->
-      <ul v-if="activeTab === 'teachers' && !loading" class="item-list">
-        <li v-for="t in filteredTeachers" :key="t.id" class="item-row">
-          <span class="item-name">{{ t.player_name }}</span>
-          <span class="item-detail">{{ t.email }}</span>
-        </li>
-        <li v-if="filteredTeachers.length === 0" class="empty">
-          {{ searchQuery ? 'No results' : 'No teachers' }}
-        </li>
-      </ul>
+      <section v-if="activeTab === 'teachers' && !loading" class="teachers-section">
+        <form class="season-form" @submit.prevent="submitTeacher">
+          <h3 class="season-form-title">Create Teacher Account</h3>
+          <input
+            v-model="teacherForm.email"
+            class="rune-input"
+            type="email"
+            autocomplete="off"
+            placeholder="teacher@example.com"
+          />
+          <input
+            v-model="teacherForm.player_name"
+            class="rune-input"
+            type="text"
+            autocomplete="off"
+            placeholder="Display name"
+          />
+          <input
+            v-model="teacherForm.password"
+            class="rune-input"
+            type="password"
+            autocomplete="new-password"
+            placeholder="Initial password (≥8 chars, letters + digits)"
+          />
+          <div v-if="teacherFormError" class="error-msg">{{ teacherFormError }}</div>
+          <div v-if="teacherFormSuccess" class="success-msg">{{ teacherFormSuccess }}</div>
+          <button class="btn" type="submit" :disabled="teacherFormSubmitting">
+            {{ teacherFormSubmitting ? 'Creating…' : 'Create Teacher' }}
+          </button>
+        </form>
+
+        <ul class="item-list">
+          <li v-for="t in filteredTeachers" :key="t.id" class="item-row">
+            <span class="item-name">{{ t.player_name }}</span>
+            <span class="item-detail">{{ t.email }}</span>
+          </li>
+          <li v-if="filteredTeachers.length === 0" class="empty">
+            {{ searchQuery ? 'No results' : 'No teachers' }}
+          </li>
+        </ul>
+      </section>
 
       <!-- Classes -->
       <ul v-if="activeTab === 'classes' && !loading" class="item-list">
@@ -285,7 +353,10 @@ watch(activeTab, loadData, { immediate: true })
 
 .back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
-.seasons-section { display: flex; flex-direction: column; gap: 12px; }
+.seasons-section,
+.teachers-section { display: flex; flex-direction: column; gap: 12px; }
+
+.success-msg { font-size: var(--text-xs); color: var(--sage-deep); }
 
 .season-form {
   display: flex;
