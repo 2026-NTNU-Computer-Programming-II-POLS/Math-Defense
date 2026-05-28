@@ -152,8 +152,19 @@ function submitTyped(): void {
 <style scoped>
 .limit-panel { display: flex; flex-direction: column; gap: 8px; }
 .question-text { font-size: var(--text-xs); color: var(--charcoal); margin: 0; line-height: 1.5; }
-.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.choice-btn { font-size: var(--text-xs); padding: 8px; }
+.choices { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+/* `.btn` sets `white-space: nowrap` globally; the limit outcome labels are
+   full sentences, so without overriding here the button's min-content forces
+   each 1fr column to the full unwrapped width and the 2×2 grid overflows the
+   320px drawer. Allow wrapping + drop the column floor to 0. */
+.choice-btn {
+  font-size: var(--text-xs);
+  padding: 8px;
+  white-space: normal;
+  line-height: 1.3;
+  text-align: center;
+  min-width: 0;
+}
 .result-text { font-size: var(--text-xs); color: var(--sage-deep); margin: 0; font-weight: 600; }
 /* Phase 6-UI: LIMIT charge-up burst hint box rendered after the question. */
 .burst-hint {
