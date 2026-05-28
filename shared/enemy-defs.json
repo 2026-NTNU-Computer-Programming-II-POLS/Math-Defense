@@ -1,0 +1,107 @@
+{
+  "_comment": "Enemy stat definitions — shared between frontend and (future) backend server-side simulation. Visual-only fields (name, color) live in frontend/src/data/enemy-defs.ts; everything that drives gameplay / scoring is here. Keys match the EnemyType string values defined in frontend/src/data/constants.ts.",
+  "general": {
+    "maxHp": 30,
+    "speed": 2.0,
+    "size": 16,
+    "reward": 15,
+    "damage": 1,
+    "killValue": 10
+  },
+  "fast": {
+    "maxHp": 15,
+    "speed": 4.0,
+    "size": 12,
+    "reward": 8,
+    "damage": 1,
+    "killValue": 5
+  },
+  "strong": {
+    "maxHp": 120,
+    "speed": 1.0,
+    "size": 24,
+    "reward": 38,
+    "damage": 2,
+    "killValue": 25
+  },
+  "split": {
+    "maxHp": 40,
+    "speed": 2.0,
+    "size": 16,
+    "reward": 8,
+    "damage": 1,
+    "killValue": 5,
+    "split": {
+      "count": 2,
+      "childType": "general",
+      "childScale": 0.4
+    }
+  },
+  "helper": {
+    "maxHp": 35,
+    "speed": 2.0,
+    "size": 16,
+    "reward": 23,
+    "damage": 1,
+    "killValue": 15,
+    "helper": {
+      "radius": 3.0,
+      "healPerSec": 5,
+      "speedBuff": 0.2
+    }
+  },
+  "bossA": {
+    "maxHp": 500,
+    "speed": 0.8,
+    "size": 40,
+    "reward": 150,
+    "damage": 99,
+    "killValue": 100,
+    "shieldHp": 200,
+    "minion": {
+      "interval": 8,
+      "type": "general"
+    }
+  },
+  "bossB": {
+    "maxHp": 600,
+    "speed": 0.7,
+    "size": 44,
+    "reward": 225,
+    "damage": 99,
+    "killValue": 150,
+    "shieldHp": 250,
+    "minion": {
+      "interval": 8,
+      "type": "fast"
+    },
+    "triggerHpRange": [0.45, 0.55]
+  },
+  "regenerator": {
+    "maxHp": 80,
+    "speed": 1.5,
+    "size": 20,
+    "reward": 30,
+    "damage": 2,
+    "killValue": 20,
+    "regenPerSec": 18
+  },
+  "bulwark": {
+    "maxHp": 220,
+    "speed": 0.9,
+    "size": 26,
+    "reward": 45,
+    "damage": 3,
+    "killValue": 30,
+    "towerDamageMult": 0.4
+  },
+  "swarmling": {
+    "maxHp": 12,
+    "speed": 3.2,
+    "size": 9,
+    "reward": 6,
+    "damage": 1,
+    "killValue": 4,
+    "towerDamageMult": 0.35
+  }
+}

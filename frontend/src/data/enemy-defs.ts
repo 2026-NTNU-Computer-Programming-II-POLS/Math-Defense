@@ -1,4 +1,5 @@
 import { EnemyType, Colors } from './constants'
+import enemyStats from '@shared/enemy-defs.json'
 
 export interface SplitConfig {
   count: number
@@ -45,144 +46,48 @@ export interface EnemyDef {
   towerDamageMult?: number
 }
 
+// Visual / presentation fields. Kept in TS so the (future) server-side sim
+// reading shared/enemy-defs.json doesn't need to know about colour palettes
+// or display names. Stats — anything that drives combat, scoring, or
+// spawn-chain behaviour — live in the shared JSON.
+const ENEMY_VISUALS: Record<EnemyType, { name: string; color: string }> = {
+  [EnemyType.GENERAL]: { name: 'General',     color: '#40b848' },
+  [EnemyType.FAST]:    { name: 'Fast',        color: '#4888cc' },
+  [EnemyType.STRONG]:  { name: 'Strong',      color: Colors.ENEMY },
+  [EnemyType.SPLIT]:   { name: 'Split',       color: '#9060c0' },
+  [EnemyType.HELPER]:  { name: 'Helper',      color: '#48c878' },
+  [EnemyType.BOSS_A]:  { name: 'Boss Type-A', color: '#cc2020' },
+  [EnemyType.BOSS_B]:  { name: 'Boss Type-B', color: '#dd3080' },
+  [EnemyType.REGENERATOR]: { name: 'Regenerator', color: Colors.REGENERATOR },
+  [EnemyType.BULWARK]:     { name: 'Bulwark',     color: Colors.BULWARK },
+  [EnemyType.SWARMLING]:   { name: 'Swarmling',   color: Colors.SWARMLING },
+}
+
+// Pull the JSON stats keyed by EnemyType value. The cast is safe because
+// the JSON keys are a 1:1 match with EnemyType values; a missing key
+// surfaces as ``undefined`` on dictionary lookup and would crash
+// build() below, which is the desired loud failure mode.
+type EnemyStatsEntry = Omit<EnemyDef, 'type' | 'name' | 'color'>
+const STATS = enemyStats as unknown as Record<EnemyType, EnemyStatsEntry>
+
+function build(type: EnemyType): EnemyDef {
+  const visual = ENEMY_VISUALS[type]
+  const stats = STATS[type]
+  if (!visual || !stats) {
+    throw new Error(`enemy-defs: missing entry for type=${type}`)
+  }
+  return { type, ...visual, ...stats }
+}
+
 export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
-  [EnemyType.GENERAL]: {
-    type: EnemyType.GENERAL,
-    name: 'General',
-    color: '#40b848',
-    maxHp: 30,
-    speed: 2.0,
-    size: 16,
-    reward: 15,
-    damage: 1,
-    killValue: 10,
-  },
-  [EnemyType.FAST]: {
-    type: EnemyType.FAST,
-    name: 'Fast',
-    color: '#4888cc',
-    maxHp: 15,
-    speed: 4.0,
-    size: 12,
-    reward: 8,
-    damage: 1,
-    killValue: 5,
-  },
-  [EnemyType.STRONG]: {
-    type: EnemyType.STRONG,
-    name: 'Strong',
-    color: Colors.ENEMY,
-    maxHp: 120,
-    speed: 1.0,
-    size: 24,
-    reward: 38,
-    damage: 2,
-    killValue: 25,
-  },
-  [EnemyType.SPLIT]: {
-    type: EnemyType.SPLIT,
-    name: 'Split',
-    color: '#9060c0',
-    maxHp: 40,
-    speed: 2.0,
-    size: 16,
-    reward: 8,
-    damage: 1,
-    killValue: 5,
-    split: {
-      count: 2,
-      childType: EnemyType.GENERAL,
-      childScale: 0.4,
-    },
-  },
-  [EnemyType.HELPER]: {
-    type: EnemyType.HELPER,
-    name: 'Helper',
-    color: '#48c878',
-    maxHp: 35,
-    speed: 2.0,
-    size: 16,
-    reward: 23,
-    damage: 1,
-    killValue: 15,
-    helper: {
-      radius: 3.0,
-      healPerSec: 5,
-      speedBuff: 0.2,
-    },
-  },
-  [EnemyType.BOSS_A]: {
-    type: EnemyType.BOSS_A,
-    name: 'Boss Type-A',
-    color: '#cc2020',
-    maxHp: 500,
-    speed: 0.8,
-    size: 40,
-    reward: 150,
-    damage: 99,
-    killValue: 100,
-    shieldHp: 200,
-    minion: {
-      interval: 8,
-      type: EnemyType.GENERAL,
-    },
-  },
-  [EnemyType.BOSS_B]: {
-    type: EnemyType.BOSS_B,
-    name: 'Boss Type-B',
-    color: '#dd3080',
-    maxHp: 600,
-    speed: 0.7,
-    size: 44,
-    reward: 225,
-    damage: 99,
-    killValue: 150,
-    shieldHp: 250,
-    minion: {
-      interval: 8,
-      type: EnemyType.FAST,
-    },
-    triggerHpRange: [0.45, 0.55],
-  },
-  [EnemyType.REGENERATOR]: {
-    type: EnemyType.REGENERATOR,
-    name: 'Regenerator',
-    color: Colors.REGENERATOR,
-    maxHp: 80,
-    speed: 1.5,
-    size: 20,
-    reward: 30,
-    damage: 2,
-    killValue: 20,
-    regenPerSec: 18,
-  },
-  [EnemyType.BULWARK]: {
-    type: EnemyType.BULWARK,
-    name: 'Bulwark',
-    color: Colors.BULWARK,
-    maxHp: 220,
-    speed: 0.9,
-    size: 26,
-    reward: 45,
-    damage: 3,
-    killValue: 30,
-    // Q6: BULWARK now uses a 60% tower-damage reduction instead of the old
-    // 14-damage per-hit cap. The cap had a hard cliff (a 15-damage shot and
-    // a 100-damage shot both landed as 14); the multiplier scales with the
-    // incoming hit, so high-investment towers still gain something. Pets and
-    // power-up effects bypass the multiplier (see SplitPolicy.applyDamage).
-    towerDamageMult: 0.4,
-  },
-  [EnemyType.SWARMLING]: {
-    type: EnemyType.SWARMLING,
-    name: 'Swarmling',
-    color: Colors.SWARMLING,
-    maxHp: 12,
-    speed: 3.2,
-    size: 9,
-    reward: 6,
-    damage: 1,
-    killValue: 4,
-    towerDamageMult: 0.35,
-  },
+  [EnemyType.GENERAL]:     build(EnemyType.GENERAL),
+  [EnemyType.FAST]:        build(EnemyType.FAST),
+  [EnemyType.STRONG]:      build(EnemyType.STRONG),
+  [EnemyType.SPLIT]:       build(EnemyType.SPLIT),
+  [EnemyType.HELPER]:      build(EnemyType.HELPER),
+  [EnemyType.BOSS_A]:      build(EnemyType.BOSS_A),
+  [EnemyType.BOSS_B]:      build(EnemyType.BOSS_B),
+  [EnemyType.REGENERATOR]: build(EnemyType.REGENERATOR),
+  [EnemyType.BULWARK]:     build(EnemyType.BULWARK),
+  [EnemyType.SWARMLING]:   build(EnemyType.SWARMLING),
 }
