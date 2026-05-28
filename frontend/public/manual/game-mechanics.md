@@ -215,9 +215,9 @@ In English:
 |---|---|---|---|
 | 1 | degrees 1–2, 2–4 curves | 3 | General only |
 | 2 | adds degree 3 and longer multisets | 4 | General, Fast, Bulwark |
-| 3 | denser mix of degrees 1–3 | 5; last wave includes Boss Type-A | Strong, Split, Regenerator, Swarmling, boss |
-| 4 | even denser multisets | 5; last wave includes Boss Type-B | Helper-heavy + boss with chain-rule |
-| 5 | hardest multisets, longest curves | 5; last wave includes Boss Type-B + Swarmling bursts | Everything; only Star-5 grants the checkpoint retry |
+| 3 | denser mix of degrees 1–3 | 5; last wave includes Boss Type-A | Strong, Fast, Split, Regenerator, Bulwark, Helper, Swarmling, Boss-A in wave 5 |
+| 4 | even denser multisets | 5; last wave includes Boss Type-B | Helper-heavy plus Fast, Strong, Split, Regenerator, Bulwark, Swarmling; Boss-B with chain rule in wave 5 |
+| 5 | hardest multisets, longest curves | 5; last wave includes Boss Type-B + Swarmling bursts | Everything but the entry-tier General (Helper, Strong, Fast, Split, Regenerator, Bulwark, Swarmling, Boss-B); only Star-5 grants the checkpoint retry |
 
 The "multiset" is the polynomial-degree multiset used by `level-generator` to draw the run's curves (e.g. `[2,2,3]` = three curves of degrees 2, 2, 3 sharing one common point). Path generation is **polynomial-only**; the trig / log curve evaluator is used by the Magic tower and the curve LaTeX renderer, not by the path. The whole sequence is replay-deterministic from `rng_seed`.
 
@@ -227,7 +227,7 @@ The "multiset" is the polynomial-degree multiset used by `level-generator` to dr
 
 What carries between runs:
 
-- **Achievements** — 33 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
+- **Achievements** — 29 entries across 6 categories (`combat / scoring / efficiency / survival / exploration / territory`). Each clear yields talent points (TP); the full pool awards 52 TP, enough to fill any single tower's branch many times over but not the whole tree at once. Some achievements scale with seasonal multipliers.
 - **Talents** — 26-node tree across the 7 tower types (19 base nodes plus 7 advanced "tier-2" nodes — one per tower — that unlock only when their parent base node sits at max level). Prerequisites form linear chains within each tower's branch. Each node has a `maxLevel` of 2 or 3 and grants a per-tower attribute bonus — damage, range, attack/sweep speed, target count, Magic's zone strength / zone width / duration / slow strength, Radar A's AoE width, Radar B/C crit chance / crit damage, Matrix's damage ramp / pair resonance, Limit's burst bonus, and Calculus pet attack speed / damage / range / crit. Per-level magnitudes vary by node (typically +8% to +25%; target-count nodes add whole targets; tier-2 crit nodes add a flat probability). Modifiers are **snapshotted at tower placement**, so re-build to refresh after reallocating. Free reset is supported.
 - **Avatar & profile** — picked from the unlocks earned along the way.
 - **Class & territory** — students can join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global.
