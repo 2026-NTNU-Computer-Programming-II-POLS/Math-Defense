@@ -407,10 +407,12 @@ const showTargetingMode = computed(() => {
   min-width: 0;
 }
 .panel-title {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-weight: 700;
   letter-spacing: 0.5px;
   line-height: 1.15;
+  /* Keep every tower name (e.g. "Radar C — Sniper") on a single line. */
+  white-space: nowrap;
 }
 .panel-coords {
   font-family: var(--font-mono);
