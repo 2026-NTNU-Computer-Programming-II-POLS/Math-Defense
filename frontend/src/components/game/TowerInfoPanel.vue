@@ -465,6 +465,11 @@ const showTargetingMode = computed(() => {
 details.stat-row--breakdown {
   display: flex;
   flex-direction: column;
+  /* Override align-items:center inherited from the shared .stat-row rule:
+     in this column flex it would centre + shrink-wrap the <summary>, leaving
+     no room for space-between so the label/value clump together. Stretch the
+     summary to full width instead. */
+  align-items: stretch;
   font-size: var(--text-xs);
   color: var(--charcoal-soft);
   padding: 9px 0;
