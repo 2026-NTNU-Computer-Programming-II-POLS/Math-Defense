@@ -32,6 +32,21 @@ const manualOpen = ref(false)
         <span class="icon">▶</span><span class="label">Start Game</span>
       </button>
 
+      <div
+        v-if="auth.isStudent || auth.isTeacher"
+        class="menu-section"
+      >
+        <div class="section-label">Progression</div>
+        <div class="btn-stack">
+          <button class="btn" @click="router.push({ name: 'achievements' })">
+            <span class="icon">★</span><span class="label">Achievements</span>
+          </button>
+          <button class="btn" @click="router.push({ name: 'talents' })">
+            <span class="icon">⬢</span><span class="label">Talent Tree</span>
+          </button>
+        </div>
+      </div>
+
       <div class="menu-section">
         <div class="section-label">Compete</div>
         <div class="btn-stack">
