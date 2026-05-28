@@ -9,6 +9,11 @@ const router = useRouter()
 const store = useTerritoryStore()
 const auth = useAuthStore()
 
+// Mirrors backend/app/schemas/territory.py:57 (Pydantic max_length=50) and
+// the DB CHECK ck_territory_slot_index_range. Keep in sync when changing.
+const MAX_SLOTS = 50
+const SLOT_WARN_THRESHOLD = MAX_SLOTS - 5
+
 const title = ref('')
 const deadline = ref('')
 const selectedClassId = ref<string | null>(null)
@@ -26,7 +31,11 @@ const hasDuplicateStars = computed(() => {
   return ratings.length !== new Set(ratings).size
 })
 
+const atSlotMax = computed(() => slots.value.length >= MAX_SLOTS)
+const nearSlotMax = computed(() => slots.value.length >= SLOT_WARN_THRESHOLD && !atSlotMax.value)
+
 function addSlot(): void {
+  if (atSlotMax.value) return
   slots.value.push({ star_rating: 1 })
 }
 
@@ -127,7 +136,11 @@ onMounted(async () => {
               <button type="button" class="btn-sm danger" :disabled="slots.length <= 1" @click="removeSlot(i)">×</button>
             </div>
           </div>
-          <button type="button" class="btn-sm" @click="addSlot">+ Add Slot</button>
+          <button type="button" class="btn-sm" :disabled="atSlotMax" @click="addSlot">
+            + Add Slot ({{ slots.length }}/{{ MAX_SLOTS }})
+          </button>
+          <div v-if="atSlotMax" class="warn-msg">Reached the maximum of {{ MAX_SLOTS }} slots per activity.</div>
+          <div v-else-if="nearSlotMax" class="warn-msg">Approaching the {{ MAX_SLOTS }}-slot limit.</div>
           <div v-if="hasDuplicateStars" class="warn-msg">Multiple slots share the same star rating — students will face the same difficulty for those territories.</div>
         </div>
 
