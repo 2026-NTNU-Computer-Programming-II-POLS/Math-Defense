@@ -6,9 +6,10 @@
  * or game state, which keeps the policy unit-testable and re-usable for
  * alternate renderers (e.g. DOM previews, tests). See spec §8.1.
  *
- * The palette deliberately mirrors `Colors` in `@/data/constants` so the
- * mages-tower art direction stays consistent when the renderer lays tiles
- * over the stone-floor checkerboard backdrop.
+ * Fills migrated to the Morandi light board palette to match the surrounding
+ * HUD / panel surfaces (`styles/variables.css`). The categorical signal now
+ * lives in the borders + hatching, not the fills — fills are intentionally
+ * close in luminance so the board reads as one cohesive light surface.
  *
  * Phase 8 accessibility pass (see `docs/playtest-notes-piecewise.md`):
  * the buildable border was retuned from amber (`#c89848`) to blue
@@ -16,12 +17,11 @@
  * stroke, so this is palette-cohesive rather than a new colour — so it
  * remains distinguishable from the path's green border under deuteranopia
  * and protanopia, where the old green + amber pair converged toward the
- * same olive hue. The amber `#c89848` is the shared theme accent for
- * Probability Shrine, Fourier tower, and mid-zone HP bars; reusing it
- * for buildable borders overloaded the token. The buildable fill was
- * also lifted to widen the luminance gap against `forbidden`, since tile
- * fills are the primary legibility signal when the border is occluded
- * by a tower sprite.
+ * same olive hue. These borders are load-bearing for CVD accessibility:
+ * do not change `path` green or `buildable` blue without re-verifying the
+ * deuteranopia/protanopia distinction. Forbidden cells rely on the red
+ * diagonal hatching (drawn by the Renderer) rather than the fill — the
+ * fill is intentionally light to match the rest of the board.
  */
 import type { TileClass } from '@/domain/level/level-layout-service'
 
@@ -55,19 +55,19 @@ export function tileStyleFor(cls: TileClass): TileStyle {
   switch (cls) {
     case 'path':
       return {
-        fill: '#2a3426',
-        border: '#4aab6e',
+        fill: '#E3EAE0',       // --correct-bg : pale sage
+        border: '#4aab6e',     // CVD-tuned green — DO NOT change without re-verification
         borderStyle: 'solid',
       }
     case 'buildable':
       return {
-        fill: '#2f2a44',
-        border: '#4a82c8',
+        fill: '#E8EFF5',       // --cream-soft : pale cool-blue
+        border: '#4a82c8',     // CVD-tuned blue — DO NOT change without re-verification
         borderStyle: 'dotted',
       }
     case 'forbidden':
       return {
-        fill: '#1a1520',
+        fill: '#F0E2DC',       // --wrong-bg : pale clay; red hatching is the primary signal
         hatching: true,
       }
   }

@@ -12,45 +12,64 @@ import type { SegmentedPath } from '@/domain/path/segmented-path'
 import { tileStyleFor, type TileStyle } from './render-helpers/tile-style'
 
 /**
- * Swappable neutral-tone palette (Backlog §16). Bright accents that encode
- * meaning (path green, buildable blue, enemy red) intentionally stay on
- * `Colors` — only the stone/grid/axis/forbidden tones, which carry no
- * categorical signal, shift on Star-1.
+ * Renderer palette. Two concerns live here:
+ *
+ *  1. Board ink (`boardBase` / `boardBaseAlt` / `boardAxis` / `gridLine` /
+ *     `forbiddenFill`) — Morandi cool-blue light theme. Aligns the canvas
+ *     backdrop with the surrounding HUD / panel surfaces in
+ *     `styles/variables.css` so the game board reads as the same visual
+ *     system instead of a separate dark dungeon.
+ *
+ *  2. Tower ink (`stoneDark` / `stoneLight` / `axis`) — medium-tone values
+ *     read by `TowerRenderer` for instrument structure strokes, base-plate
+ *     fill, and the keyboard-focus halo. These are kept on the historical
+ *     dungeon-era hex values so the tower silhouettes still register against
+ *     their tower-type colour. The legacy names are preserved because
+ *     touching `TowerRenderer` is out of scope for the board re-skin pass;
+ *     do not assume `stoneDark` is the board's dark stone any more.
+ *
+ * Bright accents that encode categorical meaning (path green, buildable
+ * blue, enemy red) live in `tile-style.ts` and the entity factories — not
+ * here.
  */
 export interface RendererPalette {
+  /** Tower instrument structure stroke (legacy name; not the board's base). */
   readonly stoneDark: string
+  /** Tower base-plate fill + soft accents (legacy name; not the board's alt). */
   readonly stoneLight: string
-  readonly gridLine: string
+  /** Tower keyboard-focus halo (legacy name; not the board axis colour). */
   readonly axis: string
+  /** Board checkerboard base — canvas clear + dark-cell stone fill. */
+  readonly boardBase: string
+  /** Board checkerboard alt — light-cell stone fill. */
+  readonly boardBaseAlt: string
+  /** Board coordinate axes + tick labels. */
+  readonly boardAxis: string
+  /** Board grid lines (low-alpha charcoal — graph-paper feel). */
+  readonly gridLine: string
+  /** Forbidden-cell base fill (red hatching from `_applyTileStyle` overlays). */
   readonly forbiddenFill: string
 }
 
-const NEUTRAL_PALETTE: RendererPalette = Object.freeze({
+const BOARD_PALETTE: RendererPalette = Object.freeze({
+  // Tower ink — restored to legacy values so TowerRenderer keeps its bite.
   stoneDark: '#7a8da8',
   stoneLight: '#8ea1bd',
-  gridLine: 'rgba(255, 255, 255, 0.25)',
   axis: '#ffd700',
-  forbiddenFill: '#6a7d99',
-})
-
-const WARM_PALETTE: RendererPalette = Object.freeze({
-  stoneDark: '#8c7d6b',
-  stoneLight: '#9d8e7c',
-  gridLine: 'rgba(255, 215, 0, 0.25)',
-  axis: '#ffea00',
-  forbiddenFill: '#7c6d5b',
+  // Board ink — Morandi light re-skin.
+  boardBase: '#DCE5ED',      // --cream      : checkerboard base
+  boardBaseAlt: '#E8EFF5',   // --cream-soft : checkerboard alt
+  boardAxis: '#ADA284',      // --gold       : muted khaki axes / ticks
+  gridLine: 'rgba(79, 74, 72, 0.18)', // --divider : graph-paper thin lines
+  forbiddenFill: '#F0E2DC',  // --wrong-bg   : forbidden cell base
 })
 
 export class Renderer {
   readonly canvas: HTMLCanvasElement
   readonly ctx: CanvasRenderingContext2D
 
-  /**
-   * Active neutral palette. Mutates only via `setStarPalette` so the engine
-   * has one well-defined seam for swapping Star-1 warming on/off, and the
-   * default state matches the legacy `Colors`-driven appearance.
-   */
-  palette: RendererPalette = NEUTRAL_PALETTE
+  /** Single board palette — Morandi light theme. No per-star variation. */
+  readonly palette: RendererPalette = BOARD_PALETTE
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -59,16 +78,6 @@ export class Renderer {
     this.ctx = ctx
 
     this._applyDpr()
-  }
-
-  /**
-   * §16: select the neutral-tone palette for the current Star tier. Star-1
-   * warms the canvas backdrop and grid (emotional-design cue per Plass et
-   * al. 2014); Star-2+ uses the default neutrals. Idempotent — safe to call
-   * on every LEVEL_START even if the rating did not change.
-   */
-  setStarPalette(starRating: number): void {
-    this.palette = starRating === 1 ? WARM_PALETTE : NEUTRAL_PALETTE
   }
 
   /** Build the backing buffer at the current devicePixelRatio. */
@@ -99,7 +108,7 @@ export class Renderer {
   }
 
   clear(): void {
-    this.ctx.fillStyle = this.palette.stoneDark
+    this.ctx.fillStyle = this.palette.boardBase
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   }
 
@@ -126,13 +135,13 @@ export class Renderer {
         if (layout) {
           this._paintTile(px, py, layout.classify(gx, gy))
         } else {
-          ctx.fillStyle = (gx + gy) % 2 === 0 ? this.palette.stoneDark : this.palette.stoneLight
+          ctx.fillStyle = (gx + gy) % 2 === 0 ? this.palette.boardBase : this.palette.boardBaseAlt
           ctx.fillRect(px, py, UNIT_PX, UNIT_PX)
         }
       }
     }
 
-    // Grid lines (dark gold rune lines)
+    // Grid lines (thin charcoal — graph-paper feel on the Morandi board)
     ctx.strokeStyle = this.palette.gridLine
     ctx.lineWidth = 0.5
     ctx.beginPath()
@@ -148,8 +157,8 @@ export class Renderer {
     }
     ctx.stroke()
 
-    // Coordinate axes (bright gold)
-    ctx.strokeStyle = this.palette.axis
+    // Coordinate axes (muted Morandi gold)
+    ctx.strokeStyle = this.palette.boardAxis
     ctx.lineWidth = 2
     ctx.beginPath()
     const xAxisY = gameToCanvasY(0)
@@ -161,7 +170,7 @@ export class Renderer {
     ctx.stroke()
 
     // Tick labels
-    ctx.fillStyle = this.palette.axis
+    ctx.fillStyle = this.palette.boardAxis
     ctx.font = '10px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
@@ -175,7 +184,7 @@ export class Renderer {
       if (gy === 0) continue
       ctx.fillText(String(gy), yAxisX - 6, gameToCanvasY(gy))
     }
-    ctx.fillStyle = this.palette.axis
+    ctx.fillStyle = this.palette.boardAxis
     ctx.textAlign = 'right'
     ctx.textBaseline = 'top'
     ctx.fillText('O', yAxisX - 6, xAxisY + 4)
@@ -190,9 +199,9 @@ export class Renderer {
    */
   private _paintTile(px: number, py: number, cls: TileClass): void {
     const style = tileStyleFor(cls)
-    // §16 Star-1 warming: forbidden cells share their fill with the stone
-    // backdrop, so swap to the active palette's neutral. Path/buildable
-    // fills encode meaning and stay on the categorical palette.
+    // Forbidden cells source their base fill from the board palette so the
+    // backdrop colour has a single source of truth. Path/buildable carry
+    // categorical meaning and keep their tile-style fills.
     const effective = cls === 'forbidden'
       ? { ...style, fill: this.palette.forbiddenFill }
       : style
@@ -307,7 +316,7 @@ export class Renderer {
         const pyBot = gameToCanvasY(GRID_MIN_Y)
         const width = Math.max(pxHi - pxLo, UNIT_PX * 0.25)
         ctx.save()
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.12)'
+        ctx.fillStyle = 'rgba(173, 162, 132, 0.12)'
         ctx.fillRect(pxLo, pyTop, width, pyBot - pyTop)
         ctx.restore()
       }
@@ -316,7 +325,7 @@ export class Renderer {
     if (segments.length < 2) return
 
     ctx.save()
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)'
+    ctx.strokeStyle = 'rgba(173, 162, 132, 0.45)'
     ctx.lineWidth = 1
     ctx.setLineDash([4, 3])
     const yTop = gameToCanvasY(GRID_MAX_Y)
@@ -343,15 +352,15 @@ export class Renderer {
     const radius = UNIT_PX * 0.8
 
     const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 1.5)
-    gradient.addColorStop(0, `rgba(255, 215, 0, ${0.4 * pulse})`)
-    gradient.addColorStop(0.5, `rgba(255, 215, 0, ${0.15 * pulse})`)
-    gradient.addColorStop(1, 'rgba(255, 215, 0, 0)')
+    gradient.addColorStop(0, `rgba(173, 162, 132, ${0.4 * pulse})`)
+    gradient.addColorStop(0.5, `rgba(173, 162, 132, ${0.15 * pulse})`)
+    gradient.addColorStop(1, 'rgba(173, 162, 132, 0)')
     ctx.fillStyle = gradient
     ctx.beginPath()
     ctx.arc(cx, cy, radius * 1.5, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.strokeStyle = `rgba(255, 215, 0, ${0.8 * pulse})`
+    ctx.strokeStyle = `rgba(173, 162, 132, ${0.8 * pulse})`
     ctx.lineWidth = 1.5
     ctx.beginPath()
     ctx.arc(cx, cy, radius * 0.5, 0, Math.PI * 2)
@@ -360,7 +369,7 @@ export class Renderer {
     ctx.save()
     ctx.translate(cx, cy)
     ctx.rotate(time * 0.5)
-    ctx.strokeStyle = `rgba(255, 215, 0, ${0.6 * pulse})`
+    ctx.strokeStyle = `rgba(173, 162, 132, ${0.6 * pulse})`
     ctx.lineWidth = 1
     for (let i = 0; i < 6; i++) {
       const angle = ((Math.PI * 2) / 6) * i
@@ -392,15 +401,15 @@ export class Renderer {
     const h = (region.yMax - region.yMin) * UNIT_PX
 
     ctx.save()
-    ctx.fillStyle = 'rgba(255, 215, 0, 0.12)'
+    ctx.fillStyle = 'rgba(173, 162, 132, 0.12)'
     ctx.fillRect(px, py, w, h)
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)'
+    ctx.strokeStyle = 'rgba(173, 162, 132, 0.85)'
     ctx.lineWidth = 1.5
     ctx.setLineDash([6, 4])
     ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1)
 
     ctx.setLineDash([])
-    ctx.fillStyle = 'rgba(255, 215, 0, 0.95)'
+    ctx.fillStyle = 'rgba(173, 162, 132, 0.95)'
     ctx.font = 'bold 11px monospace'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'top'

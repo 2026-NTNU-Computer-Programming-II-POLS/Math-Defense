@@ -673,7 +673,7 @@ Of the 28 items, 27 are implemented; the one standing item is **#26** (real-time
 | # | Change | Theory | Status | Anchor |
 |---|---|---|---|---|
 | 15 | **Audio AssetManager** — `engine/audio/AssetManager.ts` (`load`, `play`, `setVolume`, `mute`); `engine/audio/sfx-defs.ts` slug-to-URL map; assets in `frontend/public/audio/` are CC0 / synthesised in-house via `frontend/scripts/synth-audio.py` (`cast-spell`, `kill`, `wave-end`, `mh-reveal`, `achievement`, plus an `ambient-build` loop). First user gesture unlocks the `AudioContext` per Chromium autoplay policy; mute and master volume persist via `uiStore` and are exposed in `ProfileView.vue`. | Mayer (2014); Plass et al. (2014) | Implemented | §5.1, §5.3, §9.1, §11 |
-| 16 | **Tutorial-level palette warming** — `styles/variables.css` defines `[data-star='1']` overrides for `--bg-base` and HUD accent variables; `GameView.vue` writes `data-star` on the root element from `gameStore.starRating`. Static palette change so reduced-motion users still benefit. | Plass et al. (2014) | Implemented | §5.3 |
+| 16 | ~~**Tutorial-level palette warming**~~ — formerly used a Star-1 warm-palette swap on the canvas (`Renderer.setStarPalette`) plus a `data-star` attribute hook. **Retired** during the board re-skin to Morandi: the new light-cream board reads as friendly by default, so the Plass et al. (2014) warmth cue no longer needs a per-star override; the swap mechanism and the `data-star` hook were both removed. | Plass et al. (2014) | Retired | §5.3 |
 
 ### 15.6 Equity, Accessibility, and the Matthew Effect
 

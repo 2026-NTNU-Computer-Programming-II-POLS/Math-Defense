@@ -157,8 +157,8 @@ export function renderEndpoint(
   const { x: cx, y: cy } = toCanvas(gx, gy)
 
   ctx.save()
-  ctx.fillStyle = '#ffd700'
-  ctx.shadowColor = '#ffd700'
+  ctx.fillStyle = '#ADA284'
+  ctx.shadowColor = '#ADA284'
   ctx.shadowBlur = 12
   ctx.beginPath()
   ctx.arc(cx, cy, radius, 0, Math.PI * 2)

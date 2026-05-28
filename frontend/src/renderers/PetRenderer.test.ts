@@ -58,9 +58,12 @@ function makeRenderer(ctx: CanvasRenderingContext2D): Renderer {
   const palette: RendererPalette = {
     stoneDark: '#7a8da8',
     stoneLight: '#8ea1bd',
-    gridLine: 'rgba(255, 255, 255, 0.25)',
     axis: '#ffd700',
-    forbiddenFill: '#6a7d99',
+    boardBase: '#DCE5ED',
+    boardBaseAlt: '#E8EFF5',
+    boardAxis: '#ADA284',
+    gridLine: 'rgba(79, 74, 72, 0.18)',
+    forbiddenFill: '#F0E2DC',
   }
   return { ctx, palette } as unknown as Renderer
 }

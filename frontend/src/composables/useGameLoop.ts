@@ -175,7 +175,6 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
         if (g.generatedLevel) {
           g.state.pathsVisible = options.iaResult !== 'ignored'
           g.state.starRating = g.generatedLevel.starRating
-          g.renderer.setStarPalette(g.generatedLevel.starRating)
           g.state.initialAnswer = options.iaResult === 'correct' ? 1 : 0
           if (options.iaResult === 'paid') {
             g.economy.changeGold(-50)

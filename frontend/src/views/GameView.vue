@@ -349,7 +349,6 @@ onBeforeUnmount(() => {
   <div
     ref="shellRef"
     class="game-shell"
-    :data-star="gameStore.starRating"
     :style="{ '--canvas-w': `${CANVAS_WIDTH}px`, '--canvas-h': `${CANVAS_HEIGHT}px` }"
   >
     <!-- K-2: loading state while WASM / engine boot. Sits at shell level so
