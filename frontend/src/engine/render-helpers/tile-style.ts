@@ -61,9 +61,7 @@ export function tileStyleFor(cls: TileClass): TileStyle {
       }
     case 'buildable':
       return {
-        fill: '#E8EFF5',       // --cream-soft : pale cool-blue
-        border: '#4a82c8',     // CVD-tuned blue — DO NOT change without re-verification
-        borderStyle: 'dotted',
+        fill: '#DCE5ED',       // plain board tone — buildable cells carry no border
       }
     case 'forbidden':
       return {

@@ -9,10 +9,10 @@ describe('tileStyleFor', () => {
     expect(style.borderStyle).toBeUndefined()
   })
 
-  it('maps buildable to a dotted border', () => {
+  it('maps buildable to a plain borderless fill', () => {
     const style = tileStyleFor('buildable')
-    expect(style.borderStyle).toBe('dotted')
-    expect(style.border).toBeTypeOf('string')
+    expect(style.borderStyle).toBeUndefined()
+    expect(style.border).toBeUndefined()
     expect(style.hatching).toBeFalsy()
   })
 
