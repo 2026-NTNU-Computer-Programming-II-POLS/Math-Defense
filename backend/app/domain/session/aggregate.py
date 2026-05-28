@@ -7,8 +7,9 @@ import uuid
 from datetime import datetime, timedelta, UTC
 
 from app.domain.constraints import (
-    GOLD_MAX, HP_MAX, MAX_SCORE_DELTA, MAX_WAVE, SCORE_MAX, TOTAL_SCORE_MAX,
+    GOLD_MAX, HP_MAX, MAX_WAVE, SCORE_MAX, TOTAL_SCORE_MAX,
     LEVEL_MAX_SCORES, LEVEL_MAX_KILLS, LEVEL_MAX_WAVES,
+    max_score_delta_for,
 )
 from app.domain.errors import DomainValueError, InvalidStatusTransitionError, SessionNotActiveError
 from app.domain.value_objects import SessionStatus, Level, GameResult
@@ -224,7 +225,7 @@ class GameSession:
         if score is not None:
             if score < self.score:
                 raise DomainValueError("score must not decrease")
-            if score - self.score > MAX_SCORE_DELTA:
+            if score - self.score > max_score_delta_for(int(self.level)):
                 raise DomainValueError("score delta exceeds plausibility cap")
             level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
             if score > level_cap:
@@ -234,7 +235,9 @@ class GameSession:
             level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
             self.kill_value = max(0, min(kill_value, level_cap))
         if cost_total is not None:
-            self.cost_total = max(0, cost_total)
+            # Defense-in-depth upper bound (schema already enforces le=GOLD_MAX
+            # for HTTP callers — this clamp catches non-HTTP entrypoints).
+            self.cost_total = max(0, min(cost_total, GOLD_MAX))
         self._events.append(SessionUpdated(session_id=self.id))
 
     def complete(
@@ -259,7 +262,7 @@ class GameSession:
         # Reject end-payload scores that wildly exceed the most recent in-flight score
         if result.score.value < self.score:
             raise DomainValueError("final score must not be less than last reported score")
-        if result.score.value - self.score > MAX_SCORE_DELTA:
+        if result.score.value - self.score > max_score_delta_for(int(self.level)):
             raise DomainValueError("final score delta exceeds plausibility cap")
 
         # Per-level caps — reject impossible scores/kills/waves (C-02)
@@ -327,9 +330,20 @@ class GameSession:
         """
         if kill_value is not None:
             level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
+            # Per-wave plausibility: kill_value cannot exceed what the proven
+            # wave count could legitimately produce. Mirrors BD-1's per-wave
+            # score bound, applied to kill_value (the formula numerator).
+            level_wave_count = LEVEL_MAX_WAVES.get(int(self.level))
+            if level_wave_count and self.waves_survived > 0:
+                wave_cap = math.ceil(
+                    level_cap * (self.waves_survived + 1) / level_wave_count
+                )
+                level_cap = min(level_cap, wave_cap)
             self.kill_value = max(0, min(kill_value, level_cap))
         if cost_total is not None:
-            self.cost_total = max(0, cost_total)
+            # Defense-in-depth upper bound (schema already enforces le=GOLD_MAX
+            # for HTTP callers — this clamp catches non-HTTP entrypoints).
+            self.cost_total = max(0, min(cost_total, GOLD_MAX))
         if time_total is not None:
             self.time_total = max(0.0, time_total)
         if health_origin is not None:

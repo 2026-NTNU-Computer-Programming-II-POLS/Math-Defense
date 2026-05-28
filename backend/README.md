@@ -322,7 +322,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `current_wave` | 0 – 999 |
 | `gold` | 0 – 99,999 |
 | `hp` | 0 – 100 |
-| `score` | 0 – 9,999,999; monotonically non-decreasing; per-PATCH delta capped at 50,000 |
+| `score` | 0 – 9,999,999; monotonically non-decreasing; per-PATCH delta capped per-level via `max_score_delta_for(level)` = `ceil(LEVEL_MAX_SCORES / LEVEL_MAX_WAVES) × 2` (L1=3334, L2=5000, L3=6000, L4=20000, L5=33334) |
 | `kill_value` / `cost_total` | 0 – SCORE_MAX / GOLD_MAX |
 | `kills` | 0 – 9,999 |
 | `waves_survived` | 0 – 999 |

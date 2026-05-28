@@ -6,6 +6,8 @@ is encoded exactly once.
 """
 from __future__ import annotations
 
+import math
+
 STAR_MIN = 1
 STAR_MAX = 5
 STAR_RANGE = (STAR_MIN, STAR_MAX)
@@ -41,7 +43,6 @@ GOLD_RANGE = (GOLD_MIN, GOLD_MAX)
 
 # Per-wave anti-cheat ceilings.
 MAX_WAVE = 30
-MAX_SCORE_DELTA = 50_000
 
 # ── Per-level anti-cheat caps ──
 # Based on enemy counts × 10 pts/kill (with split-slime children), multiplied
@@ -70,3 +71,29 @@ LEVEL_MAX_WAVES: dict[int, int] = {
     4: 5,
     5: 6,
 }
+
+
+# Per-level single-update score delta cap (was a flat 50_000 — far looser than
+# any legitimate per-wave score).
+# Sized as ``ceil(level_max_score / level_max_waves) × 2``: twice the average
+# per-wave allocation so a wave that concentrates the level's score budget
+# (e.g. a boss wave) still passes, but a single update jumping the whole
+# level cap is rejected. Sync cadence is once per WAVE_END so this is the
+# correct granularity (see frontend/src/services/sessionLifecycleService.ts).
+def max_score_delta_for(level: int) -> int:
+    """Per-level cap on a single ``score`` increase in update_progress / complete.
+
+    Falls back to 50_000 (the pre-tightening flat value) for unknown levels so
+    callers outside the canonical 1..5 range still see an upper bound.
+    """
+    level_cap = LEVEL_MAX_SCORES.get(int(level))
+    wave_cap = LEVEL_MAX_WAVES.get(int(level))
+    if level_cap is None or not wave_cap:
+        return 50_000
+    return math.ceil(level_cap / wave_cap) * 2
+
+
+# Backwards-compatible export for tests / callers that imported the flat value.
+# Equals the loosest legitimate cap across the 1..5 range so a test asserting
+# "delta above MAX_SCORE_DELTA is rejected" still passes on every level.
+MAX_SCORE_DELTA = max(max_score_delta_for(lv) for lv in LEVEL_MAX_SCORES)
