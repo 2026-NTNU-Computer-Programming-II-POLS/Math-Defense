@@ -595,7 +595,7 @@ onBeforeUnmount(() => {
   top: calc(var(--hud-height, 56px) + 52px);
   bottom: calc(var(--tower-bar-height, 64px) + 8px);
   z-index: var(--z-chrome);
-  width: 160px;
+  width: 200px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -653,19 +653,16 @@ onBeforeUnmount(() => {
   flex-direction: column;
   line-height: 1.15;
   min-width: 0;
-  /* Allow nm to ellipsis inside the narrowed 160px rail; the full buff
-     name remains available via the parent `.lb-buff [title]` tooltip. */
   flex: 1 1 auto;
-  overflow: hidden;
 }
 .left-utility-stack .b-info .nm {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 700;
   color: var(--charcoal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Wrap to as many lines as needed so the full buff name is always shown. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   line-height: 1.2;
 }
 .left-utility-stack .b-info .ct {
