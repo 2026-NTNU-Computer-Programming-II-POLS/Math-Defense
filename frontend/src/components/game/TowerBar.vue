@@ -217,7 +217,7 @@ function isHighlighted(type: TowerType): boolean {
              the hexagon until their own 5c–5e sub-phases land. -->
         <span
           class="tower-icon"
-          :style="{ color: uiStore.selectedTowerType === def.type ? '#fff' : TOWER_CARD_COLOR[def.type] }"
+          :style="{ color: isHighlighted(def.type) ? '#fff' : TOWER_CARD_COLOR[def.type] }"
         >
           <svg
             v-if="def.type === TowerType.MAGIC"
