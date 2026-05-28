@@ -251,10 +251,12 @@ const showTargetingMode = computed(() => {
 
       <details v-if="damageBreakdown" class="stat-row stat-row--breakdown">
         <summary>
-          <span class="stat-label">Damage</span>
-          <span class="stat-value">
-            {{ damageBreakdown.total.toFixed(1) }}
-            <span class="bd-chevron" aria-hidden="true">▾</span>
+          <span class="sum-line">
+            <span class="stat-label">Damage</span>
+            <span class="stat-value">
+              {{ damageBreakdown.total.toFixed(1) }}
+              <span class="bd-chevron" aria-hidden="true">▾</span>
+            </span>
           </span>
         </summary>
         <div class="breakdown-body">
@@ -270,10 +272,12 @@ const showTargetingMode = computed(() => {
 
       <details v-if="rangeBreakdown" class="stat-row stat-row--breakdown">
         <summary>
-          <span class="stat-label">Range</span>
-          <span class="stat-value">
-            {{ rangeBreakdown.total.toFixed(1) }}
-            <span class="bd-chevron" aria-hidden="true">▾</span>
+          <span class="sum-line">
+            <span class="stat-label">Range</span>
+            <span class="stat-value">
+              {{ rangeBreakdown.total.toFixed(1) }}
+              <span class="bd-chevron" aria-hidden="true">▾</span>
+            </span>
           </span>
         </summary>
         <div class="breakdown-body">
@@ -286,10 +290,12 @@ const showTargetingMode = computed(() => {
 
       <details v-if="cooldownBreakdown" class="stat-row stat-row--breakdown">
         <summary>
-          <span class="stat-label">Cooldown</span>
-          <span class="stat-value">
-            {{ cooldownBreakdown.total.toFixed(2) }}s
-            <span class="bd-chevron" aria-hidden="true">▾</span>
+          <span class="sum-line">
+            <span class="stat-label">Cooldown</span>
+            <span class="stat-value">
+              {{ cooldownBreakdown.total.toFixed(2) }}s
+              <span class="bd-chevron" aria-hidden="true">▾</span>
+            </span>
           </span>
         </summary>
         <div class="breakdown-body">
@@ -450,7 +456,7 @@ const showTargetingMode = computed(() => {
   border-bottom: 1px dashed var(--line);
 }
 .stat-row:last-of-type { border-bottom: none; }
-.stat-row > span:last-child { color: var(--charcoal); font-weight: 700; font-family: var(--font-mono); }
+.stat-row > span:last-child { color: var(--charcoal); font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* Click-to-expand breakdown for Damage / Range / Cooldown rows. Using
    <details>/<summary> instead of an absolute-positioned tooltip avoids
@@ -465,13 +471,19 @@ details.stat-row--breakdown {
   border-bottom: 1px dashed var(--line);
 }
 details.stat-row--breakdown:last-of-type { border-bottom: none; }
+/* `display:flex` on <summary> itself is unreliable across engines (it can
+   collapse the label/value to a centred clump); flex an inner wrapper instead
+   so the row reads label-left / value-right just like the plain Level row. */
 details.stat-row--breakdown > summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: block;
   cursor: pointer;
   list-style: none;
   outline: none;
+}
+.sum-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 details.stat-row--breakdown > summary::-webkit-details-marker { display: none; }
 details.stat-row--breakdown > summary:focus-visible {
@@ -479,10 +491,11 @@ details.stat-row--breakdown > summary:focus-visible {
   outline-offset: 2px;
   border-radius: 2px;
 }
-details.stat-row--breakdown > summary > .stat-value {
+.sum-line > .stat-value {
   color: var(--charcoal);
   font-family: var(--font-mono);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -492,7 +505,7 @@ details.stat-row--breakdown > summary > .stat-value {
   color: var(--charcoal-soft);
   transition: transform 0.15s;
 }
-details.stat-row--breakdown[open] > summary > .stat-value > .bd-chevron {
+details.stat-row--breakdown[open] .bd-chevron {
   transform: rotate(180deg);
 }
 
