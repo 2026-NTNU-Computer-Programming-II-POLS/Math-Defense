@@ -330,11 +330,15 @@ function canAfford(cost: number): boolean {
   white-space: nowrap;
 }
 
+/* Category chips fill a 2-column grid, row by row, so the five filters wrap
+   into at most three lines (All/Geometry, Functions/Algebra, Calculus) to
+   match the mockup instead of stretching the bar in one long row. */
 .category-chips {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  align-content: center;
   gap: 4px;
   flex-shrink: 0;
-  flex-wrap: nowrap;
 }
 /* Category filter chips (mockup .tcat) */
 .chip {
@@ -352,7 +356,7 @@ function canAfford(cost: number): boolean {
   align-items: center;
   gap: 4px;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
-  min-height: 32px;
+  min-height: 26px;
 }
 .chip:hover {
   border-color: var(--gold);
@@ -390,12 +394,11 @@ function canAfford(cost: number): boolean {
   font-style: italic;
 }
 
-/* Tower cards laid out in a 3-row grid that fills the bar width so every
-   tower shows at once with no horizontal scrollbar. grid-auto-flow:column
-   fills top-to-bottom in 3 rows; auto columns are equal width (1fr). */
+/* Tower cards laid out in a single row that fills the bar width so every
+   tower shows at once with no horizontal scrollbar. Equal-width columns
+   (1fr) keep the cards uniform across the strip. */
 .tower-list {
   display: grid;
-  grid-template-rows: repeat(3, 1fr);
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: 5px;
