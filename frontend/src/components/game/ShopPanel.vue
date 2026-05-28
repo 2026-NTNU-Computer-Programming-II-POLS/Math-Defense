@@ -193,15 +193,13 @@ function purchase(itemId: string, cost: number): void {
    (collapsed state) is unchanged; this is the Morandi surface only. */
 .shop-panel {
   position: relative;
-  width: 296px;
+  width: 440px;
   background: var(--cream-soft);
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
   padding: 12px 14px;
   z-index: var(--z-floating);
-  max-height: 500px;
-  overflow-y: auto;
   transition:
     width 200ms ease-out,
     padding 200ms ease-out,
@@ -336,7 +334,7 @@ function purchase(itemId: string, cost: number): void {
 
 .category-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   margin-bottom: 10px;
 }
@@ -344,13 +342,13 @@ function purchase(itemId: string, cost: number): void {
   background: rgba(245, 250, 254, 0.7);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: var(--text-2xs);
   color: var(--charcoal-soft);
   cursor: pointer;
   white-space: nowrap;
   font-family: var(--font-mono);
-  letter-spacing: 0.7px;
+  letter-spacing: 0.3px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -386,8 +384,8 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .shop-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
 }
 
@@ -467,6 +465,7 @@ function purchase(itemId: string, cost: number): void {
 }
 
 .empty-msg {
+  grid-column: 1 / -1;
   font-size: var(--text-xs);
   color: var(--charcoal-soft);
   margin: 0;

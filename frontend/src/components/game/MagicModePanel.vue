@@ -89,20 +89,6 @@ const placeholder = computed(() => {
   return 'e.g. 2*x^2 - x + 5  (use * for multiply)'
 })
 
-// Render a parabola translated to pass through the tower position. The world
-// origin sits at canvas centre so both coordinates can be negative; emit clean
-// math notation rather than literal `(x - -3)^2 + -5`.
-const translatedExample = computed(() => {
-  const t = tower.value
-  if (!t) return ''
-  const h = t.x
-  const k = t.y
-  const inner = h === 0 ? 'x' : h > 0 ? `x - ${h}` : `x + ${-h}`
-  const base = h === 0 ? 'x^2' : `(${inner})^2`
-  if (k === 0) return base
-  return k > 0 ? `${base} + ${k}` : `${base} - ${-k}`
-})
-
 watch(tower, (t) => {
   inputExpr.value = t?.magicExpression ?? ''
   error.value = ''
@@ -165,8 +151,25 @@ function toggleMode(mode: MagicMode) {
 
 <template>
   <div class="magic-panel">
-    <!-- Backlog §20 — slider-fallback / practice mode. -->
-    <div v-if="sliderFallback" class="fn-input slider-fn-input">
+    <!-- MODE — only meaningful once a curve is configured. -->
+    <div v-if="tower?.configured" class="mode-card">
+      <p class="section-label">Mode</p>
+      <div class="mode-btns">
+        <button
+          class="btn"
+          :class="{ active: tower.magicMode === 'debuff' }"
+          @click="toggleMode('debuff')"
+        >Debuff Zone</button>
+        <button
+          class="btn"
+          :class="{ active: tower.magicMode === 'buff' }"
+          @click="toggleMode('buff')"
+        >Buff Zone</button>
+      </div>
+    </div>
+
+    <!-- FUNCTION — Backlog §20 slider-fallback / practice mode. -->
+    <div v-if="sliderFallback" class="fn-card slider-fn-input">
       <p class="section-label">Function f(x): a · x² + b · x + c</p>
       <div class="slider-row">
         <label class="slider-cell">
@@ -189,13 +192,8 @@ function toggleMode(mode: MagicMode) {
       <button class="btn apply-btn" @click="applySliderFunction">Apply</button>
       <p class="hint">Practice mode — runs do not appear on the global leaderboard.</p>
     </div>
-    <div v-else class="fn-input">
-      <p class="section-label">Function f(x):</p>
-      <p v-if="tower" class="hint origin-hint" data-testid="magic-origin-hint">
-        Curve is plotted in world coordinates (origin = (0, 0)).
-        This tower sits at ({{ tower.x }}, {{ tower.y }}) — to pass the curve
-        through it, translate manually, e.g. <code>{{ translatedExample }}</code>.
-      </p>
+    <div v-else class="fn-card">
+      <p class="section-label">Function f(x)</p>
       <div class="input-row">
         <input
           v-model="inputExpr"
@@ -207,54 +205,37 @@ function toggleMode(mode: MagicMode) {
         <button class="btn apply-btn" @click="applyFunction">Apply</button>
       </div>
       <p class="hint">
-        sqrt, abs, exp, pi ·
-        <span :class="{ 'fn-locked': !trigUnlocked }">sin, cos, tan{{ trigUnlocked ? '' : ' (locked)' }}</span> ·
-        <span :class="{ 'fn-locked': !logUnlocked }">log, ln{{ logUnlocked ? '' : ' (locked)' }}</span>
-        · use * for multiply (2*x not 2x)
+        allowed: sqrt · abs · exp · pi ·
+        <span :class="{ 'fn-locked': !trigUnlocked }">sin · cos · tan</span> ·
+        <span :class="{ 'fn-locked': !logUnlocked }">log · ln</span>
+        · use * for multiply
       </p>
       <p v-if="error" class="error-msg">{{ error }}</p>
-    </div>
-
-    <div v-if="tower?.configured" class="mode-select">
-      <p class="section-label">Zone Mode:</p>
-      <div class="mode-btns">
-        <button
-          class="btn"
-          :class="{ active: tower.magicMode === 'debuff' }"
-          @click="toggleMode('debuff')"
-        >Debuff Enemies</button>
-        <button
-          class="btn"
-          :class="{ active: tower.magicMode === 'buff' }"
-          @click="toggleMode('buff')"
-        >Buff Towers</button>
-      </div>
-      <!-- Phase 6 Q7 — surface the slow/DoT timing so players can plan around
-           the 2 s slow refreshing while the 1 s DoT ticks each cooldown. The
-           buff branch has its own one-line hint so the panel is informative
-           regardless of mode. -->
-      <p
-        v-if="tower.magicMode === 'debuff'"
-        class="mode-hint"
-        data-testid="magic-debuff-hint"
-      >
-        Inside the band: <strong>1 s DoT</strong> per cooldown and a <strong>2 s slow</strong> to 60% speed. Re-hits refresh the timers (no stronger stack).
-      </p>
-      <p
-        v-else-if="tower.magicMode === 'buff'"
-        class="mode-hint"
-        data-testid="magic-buff-hint"
-      >
-        Allied towers inside the wider band gain <strong>+25%</strong> damage while at least one Magic tower in this mode covers them.
-      </p>
     </div>
   </div>
 </template>
 
 <style scoped>
 .magic-panel { display: flex; flex-direction: column; gap: 8px; }
-.section-label { font-size: var(--text-xs); color: var(--charcoal-soft); margin: 0; }
-.fn-input { display: flex; flex-direction: column; gap: 4px; }
+.section-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--charcoal-soft);
+  margin: 0;
+}
+/* MODE / FUNCTION sub-cards — pale rounded surface matching the stats card. */
+.mode-card,
+.fn-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
 .input-row { display: flex; gap: 4px; }
 .fn-field {
   flex: 1;
@@ -270,13 +251,6 @@ function toggleMode(mode: MagicMode) {
 .fn-field:focus { border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28); }
 .apply-btn { font-size: var(--text-xs); padding: 6px 10px; }
 .hint { font-size: var(--text-2xs); color: var(--charcoal-soft); margin: 0; }
-.origin-hint code {
-  font-family: var(--font-mono, monospace);
-  color: var(--terracotta-deep);
-  background: rgba(111, 138, 161, 0.14);
-  padding: 0 3px;
-  border-radius: 3px;
-}
 .fn-locked { color: var(--clay-deep); opacity: 0.85; text-decoration: line-through; }
 .error-msg { font-size: var(--text-xs); color: var(--clay-deep); margin: 0; }
 /* Magic mode toggle — Debuff = dark purple, Buff = light purple. Pure text
@@ -315,20 +289,10 @@ function toggleMode(mode: MagicMode) {
 .mode-btns .btn:last-child.active {
   box-shadow: 0 0 0 2px var(--tw-magic-buff-deep), 0 4px 12px rgba(140, 122, 168, 0.32);
 }
-/* Phase 6-UI: MAGIC slow/DoT timing readout box rendered below the mode
-   toggle. Kept here so the dual-purple toggle doesn't have to know about it. */
-.mode-hint {
-  font-size: var(--text-2xs);
-  color: var(--text-primary);
-  margin: 6px 0 0;
-  line-height: 1.4;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.3);
-  border-left: 2px solid var(--gold);
-  border-radius: 0 3px 3px 0;
-}
-.mode-hint strong { color: var(--gold); font-weight: bold; }
 .slider-fn-input { gap: 6px; }
+/* Slider label carries the live a·x²+b·x+c formula — keep it readable
+   (no uppercasing) unlike the plain MODE / FUNCTION caps labels. */
+.slider-fn-input .section-label { text-transform: none; letter-spacing: 0.5px; }
 .slider-row { display: flex; flex-direction: column; gap: 4px; }
 .slider-cell { display: grid; grid-template-columns: 14px 1fr 28px; align-items: center; gap: 6px; }
 .slider-name { font-size: var(--text-xs); color: var(--terracotta-deep); font-style: italic; }

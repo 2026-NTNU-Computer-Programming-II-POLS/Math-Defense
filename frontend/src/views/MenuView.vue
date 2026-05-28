@@ -123,13 +123,16 @@ const manualOpen = ref(false)
               <div class="account-name">{{ auth.user?.player_name }}</div>
               <div class="account-sub">Player Profile</div>
             </div>
-            <button class="btn btn-ghost" @click="router.push({ name: 'profile' })">
+            <button
+              class="btn btn-ghost account-btn"
+              @click="router.push({ name: 'profile' })"
+            >
               Open
             </button>
+            <button class="btn account-btn" @click="auth.logout()">
+              <span class="icon">⏻</span><span class="label">Log Out</span>
+            </button>
           </div>
-          <button class="btn" @click="auth.logout()">
-            <span class="icon">⏻</span><span class="label">Log Out</span>
-          </button>
         </template>
         <button
           v-else
@@ -204,7 +207,22 @@ const manualOpen = ref(false)
    so the Start Game button would otherwise sit flush against "PROGRESSION".
    Restore a breathing gap that matches the inter-section spacing. */
 .menu-card > .btn.btn-primary {
+  width: 100%;
   margin-bottom: 22px;
+}
+
+/* Menu nav buttons: icon pinned to the left (inset from the edge) while the
+   label stays centred across the full button width. */
+.menu-card .btn-stack > .btn {
+  justify-content: center;
+  position: relative;
+}
+
+.menu-card .btn-stack > .btn .icon {
+  position: absolute;
+  left: var(--space-12);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* ── Sections ── */
@@ -226,13 +244,6 @@ const manualOpen = ref(false)
   margin: 22px 0 12px;
 }
 
-.section-label::after {
-  content: "";
-  flex: 1;
-  height: 0;
-  border-top: 1px dashed var(--line-strong);
-}
-
 .section-label:first-child {
   margin-top: 0;
 }
@@ -243,6 +254,18 @@ const manualOpen = ref(false)
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* Open + Log Out sit side by side at the right of the account row, sized
+   down from the standard ghost button to keep the row compact. */
+.account-btn {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.account-btn .icon {
+  font-size: var(--text-xs);
 }
 
 .avatar-sm {

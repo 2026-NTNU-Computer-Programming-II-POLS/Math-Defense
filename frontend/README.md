@@ -359,7 +359,7 @@ Game.start()
             │     placement → combat → movement → wave → buff → economy → …
             └─ accumulator -= FIXED_DT
        └─ render pass:
-            renderer.clear() → drawGrid → drawOrigin → drawFunction (path)
+            renderer.clear() → drawGrid → drawFunction (path)
             for each system: system.render?.(renderer, game)
               EnemyRenderer → TowerRenderer → ProjectileRenderer → PetRenderer
               MagicZoneRenderer → RadarRangeRenderer → MatrixLaserRenderer

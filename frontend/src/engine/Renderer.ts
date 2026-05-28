@@ -52,16 +52,24 @@ export interface RendererPalette {
   readonly stoneLight: string
   /** Tower keyboard-focus halo (legacy name; not the board axis colour). */
   readonly axis: string
-  /** Board checkerboard base — canvas clear + dark-cell stone fill. */
+  /** No-layout checkerboard base (menu/pre-level grid cells). */
   readonly boardBase: string
-  /** Board checkerboard alt — light-cell stone fill. */
+  /** No-layout checkerboard alt cell. */
   readonly boardBaseAlt: string
+  /**
+   * Canvas backdrop painted by `clear()` — the area OUTSIDE the coordinate
+   * grid (beyond GRID_MIN..GRID_MAX). Kept distinct from the grid-cell tone
+   * so the ±range plane reads as a lighter panel on a darker surround.
+   */
+  readonly outsideFill: string
   /** Board coordinate axes + tick labels. */
   readonly boardAxis: string
   /** Board grid lines (low-alpha charcoal — graph-paper feel). */
   readonly gridLine: string
-  /** Forbidden-cell base fill (red hatching from `_applyTileStyle` overlays). */
+  /** Forbidden-cell base fill (gray hatching from `_applyTileStyle` overlays). */
   readonly forbiddenFill: string
+  /** Forbidden-cell diagonal hatch stroke (slate gray — the primary signal). */
+  readonly forbiddenHatch: string
 }
 
 const BOARD_PALETTE: RendererPalette = Object.freeze({
@@ -70,11 +78,13 @@ const BOARD_PALETTE: RendererPalette = Object.freeze({
   stoneLight: '#8ea1bd',
   axis: '#ffd700',
   // Board ink — Morandi light re-skin.
-  boardBase: '#DCE5ED',      // --cream      : checkerboard base
-  boardBaseAlt: '#E8EFF5',   // --cream-soft : checkerboard alt
+  boardBase: '#E8EFF5',      // --cream-soft : no-layout checkerboard base
+  boardBaseAlt: '#DCE5ED',   // --cream      : checkerboard alt
   boardAxis: '#ADA284',      // --gold       : muted khaki axes / ticks
   gridLine: 'rgba(79, 74, 72, 0.18)', // --divider : graph-paper thin lines
-  forbiddenFill: '#F0E2DC',  // --wrong-bg   : forbidden cell base
+  forbiddenFill: '#E8EFF5',  // --cream-soft : grid-cell base; gray hatch is the signal
+  outsideFill: '#DCE5ED',    // --cream      : backdrop outside the ±grid range
+  forbiddenHatch: 'rgba(122, 141, 168, 0.55)', // stoneDark hue — diagonal stripes
 })
 
 export class Renderer {
@@ -121,7 +131,10 @@ export class Renderer {
   }
 
   clear(): void {
-    this.ctx.fillStyle = this.palette.boardBase
+    // Paint the whole canvas with the OUTSIDE-grid backdrop. drawGrid then
+    // repaints the ±GRID_MIN..GRID_MAX cells with the lighter grid tone, so
+    // only the area beyond the coordinate range keeps this colour.
+    this.ctx.fillStyle = this.palette.outsideFill
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   }
 
@@ -260,7 +273,7 @@ export class Renderer {
       ctx.beginPath()
       ctx.rect(px, py, UNIT_PX, UNIT_PX)
       ctx.clip()
-      ctx.strokeStyle = 'rgba(184, 64, 64, 0.35)'
+      ctx.strokeStyle = this.palette.forbiddenHatch
       ctx.lineWidth = 1
       const step = 4
       for (let off = -UNIT_PX; off < UNIT_PX; off += step) {
@@ -422,76 +435,65 @@ export class Renderer {
     ctx.restore()
   }
 
-  drawOrigin(time: number): void {
+  /**
+   * Draw a blinking 5-pointed star at game coordinate `(gx, gy)` — the focus
+   * point of the enemy paths (level endpoint P*). `time` (seconds) drives the
+   * pulse so the marker reads as "alive". Pure primitive: no state. The star
+   * is a bright focal accent, so its colours live here as local constants
+   * rather than in the board palette (which holds only muted board ink).
+   */
+  drawFocusStar(gx: number, gy: number, time: number): void {
     const { ctx } = this
-    const cx = gameToCanvasX(0)
-    const cy = gameToCanvasY(0)
-    const pulse = 0.6 + 0.4 * Math.sin(time * 3)
-    const radius = UNIT_PX * 0.8
+    const cx = gameToCanvasX(gx)
+    const cy = gameToCanvasY(gy)
+    const pulse = 0.5 + 0.5 * Math.sin(time * 4)
+    // Bright, prominent: a vivid gold star with a glowing white core.
+    const GOLD = '#F6C944'
+    const GOLD_EDGE = '#D69A1E'
+    const CORE = '#FFFBE6'
+    const SPIKES = 5
+    const outerR = UNIT_PX * (0.72 + 0.1 * pulse)
+    const innerR = outerR * 0.44
 
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 1.5)
-    gradient.addColorStop(0, `rgba(173, 162, 132, ${0.4 * pulse})`)
-    gradient.addColorStop(0.5, `rgba(173, 162, 132, ${0.15 * pulse})`)
-    gradient.addColorStop(1, 'rgba(173, 162, 132, 0)')
-    ctx.fillStyle = gradient
+    const traceStar = (oR: number, iR: number): void => {
+      ctx.beginPath()
+      for (let i = 0; i < SPIKES * 2; i++) {
+        const r = i % 2 === 0 ? oR : iR
+        const angle = -Math.PI / 2 + (Math.PI / SPIKES) * i
+        const x = cx + Math.cos(angle) * r
+        const y = cy + Math.sin(angle) * r
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+    }
+
+    ctx.save()
+    // Strong pulsing halo so the marker pops against the board.
+    const glowR = outerR * 2.6
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR)
+    glow.addColorStop(0, `rgba(246, 201, 68, ${0.5 + 0.35 * pulse})`)
+    glow.addColorStop(0.5, `rgba(246, 201, 68, ${0.2 * pulse})`)
+    glow.addColorStop(1, 'rgba(246, 201, 68, 0)')
+    ctx.fillStyle = glow
     ctx.beginPath()
-    ctx.arc(cx, cy, radius * 1.5, 0, Math.PI * 2)
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.strokeStyle = `rgba(173, 162, 132, ${0.8 * pulse})`
+    // Solid gold body (opaque — brightness comes from the colour, the blink
+    // from the halo and the bright core).
+    traceStar(outerR, innerR)
+    ctx.fillStyle = GOLD
+    ctx.fill()
     ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.arc(cx, cy, radius * 0.5, 0, Math.PI * 2)
+    ctx.strokeStyle = GOLD_EDGE
     ctx.stroke()
 
-    ctx.save()
-    ctx.translate(cx, cy)
-    ctx.rotate(time * 0.5)
-    ctx.strokeStyle = `rgba(173, 162, 132, ${0.6 * pulse})`
-    ctx.lineWidth = 1
-    for (let i = 0; i < 6; i++) {
-      const angle = ((Math.PI * 2) / 6) * i
-      const r = radius * 0.4
-      ctx.beginPath()
-      ctx.moveTo(0, 0)
-      ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r)
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  /**
-   * Highlight the disclosure region — a rectangle that is guaranteed to
-   * contain exactly one common intersection of all level curves (= P*, the
-   * tower-defense goal). Player sees only the rectangle, not the precise
-   * point.
-   */
-  drawDisclosureRegion(region: {
-    readonly xMin: number
-    readonly xMax: number
-    readonly yMin: number
-    readonly yMax: number
-  }): void {
-    const { ctx } = this
-    const px = gameToCanvasX(region.xMin)
-    const py = gameToCanvasY(region.yMax)
-    const w = (region.xMax - region.xMin) * UNIT_PX
-    const h = (region.yMax - region.yMin) * UNIT_PX
-
-    ctx.save()
-    ctx.fillStyle = 'rgba(173, 162, 132, 0.12)'
-    ctx.fillRect(px, py, w, h)
-    ctx.strokeStyle = 'rgba(173, 162, 132, 0.85)'
-    ctx.lineWidth = 1.5
-    ctx.setLineDash([6, 4])
-    ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1)
-
-    ctx.setLineDash([])
-    ctx.fillStyle = 'rgba(173, 162, 132, 0.95)'
-    ctx.font = 'bold 11px monospace'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'top'
-    ctx.fillText('Goal here', px + 4, py + 4)
+    // Bright pulsing inner core for extra sparkle.
+    traceStar(outerR * 0.5, innerR * 0.5)
+    ctx.globalAlpha = 0.55 + 0.45 * pulse
+    ctx.fillStyle = CORE
+    ctx.fill()
     ctx.restore()
   }
 

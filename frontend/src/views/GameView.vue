@@ -422,12 +422,10 @@ onBeforeUnmount(() => {
       <PhaseFader />
       <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
         <div class="lb-label">Tools</div>
-        <!-- Shop is build-only (purchases need BUILD). GameSpeedPanel itself
-             handles the WAVE/BUILD split: it stays visible during BUILD to
-             pre-arm the next wave's speed and shows a "wave only" hint when
-             the multiplier isn't live yet. -->
+        <!-- Shop is build-only (purchases need BUILD). The speed toggle only
+             drives the loop during WAVE, so it is wave-only too. -->
         <ShopPanel v-if="gameStore.isBuilding" />
-        <GameSpeedPanel />
+        <GameSpeedPanel v-if="gameStore.isWave" />
 
         <!-- ACTIVE BUFFS label always shows; the token cards appear as buffs
              are acquired. -->
@@ -597,7 +595,7 @@ onBeforeUnmount(() => {
   top: calc(var(--hud-height, 56px) + 52px);
   bottom: calc(var(--tower-bar-height, 64px) + 8px);
   z-index: var(--z-chrome);
-  width: 160px;
+  width: 200px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -607,7 +605,7 @@ onBeforeUnmount(() => {
   overflow: visible;
   /* Light-blue sidebar surface behind the tools + active buffs. */
   padding: 12px 10px;
-  background: rgba(214, 226, 238, 0.88);
+  background: var(--rail-surface);
   border: 1px solid var(--line);
   border-radius: 0;
   box-shadow: var(--shadow-sm);
@@ -655,19 +653,16 @@ onBeforeUnmount(() => {
   flex-direction: column;
   line-height: 1.15;
   min-width: 0;
-  /* Allow nm to ellipsis inside the narrowed 160px rail; the full buff
-     name remains available via the parent `.lb-buff [title]` tooltip. */
   flex: 1 1 auto;
-  overflow: hidden;
 }
 .left-utility-stack .b-info .nm {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 700;
   color: var(--charcoal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Wrap to as many lines as needed so the full buff name is always shown. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   line-height: 1.2;
 }
 .left-utility-stack .b-info .ct {

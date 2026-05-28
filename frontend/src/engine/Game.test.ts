@@ -8,8 +8,8 @@ vi.mock('./Renderer', () => ({
     constructor(canvas: HTMLCanvasElement) { this.canvas = canvas }
     clear(): void {}
     drawGrid(): void {}
-    drawOrigin(): void {}
     drawFunction(): void {}
+    drawFocusStar(): void {}
   },
 }))
 vi.mock('./InputManager', () => ({

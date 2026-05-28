@@ -10,7 +10,7 @@
      Morandi palette — canonical colour values.
      ============================================================ */
    --cream:        #DCE5ED;   /* soft blue-grey body / card base */
-   --cream-soft:   #E8EFF5;   /* lighter for elevated surfaces */
+   --cream-soft:   #E8EFF5;   /* lighter for elevated surfaces; coordinate-grid panel */
    --cream-deep:   #C2CFDB;   /* deeper for accents/edges */
    --sand:         #C8D2DC;   /* secondary cool surface */
    --paper:        #D6E0E8;   /* game plane paper */
@@ -106,6 +106,9 @@
    --panel-border: var(--gold);
    --panel-shadow: 0 12px 40px rgba(79, 74, 72, 0.12);
    --bar-bg: rgba(200, 210, 220, 0.96);
+   /* Light-blue chrome surface shared by the left tools/buffs rail and the
+      build (tower-info) drawer so the two read as one material. */
+   --rail-surface: rgba(214, 226, 238, 0.88);
    --overlay-bg: rgba(95, 118, 142, 0.92);
    --text-on-accent: #2D3A47;
 
@@ -127,6 +130,7 @@
    --gold-tint-select: rgba(173, 162, 132, 0.16);
    --gold-tint-faint: rgba(173, 162, 132, 0.06);
    --gold-tint-soft: rgba(173, 162, 132, 0.10);
+   --teal-tint:      rgba(143, 168, 163, 0.24);  /* active speed-toggle fill */
    --gold-shadow: 0 1px 4px rgba(79, 74, 72, 0.30);
    --gold-border: rgba(122, 113, 86, 0.55);
 

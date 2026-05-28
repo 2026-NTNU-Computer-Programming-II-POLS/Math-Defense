@@ -6,22 +6,14 @@
  * or game state, which keeps the policy unit-testable and re-usable for
  * alternate renderers (e.g. DOM previews, tests). See spec §8.1.
  *
- * Fills migrated to the Morandi light board palette to match the surrounding
- * HUD / panel surfaces (`styles/variables.css`). The categorical signal now
- * lives in the borders + hatching, not the fills — fills are intentionally
- * close in luminance so the board reads as one cohesive light surface.
- *
- * Phase 8 accessibility pass (see `docs/playtest-notes-piecewise.md`):
- * the buildable border was retuned from amber (`#c89848`) to blue
- * (`#4a82c8`) — the same blue already used as the FunctionPanel curve
- * stroke, so this is palette-cohesive rather than a new colour — so it
- * remains distinguishable from the path's green border under deuteranopia
- * and protanopia, where the old green + amber pair converged toward the
- * same olive hue. These borders are load-bearing for CVD accessibility:
- * do not change `path` green or `buildable` blue without re-verifying the
- * deuteranopia/protanopia distinction. Forbidden cells rely on the red
- * diagonal hatching (drawn by the Renderer) rather than the fill — the
- * fill is intentionally light to match the rest of the board.
+ * The board reads as a single light surface (one fill, `#E8EFF5`, the
+ * --cream-soft board tone, distinct from the --cream page behind it).
+ * Legality is encoded by exactly one signal: gray diagonal
+ * hatching marks every cell where a tower is *prohibited*. Both `path`
+ * (the enemy route) and `forbidden` carry that hatch; `buildable` is left
+ * plain, so the absence of hatch is the "you may build here" cue. There
+ * are no cell borders — placement legality on hover is shown separately by
+ * the Renderer's `drawPlacementCursor` ring.
  */
 import type { TileClass } from '@/domain/level/level-layout-service'
 
@@ -31,14 +23,13 @@ export interface TileStyle {
   /** Optional border colour; omit to skip the stroke. */
   readonly border?: string
   /**
-   * Border stroke style. `'dotted'` is used for buildable cells to signal
-   * "click here to place"; `'solid'` for path; omitted when there is no
-   * border at all.
+   * Border stroke style. Currently unused by any tile (cells are
+   * borderless); retained so the Renderer's stroke path stays general.
    */
   readonly borderStyle?: 'solid' | 'dotted'
   /**
-   * When true, the renderer overlays a diagonal hatching pattern. Used for
-   * forbidden cells so legality reads at a glance even in colour-blind modes.
+   * When true, the renderer overlays a gray diagonal hatch. Marks cells
+   * where towers are prohibited (`path` and `forbidden`).
    */
   readonly hatching?: boolean
 }
@@ -48,26 +39,23 @@ export interface TileStyle {
  *
  * Invariants asserted by `tile-style.test.ts`:
  *   - `forbidden` carries `hatching: true`.
- *   - `buildable` carries `borderStyle: 'dotted'`.
- *   - `path` carries `borderStyle: 'solid'`.
+ *   - `path` carries `hatching: true` (prohibited, same as forbidden).
+ *   - `buildable` is plain: no border, no hatch.
  */
 export function tileStyleFor(cls: TileClass): TileStyle {
   switch (cls) {
     case 'path':
       return {
-        fill: '#E3EAE0',       // --correct-bg : pale sage
-        border: '#4aab6e',     // CVD-tuned green — DO NOT change without re-verification
-        borderStyle: 'solid',
+        fill: '#E8EFF5',       // gray hatch (same as forbidden): towers prohibited
+        hatching: true,
       }
     case 'buildable':
       return {
-        fill: '#E8EFF5',       // --cream-soft : pale cool-blue
-        border: '#4a82c8',     // CVD-tuned blue — DO NOT change without re-verification
-        borderStyle: 'dotted',
+        fill: '#E8EFF5',       // plain board tone — buildable cells carry no border
       }
     case 'forbidden':
       return {
-        fill: '#F0E2DC',       // --wrong-bg : pale clay; red hatching is the primary signal
+        fill: '#DCE5ED',       // blends with board; gray hatching is the primary signal
         hatching: true,
       }
   }
