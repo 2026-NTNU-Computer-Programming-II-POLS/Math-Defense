@@ -154,7 +154,7 @@ const showTargetingMode = computed(() => {
 <template>
   <div v-if="tower && towerDef" class="tower-info-panel rune-panel">
     <header class="panel-header">
-      <span class="panel-title" :style="{ color: towerDef.cardColor }">
+      <span class="panel-icon" :style="{ background: towerDef.cardColor }" aria-hidden="true">
         <!-- Visual Redesign Phase 5a/5b: preview chip mirrors the in-canvas
              instrument silhouette per tower type. -->
         <svg
@@ -236,7 +236,10 @@ const showTargetingMode = computed(() => {
           <path d="M3 14 Q 12 4 21 14" fill="currentColor" opacity="0.25" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
           <text x="12" y="12" font-family="serif" font-size="14" font-weight="bold" text-anchor="middle" fill="currentColor">∫</text>
         </svg>
-        {{ towerDef.nameEn }}
+      </span>
+      <span class="panel-titles">
+        <span class="panel-title" :style="{ color: towerDef.cardColor }">{{ towerDef.nameEn }}</span>
+        <span class="panel-coords">({{ tower.x }}, {{ tower.y }})</span>
       </span>
       <button class="close-btn" aria-label="Close" @click="close">
         <span aria-hidden="true">✕</span>
@@ -300,7 +303,7 @@ const showTargetingMode = computed(() => {
 
     <p class="math-concept">{{ towerDef.mathConcept }}</p>
     <p class="exam-relevance">
-      <span class="exam-label">On the exam</span>
+      <span class="exam-label">On the exam —</span>
       {{ towerDef.examRelevance }}
     </p>
 
@@ -320,7 +323,7 @@ const showTargetingMode = computed(() => {
           class="btn refund-btn"
           :aria-label="`Refund ${towerDef?.nameEn ?? 'tower'} for half cost`"
           @click="requestRefund"
-        >⟲ Refund</button>
+        >↺ Refund</button>
       </template>
       <template v-if="confirmingRefund">
         <div class="refund-confirm">
@@ -336,7 +339,7 @@ const showTargetingMode = computed(() => {
         :disabled="!upgradeInfo.ok"
         @click="upgrade"
       >
-        Upgrade ({{ upgradeInfo.cost }}g)
+        Upgrade · {{ upgradeInfo.cost }}g
       </button>
     </div>
   </div>
@@ -376,29 +379,52 @@ const showTargetingMode = computed(() => {
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Drawer header — plain content row, no box (mockup .drawer-head) */
+/* Drawer header — coloured icon chip + name/coords stack + close (mockup) */
 .panel-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 10px;
   background: transparent;
   border: none;
-  padding: 4px 4px 10px;
+  padding: 2px 2px 6px;
 }
-.panel-title {
-  font-size: var(--text-sm);
-  font-weight: 700;
-  letter-spacing: 1px;
+.panel-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.panel-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.panel-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.15;
+}
+.panel-coords {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--charcoal-soft);
+  letter-spacing: 1px;
 }
 .instrument-preview {
-  width: 28px;
-  height: 14px;
+  width: 26px;
+  height: 16px;
   flex-shrink: 0;
 }
 .close-btn {
+  align-self: flex-start;
   background: none; border: none; color: var(--charcoal-soft); cursor: pointer;
   font-size: var(--text-sm); min-width: 44px; min-height: 44px;
   display: inline-flex; align-items: center; justify-content: center;
