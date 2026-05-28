@@ -51,7 +51,6 @@ function label(value: number): string {
   gap: 3px;
   padding: 5px;
   background: rgba(245, 250, 254, 0.86);
-  border: 1px solid var(--line-strong);
   border-radius: 10px;
   box-shadow: var(--shadow-sm);
   font-family: var(--font-mono);
@@ -63,8 +62,8 @@ function label(value: number): string {
 }
 
 .speed-cell {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 36px;
   padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: 8px;

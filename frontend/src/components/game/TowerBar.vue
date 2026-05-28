@@ -166,7 +166,7 @@ function isHighlighted(type: TowerType): boolean {
         :aria-pressed="isHighlighted(def.type)"
         :aria-disabled="!canAfford(def.cost)"
         :style="isHighlighted(def.type)
-          ? { background: def.cardColor, borderColor: def.cardColor }
+          ? { background: def.color, borderColor: def.color }
           : null"
         @click="selectTower(def.type, def)"
       >
@@ -177,7 +177,7 @@ function isHighlighted(type: TowerType): boolean {
              the hexagon until their own 5c–5e sub-phases land. -->
         <span
           class="tower-icon"
-          :style="{ color: isHighlighted(def.type) ? '#fff' : def.cardColor }"
+          :style="{ color: isHighlighted(def.type) ? '#fff' : def.color }"
         >
           <svg
             v-if="def.type === TowerType.MAGIC"

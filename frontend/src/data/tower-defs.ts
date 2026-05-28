@@ -1,4 +1,4 @@
-import { TowerType, Colors } from './constants'
+import { TowerType } from './constants'
 
 function validateTowerDefs(defs: Record<string, TowerDef>): void {
   const allTypes = Object.values(TowerType) as string[]
@@ -14,8 +14,8 @@ function validateTowerDefs(defs: Record<string, TowerDef>): void {
     if (!def.glyph || def.glyph.length === 0) {
       throw new Error(`[tower-defs] ${type}: glyph must be a non-empty string`)
     }
-    if (!def.cardColor || !/^#[0-9A-Fa-f]{6}$/.test(def.cardColor)) {
-      throw new Error(`[tower-defs] ${type}: cardColor must be a #RRGGBB hex (got ${def.cardColor})`)
+    if (!def.color || !/^#[0-9A-Fa-f]{6}$/.test(def.color)) {
+      throw new Error(`[tower-defs] ${type}: color must be a #RRGGBB hex (got ${def.color})`)
     }
     if (def.upgrades.length === 0) throw new Error(`[tower-defs] ${type}: upgrades array is empty`)
     for (let i = 0; i < def.upgrades.length; i++) {
@@ -45,11 +45,10 @@ export interface TowerDef {
   type: TowerType
   name: string
   nameEn: string
+  // Single tower identity colour — used both on-canvas (body, attack range,
+  // projectiles) and by out-of-canvas UI cards (TowerBar, TowerInfoPanel,
+  // talent tree) so a placed tower visually matches its button.
   color: string
-  // Muted Morandi accent used by out-of-canvas UI cards (TowerBar today;
-  // BuildPanel / TowerInfoPanel may adopt later). Softer than `color`, which
-  // is the bright on-canvas hue rendered by the engine.
-  cardColor: string
   cost: number
   damage: number
   range: number
@@ -73,8 +72,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     type: TowerType.MAGIC,
     name: 'Magic Tower',
     nameEn: 'Magic Tower',
-    color: Colors.MAGIC,
-    cardColor: '#9C8BB0',
+    color: '#9C8BB0',
     cost: 60,
     damage: 8,
     range: 10,
@@ -91,8 +89,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     type: TowerType.RADAR_A,
     name: 'Radar A — Sweep',
     nameEn: 'Radar A — Sweep',
-    color: Colors.RADAR_A,
-    cardColor: '#8FAA77',
+    color: '#8FAA77',
     cost: 50,
     damage: 5,
     range: 6,
@@ -112,8 +109,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     type: TowerType.RADAR_B,
     name: 'Radar B — Rapid',
     nameEn: 'Radar B — Rapid',
-    color: Colors.RADAR_B,
-    cardColor: '#7D9BBE',
+    color: '#7D9BBE',
     cost: 65,
     damage: 8,
     range: 7,
@@ -133,8 +129,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     type: TowerType.RADAR_C,
     name: 'Radar C — Sniper',
     nameEn: 'Radar C — Sniper',
-    color: Colors.RADAR_C,
-    cardColor: '#B07E5C',
+    color: '#B07E5C',
     cost: 90,
     damage: 40,
     range: 12,
@@ -154,8 +149,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     type: TowerType.MATRIX,
     name: 'Matrix Tower',
     nameEn: 'Matrix Tower',
-    color: Colors.MATRIX,
-    cardColor: '#C9BB6E',
+    color: '#C9BB6E',
     cost: 80,
     damage: 1,
     range: 8,
@@ -175,8 +169,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     type: TowerType.LIMIT,
     name: 'Limit Tower',
     nameEn: 'Limit Tower',
-    color: Colors.LIMIT,
-    cardColor: '#C9A99E',
+    color: '#C9A99E',
     cost: 70,
     damage: 25,
     range: 8,
@@ -193,8 +186,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     type: TowerType.CALCULUS,
     name: 'Calculus Tower',
     nameEn: 'Calculus Tower',
-    color: Colors.CALCULUS,
-    cardColor: '#9C958D',
+    color: '#9C958D',
     cost: 100,
     damage: 0,
     range: 10,

@@ -154,7 +154,7 @@ const showTargetingMode = computed(() => {
 <template>
   <div v-if="tower && towerDef" class="tower-info-panel rune-panel">
     <header class="panel-header">
-      <span class="panel-icon" :style="{ background: towerDef.cardColor }" aria-hidden="true">
+      <span class="panel-icon" :style="{ background: towerDef.color }" aria-hidden="true">
         <!-- Visual Redesign Phase 5a/5b: preview chip mirrors the in-canvas
              instrument silhouette per tower type. -->
         <svg
@@ -238,7 +238,7 @@ const showTargetingMode = computed(() => {
         </svg>
       </span>
       <span class="panel-titles">
-        <span class="panel-title" :style="{ color: towerDef.cardColor }">{{ towerDef.nameEn }}</span>
+        <span class="panel-title" :style="{ color: towerDef.color }">{{ towerDef.nameEn }}</span>
         <span class="panel-coords">({{ tower.x }}, {{ tower.y }})</span>
       </span>
       <button class="close-btn" aria-label="Close" @click="close">

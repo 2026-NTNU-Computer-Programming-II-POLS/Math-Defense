@@ -296,7 +296,7 @@ onMounted(async () => {
         v-for="tw in TOWER_ORDER"
         :key="tw"
         class="tower-section"
-        :style="{ '--tower-color': TOWER_DEFS[tw]?.cardColor ?? TOWER_DEFS[tw]?.color }"
+        :style="{ '--tower-color': TOWER_DEFS[tw]?.color }"
       >
         <h3 class="tower-name">{{ TOWER_DEFS[tw]?.nameEn ?? tw }}</h3>
         <div
