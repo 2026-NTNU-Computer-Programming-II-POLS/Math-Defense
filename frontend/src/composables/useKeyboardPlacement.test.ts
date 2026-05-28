@@ -67,10 +67,20 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     useGameStore().level = 5
   })
 
-  it('initialises cursor on the first legal position when attached during BUILD', () => {
+  it('does not show the cursor on attach — waits for first arrow keydown', () => {
     const game = makeGameStub()
     const gameRef = ref<GameLike | null>(game)
     const wrapper = mountComposable(gameRef)
+    // Lazy reveal: pure-mouse players never see the §19 focus ring.
+    expect(game.hud.keyboardCursor).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('first arrow keydown seeds the cursor at the first legal position', () => {
+    const game = makeGameStub()
+    const wrapper = mountComposable(ref<GameLike | null>(game))
+    expect(game.hud.keyboardCursor).toBeNull()
+    dispatchKey('ArrowRight')
     expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
     wrapper.unmount()
   })
@@ -78,6 +88,9 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
   it('moves cursor with arrow keys among legal positions', () => {
     const game = makeGameStub()
     const wrapper = mountComposable(ref<GameLike | null>(game))
+
+    dispatchKey('ArrowRight') // reveal at (0,0); does not move
+    expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
 
     dispatchKey('ArrowRight')
     expect(game.hud.keyboardCursor).toEqual({ gx: 1, gy: 0 })
@@ -97,7 +110,8 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
   it('does not move past the rightmost legal position', () => {
     const game = makeGameStub()
     const wrapper = mountComposable(ref<GameLike | null>(game))
-    dispatchKey('ArrowRight')
+    dispatchKey('ArrowRight') // reveal at (0,0)
+    dispatchKey('ArrowRight') // (0,0) → (1,0)
     dispatchKey('ArrowRight') // (1,0) → (2,0)
     expect(game.hud.keyboardCursor).toEqual({ gx: 2, gy: 0 })
     dispatchKey('ArrowRight') // no candidate further right; cursor stays
@@ -111,6 +125,7 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     game.eventBus.on(Events.CANVAS_CLICK, handler)
     const wrapper = mountComposable(ref<GameLike | null>(game))
 
+    dispatchKey('ArrowRight') // reveal at (0,0)
     dispatchKey('ArrowRight') // cursor → (1, 0)
     dispatchKey('Enter')
     expect(handler).toHaveBeenCalledTimes(1)
@@ -153,10 +168,13 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     wrapper.unmount()
   })
 
-  it('clears cursor when phase leaves BUILD and restores it on re-entry', () => {
+  it('after opt-in, clears cursor on WAVE and auto-restores on BUILD re-entry', () => {
     const game = makeGameStub()
     const wrapper = mountComposable(ref<GameLike | null>(game))
-    expect(game.hud.keyboardCursor).not.toBeNull()
+
+    // First arrow flips the sticky opt-in and seeds the cursor.
+    dispatchKey('ArrowRight')
+    expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
 
     game.state.phase = GamePhase.WAVE
     game.eventBus.emit(Events.PHASE_CHANGED, { from: GamePhase.BUILD, to: GamePhase.WAVE })
@@ -164,6 +182,41 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
 
     game.state.phase = GamePhase.BUILD
     game.eventBus.emit(Events.PHASE_CHANGED, { from: GamePhase.WAVE, to: GamePhase.BUILD })
+    // Sticky opt-in: BUILD re-entry auto-restores the cursor for the
+    // keyboard player without forcing them to re-tap an arrow.
+    expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
+
+    wrapper.unmount()
+  })
+
+  it('pure-mouse player (no arrow keydown) never sees the cursor across BUILD↔WAVE cycles', () => {
+    const game = makeGameStub()
+    const wrapper = mountComposable(ref<GameLike | null>(game))
+    expect(game.hud.keyboardCursor).toBeNull()
+
+    game.state.phase = GamePhase.WAVE
+    game.eventBus.emit(Events.PHASE_CHANGED, { from: GamePhase.BUILD, to: GamePhase.WAVE })
+    expect(game.hud.keyboardCursor).toBeNull()
+
+    game.state.phase = GamePhase.BUILD
+    game.eventBus.emit(Events.PHASE_CHANGED, { from: GamePhase.WAVE, to: GamePhase.BUILD })
+    // Opt-in never flipped → cursor stays hidden on BUILD re-entry.
+    expect(game.hud.keyboardCursor).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('LEVEL_START resets the cursor; auto-restores only after opt-in', () => {
+    const game = makeGameStub()
+    const wrapper = mountComposable(ref<GameLike | null>(game))
+
+    // Before opt-in, LEVEL_START leaves the cursor null.
+    game.eventBus.emit(Events.LEVEL_START, 1)
+    expect(game.hud.keyboardCursor).toBeNull()
+
+    // After opt-in, LEVEL_START re-seeds the cursor at the first legal cell.
+    dispatchKey('ArrowRight')
+    game.eventBus.emit(Events.LEVEL_START, 2)
     expect(game.hud.keyboardCursor).toEqual({ gx: 0, gy: 0 })
 
     wrapper.unmount()

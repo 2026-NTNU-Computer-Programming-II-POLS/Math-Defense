@@ -7,6 +7,19 @@
  * authority), Tab cycles unlocked tower types, 1-7 picks a tower by index,
  * Esc cancels the held tower. Active only during BUILD; the cursor is
  * cleared on phase exit so it never renders during WAVE.
+ *
+ * The focus ring is **lazy + sticky** — on the first BUILD entry it stays
+ * hidden, so pure-mouse players never see an accessibility indicator they
+ * never asked for. The first arrow keydown flips a session-scoped opt-in
+ * flag and seeds the cursor at the first legal position (via `moveCursor`'s
+ * existing "press to seed" branch). Once opted in, subsequent BUILD entries
+ * auto-restore the cursor so a keyboard player isn't forced to re-tap an
+ * arrow at the start of every BUILD phase. The opt-in flag is closure-
+ * scoped: it resets when the composable unmounts (e.g. leaving GameView)
+ * but persists across LEVEL_START and BUILD↔WAVE cycles inside one run.
+ *
+ * This still satisfies SC 2.4.7 (focus is visible whenever a keyboard user
+ * starts navigating) and SC 2.1.1 (every action remains keyboard-reachable).
  */
 import { onMounted, onBeforeUnmount, watch, type Ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
@@ -54,6 +67,11 @@ export function useKeyboardPlacement(
   const uiStore = useUiStore()
   let legal: LegalPositionSet | null = null
   const unsubs: (() => void)[] = []
+  // Sticky opt-in: once the user has navigated with an arrow key during this
+  // mount, treat them as a keyboard player for the remainder of the session
+  // and auto-restore the focus ring on subsequent BUILD entries. Pure-mouse
+  // players never flip this, so the ring stays invisible end-to-end.
+  let keyboardOptIn = false
 
   function recomputeLegal(g: GameLike): void {
     const ctx = g.levelContext
@@ -73,6 +91,9 @@ export function useKeyboardPlacement(
   function moveCursor(dx: -1 | 0 | 1, dy: -1 | 0 | 1): void {
     const g = game.value
     if (!g || !legal || legal.positions.length === 0) return
+    // First arrow keydown during this mount marks the player as a keyboard
+    // user; subsequent BUILD entries will auto-restore the cursor.
+    keyboardOptIn = true
     if (g.hud.keyboardCursor === null) { ensureCursor(g); return }
     const cur = g.hud.keyboardCursor
 
@@ -157,17 +178,20 @@ export function useKeyboardPlacement(
   function attach(g: GameLike): void {
     detach()
     recomputeLegal(g)
-    if (g.state.phase === GamePhase.BUILD) ensureCursor(g)
+    // Lazy reveal on first attach: cursor stays null until the first arrow
+    // keydown (moveCursor seeds it). Once the player has opted in earlier in
+    // this mount, restore the cursor immediately on BUILD-phase attaches.
+    if (g.state.phase === GamePhase.BUILD && keyboardOptIn) ensureCursor(g)
 
     unsubs.push(g.eventBus.on(Events.LEVEL_START, () => {
       recomputeLegal(g)
       g.hud.keyboardCursor = null
-      if (g.state.phase === GamePhase.BUILD) ensureCursor(g)
+      if (g.state.phase === GamePhase.BUILD && keyboardOptIn) ensureCursor(g)
     }))
     unsubs.push(g.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
       if (to === GamePhase.BUILD) {
         recomputeLegal(g)
-        ensureCursor(g)
+        if (keyboardOptIn) ensureCursor(g)
       } else {
         g.hud.keyboardCursor = null
       }
