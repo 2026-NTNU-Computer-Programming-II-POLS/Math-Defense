@@ -364,7 +364,7 @@ const showTargetingMode = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #C5D9E8;
+  background: var(--rail-surface);
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--shadow-lg);

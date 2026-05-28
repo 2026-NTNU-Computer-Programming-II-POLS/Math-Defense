@@ -106,6 +106,9 @@
    --panel-border: var(--gold);
    --panel-shadow: 0 12px 40px rgba(79, 74, 72, 0.12);
    --bar-bg: rgba(200, 210, 220, 0.96);
+   /* Light-blue chrome surface shared by the left tools/buffs rail and the
+      build (tower-info) drawer so the two read as one material. */
+   --rail-surface: rgba(214, 226, 238, 0.88);
    --overlay-bg: rgba(95, 118, 142, 0.92);
    --text-on-accent: #2D3A47;
 

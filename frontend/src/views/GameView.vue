@@ -605,7 +605,7 @@ onBeforeUnmount(() => {
   overflow: visible;
   /* Light-blue sidebar surface behind the tools + active buffs. */
   padding: 12px 10px;
-  background: rgba(214, 226, 238, 0.88);
+  background: var(--rail-surface);
   border: 1px solid var(--line);
   border-radius: 0;
   box-shadow: var(--shadow-sm);
