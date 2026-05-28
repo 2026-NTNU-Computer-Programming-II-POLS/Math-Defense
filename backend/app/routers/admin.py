@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, Query, Request
+import hashlib
+import logging
+
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -6,12 +9,26 @@ from app.domain.errors import DomainValueError
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 from app.factories import build_admin_service, build_season_service
+from app.infrastructure.audit_logger import record_audit_event
 from app.limiter import limiter
 from app.middleware.auth import require_role
-from app.schemas.admin import ClassSummaryOut, PaginatedClassesOut, PaginatedUsersOut, SetUserActiveRequest, UserSummaryOut
+from app.schemas.admin import (
+    ClassSummaryOut,
+    CreateTeacherRequest,
+    PaginatedClassesOut,
+    PaginatedUsersOut,
+    SetUserActiveRequest,
+    UserSummaryOut,
+)
 from app.schemas.season import SeasonCreateRequest, SeasonOut
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _anon(identifier: object) -> str:
+    return hashlib.sha256(str(identifier).encode("utf-8")).hexdigest()[:10]
 
 
 @router.get("/teachers", response_model=PaginatedUsersOut)
@@ -54,6 +71,33 @@ def list_classes(
     offset = (page - 1) * per_page
     rows, total = build_admin_service(db).list_all_classes_paginated(offset, per_page)
     return PaginatedClassesOut(items=[_to_class_out(c, cnt) for c, cnt in rows], total=total)
+
+
+@router.post("/teachers", response_model=UserSummaryOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
+def create_teacher(
+    request: Request,
+    req: CreateTeacherRequest,
+    requester: User = Depends(require_role(Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """Provision a teacher account. Closes the M-04 gap where the schema
+    refuses self-service teacher registration but no admin-side path existed
+    to create teachers in production.
+    """
+    user = build_admin_service(db).create_teacher(
+        email=req.email,
+        password=req.password,
+        player_name=req.player_name,
+    )
+    logger.info("Admin provisioned teacher: admin=%s teacher_anon=%s", requester.id, _anon(user.id))
+    record_audit_event(
+        request,
+        "ADMIN_TEACHER_CREATE",
+        requester.id,
+        {"created_user_id": user.id, "email_anon": _anon(req.email)},
+    )
+    return _to_user_out(user)
 
 
 @router.patch("/users/{user_id}/active", response_model=UserSummaryOut)

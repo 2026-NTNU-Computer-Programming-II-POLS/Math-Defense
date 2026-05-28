@@ -3,10 +3,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from app.application.auth_service import _assert_password_strength
 from app.domain.class_.aggregate import Class
-from app.domain.errors import UserNotFoundError
+from app.domain.errors import (
+    DomainValueError,
+    UserNotFoundError,
+    UsernameTakenError,
+)
 from app.domain.user.aggregate import User
-from app.domain.user.value_objects import Role
+from app.domain.user.value_objects import Email, Role
+from app.utils.security import hash_password
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
@@ -41,10 +47,39 @@ class AdminApplicationService:
         counts = self._class_repo.count_memberships_by_class_bulk([c.id for c in classes])
         return [(c, counts.get(c.id, 0)) for c in classes], total
 
+    def create_teacher(self, email: str, password: str, player_name: str) -> User:
+        """Provision a teacher account on behalf of an admin.
+
+        Unlike public /register (M-04 student-only, M-05 enumeration-safe),
+        this path is authenticated as ADMIN so it returns explicit conflict
+        feedback (UsernameTakenError → 409) and marks the account email-
+        verified — the admin vouches for the identity and the new teacher
+        cannot click their own verification link before first login.
+        """
+        if self._uow is None:
+            raise RuntimeError("UoW not configured")
+        try:
+            email_vo = Email(email)
+        except ValueError as e:
+            raise DomainValueError(str(e)) from e
+        _assert_password_strength(password)
+        with self._uow:
+            if self._user_repo.find_by_email(email_vo.value) is not None:
+                raise UsernameTakenError("Email is already in use")
+            user = User.create(
+                email=email_vo.value,
+                player_name=player_name,
+                role=Role.TEACHER,
+                password_hash=hash_password(password),
+            )
+            user.is_email_verified = True
+            self._user_repo.save(user)
+            self._uow.commit()
+        return user
+
     def set_user_active(self, user_id: str, is_active: bool, requester_id: str) -> User:
         if self._uow is None:
             raise RuntimeError("UoW not configured")
-        from app.domain.errors import DomainValueError
 
         with self._uow:
             user = self._user_repo.find_by_id(user_id)
