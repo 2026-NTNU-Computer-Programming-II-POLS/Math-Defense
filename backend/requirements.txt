@@ -16,4 +16,4 @@ pyotp==2.9.0
 # FU-A — server-side replay validation. Hosts the same math_engine.wasm the
 # frontend ships so v2 score recomputation uses the identical musl pow and
 # agrees bit-exactly. See app/infrastructure/wasm_runtime.py.
-wasmtime==44.0.0
+wasmtime==45.0.0
