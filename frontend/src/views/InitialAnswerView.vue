@@ -369,6 +369,6 @@ function startGame() {
 .result-ignored { color: var(--slate-deep); font-size: var(--text-base); }
 
 .start-btn {
-  margin-top: 14px;
+  margin-top: 22px;
 }
 </style>
