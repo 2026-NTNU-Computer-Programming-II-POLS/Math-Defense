@@ -16,9 +16,10 @@
   flex-direction: column;
   background: var(--cream-soft);
   color: var(--text-primary);
-  border: 1px solid var(--line-strong);
+  /* Border + gold halo come from `.card-ornate` (global.css). The stronger
+     modal shadow lives here to lift the dialog off the dim overlay. */
   border-radius: 8px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 0 0 0 4px var(--gold-tint-soft);
   font-family: var(--font-main);
   overflow: hidden;
   outline: none;

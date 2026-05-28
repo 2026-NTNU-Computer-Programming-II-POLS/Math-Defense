@@ -85,9 +85,13 @@ onBeforeUnmount(() => {
   >
     <div
       ref="boxRef"
-      class="manual-box"
+      class="manual-box card-ornate"
       tabindex="-1"
     >
+      <span class="card-corner card-corner--inset card-corner-tl" aria-hidden="true"></span>
+      <span class="card-corner card-corner--inset card-corner-tr" aria-hidden="true"></span>
+      <span class="card-corner card-corner--inset card-corner-bl" aria-hidden="true"></span>
+      <span class="card-corner card-corner--inset card-corner-br" aria-hidden="true"></span>
       <header class="manual-header">
         <h2 id="manual-title" class="manual-title">{{ title }}</h2>
         <button
