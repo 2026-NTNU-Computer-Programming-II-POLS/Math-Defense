@@ -772,12 +772,23 @@ export class TowerRenderer {
       ctx.stroke()
 
       // Filled arc — clockwise from the south pole. Charge of 1 → full ring;
-      // brightens to white on fire so the burst reads visually.
+      // brightens to white on fire so the burst reads visually. When the
+      // arc enters the pre-burst window (>= 0.85) it pulses (brightness +
+      // thickness oscillation) so a player whose camera is far from the
+      // tower can still see "burst imminent" telegraphing.
       const sweep = Math.PI * 2 * Math.max(0, Math.min(1, charge))
+      const preBurst = charge >= 0.85 && !firing
+      const pulse = preBurst ? 0.5 + 0.5 * Math.sin(this._time * 14) : 0
       ctx.strokeStyle = firing
         ? `rgba(255,255,255,${0.55 + fireT * 0.45})`
-        : color
-      ctx.lineWidth = firing ? 2.6 + fireT * 1.0 : 2.0
+        : preBurst
+          ? `rgba(255,255,255,${0.45 + pulse * 0.4})`
+          : color
+      ctx.lineWidth = firing
+        ? 2.6 + fireT * 1.0
+        : preBurst
+          ? 2.0 + pulse * 1.0
+          : 2.0
       ctx.lineCap = 'round'
       ctx.beginPath()
       ctx.arc(

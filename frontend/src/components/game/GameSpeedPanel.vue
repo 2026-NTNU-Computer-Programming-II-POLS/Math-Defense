@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { gameCommands } from '@/services/gameCommandService'
+import { PERCEIVED_SPEED_OPTIONS } from '@/data/constants'
 
 const g = useGameStore()
 
