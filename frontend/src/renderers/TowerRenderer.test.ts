@@ -63,6 +63,7 @@ function makeRenderer(ctx: CanvasRenderingContext2D): Renderer {
     gridLine: 'rgba(79, 74, 72, 0.18)',
     forbiddenFill: '#E8EFF5',
     forbiddenHatch: 'rgba(122, 141, 168, 0.55)',
+    outsideFill: '#DCE5ED',
   }
   return { ctx, palette } as unknown as Renderer
 }

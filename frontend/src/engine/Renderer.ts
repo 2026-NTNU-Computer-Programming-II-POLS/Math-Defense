@@ -52,10 +52,16 @@ export interface RendererPalette {
   readonly stoneLight: string
   /** Tower keyboard-focus halo (legacy name; not the board axis colour). */
   readonly axis: string
-  /** Board checkerboard base — canvas clear + dark-cell stone fill. */
+  /** No-layout checkerboard base (menu/pre-level grid cells). */
   readonly boardBase: string
-  /** Board checkerboard alt — light-cell stone fill. */
+  /** No-layout checkerboard alt cell. */
   readonly boardBaseAlt: string
+  /**
+   * Canvas backdrop painted by `clear()` — the area OUTSIDE the coordinate
+   * grid (beyond GRID_MIN..GRID_MAX). Kept distinct from the grid-cell tone
+   * so the ±range plane reads as a lighter panel on a darker surround.
+   */
+  readonly outsideFill: string
   /** Board coordinate axes + tick labels. */
   readonly boardAxis: string
   /** Board grid lines (low-alpha charcoal — graph-paper feel). */
@@ -72,11 +78,12 @@ const BOARD_PALETTE: RendererPalette = Object.freeze({
   stoneLight: '#8ea1bd',
   axis: '#ffd700',
   // Board ink — Morandi light re-skin.
-  boardBase: '#E8EFF5',      // --cream-soft : grid background (distinct from --cream page)
+  boardBase: '#E8EFF5',      // --cream-soft : no-layout checkerboard base
   boardBaseAlt: '#DCE5ED',   // --cream      : checkerboard alt
   boardAxis: '#ADA284',      // --gold       : muted khaki axes / ticks
   gridLine: 'rgba(79, 74, 72, 0.18)', // --divider : graph-paper thin lines
-  forbiddenFill: '#E8EFF5',  // blends with board; gray hatch is the signal
+  forbiddenFill: '#E8EFF5',  // --cream-soft : grid-cell base; gray hatch is the signal
+  outsideFill: '#DCE5ED',    // --cream      : backdrop outside the ±grid range
   forbiddenHatch: 'rgba(122, 141, 168, 0.55)', // stoneDark hue — diagonal stripes
 })
 
@@ -124,7 +131,10 @@ export class Renderer {
   }
 
   clear(): void {
-    this.ctx.fillStyle = this.palette.boardBase
+    // Paint the whole canvas with the OUTSIDE-grid backdrop. drawGrid then
+    // repaints the ±GRID_MIN..GRID_MAX cells with the lighter grid tone, so
+    // only the area beyond the coordinate range keeps this colour.
+    this.ctx.fillStyle = this.palette.outsideFill
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   }
 
