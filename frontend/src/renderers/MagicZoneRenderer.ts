@@ -2,6 +2,7 @@ import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import { clipToBoard } from '@/engine/render-helpers/clip-to-board'
 import { projectMagicZones } from '@/engine/projections/project-magic-zones'
 import type { MagicZoneView } from '@/engine/projections/views'
 
@@ -9,10 +10,15 @@ export class MagicZoneRenderer {
   update(_dt: number, _game: Game): void {}
 
   render(renderer: Renderer, game: Game): void {
+    const views = projectMagicZones(game)
+    if (views.length === 0) return
     const { ctx } = renderer
-    for (const view of projectMagicZones(game)) {
+    ctx.save()
+    clipToBoard(ctx)
+    for (const view of views) {
       this._drawZone(ctx, view)
     }
+    ctx.restore()
   }
 
   private _drawZone(ctx: CanvasRenderingContext2D, view: MagicZoneView): void {
