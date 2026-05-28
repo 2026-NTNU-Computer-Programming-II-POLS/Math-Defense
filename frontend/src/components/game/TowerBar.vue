@@ -164,23 +164,26 @@ function canAfford(cost: number): boolean {
 
 <template>
   <div ref="barRef" class="tower-bar">
-    <div class="bar-label">Towers</div>
-
-    <!-- Category chips: only render when ≥2 categories unlock to avoid
-         taking up space early in the run when there's nothing to filter. -->
-    <div v-if="visibleCategories.length > 1" class="category-chips" role="tablist">
-      <button
-        v-for="c in visibleCategories"
-        :key="c"
-        :class="['chip', { 'chip--active': activeCategory === c }]"
-        role="tab"
-        :aria-selected="activeCategory === c"
-        :aria-label="`Show ${CATEGORY_LABELS[c]} towers (${categoryCount(c)})`"
-        @click="setCategory(c)"
-      >
-        {{ CATEGORY_LABELS[c] }}
-        <span class="chip-count">{{ categoryCount(c) }}</span>
-      </button>
+    <!-- Header: the TOWERS label shares a 2-column grid with the category
+         chips so they read TOWERS/All, Geometry/Functions, Algebra/Calculus
+         down the strip (mockup). Chips only render when ≥2 categories unlock
+         to avoid taking up space early in the run with nothing to filter. -->
+    <div class="bar-head" role="tablist">
+      <span class="bar-label" role="presentation">Towers</span>
+      <template v-if="visibleCategories.length > 1">
+        <button
+          v-for="c in visibleCategories"
+          :key="c"
+          :class="['chip', { 'chip--active': activeCategory === c }]"
+          role="tab"
+          :aria-selected="activeCategory === c"
+          :aria-label="`Show ${CATEGORY_LABELS[c]} towers (${categoryCount(c)})`"
+          @click="setCategory(c)"
+        >
+          {{ CATEGORY_LABELS[c] }}
+          <span class="chip-count">{{ categoryCount(c) }}</span>
+        </button>
+      </template>
     </div>
 
     <div class="tower-list">
@@ -328,12 +331,15 @@ function canAfford(cost: number): boolean {
   letter-spacing: 2.5px;
   text-transform: uppercase;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
 }
 
-/* Category chips fill a 2-column grid, row by row, so the five filters wrap
-   into at most three lines (All/Geometry, Functions/Algebra, Calculus) to
-   match the mockup instead of stretching the bar in one long row. */
-.category-chips {
+/* Header grid: the TOWERS label occupies the first cell and the category
+   chips fill the rest, two per row, so the bar reads TOWERS/All,
+   Geometry/Functions, Algebra/Calculus down at most three lines (mockup)
+   instead of stretching across one long row. */
+.bar-head {
   display: grid;
   grid-template-columns: repeat(2, auto);
   align-content: center;
@@ -394,13 +400,15 @@ function canAfford(cost: number): boolean {
   font-style: italic;
 }
 
-/* Tower cards laid out in a single row that fills the bar width so every
-   tower shows at once with no horizontal scrollbar. Equal-width columns
-   (1fr) keep the cards uniform across the strip. */
+/* Tower cards laid out in a single row. Columns are a fixed width (not 1fr)
+   so each card stays the same size regardless of how many towers the active
+   category shows or which tower is selected, and the width is generous
+   enough that every name fits on one line inside the card frame. */
 .tower-list {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  grid-auto-columns: 144px;
+  justify-content: start;
   gap: 5px;
   flex: 1;
   min-width: 0;
