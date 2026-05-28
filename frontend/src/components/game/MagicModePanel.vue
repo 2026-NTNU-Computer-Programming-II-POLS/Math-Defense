@@ -151,8 +151,9 @@ function toggleMode(mode: MagicMode) {
 
 <template>
   <div class="magic-panel">
-    <!-- MODE — only meaningful once a curve is configured. -->
-    <div v-if="tower?.configured" class="mode-card">
+    <!-- MODE — debuff/buff is stored on the tower from creation, so the
+         toggle is shown immediately rather than waiting for a curve. -->
+    <div v-if="tower" class="mode-card">
       <p class="section-label">Mode</p>
       <div class="mode-btns">
         <button
