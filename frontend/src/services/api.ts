@@ -49,28 +49,83 @@ const REFRESH_PATH = '/api/auth/refresh'
 // multiple times.
 let _refreshInFlight: Promise<boolean> | null = null
 
+// Cross-tab lock name used with the Web Locks API. Two tabs with stale
+// access cookies would otherwise both POST /refresh with the same value,
+// and the second arrival trips backend reuse-detection → revoke_all_for_user
+// → both tabs get force-logged-out. Wrapping the refresh in a same-origin
+// lock serialises them: the second tab acquires the lock after the first
+// has rotated the cookie, then sends the freshly-rotated value and succeeds
+// in turn. Falls back to the existing per-tab coalescing when the API is
+// unavailable (e.g. very old browsers).
+const REFRESH_LOCK_NAME = 'mg-auth-refresh'
+
+const REFRESH_CSRF_WARMUP_PATH = '/api/auth/me'
+
+async function _attemptRefreshOnce(csrfOverride?: string): Promise<Response | null> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const csrf = csrfOverride ?? readCookie(CSRF_COOKIE_NAME)
+  if (csrf) headers[CSRF_HEADER_NAME] = csrf
+  const url = API_BASE_URL ? `${API_BASE_URL}${REFRESH_PATH}` : REFRESH_PATH
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(url, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    })
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function _doRefresh(): Promise<boolean> {
+  const first = await _attemptRefreshOnce()
+  if (first === null) return false
+  if (first.ok) return true
+  // Mirror the main request()'s CSRF refresh-and-retry (F-BUG-16). If the
+  // csrf cookie was missing or stale, /refresh comes back 403 because the
+  // double-submit check fails; a safe GET through CsrfMiddleware mints a
+  // fresh csrf cookie, then we retry the refresh once with the new token.
+  // Bounded to a single retry so a server stuck on 403 can't loop.
+  if (first.status !== 403) return false
+  const warmupUrl = API_BASE_URL
+    ? `${API_BASE_URL}${REFRESH_CSRF_WARMUP_PATH}`
+    : REFRESH_CSRF_WARMUP_PATH
+  const warmupController = new AbortController()
+  const warmupTimer = setTimeout(() => warmupController.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    await fetch(warmupUrl, { credentials: 'include', signal: warmupController.signal })
+  } catch {
+    // Best effort — if the warmup fetch itself fails (timeout or network),
+    // the retry below will see the same missing-cookie state and return
+    // false cleanly.
+  } finally {
+    clearTimeout(warmupTimer)
+  }
+  const csrf = readCookie(CSRF_COOKIE_NAME)
+  if (!csrf) return false
+  const retry = await _attemptRefreshOnce(csrf)
+  return retry !== null && retry.ok
+}
+
 async function tryRefresh(): Promise<boolean> {
   if (_refreshInFlight) return _refreshInFlight
   _refreshInFlight = (async () => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    const csrf = readCookie(CSRF_COOKIE_NAME)
-    if (csrf) headers[CSRF_HEADER_NAME] = csrf
-    const url = API_BASE_URL ? `${API_BASE_URL}${REFRESH_PATH}` : REFRESH_PATH
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        signal: controller.signal,
-      })
-      return res.ok
-    } catch {
-      return false
-    } finally {
-      clearTimeout(timer)
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      try {
+        return await navigator.locks.request(REFRESH_LOCK_NAME, _doRefresh)
+      } catch {
+        // navigator.locks may throw under unusual conditions (storage
+        // partitioning policies, locked-down enterprise builds). Fall
+        // through to the unlocked path so tryRefresh never escapes via
+        // an exception — callers rely on the boolean contract.
+      }
     }
+    return _doRefresh()
   })()
   try {
     return await _refreshInFlight

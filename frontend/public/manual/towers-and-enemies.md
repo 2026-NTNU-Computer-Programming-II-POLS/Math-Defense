@@ -6,7 +6,7 @@ Quick-lookup tables for towers, enemies, spells, buffs, and Monty Hall rewards. 
 
 ## Towers
 
-Seven tower types, each tied to a real math concept. Stats below are the **base** tier; Tier 2 adds +25% damage and +10% range at 60% of base cost, and Tier 3 adds +50% damage and +20% range at 100% of base cost. Speed changes, if any, are tower-specific bonuses noted in each row.
+Seven tower types, each tied to a real math concept. Stats below are the **base** tier. Tier 2 adds +25% damage and +10% range at 60% of base cost; Tier 3 adds +50% damage, +20% range, **and a universal +15% attack speed** at 100% of base cost. The +15% speed reduces base cooldown by 15% and so has no effect on Calculus (whose base cooldown is 0). Any other per-tower bonuses (sweep speed, target count, crit, ramp, AoE width, pet stats) are listed in each row.
 
 ### Magic Tower — ✦
 
@@ -23,7 +23,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Math:** radian arcs, sector area
 - **Unlocked from:** Star 1
 - **Mechanic:** a needle sweeps a continuous **full 360°** circle; any enemy in range takes AoE damage every tick the needle crosses it. The configurable arc does not steer the sweep — it only marks the ×1.5 focus sector (see below).
-- **Tier 2/3:** sweep speed +20% / +40%; Tier 3 also widens the AoE band by +30%.
+- **Tier 2/3:** sweep speed +20% / +40%; Tier 3 also widens the AoE band by +0.3 rad (absolute, on top of the base 0.5 rad band — i.e. about +60% wider).
 - **Pick when:** the path makes a tight wrap around a small region — you cover it with one tower.
 
 ### Radar B — Rapid — ◑
@@ -77,7 +77,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 100 / 0 base / 10 / — (does not fire directly)
 - **Math:** derivatives, integrals, power rule
 - **Unlocked from:** Star 3
-- **Mechanic:** pick a monomial `f(x)`, then pick an operation — `f'`, `f''`, or `∫f` — and **solve it yourself**: type the resulting monomial. The panel never shows the answer; only a correct answer applies the operation. The result `C·x^n` spawns **C pets**, each whose trait is determined by **n** — homing speed, lifetime, damage profile, AoE radius. Pets fly out, home onto the nearest enemy, and detonate. The first operation is free; chaining another costs gold, while a wrong answer is rejected at no cost.
+- **Mechanic:** pick a monomial `f(x)`, then pick an operation — `f'`, `f''`, or `∫f` — and **solve it yourself**: type the resulting monomial. The panel never shows the answer; only a correct answer applies the operation. The result `C·x^n` spawns pets that home onto the nearest enemy and detonate. The exponent **n** picks the **trait** (`n=1` → slow, `n=2` → fast, `n=3` → heavy, `n ≥ 4` → basic), which sets per-pet damage / fire rate / movement speed (a "fast" pet hits softer but more often; a "heavy" pet hits hard but slow). The coefficient **C** is **log-compressed** into pet count — `floor(log₂(C+1))` pets — so a `99·x²` result spawns 6 fast pets, not 99. Talents add to that count; non-integer `|C|` becomes a damage multiplier on each pet. The first operation is free; chaining another costs gold; a wrong answer is rejected at no cost.
 - **Tier 2/3:** pet damage +25% / +50%; Tier 3 also +1 pet count and +20% pet speed.
 - **Pick when:** you want autonomous chip damage during waves or extra cleanup that doesn't need direct line-of-sight positioning.
 - **Exam tie-in:** AP Calculus AB Section I differentiation/integration of polynomials.
@@ -125,7 +125,9 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 **Boss Type-B (`bossB`)**
 - Shield + Fast-minion spawn behave as above.
 - When current HP enters the range `[0.45, 0.55] × maxHp` (sampled per spawn so it isn't memorizable), the wave enters `CHAIN_RULE` phase.
-- A KaTeX-rendered chain rule question is presented (e.g. compute `(f∘g)'(x)`). Correct → +100 gold bonus and large bonus damage applied immediately. Incorrect → boss heals.
+- A KaTeX-rendered chain rule question is presented (e.g. compute `(f∘g)'(x)`).
+  - **Correct** → +100 gold (`bossCorrectAnswerBonus`) **and the boss is instakilled immediately**, then shatters into two smaller enemies on the same path: a Strong-variant at 60% of the boss's max HP and a Fast-variant at 40% (both shield-stripped, with reduced reward and kill value).
+  - **Incorrect / no answer** → no heal, no penalty beyond the lost insta-kill. The boss returns to combat at the HP it had when the question fired. Whenever the boss eventually dies by normal damage, it still splits into the same two smaller enemies.
 - After resolution, the wave resumes.
 
 ### Counter-Enemies: How to Beat Each
@@ -138,7 +140,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 | Helper | buffs nearby allies | Kill the Helper *first*. Radar C or a Lightning spell are reliable openers. |
 | Split | doubles into smaller mobs | Place AoE (Magic curve, Radar A sweep) where the children will spawn. |
 | Boss A | shield + minion pressure | Sustained DPS on the shield; a Matrix pair locks on for ramp damage. |
-| Boss B | shield + chain-rule gate | Answer the chain rule correctly; have Fireball + Lightning ready post-question. |
+| Boss B | shield + chain-rule gate + post-split adds | Answer the chain rule correctly to insta-kill (boss still splits into a Strong + Fast pair, so have Fireball / Frost Nova ready for the cleanup). |
 
 ---
 
@@ -216,7 +218,14 @@ Switch via the small targeting toggle on the tower panel.
 
 ## Talent Tree (Persistent)
 
-Nineteen nodes across the seven tower types (Magic 3, Radar A 2, Radar B 3, Radar C 3, Matrix 3, Limit 2, Calculus 3). Each node has a `maxLevel` of 2 or 3 and multiplies a per-tower attribute — `damage`, `range`, `attack_speed` / `sweep_speed`, `target_count`, Magic's `zone_strength` / `zone_width` / `duration`, Matrix's `damage_ramp`, or Calculus's `pet_attack_speed` / `pet_damage` / `pet_range` (+20% per level). Prerequisites are linear chains within each tower's branch. Free reset is available from the Talent Tree view. Effects apply at *tower placement* — re-build a tower to refresh its modifier snapshot after reallocating.
+Twenty-six nodes across the seven tower types: nineteen base nodes (Magic 3, Radar A 2, Radar B 3, Radar C 3, Matrix 3, Limit 2, Calculus 3) plus seven advanced **"tier-2"** nodes — one per tower — that each require their parent base node at max level. Prerequisites within each tower form linear chains.
+
+| Tier | Per-tower coverage | Magnitude |
+|---|---|---|
+| Base | `damage`, `range`, `attack_speed` / `sweep_speed`, `target_count`, Magic `zone_strength` / `zone_width` / `duration`, Matrix `damage_ramp`, Calculus `pet_attack_speed` / `pet_damage` / `pet_range` | +8% to +20% per level (target-count nodes add a whole target) |
+| Tier-2 | Magic `slow_strength`, Radar A `aoe_width`, Radar B `crit_chance`, Radar C `crit_damage`, Matrix `resonance` (paired-tower base damage ×(1+resonance)), Limit `burst_bonus` (adds to the 1.5× burst multiplier), Calculus `pet_crit` | +10% to +50% per level depending on the node; crit-chance nodes add a probability |
+
+Each node has a `maxLevel` of 2 or 3. Free reset is available from the Talent Tree view. Effects apply at *tower placement* — re-build a tower to refresh its modifier snapshot after reallocating.
 
 ---
 

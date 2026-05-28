@@ -227,22 +227,13 @@ async function selectAvatar(url: string): Promise<void> {
 
       <div v-if="loading" class="progression-loading">Loading progression…</div>
       <div v-else-if="loadError" class="progression-error">{{ loadError }}</div>
-      <div v-else class="progression-summary">
-        <div v-if="achievementSummary" class="summary-card" @click="router.push('/achievements')">
-          <div class="summary-title">Achievements</div>
-          <div class="summary-stat">{{ achievementSummary.unlocked }} / {{ achievementSummary.total }}</div>
-          <div class="summary-sub">{{ achievementSummary.talent_points_earned }} TP earned</div>
-        </div>
-        <div v-if="talentSummary" class="summary-card" @click="router.push('/talents')">
-          <div class="summary-title">Talents</div>
-          <div class="summary-stat">{{ talentSummary.points_available }} available</div>
-          <div class="summary-sub">{{ talentSummary.points_spent }} / {{ talentSummary.points_earned }} spent</div>
-        </div>
-      </div>
-
-      <div class="profile-links">
-        <button class="btn link-btn" @click="router.push('/achievements')">View Achievements</button>
-        <button class="btn link-btn" @click="router.push('/talents')">Talent Tree</button>
+      <div
+        v-else-if="achievementSummary && talentSummary"
+        class="progression-line"
+      >
+        {{ achievementSummary.unlocked }}/{{ achievementSummary.total }} achievements
+        ·
+        {{ talentSummary.points_available }} talent points available
       </div>
 
       <div class="settings-section">
@@ -502,41 +493,13 @@ async function selectAvatar(url: string): Promise<void> {
 .progression-loading { font-size: var(--text-xs); color: var(--charcoal-soft); text-align: center; }
 .progression-error { font-size: var(--text-xs); color: var(--clay-deep); text-align: center; }
 
-.progression-summary {
-  display: flex;
-  gap: 12px;
-}
-
-.summary-card {
-  flex: 1;
-  padding: 14px;
-  background: rgba(245, 250, 254, 0.6);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: border-color 0.2s;
-  text-align: center;
-}
-
-.summary-card:hover { border-color: var(--terracotta); }
-.summary-title { font-size: var(--text-2xs); color: var(--charcoal-soft); font-family: var(--font-mono); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
-.summary-stat { font-size: var(--text-xl); font-family: var(--font-mono); color: var(--terracotta-deep); font-weight: 700; }
-.summary-sub { font-size: var(--text-2xs); color: var(--charcoal-soft); opacity: 0.8; margin-top: 4px; }
-
-.profile-links {
-  display: flex;
-  gap: 8px;
-}
-
-.link-btn {
-  flex: 1;
+.progression-line {
   font-size: var(--text-xs);
+  color: var(--charcoal-soft);
+  text-align: center;
+  font-family: var(--font-mono);
   letter-spacing: 1px;
-  border-color: var(--terracotta);
-  color: var(--terracotta-deep);
 }
-
-.link-btn:hover { background: var(--terracotta); color: #fff; }
 
 .pw-section { display: flex; flex-direction: column; }
 

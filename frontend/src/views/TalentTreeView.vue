@@ -144,7 +144,7 @@ onMounted(async () => {
       </div>
       <div class="talent-actions">
         <button class="btn reset-btn" :disabled="allocating || !tree || tree.points_spent === 0" @click="resetTree">Reset All</button>
-        <button class="btn" @click="router.push('/profile')">← Back</button>
+        <button class="btn" @click="router.push({ name: 'menu' })">← Back</button>
       </div>
     </header>
 
