@@ -166,7 +166,7 @@ export class TowerRenderer {
     ctx.restore()
 
     if (view.showCoords) {
-      ctx.fillStyle = this._palette.axis
+      ctx.fillStyle = this._palette.boardAxis  // --gold
       ctx.font = '9px monospace'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'bottom'
