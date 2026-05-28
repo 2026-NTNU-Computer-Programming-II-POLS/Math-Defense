@@ -251,7 +251,9 @@ class TestAbuseCases:
         )
         assert ok.status_code == 200
 
-        # Now jump by > 50_000 in a single patch — aggregate should reject
+        # Now jump by an amount that exceeds the per-level delta cap
+        # (max_score_delta_for(1) = 3334). The level_cap check (5000) would also
+        # 422 this, but the delta cap is the first wall the request hits.
         bad = client.patch(
             f"/api/sessions/{sid}",
             json={"score": 100 + 60_000},
@@ -273,7 +275,11 @@ class TestAbuseCases:
     def test_end_score_below_in_flight_rejected(self, client):
         token = _register_and_token(client, "abuse_end_lt_score")
         sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
-        client.patch(f"/api/sessions/{sid}", json={"score": 5_000}, headers=_auth(token))
+        # Patch must stay within the per-level update delta cap
+        # (max_score_delta_for(1) = 3334) so the in-flight score actually lands.
+        # The original value (5_000) was below the old flat 50_000 cap but
+        # exceeds the tightened L1 cap and would 422 here instead of at /end.
+        client.patch(f"/api/sessions/{sid}", json={"score": 2_000}, headers=_auth(token))
         res = client.post(
             f"/api/sessions/{sid}/end",
             json={"score": 100, "kills": 1, "waves_survived": 1},
@@ -322,6 +328,21 @@ class TestUserDeletionCascade:
             assert lb[0].session_id is None
         finally:
             db.close()
+
+        # H5: the leaderboard query must still surface the anonymised row (it
+        # was vanishing pre-fix because every query INNER-JOINed User and
+        # filtered ``user_id IS NOT NULL`` — directly negating the SET NULL
+        # migration intent).
+        res = client.get("/api/leaderboard")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["total"] == 1
+        assert len(body["entries"]) == 1
+        entry = body["entries"][0]
+        assert entry["score"] == 333
+        # Anonymisation applies to unauthenticated viewers, but the deleted-user
+        # sentinel passes through unchanged (it isn't a real identifier).
+        assert entry["player_name"] == "Deleted User"
 
 
 # ── 6. Parametrised SessionStatus × command matrix ──────────────────────────
