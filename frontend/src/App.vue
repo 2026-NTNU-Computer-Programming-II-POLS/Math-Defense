@@ -24,11 +24,19 @@ onUnmounted(() => {
     <div v-if="navigating" class="nav-progress" aria-hidden="true" />
     <RouterView v-slot="{ Component, route }">
       <GlobalBackground v-if="!route.meta.hideGlobalBg" />
+      <!-- Single stable wrapper inside <Transition>. Previously the Transition
+           held two sibling branches (v-if AppShell + v-else bare) and Vue 3.5
+           failed to mount the entering vnode on a cross-branch swap with
+           mode="out-in" — e.g. /game (bare) -> /level-select (shell) blanked
+           the screen until a hard reload. Keying the wrapper by route.path
+           drives the transition; the inner v-if just picks the layout. -->
       <Transition name="fade" mode="out-in">
-        <AppShell v-if="!route.meta.hideShell" :key="`shell-${route.name as string}`">
-          <component :is="Component" />
-        </AppShell>
-        <component :is="Component" v-else :key="`bare-${route.name as string}`" />
+        <div :key="route.path" class="route-host">
+          <AppShell v-if="!route.meta.hideShell">
+            <component :is="Component" />
+          </AppShell>
+          <component :is="Component" v-else />
+        </div>
       </Transition>
     </RouterView>
     <Modal v-if="uiStore.modalVisible" />
@@ -40,6 +48,12 @@ onUnmounted(() => {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.route-host {
+  display: block;
+  width: 100%;
   min-height: 100dvh;
 }
 
