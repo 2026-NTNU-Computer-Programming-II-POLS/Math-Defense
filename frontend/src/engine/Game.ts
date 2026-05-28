@@ -85,6 +85,35 @@ export interface DamageResolvedPayload {
   readonly kind: 'capped' | 'reduced'
 }
 
+/**
+ * Payload of LIMIT_BURST — emitted once per Limit tower burst tick by
+ * LimitTowerSystem after the AoE damage pass. Carries everything the
+ * LimitBurstRenderer needs to paint the shockwave ring, per-hit damage
+ * popups, and the result-attribution badge ("+∞ → KILL" / "×3" / "chip").
+ *
+ * `hits` is the per-enemy applied-damage list (post-burstMult). For the
+ * `+inf` outcome `killed` is true and `damage` is 0 (instakill bypasses the
+ * damage path), so the renderer paints a kill marker instead of a number.
+ */
+export interface LimitBurstPayload {
+  readonly towerId: string
+  readonly x: number
+  readonly y: number
+  readonly range: number
+  readonly color: string
+  readonly outcome: '+inf' | '+c' | 'zero' | 'constant' | '-c' | '-inf'
+  /** Burst multiplier in effect (BURST_MULTIPLIER + burst_bonus talent). */
+  readonly multiplier: number
+  /** Player's answer value (|C| for +c / -c, raw value otherwise). */
+  readonly answerValue: number
+  readonly hits: ReadonlyArray<{
+    readonly x: number
+    readonly y: number
+    readonly damage: number
+    readonly killed: boolean
+  }>
+}
+
 export interface GameEvents {
   [Events.PHASE_CHANGED]:        { from: GamePhase; to: GamePhase }
   [Events.LEVEL_START]:          number
@@ -124,6 +153,7 @@ export interface GameEvents {
   [Events.TOWER_TARGETING_CHANGED]: { towerId: string; mode: TargetingMode }
   [Events.MATRIX_PAIR_CHANGED]:  { towerId: string; pairId: string }
   [Events.LIMIT_ANSWER]:         { towerId: string; answer: LimitResult }
+  [Events.LIMIT_BURST]:          LimitBurstPayload
   [Events.CALCULUS_OPERATION]:    { towerId: string; presetIndex?: number; operation?: CalcOp }
   [Events.CALCULUS_STATE_CHANGED]:{ towerId: string; state: CalculusState | null }
   [Events.TOWER_UPGRADE]:        { towerId: string }

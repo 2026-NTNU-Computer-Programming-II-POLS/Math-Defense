@@ -66,6 +66,7 @@ export class LimitTowerSystem {
       const burstBonus = tower.talentMods['burst_bonus'] ?? 0
       const burstMult = BURST_MULTIPLIER + burstBonus
       const range = tower.effectiveRange
+      const hits: { x: number; y: number; damage: number; killed: boolean }[] = []
       for (const enemy of game.enemies) {
         if (!enemy.alive) continue
         if (distance(tower.x, tower.y, enemy.x, enemy.y) > range) continue
@@ -73,6 +74,7 @@ export class LimitTowerSystem {
         if (result.outcome === '+inf') {
           // Infinity kills outright: bypass all defensive modifiers (Bulwark
           // cap, evasion) so a correct +inf answer always removes the enemy.
+          hits.push({ x: enemy.x, y: enemy.y, damage: 0, killed: true })
           killEnemy(enemy, game)
           continue
         }
@@ -90,9 +92,37 @@ export class LimitTowerSystem {
         }
 
         if (dmg > 0) {
-          applyDamage(enemy, dmg * burstMult, game, 'towerHit')
+          const applied = dmg * burstMult
+          // If the defensive pipeline will change this number (Bulwark cap or
+          // Swarmling/Bulwark towerDamageMult), `applyDamage` emits
+          // DAMAGE_RESOLVED and CombatFeedbackRenderer paints the
+          // authoritative "raw → applied" yellow/grey popup. Skip the burst
+          // popup in that case so the two layers don't stack a stale white
+          // pre-defense number on top of the post-defense one.
+          const willBeModified =
+            (enemy.damageCapPerHit > 0 && applied > enemy.damageCapPerHit) ||
+            enemy.towerDamageMult < 1
+          applyDamage(enemy, applied, game, 'towerHit')
+          if (!willBeModified) {
+            hits.push({ x: enemy.x, y: enemy.y, damage: applied, killed: !enemy.alive })
+          }
         }
       }
+
+      // Always emit, even when hits is empty — the shockwave ring still
+      // tells the player "you spent the charge window on nothing in range",
+      // and the result badge teaches the answer-outcome lookup.
+      game.eventBus.emit(Events.LIMIT_BURST, {
+        towerId: tower.id,
+        x: tower.x,
+        y: tower.y,
+        range,
+        color: tower.color,
+        outcome: result.outcome,
+        multiplier: burstMult,
+        answerValue: result.value,
+        hits,
+      })
     }
   }
 

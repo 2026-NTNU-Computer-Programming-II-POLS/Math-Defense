@@ -45,6 +45,7 @@ import { MatrixLaserRenderer } from '@/renderers/MatrixLaserRenderer'
 import { PetRenderer } from '@/renderers/PetRenderer'
 import { SpellEffectRenderer } from '@/renderers/SpellEffectRenderer'
 import { CombatFeedbackRenderer } from '@/renderers/CombatFeedbackRenderer'
+import { LimitBurstRenderer } from '@/renderers/LimitBurstRenderer'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { TowerType } from '@/data/constants'
 
@@ -98,6 +99,7 @@ export function registerSystems(game: Game, opts: RegisterSystemsOptions): void 
     ['petRenderer', new PetRenderer()],
     ['spellEffectRenderer', new SpellEffectRenderer()],
     ['combatFeedbackRenderer', new CombatFeedbackRenderer()],
+    ['limitBurstRenderer', new LimitBurstRenderer()],
   ]
   for (const [name, sys] of systems) game.addSystem(name, sys)
 }

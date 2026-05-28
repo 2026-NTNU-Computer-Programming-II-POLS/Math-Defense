@@ -124,6 +124,11 @@ export const Events = Object.freeze({
   TOWER_TARGETING_CHANGED: 'towerTargetingChanged',
   MATRIX_PAIR_CHANGED:  'matrixPairChanged',
   LIMIT_ANSWER:         'limitAnswer',
+  // Fired once per LIMIT tower burst tick (charge window expired). Payload
+  // carries the tower position, range, the player's answer outcome, and the
+  // per-enemy damage list — consumed by LimitBurstRenderer to paint the
+  // shockwave ring + per-hit damage popups + result badge.
+  LIMIT_BURST:          'limitBurst',
   CALCULUS_OPERATION:    'calculusOperation',
   CALCULUS_STATE_CHANGED:'calculusStateChanged',
   TOWER_UPGRADE:        'towerUpgrade',
