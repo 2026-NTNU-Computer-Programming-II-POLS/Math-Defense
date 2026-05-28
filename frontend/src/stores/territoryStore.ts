@@ -59,6 +59,7 @@ export const useTerritoryStore = defineStore('territory', () => {
     deadline: string
     class_id?: string | null
     slots: SlotDefinition[]
+    student_slot_cap?: number
   }): Promise<ActivityInfo | null> {
     errorCreate.value = ''
     try {

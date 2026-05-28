@@ -68,6 +68,9 @@ export class RadarTowerSystem {
     angle += sweepSpeed * dt
     if (angle > 2 * Math.PI) angle -= 2 * Math.PI
     this._sweepAngles.set(tower.id, angle)
+    // Mirror onto the entity so projectTowerScene can surface it to the
+    // RadarRangeRenderer without reaching into this system's private Map.
+    tower.sweepAngle = angle
 
     const range = tower.effectiveRange
     // Phase 7 (Q14): `aoe_width` talent adds to the sweep arc half-width in
@@ -89,6 +92,10 @@ export class RadarTowerSystem {
         // needle's — same basis as RADAR_B/C (_getArcBonusForTarget), so all
         // three radars agree on what "inside the arc" means. Keying it on the
         // needle smeared the ×1.5 across the arc edge by ±aoeWidth.
+        // applyDamage (via _dealDamage) already resets enemy.hitFlashAge to 0
+        // each tick, so MovementSystem's age + EnemyRenderer's overlay give a
+        // free per-tick glow while the needle is on the enemy — no extra
+        // hit-flash plumbing needed here for A4.
         const arcBonus = this._getArcBonus(tower, enemyAngle)
         this._dealDamage(enemy, tower.effectiveDamage * arcBonus * dt, game)
       }

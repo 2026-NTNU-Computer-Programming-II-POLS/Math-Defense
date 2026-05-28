@@ -320,7 +320,7 @@ onBeforeUnmount(cancelInflight)
 </script>
 
 <template>
-  <div class="rankings-view">
+  <div class="rankings-view rune-panel">
     <header class="rk-header">
       <h1 class="rk-title">Rankings</h1>
       <button class="btn" @click="router.push('/')">← Back</button>

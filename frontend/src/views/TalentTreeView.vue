@@ -51,15 +51,136 @@ const TOWER_ORDER: TowerType[] = [
   TowerType.MATRIX, TowerType.LIMIT, TowerType.CALCULUS,
 ]
 
-const nodesByTower = computed(() => {
-  if (!tree.value) return {}
-  const map: Record<string, TalentNodeOut[]> = {}
-  for (const node of tree.value.nodes) {
-    if (!map[node.tower_type]) map[node.tower_type] = []
-    map[node.tower_type].push(node)
+interface NodeLayout {
+  node: TalentNodeOut
+  tier: number
+  // -1 means "span all columns" (centered). Otherwise 1-indexed grid column.
+  col: number
+  hasChildren: boolean
+  hasMultiChildren: boolean
+  prereqMet: boolean
+}
+
+interface TowerLayout {
+  tower: string
+  maxCols: number
+  flat: NodeLayout[]
+}
+
+function nodePrereqMet(node: TalentNodeOut, all: TalentNodeOut[]): boolean {
+  for (const pid of node.prerequisites) {
+    const p = all.find(n => n.id === pid)
+    if (!p || p.current_level < 1) return false
   }
-  return map
+  for (const pid of node.prerequisite_max_levels ?? []) {
+    const p = all.find(n => n.id === pid)
+    if (!p || p.current_level < p.max_level) return false
+  }
+  return true
+}
+
+// Per-tower BFS layout: tier from longest prereq chain, column from parent
+// position (single child inherits parent col, siblings fan to cols 1..N).
+// Keeps each T2 visually under the parent it gates on.
+const towerLayouts = computed<Record<string, TowerLayout>>(() => {
+  if (!tree.value) return {}
+  const all = tree.value.nodes
+  const tierCache = new Map<string, number>()
+  const tierOf = (n: TalentNodeOut): number => {
+    const cached = tierCache.get(n.id)
+    if (cached !== undefined) return cached
+    const prereqs = [...n.prerequisites, ...(n.prerequisite_max_levels ?? [])]
+    if (!prereqs.length) { tierCache.set(n.id, 0); return 0 }
+    let m = 0
+    for (const pid of prereqs) {
+      const p = all.find(x => x.id === pid)
+      if (p) m = Math.max(m, tierOf(p) + 1)
+    }
+    tierCache.set(n.id, m)
+    return m
+  }
+
+  const childCount = new Map<string, number>()
+  for (const n of all) {
+    for (const pid of [...n.prerequisites, ...(n.prerequisite_max_levels ?? [])]) {
+      childCount.set(pid, (childCount.get(pid) ?? 0) + 1)
+    }
+  }
+
+  const result: Record<string, TowerLayout> = {}
+  for (const tw of TOWER_ORDER) {
+    const towerNodes = all.filter(n => n.tower_type === tw)
+    if (!towerNodes.length) continue
+    const byTier = new Map<number, TalentNodeOut[]>()
+    let maxTier = 0
+    for (const n of towerNodes) {
+      const t = tierOf(n)
+      if (!byTier.has(t)) byTier.set(t, [])
+      byTier.get(t)!.push(n)
+      if (t > maxTier) maxTier = t
+    }
+    let maxCols = 1
+    for (let t = 0; t <= maxTier; t++) {
+      maxCols = Math.max(maxCols, byTier.get(t)?.length ?? 0)
+    }
+    const colOf = new Map<string, number>()
+    const tier0 = byTier.get(0) ?? []
+    tier0.forEach((n, i) => colOf.set(n.id, tier0.length === 1 ? -1 : i + 1))
+    for (let t = 1; t <= maxTier; t++) {
+      const rows = byTier.get(t) ?? []
+      const byParent = new Map<string, TalentNodeOut[]>()
+      for (const n of rows) {
+        const pid = [...n.prerequisites, ...(n.prerequisite_max_levels ?? [])][0] ?? '__orphan__'
+        if (!byParent.has(pid)) byParent.set(pid, [])
+        byParent.get(pid)!.push(n)
+      }
+      for (const [pid, kids] of byParent) {
+        if (kids.length === 1) {
+          colOf.set(kids[0].id, colOf.get(pid) ?? -1)
+        } else {
+          kids.forEach((k, i) => colOf.set(k.id, i + 1))
+        }
+      }
+    }
+    const flat: NodeLayout[] = []
+    for (let t = 0; t <= maxTier; t++) {
+      for (const n of byTier.get(t) ?? []) {
+        const c = childCount.get(n.id) ?? 0
+        flat.push({
+          node: n,
+          tier: t,
+          col: colOf.get(n.id) ?? -1,
+          hasChildren: c > 0,
+          hasMultiChildren: c > 1,
+          prereqMet: nodePrereqMet(n, all),
+        })
+      }
+    }
+    result[tw] = { tower: tw, maxCols, flat }
+  }
+  return result
 })
+
+function cellStyle(l: NodeLayout): Record<string, string> {
+  return {
+    gridRow: String(l.tier + 1),
+    gridColumn: l.col === -1 ? '1 / -1' : String(l.col),
+  }
+}
+
+// Connector geometry + lighting are driven from data-* on the .node-cell
+// wrapper so the bar can span the full grid cell (the .talent-node card is
+// max-width clamped and centered inside the cell, which would otherwise
+// leave the fan-out endpoints far short of the children below).
+function cellAttrs(l: NodeLayout): Record<string, string> {
+  return {
+    'data-tier': String(l.tier),
+    'data-has-children': l.hasChildren ? 'true' : 'false',
+    'data-multi-children': l.hasMultiChildren ? 'true' : 'false',
+    'data-prereq-met': l.prereqMet ? 'true' : 'false',
+    'data-allocated': l.node.current_level >= 1 ? 'true' : 'false',
+  }
+}
 
 function canAllocate(node: TalentNodeOut): boolean {
   if (!tree.value) return false
@@ -171,40 +292,54 @@ onMounted(async () => {
         >×</button>
       </div>
       <div class="talent-towers">
-      <div v-for="tw in TOWER_ORDER" :key="tw" class="tower-section">
-        <h3 class="tower-name" :style="{ color: TOWER_DEFS[tw]?.color }">
-          {{ TOWER_DEFS[tw]?.nameEn ?? tw }}
-        </h3>
-        <div class="nodes">
+      <div
+        v-for="tw in TOWER_ORDER"
+        :key="tw"
+        class="tower-section"
+        :style="{ '--tower-color': TOWER_DEFS[tw]?.cardColor ?? TOWER_DEFS[tw]?.color }"
+      >
+        <h3 class="tower-name">{{ TOWER_DEFS[tw]?.nameEn ?? tw }}</h3>
+        <div
+          class="tower-tree"
+          :style="{ '--max-cols': towerLayouts[tw]?.maxCols ?? 1 }"
+        >
           <div
-            v-for="node in (nodesByTower[tw] ?? [])"
-            :key="node.id"
-            :class="['talent-node', {
-              maxed: node.current_level >= node.max_level,
-              available: canAllocate(node),
-              locked: !canAllocate(node) && node.current_level < node.max_level,
-              loading: allocatingNodeId === node.id,
-              recommended: showRecommendation && recommendedNodeId === node.id,
-            }]"
-            @click="canAllocate(node) && allocate(node.id)"
+            v-for="layout in (towerLayouts[tw]?.flat ?? [])"
+            :key="layout.node.id"
+            class="node-cell"
+            :style="cellStyle(layout)"
+            v-bind="cellAttrs(layout)"
           >
-            <div class="node-name">
-              {{ node.name }}
-              <!-- Phase 7 (Q14): tier-2 badge so advanced nodes are visually
-                   distinct from base nodes. Driven from the same field the
-                   gate above uses, so badge + gate cannot drift apart. -->
-              <span
-                v-if="(node.prerequisite_max_levels?.length ?? 0) > 0"
-                class="tier-badge"
-                aria-label="Tier 2 talent — requires parent at max level"
-              >T2</span>
+            <div
+              :class="['talent-node', {
+                maxed: layout.node.current_level >= layout.node.max_level,
+                allocated: layout.node.current_level >= 1 && layout.node.current_level < layout.node.max_level,
+                available: canAllocate(layout.node),
+                locked: !layout.prereqMet && layout.node.current_level < 1,
+                loading: allocatingNodeId === layout.node.id,
+                recommended: showRecommendation && recommendedNodeId === layout.node.id,
+                't2-node': (layout.node.prerequisite_max_levels?.length ?? 0) > 0,
+              }]"
+              @click="canAllocate(layout.node) && allocate(layout.node.id)"
+            >
+              <div class="node-name">
+                {{ layout.node.name }}
+                <!-- Phase 7 (Q14): tier-2 badge so advanced nodes are visually
+                     distinct from base nodes. Driven from the same field the
+                     gate above uses, so badge + gate cannot drift apart. -->
+                <span
+                  v-if="(layout.node.prerequisite_max_levels?.length ?? 0) > 0"
+                  class="tier-badge"
+                  aria-label="Tier 2 talent — requires parent at max level"
+                >T2</span>
+              </div>
+              <div class="node-level">
+                {{ allocatingNodeId === layout.node.id ? '…' : `${layout.node.current_level} / ${layout.node.max_level}` }}
+              </div>
+              <div class="node-desc">{{ layout.node.description }}</div>
+              <div class="node-effect">+{{ (layout.node.effect_per_level * 100).toFixed(0) }}% per level</div>
+              <div class="node-cost">Cost: {{ layout.node.cost_per_level }} TP</div>
             </div>
-            <div class="node-level">
-              {{ allocatingNodeId === node.id ? '…' : `${node.current_level} / ${node.max_level}` }}
-            </div>
-            <div class="node-desc">{{ node.description }}</div>
-            <div class="node-effect">+{{ (node.effect_per_level * 100).toFixed(0) }}% per level</div>
-            <div class="node-cost">Cost: {{ node.cost_per_level }} TP</div>
           </div>
         </div>
       </div>
@@ -217,7 +352,7 @@ onMounted(async () => {
 .talent-view {
   position: relative;
   z-index: 1;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 40px auto;
   padding: 26px;
   display: flex;
@@ -253,52 +388,157 @@ onMounted(async () => {
 .talent-error { color: var(--clay-deep); }
 .talent-alloc-error { font-size: var(--text-xs); color: var(--clay-deep); text-align: center; }
 
-.talent-towers { display: flex; flex-direction: column; gap: 18px; }
+.talent-towers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 760px) {
+  .talent-towers { grid-template-columns: 1fr; }
+}
 
 .tower-section {
   background: rgba(245, 250, 254, 0.6);
   border: 1px solid var(--line);
+  border-left: 3px solid var(--tower-color, var(--line-strong));
   border-radius: 12px;
-  padding: 16px;
+  padding: 16px 16px 20px;
 }
 
 .tower-name {
   font-size: var(--text-sm);
   font-family: var(--font-mono);
-  color: var(--charcoal-soft);
+  color: var(--tower-color, var(--charcoal-soft));
   text-transform: uppercase;
   letter-spacing: 2px;
-  margin-bottom: 12px;
+  margin-bottom: 18px;
+  text-align: center;
 }
 
-.nodes { display: flex; gap: 12px; flex-wrap: wrap; }
+/* Per-tower mini-tree grid: rows = tier depth, cols = max sibling width.
+   --col-gap is parameterized so the fan-bar endpoint math below can stay
+   in lockstep with column-gap. */
+.tower-tree {
+  --col-gap: 14px;
+  --row-gap: 36px;
+  --connector-rise: 18px;
+  display: grid;
+  grid-template-columns: repeat(var(--max-cols, 1), minmax(0, 1fr));
+  column-gap: var(--col-gap);
+  row-gap: var(--row-gap);
+  align-items: start;
+  padding: 6px 8px 4px;
+}
+
+/* Wrapper that owns grid placement + connector pseudo-elements. Cell spans
+   the full grid column(s) so percentage-based fan-bar endpoints map onto
+   the child cells' centers, even though the .talent-node card inside is
+   max-width clamped and centered. */
+.node-cell {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* Vertical drop from each non-root cell up to mid-row-gap (meets parent's
+   stub or fan-bar drawn from above). */
+.node-cell:not([data-tier="0"])::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--connector-rise));
+  width: 2px;
+  height: var(--connector-rise);
+  transform: translateX(-50%);
+  background: var(--line-strong);
+  pointer-events: none;
+}
+
+/* Single-child parent: a short stub drops from cell bottom to mid-row-gap,
+   meeting the child's ::before. Child inherits parent's column so both sit
+   on the same vertical line. */
+.node-cell[data-has-children="true"]:not([data-multi-children="true"])::after {
+  content: '';
+  position: absolute;
+  bottom: calc(-1 * var(--connector-rise));
+  left: 50%;
+  width: 2px;
+  height: var(--connector-rise);
+  transform: translateX(-50%);
+  background: var(--line-strong);
+  pointer-events: none;
+}
+
+/* Multi-children parent (only root in current talent data): horizontal bar
+   at mid-row-gap. Endpoints land at each child column's center.
+   For a 2-col grid (cell-1 center at (W-gap)/4 from left, cell-2 center
+   symmetric), the bar must span left=25%-gap/4, right=25%-gap/4. */
+.node-cell[data-multi-children="true"]::after {
+  content: '';
+  position: absolute;
+  bottom: calc(-1 * var(--connector-rise));
+  left: calc(25% - var(--col-gap) / 4);
+  right: calc(25% - var(--col-gap) / 4);
+  height: 2px;
+  background: var(--line-strong);
+  pointer-events: none;
+}
+
+/* Light connectors with the tower color once the path is open. The drop
+   lights when this child's prereq is satisfied; the parent's stub/fan-bar
+   lights when the parent has any allocation. */
+.node-cell[data-prereq-met="true"]:not([data-tier="0"])::before {
+  background: var(--tower-color, var(--terracotta));
+}
+.node-cell[data-has-children="true"][data-allocated="true"]::after {
+  background: var(--tower-color, var(--terracotta));
+}
 
 .talent-node {
-  width: 140px;
-  padding: 12px;
+  position: relative;
+  width: 100%;
+  max-width: 170px;
+  padding: 10px 12px;
   background: rgba(245, 250, 254, 0.7);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: default;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
 .talent-node.available {
   cursor: pointer;
-  border-color: var(--terracotta);
+  border-color: var(--tower-color, var(--terracotta));
 }
 
 .talent-node.available:hover {
   background: linear-gradient(135deg, rgba(168, 188, 203, 0.26), #fff);
+  box-shadow: 0 0 0 1px var(--tower-color, var(--terracotta));
+}
+
+.talent-node.allocated {
+  border-color: var(--tower-color, var(--terracotta));
+  background: rgba(245, 250, 254, 0.92);
 }
 
 .talent-node.maxed {
-  border-color: var(--terracotta);
+  border-color: var(--tower-color, var(--terracotta));
   background: linear-gradient(135deg, rgba(168, 188, 203, 0.26), #fff);
+  box-shadow: inset 0 0 0 1px var(--tower-color, var(--terracotta));
 }
 
-.talent-node.locked { opacity: 0.5; }
+.talent-node.locked { opacity: 0.45; }
 .talent-node.loading { opacity: 0.6; cursor: wait; }
+
+.talent-node.t2-node {
+  border-style: dashed;
+}
+.talent-node.t2-node.allocated,
+.talent-node.t2-node.maxed {
+  border-style: solid;
+}
 
 .talent-node.recommended {
   /* Override .locked dimming so the highlighted root remains visible even

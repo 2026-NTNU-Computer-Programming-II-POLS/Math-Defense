@@ -761,3 +761,93 @@ def test_settle_expired_path_locks_out_plays(client, db_session):
     assert res.status_code == 409, (
         "Plays against an activity settled by the scheduler must return 409"
     )
+
+
+# ── Slot count bounds ─────────────────────────────────────────────────────────
+
+def test_create_activity_rejects_more_than_50_slots(client, db_session):
+    """Pydantic max_length=50 must reject a 51-slot create request with 422
+    before the request reaches the application service.
+    """
+    teacher_token = _register_teacher(db_session, "t_51_slots")
+    res = _create_activity(
+        client, teacher_token, slots=[{"star_rating": 1}] * 51,
+    )
+    assert res.status_code == 422
+
+
+def test_custom_student_slot_cap_lower_than_default(client, db_session):
+    """Teacher-configured student_slot_cap=2 must cap a student at 2 slots,
+    overriding the global default of 5.
+    """
+    teacher_token = _register_teacher(db_session, "t_cap_lo")
+    student_token = _register_student(client, "s_cap_lo")
+
+    body = {
+        "title": "Custom Cap Lo",
+        "deadline": _future_deadline(),
+        "slots": [{"star_rating": 1}] * 4,
+        "student_slot_cap": 2,
+    }
+    res = client.post("/api/activities", json=body, headers=_auth(teacher_token))
+    assert res.status_code == 201
+    assert res.json()["student_slot_cap"] == 2
+    activity_id = res.json()["id"]
+    slots = _slots_for(client, teacher_token, activity_id)
+
+    for i in range(2):
+        sid = _complete_session(client, student_token, level=1, score=500)
+        play = _play(client, student_token, activity_id, slots[i]["id"], sid)
+        assert play.status_code == 200 and play.json()["seized"] is True
+
+    over_sid = _complete_session(client, student_token, level=1, score=500)
+    over = _play(client, student_token, activity_id, slots[2]["id"], over_sid)
+    assert over.status_code == 409
+
+
+def test_create_activity_rejects_invalid_student_slot_cap(client, db_session):
+    """Pydantic must reject student_slot_cap outside [1, 50]."""
+    teacher_token = _register_teacher(db_session, "t_cap_bad")
+    for bad_cap in (0, 51, -1):
+        res = client.post(
+            "/api/activities",
+            json={
+                "title": "Bad Cap",
+                "deadline": _future_deadline(),
+                "slots": [{"star_rating": 1}],
+                "student_slot_cap": bad_cap,
+            },
+            headers=_auth(teacher_token),
+        )
+        assert res.status_code == 422, f"cap={bad_cap} should be rejected"
+
+
+def test_student_slot_cap_defaults_to_5_when_omitted(client, db_session):
+    """Omitting student_slot_cap must default to 5 in the response."""
+    teacher_token = _register_teacher(db_session, "t_cap_default")
+    res = _create_activity(client, teacher_token)
+    assert res.status_code == 201
+    assert res.json()["student_slot_cap"] == 5
+
+
+def test_db_rejects_slot_index_50(client, db_session):
+    """Direct ORM insert with slot_index=50 must be rejected by the
+    ck_territory_slot_index_range CHECK constraint, so the 50-slot cap holds
+    even for code paths that bypass the application service.
+    """
+    from sqlalchemy.exc import IntegrityError
+    from app.models.territory import TerritorySlot
+
+    teacher_token = _register_teacher(db_session, "t_idx50")
+    activity_id = _create_activity(client, teacher_token).json()["id"]
+
+    db_session.add(TerritorySlot(
+        activity_id=activity_id,
+        star_rating=1,
+        slot_index=50,
+    ))
+    try:
+        db_session.flush()
+        raise AssertionError("CHECK constraint did not reject slot_index=50")
+    except IntegrityError:
+        db_session.rollback()

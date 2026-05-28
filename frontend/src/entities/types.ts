@@ -58,6 +58,12 @@ export interface Tower {
   // firing system on TOWER_FIRED; aged each tick. The TowerRenderer paints
   // an outward ring + core flash while < ANIM.TOWER_FIRE_FLASH.
   firingFlashAge?: number
+
+  // Current sweep-needle angle (radians) for RADAR_A. Written each tick by
+  // RadarTowerSystem._updateSweep so the renderer can paint the rotating
+  // needle and the half-aoeWidth detection band; undefined for other types
+  // and for unconfigured RADAR_A towers.
+  sweepAngle?: number
 }
 
 export type TargetingMode = 'first' | 'last' | 'closest' | 'strongest'

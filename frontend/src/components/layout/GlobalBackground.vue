@@ -1,31 +1,190 @@
 <script setup lang="ts">
-const mathGlyphs = [
-  { text: '7', left: '7%', top: '78%', size: '34px', duration: '20s', delay: '-4s', drift: '18px', rotate: '-8deg' },
-  { text: '+', left: '14%', top: '42%', size: '26px', duration: '24s', delay: '-16s', drift: '-24px', rotate: '12deg' },
-  { text: 'x', left: '20%', top: '88%', size: '22px', duration: '18s', delay: '-9s', drift: '16px', rotate: '18deg' },
-  { text: '12', left: '26%', top: '62%', size: '30px', duration: '28s', delay: '-20s', drift: '-18px', rotate: '-14deg' },
-  { text: '=', left: '32%', top: '22%', size: '24px', duration: '22s', delay: '-5s', drift: '28px', rotate: '8deg' },
-  { text: 'f(x)', left: '39%', top: '83%', size: '28px', duration: '26s', delay: '-14s', drift: '-22px', rotate: '-10deg' },
-  { text: '3.14', left: '46%', top: '48%', size: '22px', duration: '19s', delay: '-11s', drift: '20px', rotate: '16deg' },
-  { text: '-', left: '54%', top: '72%', size: '30px', duration: '25s', delay: '-7s', drift: '-26px', rotate: '-18deg' },
-  { text: '9', left: '62%', top: '30%', size: '36px', duration: '21s', delay: '-17s', drift: '18px', rotate: '10deg' },
-  { text: '/', left: '69%', top: '87%', size: '28px', duration: '27s', delay: '-12s', drift: '-20px', rotate: '20deg' },
-  { text: '2^n', left: '76%', top: '55%', size: '24px', duration: '23s', delay: '-18s', drift: '26px', rotate: '-12deg' },
-  { text: '0', left: '84%', top: '76%', size: '32px', duration: '18s', delay: '-3s', drift: '-18px', rotate: '14deg' },
-  { text: '42', left: '90%', top: '36%', size: '26px', duration: '29s', delay: '-21s', drift: '22px', rotate: '-16deg' },
-  { text: '*', left: '11%', top: '18%', size: '32px', duration: '20s', delay: '-13s', drift: '20px', rotate: '-20deg' },
-  { text: '8', left: '57%', top: '12%', size: '24px', duration: '24s', delay: '-8s', drift: '-24px', rotate: '14deg' },
-  { text: '<', left: '88%', top: '12%', size: '22px', duration: '26s', delay: '-15s', drift: '16px', rotate: '9deg' },
+type Layer = 'far' | 'mid' | 'near'
+type Accent = 'warm' | 'cool'
+
+interface Glyph {
+  text: string
+  layer: Layer
+  left: string
+  top: string
+  size: string
+  duration: string
+  delay: string
+  drift: string
+  rotate: string
+  accent?: Accent
+}
+
+const mathGlyphs: Glyph[] = [
+  // Far layer — small, blurred, slow. The "atmospheric perspective" backdrop.
+  { text: '∑', layer: 'far', left: '4%',  top: '78%', size: '20px', duration: '42s', delay: '-4s',  drift: '12px',  rotate: '-6deg' },
+  { text: 'π', layer: 'far', left: '11%', top: '32%', size: '18px', duration: '38s', delay: '-22s', drift: '-14px', rotate: '8deg'  },
+  { text: '≈', layer: 'far', left: '23%', top: '88%', size: '16px', duration: '46s', delay: '-9s',  drift: '10px',  rotate: '14deg' },
+  { text: '∂', layer: 'far', left: '32%', top: '14%', size: '20px', duration: '40s', delay: '-30s', drift: '-12px', rotate: '-10deg'},
+  { text: 'dy/dx', layer: 'far', left: '44%', top: '60%', size: '18px', duration: '44s', delay: '-12s', drift: '14px',  rotate: '6deg'  },
+  { text: '∇', layer: 'far', left: '55%', top: '20%', size: '22px', duration: '36s', delay: '-18s', drift: '-10px', rotate: '12deg' },
+  { text: 'ε', layer: 'far', left: '66%', top: '85%', size: '18px', duration: '42s', delay: '-26s', drift: '12px',  rotate: '-8deg' },
+  { text: 'Δ', layer: 'far', left: '78%', top: '40%', size: '20px', duration: '40s', delay: '-7s',  drift: '-14px', rotate: '10deg' },
+  { text: '∫', layer: 'far', left: '88%', top: '72%', size: '22px', duration: '48s', delay: '-15s', drift: '10px',  rotate: '-12deg'},
+  { text: 'φ', layer: 'far', left: '95%', top: '22%', size: '18px', duration: '38s', delay: '-3s',  drift: '-12px', rotate: '14deg' },
+
+  // Mid layer — default visibility. The "main read".
+  { text: 'f(x)',   layer: 'mid', left: '8%',  top: '52%', size: '26px', duration: '26s', delay: '-11s', drift: '20px',  rotate: '-10deg' },
+  { text: 'a²+b²',  layer: 'mid', left: '18%', top: '20%', size: '24px', duration: '28s', delay: '-19s', drift: '-22px', rotate: '8deg' },
+  { text: '3.14',   layer: 'mid', left: '28%', top: '68%', size: '28px', duration: '24s', delay: '-6s',  drift: '18px',  rotate: '14deg' },
+  { text: '∀x∈ℝ',  layer: 'mid', left: '42%', top: '34%', size: '24px', duration: '30s', delay: '-23s', drift: '-20px', rotate: '-12deg', accent: 'cool' },
+  { text: 'lim',    layer: 'mid', left: '52%', top: '78%', size: '26px', duration: '26s', delay: '-14s', drift: '22px',  rotate: '10deg' },
+  { text: '√2',     layer: 'mid', left: '64%', top: '54%', size: '28px', duration: '22s', delay: '-9s',  drift: '-18px', rotate: '-16deg' },
+  { text: 'θ',      layer: 'mid', left: '74%', top: '14%', size: '26px', duration: '28s', delay: '-17s', drift: '20px',  rotate: '12deg', accent: 'warm' },
+  { text: 'iℏ∂Ψ',  layer: 'mid', left: '84%', top: '60%', size: '24px', duration: '24s', delay: '-21s', drift: '-22px', rotate: '-8deg' },
+
+  // Near layer — large, sharp, soft glow, fast. The "hero motion" elements.
+  { text: 'e^{iπ}+1=0',  layer: 'near', left: '15%', top: '76%', size: '40px', duration: '18s', delay: '-8s',  drift: '28px',  rotate: '-6deg', accent: 'warm' },
+  { text: '∇·E = ρ/ε₀',  layer: 'near', left: '60%', top: '28%', size: '40px', duration: '16s', delay: '-12s', drift: '-26px', rotate: '8deg',  accent: 'cool' },
+  { text: '∑',           layer: 'near', left: '38%', top: '46%', size: '52px', duration: '14s', delay: '-3s',  drift: '24px',  rotate: '-10deg' },
+  { text: '∞',           layer: 'near', left: '82%', top: '88%', size: '46px', duration: '18s', delay: '-16s', drift: '-22px', rotate: '6deg' },
+  { text: 'dy/dx',       layer: 'near', left: '6%',  top: '12%', size: '38px', duration: '16s', delay: '-5s',  drift: '26px',  rotate: '12deg' },
 ]
+
+// Constellation: dots and dashed connecting lines, regenerated on every
+// mount so each visit to the menu sees a different star map. Coordinates
+// are in a 100×100 SVG viewBox stretched across the viewport with
+// preserveAspectRatio=none; the strokes use vector-effect=non-scaling-stroke
+// so they stay 1 screen-px regardless of stretch, and the dots are
+// positioned with CSS % so they stay circular.
+//
+// Each star and edge carries its own pulse duration + negative phase delay,
+// so what is visible at any moment is a constantly-shifting *subset* of
+// the full graph — the shape never freezes, even within one session.
+interface Star {
+  x: number       // viewBox / percent units (0–100)
+  y: number
+  pulse: number   // seconds — full pulse cycle
+  delay: number   // negative seconds — phase offset
+  size: number    // px diameter
+  glow: number    // px box-shadow blur
+}
+
+interface Edge {
+  from: number
+  to: number
+  pulse: number
+  delay: number
+}
+
+interface Zone { xMin: number; xMax: number; yMin: number; yMax: number }
+
+// Zones avoid the central column where the menu card lives.
+const ZONES: ReadonlyArray<Zone> = [
+  { xMin: 4,  xMax: 32, yMin: 8,  yMax: 28 }, // top-left
+  { xMin: 58, xMax: 94, yMin: 8,  yMax: 28 }, // top-right
+  { xMin: 2,  xMax: 16, yMin: 34, yMax: 68 }, // left side
+  { xMin: 84, xMax: 98, yMin: 34, yMax: 68 }, // right side
+  { xMin: 6,  xMax: 38, yMin: 76, yMax: 94 }, // bottom-left
+  { xMin: 60, xMax: 92, yMin: 76, yMax: 94 }, // bottom-right
+]
+
+function rand(min: number, max: number): number {
+  return min + Math.random() * (max - min)
+}
+
+function makeStars(): Star[] {
+  const out: Star[] = []
+  for (const z of ZONES) {
+    for (let i = 0; i < 2; i++) {
+      const big = Math.random() < 0.25
+      out.push({
+        x: rand(z.xMin, z.xMax),
+        y: rand(z.yMin, z.yMax),
+        pulse: rand(11, 19),
+        delay: -rand(0, 14),
+        size: big ? 6 : 4 + Math.round(Math.random()),
+        glow: big ? 12 : 7,
+      })
+    }
+  }
+  return out
+}
+
+// Edges: pick up to MAX_EDGES random pairs whose euclidean distance falls in
+// a "feels like a constellation" band — too close → invisible, too far →
+// long wires across the viewport. Tuned against viewBox 0–100.
+function makeEdges(stars: Star[]): Edge[] {
+  const MIN_DIST = 6
+  const MAX_DIST = 34
+  const MAX_EDGES = 10
+  const candidates: { from: number; to: number }[] = []
+  for (let i = 0; i < stars.length; i++) {
+    for (let j = i + 1; j < stars.length; j++) {
+      const dx = stars[i].x - stars[j].x
+      const dy = stars[i].y - stars[j].y
+      const d = Math.sqrt(dx * dx + dy * dy)
+      if (d > MIN_DIST && d < MAX_DIST) candidates.push({ from: i, to: j })
+    }
+  }
+  // Fisher-Yates shuffle so the surviving subset is unbiased.
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+  }
+  return candidates.slice(0, MAX_EDGES).map((e) => ({
+    from: e.from,
+    to: e.to,
+    pulse: rand(18, 30),
+    delay: -rand(0, 22),
+  }))
+}
+
+const stars = makeStars()
+const edges = makeEdges(stars)
 </script>
 
 <template>
   <div class="global-bg" aria-hidden="true">
+    <!-- Giant anchor: claims math identity even when no motion -->
+    <span class="anchor-glyph">∞</span>
+
+    <!-- Constellation lines (SVG stretches to viewport, strokes stay 1px) -->
+    <svg class="constellation-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <line
+        v-for="(e, i) in edges"
+        :key="`line-${i}`"
+        :x1="stars[e.from].x"
+        :y1="stars[e.from].y"
+        :x2="stars[e.to].x"
+        :y2="stars[e.to].y"
+        :style="{
+          '--line-pulse': `${e.pulse}s`,
+          '--line-delay': `${e.delay}s`,
+        }"
+      />
+    </svg>
+
+    <!-- Constellation dots (positioned in % so they stay circular) -->
+    <span
+      v-for="(s, i) in stars"
+      :key="`star-${i}`"
+      class="constellation-dot"
+      :style="{
+        left: `${s.x}%`,
+        top: `${s.y}%`,
+        '--dot-size': `${s.size}px`,
+        '--dot-glow': `${s.glow}px`,
+        '--dot-pulse': `${s.pulse}s`,
+        '--dot-delay': `${s.delay}s`,
+      }"
+    />
+
+    <!-- Floating math glyphs across 3 depth layers -->
     <div class="math-field">
       <span
         v-for="(glyph, index) in mathGlyphs"
         :key="`${glyph.text}-${index}`"
-        class="math-glyph"
+        :class="[
+          'math-glyph',
+          `math-glyph--${glyph.layer}`,
+          glyph.accent ? `math-glyph--${glyph.accent}` : null,
+        ]"
         :style="{
           '--glyph-left': glyph.left,
           '--glyph-top': glyph.top,
@@ -52,11 +211,76 @@ const mathGlyphs = [
     linear-gradient(165deg, #B8C8D5 0%, #CDD9E2 50%, #ACBDCC 100%);
 }
 
-.math-field {
+/* ── Anchor glyph ──
+   A single giant low-opacity symbol pinned to a corner. Establishes the
+   "this is a math product" identity even before any motion registers. */
+.anchor-glyph {
   position: absolute;
-  inset: 0;
+  right: -3%;
+  bottom: -6%;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 38vmin;
+  color: rgba(58, 76, 96, 0.05);
+  line-height: 1;
+  user-select: none;
+  animation: anchor-breathe 28s ease-in-out infinite;
+  transform-origin: 60% 60%;
 }
 
+@keyframes anchor-breathe {
+  0%, 100% { opacity: 1;   transform: rotate(0deg); }
+  50%      { opacity: 0.65; transform: rotate(3deg); }
+}
+
+/* ── Constellation ── */
+.constellation-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.constellation-svg line {
+  stroke: rgba(58, 76, 96, 0.28);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-dasharray: 3 6;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: constellation-line-pulse var(--line-pulse, 22s) ease-in-out infinite;
+  animation-delay: var(--line-delay, 0s);
+}
+
+.constellation-dot {
+  position: absolute;
+  width: var(--dot-size, 5px);
+  height: var(--dot-size, 5px);
+  border-radius: 50%;
+  background: rgba(58, 76, 96, 0.45);
+  box-shadow: 0 0 var(--dot-glow, 8px) rgba(120, 150, 175, 0.45);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: constellation-dot-pulse var(--dot-pulse, 14s) ease-in-out infinite;
+  animation-delay: var(--dot-delay, 0s);
+}
+
+/* Stars: wider visible window (25–75%) so several are always lit and the
+   sky feels populated. */
+@keyframes constellation-dot-pulse {
+  0%, 100% { opacity: 0; }
+  25%, 75% { opacity: 1; }
+}
+
+/* Lines: brief flicker (40–60%) so only a few edges are ever visible at
+   once, making the wired-up "shape" constantly morph. */
+@keyframes constellation-line-pulse {
+  0%, 100% { opacity: 0; }
+  40%, 60% { opacity: 1; }
+}
+
+/* ── Floating glyph base ── */
 .math-glyph {
   position: absolute;
   left: var(--glyph-left);
@@ -66,17 +290,45 @@ const mathGlyphs = [
   font-size: var(--glyph-size);
   font-weight: 700;
   line-height: 1;
+  white-space: nowrap;
   transform: translate3d(-50%, 0, 0) rotate(var(--glyph-rotate));
   animation: glyph-float var(--glyph-duration) linear infinite;
   animation-delay: var(--glyph-delay);
+  will-change: transform, opacity;
 }
 
-.math-glyph:nth-child(3n) {
-  color: rgba(107, 127, 148, 0.18);
+/* Far: small, hazy, low alpha — the depth backdrop. blur is GPU-cheap at
+   1.2px on ≤10 elements, but flips the layer to software compositing in
+   some browsers, so keep the count and radius modest. */
+.math-glyph--far {
+  filter: blur(1.2px);
+  color: rgba(58, 76, 96, 0.10);
 }
 
-.math-glyph:nth-child(4n) {
-  color: rgba(168, 133, 108, 0.13);
+/* Mid: inherits base values (the original look) */
+
+/* Near: large, sharp, soft glow */
+.math-glyph--near {
+  color: rgba(40, 58, 78, 0.24);
+  text-shadow: 0 0 14px rgba(120, 150, 175, 0.20);
+  letter-spacing: 0.5px;
+}
+
+/* Accent tints — applied sparingly to break the monochrome */
+.math-glyph--warm {
+  color: rgba(168, 113, 78, 0.20);
+}
+.math-glyph--warm.math-glyph--near {
+  color: rgba(168, 113, 78, 0.28);
+  text-shadow: 0 0 14px rgba(214, 152, 102, 0.22);
+}
+
+.math-glyph--cool {
+  color: rgba(72, 130, 158, 0.22);
+}
+.math-glyph--cool.math-glyph--near {
+  color: rgba(60, 120, 150, 0.30);
+  text-shadow: 0 0 14px rgba(110, 175, 200, 0.25);
 }
 
 @keyframes glyph-float {
@@ -97,9 +349,16 @@ const mathGlyphs = [
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .math-glyph {
+  .math-glyph,
+  .constellation-dot,
+  .constellation-svg line,
+  .anchor-glyph {
     animation: none;
-    opacity: 0.42;
   }
+  .math-glyph         { opacity: 0.42; }
+  .math-glyph--far    { opacity: 0.28; }
+  .math-glyph--near   { opacity: 0.55; }
+  .constellation-dot  { opacity: 0.6; }
+  .constellation-svg line { opacity: 0.5; }
 }
 </style>

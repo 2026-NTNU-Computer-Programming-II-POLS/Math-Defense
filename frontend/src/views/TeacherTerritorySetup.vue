@@ -9,10 +9,18 @@ const router = useRouter()
 const store = useTerritoryStore()
 const auth = useAuthStore()
 
+// Mirrors backend/app/schemas/territory.py:57 (Pydantic max_length=50) and
+// the DB CHECK ck_territory_slot_index_range. Keep in sync when changing.
+const MAX_SLOTS = 50
+const SLOT_WARN_THRESHOLD = MAX_SLOTS - 5
+
+const DEFAULT_STUDENT_SLOT_CAP = 5
+
 const title = ref('')
 const deadline = ref('')
 const selectedClassId = ref<string | null>(null)
 const slots = ref<{ star_rating: number }[]>([{ star_rating: 1 }])
+const studentSlotCap = ref<number>(DEFAULT_STUDENT_SLOT_CAP)
 const classes = ref<ClassInfo[]>([])
 const submitting = ref(false)
 const validationError = ref('')
@@ -26,7 +34,13 @@ const hasDuplicateStars = computed(() => {
   return ratings.length !== new Set(ratings).size
 })
 
+const atSlotMax = computed(() => slots.value.length >= MAX_SLOTS)
+const nearSlotMax = computed(() => slots.value.length >= SLOT_WARN_THRESHOLD && !atSlotMax.value)
+
+const capUnreachable = computed(() => studentSlotCap.value >= slots.value.length)
+
 function addSlot(): void {
+  if (atSlotMax.value) return
   slots.value.push({ star_rating: 1 })
 }
 
@@ -50,6 +64,12 @@ async function submit(): Promise<void> {
     return
   }
 
+  const cap = Math.round(studentSlotCap.value)
+  if (!Number.isFinite(cap) || cap < 1 || cap > MAX_SLOTS) {
+    validationError.value = `Per-student cap must be between 1 and ${MAX_SLOTS}`
+    return
+  }
+
   validationError.value = ''
   submitting.value = true
   try {
@@ -58,6 +78,7 @@ async function submit(): Promise<void> {
       deadline: parsedDeadline.toISOString(),
       class_id: selectedClassId.value,
       slots: slots.value.map((s) => ({ star_rating: s.star_rating })),
+      student_slot_cap: cap,
     })
     if (activity) router.push(`/territory/${activity.id}`)
   } finally {
@@ -127,8 +148,25 @@ onMounted(async () => {
               <button type="button" class="btn-sm danger" :disabled="slots.length <= 1" @click="removeSlot(i)">×</button>
             </div>
           </div>
-          <button type="button" class="btn-sm" @click="addSlot">+ Add Slot</button>
+          <button type="button" class="btn-sm" :disabled="atSlotMax" @click="addSlot">
+            + Add Slot ({{ slots.length }}/{{ MAX_SLOTS }})
+          </button>
+          <div v-if="atSlotMax" class="warn-msg">Reached the maximum of {{ MAX_SLOTS }} slots per activity.</div>
+          <div v-else-if="nearSlotMax" class="warn-msg">Approaching the {{ MAX_SLOTS }}-slot limit.</div>
           <div v-if="hasDuplicateStars" class="warn-msg">Multiple slots share the same star rating — students will face the same difficulty for those territories.</div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Per-student territory cap</label>
+          <input
+            v-model.number="studentSlotCap"
+            type="number"
+            class="rune-input"
+            :min="1"
+            :max="MAX_SLOTS"
+            step="1"
+          />
+          <div v-if="capUnreachable" class="warn-msg">Cap ≥ slot count — every student can occupy every territory (no scarcity).</div>
         </div>
 
         <div class="form-actions">

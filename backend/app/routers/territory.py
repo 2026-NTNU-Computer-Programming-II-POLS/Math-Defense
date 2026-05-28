@@ -50,6 +50,7 @@ def create_activity(
         deadline=req.deadline,
         class_id=req.class_id,
         slots=[s.model_dump() for s in req.slots],
+        student_slot_cap=req.student_slot_cap,
     )
     return _activity_out(activity)
 
@@ -179,6 +180,7 @@ def _activity_out(a) -> ActivityOut:
         settled=a.settled,
         settled_at=getattr(a, "settled_at", None),
         settled_by=getattr(a, "settled_by", None),
+        student_slot_cap=getattr(a, "student_slot_cap", 5),
         created_at=a.created_at,
     )
 

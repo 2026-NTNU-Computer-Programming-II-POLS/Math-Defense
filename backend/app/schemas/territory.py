@@ -55,6 +55,7 @@ class CreateActivityRequest(BaseModel):
     deadline: datetime
     class_id: str | None = None
     slots: list[SlotDefinition] = Field(min_length=1, max_length=50)
+    student_slot_cap: int = Field(default=5, ge=1, le=50)
 
     @field_validator("title")
     @classmethod
@@ -116,6 +117,7 @@ class ActivityOut(BaseModel):
     settled: bool
     settled_at: datetime | None = None
     settled_by: str | None = None
+    student_slot_cap: int = 5
     created_at: datetime
 
 

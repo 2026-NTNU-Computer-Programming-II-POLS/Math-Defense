@@ -13,6 +13,10 @@ from app.domain.territory.errors import (
     NotActivityOwnerError,
 )
 
+# Default per-student occupation cap for new activities. Each activity row
+# stores its own `student_slot_cap`, which is what `attempt_occupation` reads;
+# this constant is only the fallback used when a caller creates an activity
+# without specifying one (and is preserved for tests that import it).
 TERRITORY_CAP_PER_STUDENT = 5
 
 
@@ -81,7 +85,8 @@ class GrabbingTerritoryActivity:
     Invariants:
     1. Only the owning teacher can mutate the activity.
     2. No occupation changes after settlement or past deadline.
-    3. A student may hold at most TERRITORY_CAP_PER_STUDENT slots per activity.
+    3. A student may hold at most ``student_slot_cap`` slots per activity
+       (teacher-configurable, defaults to TERRITORY_CAP_PER_STUDENT).
     4. A slot can only be seized if empty or the new score beats the current holder.
     5. One occupation per slot (enforced by DB unique constraint).
     """
@@ -98,7 +103,12 @@ class GrabbingTerritoryActivity:
         slots: list[TerritorySlot] | None = None,
         settled_at: datetime | None = None,
         settled_by: str | None = None,
+        student_slot_cap: int = TERRITORY_CAP_PER_STUDENT,
     ) -> None:
+        if not (1 <= student_slot_cap <= 50):
+            raise ValueError(
+                f"student_slot_cap must be 1-50, got {student_slot_cap}"
+            )
         self.id = id
         self.class_id = class_id
         self.teacher_id = teacher_id
@@ -109,6 +119,7 @@ class GrabbingTerritoryActivity:
         self.slots: list[TerritorySlot] = slots or []
         self.settled_at = settled_at
         self.settled_by = settled_by
+        self.student_slot_cap = student_slot_cap
 
     @classmethod
     def create(
@@ -117,6 +128,7 @@ class GrabbingTerritoryActivity:
         title: str,
         deadline: datetime,
         class_id: str | None = None,
+        student_slot_cap: int = TERRITORY_CAP_PER_STUDENT,
     ) -> GrabbingTerritoryActivity:
         return cls(
             id=str(uuid.uuid4()),
@@ -124,6 +136,7 @@ class GrabbingTerritoryActivity:
             teacher_id=teacher_id,
             title=title,
             deadline=deadline,
+            student_slot_cap=student_slot_cap,
         )
 
     def is_owned_by(self, user_id: str) -> bool:
@@ -206,9 +219,9 @@ class GrabbingTerritoryActivity:
                 "Your score does not beat the current holder's score"
             )
 
-        if student_occupation_count >= TERRITORY_CAP_PER_STUDENT:
+        if student_occupation_count >= self.student_slot_cap:
             raise TerritoryCapReachedError(
-                f"You already hold {TERRITORY_CAP_PER_STUDENT} territories in this activity"
+                f"You already hold {self.student_slot_cap} territories in this activity"
             )
 
         return TerritoryOccupation(

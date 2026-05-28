@@ -191,6 +191,9 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   LIMIT_ANSWER: [
     { module: 'systems/LimitTowerSystem', handler: 'anonymous', purpose: 'Evaluate limit answer and apply result' },
   ],
+  LIMIT_BURST: [
+    { module: 'renderers/LimitBurstRenderer', handler: 'anonymous', purpose: 'Paint shockwave ring, per-hit damage popups, and result-attribution badge on Limit tower burst' },
+  ],
   CALCULUS_OPERATION: [
     { module: 'systems/CalculusTowerSystem', handler: 'anonymous', purpose: 'Apply calculus operation to tower state' },
   ],

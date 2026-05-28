@@ -14,6 +14,10 @@ class GrabbingTerritoryActivity(Base):
         Index("ix_gt_activities_teacher_id", "teacher_id"),
         Index("ix_gt_activities_class_id", "class_id"),
         Index("ix_gt_activities_deadline", "deadline"),
+        CheckConstraint(
+            "student_slot_cap BETWEEN 1 AND 50",
+            name="ck_gt_activity_student_slot_cap_range",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -30,6 +34,9 @@ class GrabbingTerritoryActivity(Base):
     settled_by: Mapped[str | None] = mapped_column(
         String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
     )
+    student_slot_cap: Mapped[int] = mapped_column(
+        Integer, default=5, server_default="5", nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )
@@ -40,7 +47,7 @@ class TerritorySlot(Base):
     __table_args__ = (
         Index("ix_territory_slots_activity_id", "activity_id"),
         CheckConstraint("star_rating BETWEEN 1 AND 5", name="ck_territory_slot_star_range"),
-        CheckConstraint("slot_index >= 0", name="ck_territory_slot_index_nonneg"),
+        CheckConstraint("slot_index BETWEEN 0 AND 49", name="ck_territory_slot_index_range"),
         UniqueConstraint("activity_id", "slot_index", name="uq_territory_slot_activity_index"),
     )
 

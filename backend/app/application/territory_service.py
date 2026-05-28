@@ -95,6 +95,7 @@ class TerritoryApplicationService:
         deadline: datetime,
         class_id: str | None,
         slots: list[dict[str, Any]],
+        student_slot_cap: int = 5,
     ) -> GrabbingTerritoryActivity:
         with self._uow:
             # B-H-4: domain guard against past-or-imminent deadlines
@@ -117,6 +118,7 @@ class TerritoryApplicationService:
                 title=title,
                 deadline=deadline,
                 class_id=class_id,
+                student_slot_cap=student_slot_cap,
             )
             self._territory_repo.save_activity(activity)
 
