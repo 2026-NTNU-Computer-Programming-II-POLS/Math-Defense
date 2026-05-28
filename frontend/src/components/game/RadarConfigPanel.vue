@@ -90,7 +90,7 @@ function apply() {
   padding: 6px 8px;
   font-size: var(--text-xs);
   font-family: var(--font-mono);
-  background: rgba(245, 250, 254, 0.85);
+  background: var(--cream-soft);
   color: var(--charcoal);
   border: 1px solid var(--line-strong);
   border-radius: 8px;

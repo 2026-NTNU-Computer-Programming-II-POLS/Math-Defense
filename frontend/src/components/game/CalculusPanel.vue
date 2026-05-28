@@ -374,7 +374,7 @@ function submitAnswer() {
   padding: 6px;
   font-size: var(--text-xs);
   font-family: var(--font-mono);
-  background: var(--stone-dark);
+  background: var(--cream-soft);
   color: #ffffff;
   border: 1px solid var(--gold);
   border-radius: 4px;

@@ -183,7 +183,7 @@ function submitTyped(): void {
 .typed-entry { display: flex; gap: 6px; }
 .typed-input {
   flex: 1; padding: 8px 10px; font-size: var(--text-xs);
-  background: #fff; color: var(--charcoal);
+  background: var(--cream-soft); color: var(--charcoal);
   border: 1px solid var(--line-strong); border-radius: 8px;
 }
 .typed-input:focus { outline: none; border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28); }

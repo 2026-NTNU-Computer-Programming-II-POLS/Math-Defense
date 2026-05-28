@@ -242,7 +242,7 @@ function toggleMode(mode: MagicMode) {
   flex: 1;
   font-size: var(--text-xs);
   padding: 8px 10px;
-  background: #fff;
+  background: var(--cream-soft);
   color: var(--charcoal);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
