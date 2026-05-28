@@ -207,7 +207,19 @@ const manualOpen = ref(false)
    so the Start Game button would otherwise sit flush against "PROGRESSION".
    Restore a breathing gap that matches the inter-section spacing. */
 .menu-card > .btn.btn-primary {
+  width: 100%;
   margin-bottom: 22px;
+}
+
+/* Menu nav buttons read as a list: icon pinned to a fixed left column so
+   every label starts at the same x and lines up down the stack. */
+.menu-card .btn-stack > .btn {
+  justify-content: flex-start;
+}
+
+.menu-card .btn-stack > .btn .icon {
+  width: var(--space-5);
+  text-align: center;
 }
 
 /* ── Sections ── */
