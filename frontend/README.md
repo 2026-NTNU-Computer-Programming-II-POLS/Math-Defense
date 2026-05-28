@@ -66,7 +66,7 @@ frontend/
 │   │   │   │                       Monty Hall progress bar, spell bar, buff icons, prep timer
 │   │   │   ├── TowerBar.vue        Tower selection bar
 │   │   │   ├── StartWaveButton.vue Player-paced "Start Wave" control shown during BUILD
-│   │   │   ├── GameSpeedPanel.vue  Runtime game-speed multiplier control (×0.5 / ×1 / ×2 / ×4)
+│   │   │   ├── GameSpeedPanel.vue  Runtime game-speed multiplier control (×0.5 / ×1 / ×2 / ×3)
 │   │   │   ├── WaveForecast.vue    Build-phase preview of upcoming wave composition
 │   │   │   ├── BuildPanel.vue      Thin wrapper — delegates to TowerInfoPanel
 │   │   │   ├── TowerInfoPanel.vue  Unified stats + type-specific panel + upgrade button

@@ -1,36 +1,44 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { gameCommands } from '@/services/gameCommandService'
+import { PERCEIVED_SPEED_OPTIONS } from '@/data/constants'
 
 const g = useGameStore()
 
 // The perceived-speed multiplier only drives the loop during WAVE. In BUILD
-// the toggle still works — it pre-arms the setting for the next wave — so the
-// panel stays visible but shows a hint that the change isn't live yet.
-const isLive = computed(() => g.isWave)
-const isFast = computed(() => g.perceivedSpeedMultiplier >= 2)
+// the chip row still works — it pre-arms the setting for the next wave — so
+// the panel stays visible but shows a hint that the change isn't live yet.
 
-function toggleSpeed(): void {
-  gameCommands.setPerceivedSpeedMultiplier(isFast.value ? 1 : 2)
+function setSpeed(value: number): void {
+  gameCommands.setPerceivedSpeedMultiplier(value)
+}
+
+function label(value: number): string {
+  // Keep "0.5x" / "1x" / "2x" / "3x" — short enough for a 32 px cell at
+  // --text-xs and the active state still reads as a multiplier badge.
+  return `${value}x`
 }
 </script>
 
 <template>
   <div class="speed-panel" role="group" aria-label="Game speed; score timing is unchanged">
-    <button
-      type="button"
-      class="speed-cell"
-      :class="{ active: isFast }"
-      :aria-pressed="isFast"
-      :title="isLive
-        ? 'Toggle faster pace; score timing is unchanged'
-        : 'Speed applies once the wave starts; score timing is unchanged'"
-      @click="toggleSpeed"
-    >
-      {{ isFast ? '2x' : '1x' }}
-    </button>
-    <span v-if="!isLive" class="speed-hint">wave only</span>
+    <div class="speed-row">
+      <button
+        v-for="value in PERCEIVED_SPEED_OPTIONS"
+        :key="value"
+        type="button"
+        class="speed-cell"
+        :class="{ active: g.perceivedSpeedMultiplier === value }"
+        :aria-pressed="g.perceivedSpeedMultiplier === value"
+        :title="g.isWave
+          ? `Set game pace to ${label(value)}; score timing is unchanged`
+          : `Speed applies once the wave starts (${label(value)}); score timing is unchanged`"
+        @click="setSpeed(value)"
+      >
+        {{ label(value) }}
+      </button>
+    </div>
+    <span v-if="!g.isWave" class="speed-hint">wave only</span>
   </div>
 </template>
 
@@ -49,9 +57,15 @@ function toggleSpeed(): void {
   font-family: var(--font-mono);
 }
 
+.speed-row {
+  display: flex;
+  gap: 4px;
+}
+
 .speed-cell {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: rgba(245, 250, 254, 0.94);
