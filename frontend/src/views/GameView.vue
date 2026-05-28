@@ -592,20 +592,21 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 0;
   /* Flush against the left edge and the bottom of the HUD sub-bar (MH/spells
-     row) so it never covers it; stretch down to just above the tower panel. */
-  top: calc(var(--hud-height, 56px) + 68px);
+     row) so it never covers it; stretch down to just above the tower panel.
+     The +52 matches the new .hud-row2 height in HUD.vue. */
+  top: calc(var(--hud-height, 56px) + 52px);
   bottom: calc(var(--tower-bar-height, 64px) + 8px);
   z-index: var(--z-chrome);
-  width: 210px;
+  width: 160px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
   /* Visible (not auto) so the Shop dropdown can extend past the sidebar at its
      full width instead of being clipped to the sidebar's narrow column. */
   overflow: visible;
   /* Light-blue sidebar surface behind the tools + active buffs. */
-  padding: 14px 12px;
+  padding: 12px 10px;
   background: rgba(214, 226, 238, 0.88);
   border: 1px solid var(--line);
   border-radius: 0;
@@ -654,15 +655,19 @@ onBeforeUnmount(() => {
   flex-direction: column;
   line-height: 1.15;
   min-width: 0;
+  /* Allow nm to ellipsis inside the narrowed 160px rail; the full buff
+     name remains available via the parent `.lb-buff [title]` tooltip. */
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 .left-utility-stack .b-info .nm {
-  /* Mono to match the TOOLS label; shows the full buff name on one line in the
-     widened rail (no wrap, no ellipsis). */
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 700;
   color: var(--charcoal);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.2;
 }
 .left-utility-stack .b-info .ct {
