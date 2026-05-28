@@ -1,34 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { getSpellIconDef } from './spell-icon-defs'
 
 const props = defineProps<{ spellId: string }>()
 
-// Flat shape glyphs (mockup). The U+FE0E variation selector forces text (not
-// emoji) presentation so the snowflake / bolt render monochrome and pick up
-// the spell colour via `fill: currentColor`. All stay within the BMP.
-const GLYPH: Record<string, string> = {
-  fireball: '▲',                // ▲
-  slow: '❄︎',              // ❄ + text-presentation selector
-  lightning: '⚡︎',         // ⚡ + text-presentation selector
-  haste: '↯',                   // ↯
-}
-
-const glyph = computed(() => GLYPH[props.spellId] ?? '?')
-// Single-shape glyphs sit at a fixed size within the 32-unit viewBox.
-// Values are SVG user units (unitless number), not CSS pixels.
-const fontSize = computed(() => 24)
+// Stroke-only path glyphs. Stroke colour inherits via `currentColor`, which the
+// parent button sets through `--spell-color`. Fill ramps up via the
+// `--spell-icon-fill-opacity` cascade so hover / casting can ignite the glyph
+// without the icon needing to know about button state.
+const path = computed(() => getSpellIconDef(props.spellId).path)
 </script>
 
 <template>
   <svg class="spell-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-    <text
-      class="icon-fill"
-      :font-size="fontSize"
-      x="16"
-      y="16"
-      text-anchor="middle"
-      dominant-baseline="central"
-    >{{ glyph }}</text>
+    <path class="spell-icon-path" :d="path" />
   </svg>
 </template>
 
@@ -39,11 +24,20 @@ const fontSize = computed(() => 24)
   display: block;
   width: 28px;
   height: 28px;
-  color: var(--spell-color, #888);
-  font-weight: 900;
+  color: var(--spell-color, #6f6a65);
 }
 
-.icon-fill {
+.spell-icon-path {
   fill: currentColor;
+  fill-opacity: var(--spell-icon-fill-opacity, 0);
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: fill-opacity 140ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spell-icon-path { transition: none; }
 }
 </style>

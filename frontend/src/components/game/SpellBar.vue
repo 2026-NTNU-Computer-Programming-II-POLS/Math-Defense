@@ -4,6 +4,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { SPELL_DEFS } from '@/data/spell-defs'
 import { Events } from '@/data/constants'
 import SpellIcon from './SpellIcon.vue'
+import { getSpellIconDef } from './spell-icon-defs'
 
 const g = useGameStore()
 const castingSpell = ref<string | null>(null)
@@ -30,8 +31,13 @@ onBeforeUnmount(() => {
 const spells = computed(() =>
   SPELL_DEFS.map((s) => {
     const cd = g.spellCooldowns[s.id] ?? 0
+    // The button styling reads from the HUD-layer icon registry, not from the
+    // in-canvas VFX colour on `SpellDef.color` — the two concerns are tuned
+    // against different backgrounds.
+    const iconColor = getSpellIconDef(s.id).color
     return {
       ...s,
+      iconColor,
       onCooldown: cd > 0,
       cooldownPct: cd > 0 ? (cd / s.cooldown) * 100 : 0,
       cooldownLabel: cd > 0 ? Math.ceil(cd) + 's' : '',
@@ -84,7 +90,7 @@ defineExpose({ castingSpell, castAtPosition })
         unaffordable: !spell.affordable && !spell.onCooldown,
         casting: castingSpell === spell.id,
       }"
-      :style="{ '--spell-color': spell.color }"
+      :style="{ '--spell-color': spell.iconColor }"
       :disabled="spell.onCooldown || !spell.affordable"
       :title="`${spell.name} (${spell.cost}g) — ${spell.description}`"
       :aria-label="`${spell.name}, costs ${spell.cost} gold${spell.onCooldown ? `, on cooldown ${spell.cooldownLabel}` : ''}`"
@@ -130,11 +136,17 @@ defineExpose({ castingSpell, castAtPosition })
   background: #fff;
   border-color: var(--spell-color, var(--terracotta));
   transform: translateY(-1px);
+  /* Cascades into SpellIcon's `.spell-icon-path` — keeps the icon outline-first
+     but ignites a soft fill on hover so the active state still feels tangible. */
+  --spell-icon-fill-opacity: 0.14;
 }
 
-.spell-btn.casting {
+/* Specificity bump (`:not(:disabled)`) so a hovered button mid-cast keeps the
+   casting fill (0.22) rather than collapsing to the lighter hover fill. */
+.spell-btn.casting:not(:disabled) {
   border-color: var(--spell-color, var(--gold-deep));
   box-shadow: 0 0 8px var(--spell-color, var(--gold-soft));
+  --spell-icon-fill-opacity: 0.22;
 }
 
 .spell-btn.on-cooldown {
