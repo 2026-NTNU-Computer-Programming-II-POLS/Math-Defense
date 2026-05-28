@@ -40,7 +40,7 @@ class TerritorySlot(Base):
     __table_args__ = (
         Index("ix_territory_slots_activity_id", "activity_id"),
         CheckConstraint("star_rating BETWEEN 1 AND 5", name="ck_territory_slot_star_range"),
-        CheckConstraint("slot_index >= 0", name="ck_territory_slot_index_nonneg"),
+        CheckConstraint("slot_index BETWEEN 0 AND 49", name="ck_territory_slot_index_range"),
         UniqueConstraint("activity_id", "slot_index", name="uq_territory_slot_activity_index"),
     )
 

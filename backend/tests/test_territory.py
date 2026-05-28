@@ -761,3 +761,39 @@ def test_settle_expired_path_locks_out_plays(client, db_session):
     assert res.status_code == 409, (
         "Plays against an activity settled by the scheduler must return 409"
     )
+
+
+# ── Slot count bounds ─────────────────────────────────────────────────────────
+
+def test_create_activity_rejects_more_than_50_slots(client, db_session):
+    """Pydantic max_length=50 must reject a 51-slot create request with 422
+    before the request reaches the application service.
+    """
+    teacher_token = _register_teacher(db_session, "t_51_slots")
+    res = _create_activity(
+        client, teacher_token, slots=[{"star_rating": 1}] * 51,
+    )
+    assert res.status_code == 422
+
+
+def test_db_rejects_slot_index_50(client, db_session):
+    """Direct ORM insert with slot_index=50 must be rejected by the
+    ck_territory_slot_index_range CHECK constraint, so the 50-slot cap holds
+    even for code paths that bypass the application service.
+    """
+    from sqlalchemy.exc import IntegrityError
+    from app.models.territory import TerritorySlot
+
+    teacher_token = _register_teacher(db_session, "t_idx50")
+    activity_id = _create_activity(client, teacher_token).json()["id"]
+
+    db_session.add(TerritorySlot(
+        activity_id=activity_id,
+        star_rating=1,
+        slot_index=50,
+    ))
+    try:
+        db_session.flush()
+        raise AssertionError("CHECK constraint did not reject slot_index=50")
+    except IntegrityError:
+        db_session.rollback()
