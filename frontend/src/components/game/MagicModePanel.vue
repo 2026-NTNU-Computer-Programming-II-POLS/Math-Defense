@@ -282,7 +282,7 @@ function toggleMode(mode: MagicMode) {
 /* Magic mode toggle — Debuff = dark purple, Buff = light purple. Pure text
    labels; the inactive option fades to 0.55, the active one gains a purple
    glow ring. Layout/padding identical so only the purple shade differs. */
-.mode-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mode-btns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
 .mode-btns .btn {
   font-size: var(--text-xs);
   font-weight: 600;
@@ -291,6 +291,11 @@ function toggleMode(mode: MagicMode) {
   cursor: pointer;
   transition: all 0.14s ease;
   text-transform: none;
+  /* `.btn` defaults to `white-space: nowrap`; combined with grid 1fr that
+     means the min-content of each label sets the column floor. Allow wrap +
+     drop the floor to 0 so the panel never overflows the 320px drawer. */
+  white-space: normal;
+  min-width: 0;
 }
 .mode-btns .btn:first-child {
   background: linear-gradient(135deg, var(--tw-magic-debuff), var(--tw-magic-debuff-soft));
