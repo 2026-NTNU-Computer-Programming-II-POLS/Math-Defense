@@ -142,14 +142,15 @@ erDiagram
     }
 
     grabbing_territory_activities {
-        string  id          PK  "UUID"
-        string  class_id    FK  "→ classes.id CASCADE, nullable"
-        string  teacher_id  FK  "→ users.id CASCADE"
-        string  title           "NOT NULL"
+        string  id                 PK  "UUID"
+        string  class_id           FK  "→ classes.id CASCADE, nullable"
+        string  teacher_id         FK  "→ users.id CASCADE"
+        string  title                  "NOT NULL"
         datetime deadline
-        boolean settled         "DEFAULT false"
-        datetime settled_at     "nullable"
-        string  settled_by  FK  "→ users.id SET NULL"
+        boolean settled                "DEFAULT false"
+        datetime settled_at            "nullable"
+        string  settled_by         FK  "→ users.id SET NULL"
+        int     student_slot_cap       "DEFAULT 5; CHECK 1..50 — per-activity occupation cap per student"
         datetime created_at
     }
 
@@ -158,7 +159,7 @@ erDiagram
         string  activity_id  FK  "→ grabbing_territory_activities.id CASCADE"
         int     star_rating      "CHECK 1–5"
         json    path_config      "nullable"
-        int     slot_index       "CHECK >= 0, UNIQUE per activity"
+        int     slot_index       "CHECK BETWEEN 0 AND 49, UNIQUE per activity"
     }
 
     territory_occupations {
@@ -595,8 +596,10 @@ A teacher-created territory game scoped to a class. After the `deadline`, settle
 | `settled` | `Boolean` | NO | DEFAULT `false` |
 | `settled_at` | `DateTime(tz)` | YES | — |
 | `settled_by` | `String` (FK) | YES | → `users.id` ON DELETE **SET NULL** (`fk_gt_activities_settled_by`) |
+| `student_slot_cap` | `Integer` | NO | DEFAULT `5`; SERVER DEFAULT `5`; `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Per-activity, teacher-configurable cap on how many slots a single student may simultaneously occupy. Default of 5 preserves the legacy hard-coded `TERRITORY_CAP_PER_STUDENT` value. Added in `ee5f6a7b8c9d` |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
+**Constraints:** `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`)  
 **Indexes:** `ix_gt_activities_teacher_id`, `ix_gt_activities_class_id`, `ix_gt_activities_deadline`
 
 ---
@@ -611,9 +614,9 @@ Individual problem slots within a territory activity. Each slot has its own diff
 | `activity_id` | `String` (FK) | NO | → `grabbing_territory_activities.id` ON DELETE **CASCADE** |
 | `star_rating` | `Integer` | NO | `CHECK(1 ≤ star_rating ≤ 5)` |
 | `path_config` | `JSON` | YES | — |
-| `slot_index` | `Integer` | NO | `CHECK(slot_index ≥ 0)` |
+| `slot_index` | `Integer` | NO | `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`) — tightened from the original `>= 0` in migration `dd4e5f6a7b8c` so the 50-slot cap (set by Pydantic `CreateActivityRequest.max_length=50`) is also enforced at the DB layer |
 
-**Constraints:** `UNIQUE(activity_id, slot_index)` (`uq_territory_slot_activity_index`), `CHECK(1 ≤ star_rating ≤ 5)` (`ck_territory_slot_star_range`), `CHECK(slot_index ≥ 0)` (`ck_territory_slot_index_nonneg`)  
+**Constraints:** `UNIQUE(activity_id, slot_index)` (`uq_territory_slot_activity_index`), `CHECK(1 ≤ star_rating ≤ 5)` (`ck_territory_slot_star_range`), `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`)  
 **Indexes:** `ix_territory_slots_activity_id`
 
 ---
@@ -1040,10 +1043,12 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `d4_drop_redundant_constraints` | L-21/L-22 cleanup — drop `ix_territory_occupations_slot_id` (covered by `uq_territory_occupation_slot`) and `uq_study_enrollment` (covered by composite PK) |
 | `e5_territory_session_use_cascade` | Relax `territory_session_uses.session_id` FK from RESTRICT → CASCADE. RESTRICT blocked user-deletion cascades (`GameSession.user_id` is CASCADE), and the replay risk is moot once the parent session row is deleted |
 | `bb2c3d4e5f7a` | **Merge migration** for the two heads `aa1d2e3f4a6` and `e5_territory_session_use_cascade`. Also expands `classes` for Tier-C class management: adds `description / subject / school_year / capacity / color / icon / archived_at` plus `ck_classes_capacity_positive` and `ix_classes_archived_at`; creates `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` |
-| `cc3d4e5f6a8b` | **Current head.** Balance Overhaul Phase 4 (Q10): `DELETE FROM talent_allocations WHERE talent_node_id = 'calculus_pet_hp'`. Node was renamed `calculus_pet_range`; orphaned allocations are removed so spent-TP recovery (`achievement_service.compute_remaining_talent_points`) reflects the rename automatically |
+| `cc3d4e5f6a8b` | Balance Overhaul Phase 4 (Q10): `DELETE FROM talent_allocations WHERE talent_node_id = 'calculus_pet_hp'`. Node was renamed `calculus_pet_range`; orphaned allocations are removed so spent-TP recovery (`achievement_service.compute_remaining_talent_points`) reflects the rename automatically |
+| `dd4e5f6a7b8c` | Tighten `territory_slots.slot_index` CHECK from `>= 0` to `BETWEEN 0 AND 49`. Combined with the existing `UNIQUE(activity_id, slot_index)` and sequential 0-based assignment, this caps per-activity slot count at 50 at the DB layer (matching `CreateActivityRequest.max_length=50`) so paths that bypass the application service still can't exceed the limit. Renames constraint `ck_territory_slot_index_nonneg` → `ck_territory_slot_index_range` |
+| `ee5f6a7b8c9d` | **Current head.** Add `grabbing_territory_activities.student_slot_cap INTEGER NOT NULL DEFAULT 5` plus `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Surfaces the previously hard-coded `TERRITORY_CAP_PER_STUDENT = 5` as a per-activity, teacher-configurable column; default of 5 preserves existing behaviour for backfilled rows |
 
 > **Branched history**: Two parallel merges exist in the chain.
 > 1. After `q1f2a3b4c5d6` (gameplay — practice mode) and `a3b4c5d6e7f8` (auth — lockout backoff), `r2a3b4c5d6e7` merges them and also creates the `seasons` table.
-> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `cc3d4e5f6a8b` is the current single head.
+> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `ee5f6a7b8c9d` is the current single head (linear chain `bb2c3d4e5f7a` → `cc3d4e5f6a8b` → `dd4e5f6a7b8c` → `ee5f6a7b8c9d`).
 
 > **Earlier history**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create.
