@@ -125,7 +125,9 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 **Boss Type-B (`bossB`)**
 - Shield + Fast-minion spawn behave as above.
 - When current HP enters the range `[0.45, 0.55] × maxHp` (sampled per spawn so it isn't memorizable), the wave enters `CHAIN_RULE` phase.
-- A KaTeX-rendered chain rule question is presented (e.g. compute `(f∘g)'(x)`). Correct → +100 gold bonus and large bonus damage applied immediately. Incorrect → boss heals.
+- A KaTeX-rendered chain rule question is presented (e.g. compute `(f∘g)'(x)`).
+  - **Correct** → +100 gold (`bossCorrectAnswerBonus`) **and the boss is instakilled immediately**, then shatters into two smaller enemies on the same path: a Strong-variant at 60% of the boss's max HP and a Fast-variant at 40% (both shield-stripped, with reduced reward and kill value).
+  - **Incorrect / no answer** → no heal, no penalty beyond the lost insta-kill. The boss returns to combat at the HP it had when the question fired. Whenever the boss eventually dies by normal damage, it still splits into the same two smaller enemies.
 - After resolution, the wave resumes.
 
 ### Counter-Enemies: How to Beat Each
@@ -138,7 +140,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 | Helper | buffs nearby allies | Kill the Helper *first*. Radar C or a Lightning spell are reliable openers. |
 | Split | doubles into smaller mobs | Place AoE (Magic curve, Radar A sweep) where the children will spawn. |
 | Boss A | shield + minion pressure | Sustained DPS on the shield; a Matrix pair locks on for ramp damage. |
-| Boss B | shield + chain-rule gate | Answer the chain rule correctly; have Fireball + Lightning ready post-question. |
+| Boss B | shield + chain-rule gate + post-split adds | Answer the chain rule correctly to insta-kill (boss still splits into a Strong + Fast pair, so have Fireball / Frost Nova ready for the cleanup). |
 
 ---
 

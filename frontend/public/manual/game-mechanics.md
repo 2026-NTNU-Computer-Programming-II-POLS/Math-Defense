@@ -125,10 +125,10 @@ Mathematically: **switching wins** P = (doors − 1) / doors after a reveal, so 
 
 When Boss Type-B drops to ~50% HP, the wave pauses and a chain-rule question appears (e.g. *"if f(g(x)) = sin(x²), what is f'(g(x)) · g'(x) at x = 1?"*).
 
-- Answer correctly → the boss takes massive bonus damage and the wave resumes.
-- Answer incorrectly → the boss heals and the wave resumes.
+- Answer correctly → the boss is **instakilled** on the spot, then shatters into two smaller enemies (a Strong-variant at 60% of the boss's max HP and a Fast-variant at 40%, both shield-stripped). You also collect a **+100 gold** bonus (`bossCorrectAnswerBonus`).
+- Answer incorrectly (or close the prompt without answering) → the wave resumes with the boss at the HP it had when the question fired; no heal, no penalty beyond the lost insta-kill. When the boss is later killed by normal damage, it still splits into the same two smaller enemies.
 
-There is no skip. The challenge fires once per Boss Type-B per run, with the trigger HP fraction sampled from `triggerHpRange: [0.45, 0.55]` so the timing is not memorizable.
+There is no skip. The challenge fires once per Boss Type-B per run, with the trigger HP fraction sampled from `triggerHpRange: [0.45, 0.55]` so the timing is not memorizable. A backstop sample fires on the first tick after spawn in case the `ENEMY_SPAWNED` event was missed — the ability is guaranteed to never be skipped.
 
 ---
 
