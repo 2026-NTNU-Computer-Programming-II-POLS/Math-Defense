@@ -352,7 +352,10 @@ const showTargetingMode = computed(() => {
   bottom: calc(var(--tower-bar-height, 64px) + 12px);
   width: 320px;
   max-width: calc(100vw - 32px);
-  max-height: calc(100% - var(--tower-bar-height, 64px) - 96px);
+  /* Reserve room for the full top HUD (base bar + spells/MH sub-row) and the
+     bottom tower bar so the drawer never overlaps either; content scrolls if
+     it still doesn't fit. */
+  max-height: calc(100% - var(--tower-bar-height, 64px) - 128px);
   overflow-y: auto;
   z-index: var(--z-floating);
   display: flex;
