@@ -100,7 +100,11 @@ function startGame() {
 
 <template>
   <div v-if="level" class="ia-view">
-    <div class="card ia-card">
+    <div class="card card-ornate ia-card">
+      <span class="card-corner card-corner-tl" aria-hidden="true"></span>
+      <span class="card-corner card-corner-tr" aria-hidden="true"></span>
+      <span class="card-corner card-corner-bl" aria-hidden="true"></span>
+      <span class="card-corner card-corner-br" aria-hidden="true"></span>
       <div class="ia-head">
         <h1 class="title-main">Find the Intersection</h1>
         <p class="motto">

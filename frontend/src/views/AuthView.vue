@@ -160,14 +160,24 @@ async function submit(): Promise<void> {
 
 <template>
   <div class="auth-view">
-    <div class="card auth-card">
-      <img
-        class="auth-logo"
-        src="/logo.png"
-        alt="Math Defense"
-        width="1069"
-        height="1389"
-      />
+    <div class="card card-ornate auth-card">
+      <span class="card-corner card-corner-tl" aria-hidden="true"></span>
+      <span class="card-corner card-corner-tr" aria-hidden="true"></span>
+      <span class="card-corner card-corner-bl" aria-hidden="true"></span>
+      <span class="card-corner card-corner-br" aria-hidden="true"></span>
+      <div class="logo-ring logo-ring--sm auth-logo-ring">
+        <span class="logo-cardinal logo-cardinal-n" aria-hidden="true">✦</span>
+        <span class="logo-cardinal logo-cardinal-e" aria-hidden="true">◆</span>
+        <span class="logo-cardinal logo-cardinal-s" aria-hidden="true">✦</span>
+        <span class="logo-cardinal logo-cardinal-w" aria-hidden="true">◆</span>
+        <img
+          class="logo-ring__img auth-logo"
+          src="/logo.png"
+          alt="Math Defense"
+          width="1069"
+          height="1389"
+        />
+      </div>
       <!-- Two-factor verification (no mockup design — themed to palette) -->
       <template v-if="mfaRequired">
         <h2 class="auth-title">Two-Factor Authentication</h2>
@@ -346,11 +356,13 @@ async function submit(): Promise<void> {
   margin: 0 auto;
 }
 
-.auth-logo {
-  display: block;
-  width: 96px;
-  height: auto;
+.auth-logo-ring {
   margin: 0 auto 18px;
+}
+
+.auth-logo {
+  width: 80px;
+  height: auto;
 }
 
 /* ── Tabs ── */

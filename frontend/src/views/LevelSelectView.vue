@@ -107,7 +107,11 @@ async function startLevel() {
 
 <template>
   <div class="level-select">
-    <div class="card ls-card">
+    <div class="card card-ornate ls-card">
+      <span class="card-corner card-corner-tl" aria-hidden="true"></span>
+      <span class="card-corner card-corner-tr" aria-hidden="true"></span>
+      <span class="card-corner card-corner-bl" aria-hidden="true"></span>
+      <span class="card-corner card-corner-br" aria-hidden="true"></span>
       <div class="ls-head">
         <h1 class="title-main">Choose Your Difficulty</h1>
         <p class="motto">Higher stars yield richer rewards — and harsher enemies.</p>
