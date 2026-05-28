@@ -63,7 +63,8 @@ function makeRenderer(ctx: CanvasRenderingContext2D): Renderer {
     boardBaseAlt: '#E8EFF5',
     boardAxis: '#ADA284',
     gridLine: 'rgba(79, 74, 72, 0.18)',
-    forbiddenFill: '#F0E2DC',
+    forbiddenFill: '#DCE5ED',
+    forbiddenHatch: 'rgba(122, 141, 168, 0.55)',
   }
   return { ctx, palette } as unknown as Renderer
 }

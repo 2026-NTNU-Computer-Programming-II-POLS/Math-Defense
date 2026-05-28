@@ -19,7 +19,7 @@
  * and protanopia, where the old green + amber pair converged toward the
  * same olive hue. These borders are load-bearing for CVD accessibility:
  * do not change `path` green or `buildable` blue without re-verifying the
- * deuteranopia/protanopia distinction. Forbidden cells rely on the red
+ * deuteranopia/protanopia distinction. Forbidden cells rely on the gray
  * diagonal hatching (drawn by the Renderer) rather than the fill — the
  * fill is intentionally light to match the rest of the board.
  */
@@ -67,7 +67,7 @@ export function tileStyleFor(cls: TileClass): TileStyle {
       }
     case 'forbidden':
       return {
-        fill: '#F0E2DC',       // --wrong-bg : pale clay; red hatching is the primary signal
+        fill: '#DCE5ED',       // blends with board; gray hatching is the primary signal
         hatching: true,
       }
   }

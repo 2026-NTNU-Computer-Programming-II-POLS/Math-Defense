@@ -60,8 +60,10 @@ export interface RendererPalette {
   readonly boardAxis: string
   /** Board grid lines (low-alpha charcoal — graph-paper feel). */
   readonly gridLine: string
-  /** Forbidden-cell base fill (red hatching from `_applyTileStyle` overlays). */
+  /** Forbidden-cell base fill (gray hatching from `_applyTileStyle` overlays). */
   readonly forbiddenFill: string
+  /** Forbidden-cell diagonal hatch stroke (slate gray — the primary signal). */
+  readonly forbiddenHatch: string
 }
 
 const BOARD_PALETTE: RendererPalette = Object.freeze({
@@ -74,7 +76,8 @@ const BOARD_PALETTE: RendererPalette = Object.freeze({
   boardBaseAlt: '#E8EFF5',   // --cream-soft : checkerboard alt
   boardAxis: '#ADA284',      // --gold       : muted khaki axes / ticks
   gridLine: 'rgba(79, 74, 72, 0.18)', // --divider : graph-paper thin lines
-  forbiddenFill: '#F0E2DC',  // --wrong-bg   : forbidden cell base
+  forbiddenFill: '#DCE5ED',  // blends with board; gray hatch is the signal
+  forbiddenHatch: 'rgba(122, 141, 168, 0.55)', // stoneDark hue — diagonal stripes
 })
 
 export class Renderer {
@@ -260,7 +263,7 @@ export class Renderer {
       ctx.beginPath()
       ctx.rect(px, py, UNIT_PX, UNIT_PX)
       ctx.clip()
-      ctx.strokeStyle = 'rgba(184, 64, 64, 0.35)'
+      ctx.strokeStyle = this.palette.forbiddenHatch
       ctx.lineWidth = 1
       const step = 4
       for (let off = -UNIT_PX; off < UNIT_PX; off += step) {
