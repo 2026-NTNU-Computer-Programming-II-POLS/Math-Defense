@@ -425,44 +425,6 @@ export class Renderer {
     ctx.restore()
   }
 
-  drawOrigin(time: number): void {
-    const { ctx } = this
-    const cx = gameToCanvasX(0)
-    const cy = gameToCanvasY(0)
-    const pulse = 0.6 + 0.4 * Math.sin(time * 3)
-    const radius = UNIT_PX * 0.8
-
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 1.5)
-    gradient.addColorStop(0, `rgba(173, 162, 132, ${0.4 * pulse})`)
-    gradient.addColorStop(0.5, `rgba(173, 162, 132, ${0.15 * pulse})`)
-    gradient.addColorStop(1, 'rgba(173, 162, 132, 0)')
-    ctx.fillStyle = gradient
-    ctx.beginPath()
-    ctx.arc(cx, cy, radius * 1.5, 0, Math.PI * 2)
-    ctx.fill()
-
-    ctx.strokeStyle = `rgba(173, 162, 132, ${0.8 * pulse})`
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.arc(cx, cy, radius * 0.5, 0, Math.PI * 2)
-    ctx.stroke()
-
-    ctx.save()
-    ctx.translate(cx, cy)
-    ctx.rotate(time * 0.5)
-    ctx.strokeStyle = `rgba(173, 162, 132, ${0.6 * pulse})`
-    ctx.lineWidth = 1
-    for (let i = 0; i < 6; i++) {
-      const angle = ((Math.PI * 2) / 6) * i
-      const r = radius * 0.4
-      ctx.beginPath()
-      ctx.moveTo(0, 0)
-      ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r)
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
   /**
    * Highlight the disclosure region — a rectangle that is guaranteed to
    * contain exactly one common intersection of all level curves (= P*, the

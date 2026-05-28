@@ -584,7 +584,6 @@ export class Game {
     // active (MENU, or flag-off legacy path) drawGrid falls back to the
     // checkerboard itself — we do not branch on phase here.
     renderer.drawGrid(this.levelContext?.layout ?? null)
-    renderer.drawOrigin(this.time)
 
     if (this.levelContext && this.state.phase !== GamePhase.MENU) {
       const genCtx = isGeneratedLevelContext(this.levelContext) ? this.levelContext : null
