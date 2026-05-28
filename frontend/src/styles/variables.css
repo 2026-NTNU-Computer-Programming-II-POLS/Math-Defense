@@ -10,8 +10,7 @@
      Morandi palette — canonical colour values.
      ============================================================ */
    --cream:        #DCE5ED;   /* soft blue-grey body / card base */
-   --cream-soft:   #E8EFF5;   /* lighter for elevated surfaces */
-   --cream-bright: #F2F7FB;   /* near-white cool — coordinate-grid panel */
+   --cream-soft:   #E8EFF5;   /* lighter for elevated surfaces; coordinate-grid panel */
    --cream-deep:   #C2CFDB;   /* deeper for accents/edges */
    --sand:         #C8D2DC;   /* secondary cool surface */
    --paper:        #D6E0E8;   /* game plane paper */
