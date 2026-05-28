@@ -102,9 +102,9 @@ body {
   border: 1px solid var(--gold-deep);
   font-size: var(--text-base);
   letter-spacing: 1.2px;
-  min-height: 50px;
-  padding: 12px 22px;
-  box-shadow: 0 8px 20px rgba(122, 113, 86, 0.36);
+  min-height: 46px;
+  padding: 10px 20px;
+  box-shadow: 0 4px 12px rgba(122, 113, 86, 0.32);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 
@@ -115,7 +115,7 @@ body {
 
 .btn.btn-primary:hover {
   background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
-  box-shadow: 0 12px 28px rgba(122, 113, 86, 0.44);
+  box-shadow: 0 6px 16px rgba(122, 113, 86, 0.38);
 }
 
 /* Quiet, secondary action. */
