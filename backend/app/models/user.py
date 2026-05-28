@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from sqlalchemy import Boolean, CheckConstraint, String, Integer, Float, DateTime, Enum, text
+from sqlalchemy import Boolean, CheckConstraint, String, Integer, Float, DateTime, Enum, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
 
@@ -11,6 +11,19 @@ class User(Base):
         CheckConstraint(
             "ia_recent_accuracy BETWEEN 0.0 AND 1.0",
             name="ck_user_ia_accuracy_range",
+        ),
+        # Endpoint marker style + hit-FX enum allowlists at the DB layer —
+        # defense-in-depth behind Pydantic + aggregate. NULL is allowed
+        # (legacy rows + users who haven't set the preference).
+        CheckConstraint(
+            "endpoint_marker_style IS NULL OR endpoint_marker_style IN "
+            "('star', 'gorilla', 'custom')",
+            name="ck_user_endpoint_marker_style",
+        ),
+        CheckConstraint(
+            "endpoint_hit_fx IS NULL OR endpoint_hit_fx IN "
+            "('random', 'fragments', 'crying', 'angry')",
+            name="ck_user_endpoint_hit_fx",
         ),
     )
 
@@ -36,6 +49,14 @@ class User(Base):
     # session-end and read by the frontend at level start to drive
     # concrete-fading on the Star-1 path renderer (spec §17).
     ia_recent_accuracy: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
+    # Endpoint marker (P*) display preferences — server-side persistence so
+    # the choice follows the player across devices. All nullable; NULL means
+    # the player has not chosen and the FE falls back to its local default.
+    # Allowlist enforced at three layers: Pydantic schema (early 422), domain
+    # aggregate (canonical invariant), DB CheckConstraint above.
+    endpoint_marker_style: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    endpoint_marker_custom_dataurl: Mapped[str | None] = mapped_column(Text, nullable=True)
+    endpoint_hit_fx: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )

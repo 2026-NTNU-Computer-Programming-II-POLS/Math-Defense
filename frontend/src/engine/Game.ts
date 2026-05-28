@@ -311,6 +311,25 @@ export class Game {
 
   towerModifierProvider: ((towerType: TowerType) => Record<string, number>) | null = null
 
+  /**
+   * Endpoint marker (P*) display preferences. Set by useGameLoop from uiStore
+   * — the engine never imports Pinia. Pure presentation: nothing here enters
+   * deterministic state, so live-editing during a run is safe.
+   */
+  endpointMarker: {
+    style: 'star' | 'gorilla' | 'custom'
+    customImage: HTMLImageElement | null
+  } = { style: 'star', customImage: null }
+
+  /**
+   * Endpoint hit-FX style. `'random'` defers the choice to EndpointFXSystem,
+   * which picks one of the concrete kinds per hit via `game.rng` (so replays
+   * still reproduce the same FX sequence).
+   */
+  endpointFx: {
+    style: 'random' | 'fragments' | 'crying' | 'angry'
+  } = { style: 'fragments' }
+
   // Game time in seconds (used for animation)
   time = 0
 
@@ -650,7 +669,18 @@ export class Game {
             }
           }
         }
-        renderer.drawFocusStar(genCtx.endpoint.x, genCtx.endpoint.y, this.time)
+        // Plan: hide the endpoint marker iff the player skipped the pre-game
+        // P* question (iaResult === 'ignored'). useGameLoop maps that exact
+        // condition onto `state.pathsVisible`, so reusing it keeps the two
+        // disclosures tied — correct / wrong / paid all reveal P*.
+        if (this.state.pathsVisible) {
+          renderer.drawFocusMarker(
+            genCtx.endpoint.x,
+            genCtx.endpoint.y,
+            this.time,
+            this.endpointMarker,
+          )
+        }
       } else {
         renderer.drawSegmentBoundaries(this.levelContext.path, this.hud.hoveredSegmentId)
         for (const seg of this.levelContext.path.segments) {

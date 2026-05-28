@@ -48,7 +48,7 @@ interface TileEdges {
 export interface RendererPalette {
   /** Tower instrument structure stroke (legacy name; not the board's base). */
   readonly stoneDark: string
-  /** Tower base-plate fill + soft accents (legacy name; not the board's alt). */
+  /** Tower base-plate fill — light blue (legacy name; not the board's alt). */
   readonly stoneLight: string
   /** Tower keyboard-focus halo (legacy name; not the board axis colour). */
   readonly axis: string
@@ -75,7 +75,7 @@ export interface RendererPalette {
 const BOARD_PALETTE: RendererPalette = Object.freeze({
   // Tower ink — restored to legacy values so TowerRenderer keeps its bite.
   stoneDark: '#7a8da8',
-  stoneLight: '#8ea1bd',
+  stoneLight: '#A8BCCB',  // --terracotta : light-blue tower base-plate fill
   axis: '#ffd700',
   // Board ink — Morandi light re-skin.
   boardBase: '#E8EFF5',      // --cream-soft : no-layout checkerboard base
@@ -93,6 +93,7 @@ export class Renderer {
 
   /** Single board palette — Morandi light theme. No per-star variation. */
   readonly palette: RendererPalette = BOARD_PALETTE
+
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -436,23 +437,61 @@ export class Renderer {
   }
 
   /**
-   * Draw a blinking 5-pointed star at game coordinate `(gx, gy)` — the focus
-   * point of the enemy paths (level endpoint P*). `time` (seconds) drives the
-   * pulse so the marker reads as "alive". Pure primitive: no state. The star
-   * is a bright focal accent, so its colours live here as local constants
-   * rather than in the board palette (which holds only muted board ink).
+   * Draw the focus marker at game coordinate `(gx, gy)` — the level endpoint
+   * P\* (common intersection of all curves). The marker can be the default
+   * pulsing gold star, a gorilla emoji, or a player-uploaded image; the gold
+   * halo is shared so all three variants pop equally against the muted board.
+   * Pure primitive: no state.
    */
-  drawFocusStar(gx: number, gy: number, time: number): void {
+  drawFocusMarker(
+    gx: number,
+    gy: number,
+    time: number,
+    opts: {
+      style: 'star' | 'gorilla' | 'custom'
+      customImage: HTMLImageElement | null
+    },
+  ): void {
     const { ctx } = this
     const cx = gameToCanvasX(gx)
     const cy = gameToCanvasY(gy)
     const pulse = 0.5 + 0.5 * Math.sin(time * 4)
-    // Bright, prominent: a vivid gold star with a glowing white core.
+    const outerR = UNIT_PX * (0.72 + 0.1 * pulse)
+
+    ctx.save()
+    this._drawFocusHalo(cx, cy, outerR, pulse)
+
+    if (opts.style === 'gorilla') {
+      this._drawFocusEmoji(cx, cy, outerR, '🦍')
+    } else if (opts.style === 'custom' && opts.customImage) {
+      this._drawFocusImage(cx, cy, outerR, opts.customImage)
+    } else {
+      // 'star', or 'custom' before its image finishes loading — fall back to
+      // the canonical star so the marker is never an empty halo.
+      this._drawFocusStarBody(cx, cy, outerR, pulse)
+    }
+    ctx.restore()
+  }
+
+  private _drawFocusHalo(cx: number, cy: number, outerR: number, pulse: number): void {
+    const { ctx } = this
+    const glowR = outerR * 2.6
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR)
+    glow.addColorStop(0, `rgba(246, 201, 68, ${0.5 + 0.35 * pulse})`)
+    glow.addColorStop(0.5, `rgba(246, 201, 68, ${0.2 * pulse})`)
+    glow.addColorStop(1, 'rgba(246, 201, 68, 0)')
+    ctx.fillStyle = glow
+    ctx.beginPath()
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  private _drawFocusStarBody(cx: number, cy: number, outerR: number, pulse: number): void {
+    const { ctx } = this
     const GOLD = '#F6C944'
     const GOLD_EDGE = '#D69A1E'
     const CORE = '#FFFBE6'
     const SPIKES = 5
-    const outerR = UNIT_PX * (0.72 + 0.1 * pulse)
     const innerR = outerR * 0.44
 
     const traceStar = (oR: number, iR: number): void => {
@@ -468,20 +507,6 @@ export class Renderer {
       ctx.closePath()
     }
 
-    ctx.save()
-    // Strong pulsing halo so the marker pops against the board.
-    const glowR = outerR * 2.6
-    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR)
-    glow.addColorStop(0, `rgba(246, 201, 68, ${0.5 + 0.35 * pulse})`)
-    glow.addColorStop(0.5, `rgba(246, 201, 68, ${0.2 * pulse})`)
-    glow.addColorStop(1, 'rgba(246, 201, 68, 0)')
-    ctx.fillStyle = glow
-    ctx.beginPath()
-    ctx.arc(cx, cy, glowR, 0, Math.PI * 2)
-    ctx.fill()
-
-    // Solid gold body (opaque — brightness comes from the colour, the blink
-    // from the halo and the bright core).
     traceStar(outerR, innerR)
     ctx.fillStyle = GOLD
     ctx.fill()
@@ -489,11 +514,123 @@ export class Renderer {
     ctx.strokeStyle = GOLD_EDGE
     ctx.stroke()
 
-    // Bright pulsing inner core for extra sparkle.
     traceStar(outerR * 0.5, innerR * 0.5)
     ctx.globalAlpha = 0.55 + 0.45 * pulse
     ctx.fillStyle = CORE
     ctx.fill()
+    ctx.globalAlpha = 1
+  }
+
+  private _drawFocusEmoji(cx: number, cy: number, outerR: number, glyph: string): void {
+    const { ctx } = this
+    // Emoji are drawn as text — fillText on most browsers uses the system
+    // color-emoji font automatically when the codepoint is in that range.
+    ctx.font = `${Math.round(outerR * 2.0)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(glyph, cx, cy)
+  }
+
+  private _drawFocusImage(
+    cx: number,
+    cy: number,
+    outerR: number,
+    img: HTMLImageElement,
+  ): void {
+    const { ctx } = this
+    const size = outerR * 2
+    ctx.drawImage(img, cx - outerR, cy - outerR, size, size)
+  }
+
+  /**
+   * Endpoint hit FX — 8 small gold polygons radiating from (gx, gy), fading
+   * with `easeOutQuart` over the lifetime. Driven purely by `progress` in
+   * [0, 1] so the system holds no per-effect state beyond `age / maxAge`.
+   */
+  drawEndpointFragments(gx: number, gy: number, progress: number): void {
+    const { ctx } = this
+    const cx = gameToCanvasX(gx)
+    const cy = gameToCanvasY(gy)
+    const p = Math.max(0, Math.min(1, progress))
+    const eased = 1 - (1 - p) ** 4
+    const fade = 1 - p
+    const FRAGMENTS = 8
+    const reach = UNIT_PX * 1.6 * eased
+    const size = UNIT_PX * 0.22 * (1 - 0.4 * p)
+    ctx.save()
+    ctx.fillStyle = '#F6C944'
+    ctx.strokeStyle = '#D69A1E'
+    ctx.lineWidth = 1.2
+    ctx.globalAlpha = fade
+    for (let i = 0; i < FRAGMENTS; i++) {
+      const a = (Math.PI * 2 * i) / FRAGMENTS - Math.PI / 2
+      const ex = cx + Math.cos(a) * reach
+      const ey = cy + Math.sin(a) * reach
+      ctx.save()
+      ctx.translate(ex, ey)
+      ctx.rotate(a + p * Math.PI)
+      ctx.beginPath()
+      ctx.moveTo(0, -size)
+      ctx.lineTo(size * 0.7, 0)
+      ctx.lineTo(0, size)
+      ctx.lineTo(-size * 0.7, 0)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+      ctx.restore()
+    }
+    ctx.restore()
+  }
+
+  /** Endpoint hit FX — 3 crying-face emojis bursting out + falling. */
+  drawEndpointTears(gx: number, gy: number, progress: number): void {
+    const { ctx } = this
+    const cx = gameToCanvasX(gx)
+    const cy = gameToCanvasY(gy)
+    const p = Math.max(0, Math.min(1, progress))
+    const eased = 1 - (1 - p) ** 3
+    const fade = 1 - p * p
+    const COUNT = 3
+    const reach = UNIT_PX * 1.2 * eased
+    const drop = UNIT_PX * 0.9 * p * p
+    const size = Math.round(UNIT_PX * 0.9)
+    ctx.save()
+    ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.globalAlpha = fade
+    for (let i = 0; i < COUNT; i++) {
+      const a = (Math.PI * 2 * i) / COUNT - Math.PI / 2
+      const ex = cx + Math.cos(a) * reach
+      const ey = cy + Math.sin(a) * reach + drop
+      ctx.fillText('😭', ex, ey)
+    }
+    ctx.restore()
+  }
+
+  /** Endpoint hit FX — 4 anger-mark emojis pulsing outward in cardinals. */
+  drawEndpointAngry(gx: number, gy: number, progress: number): void {
+    const { ctx } = this
+    const cx = gameToCanvasX(gx)
+    const cy = gameToCanvasY(gy)
+    const p = Math.max(0, Math.min(1, progress))
+    const eased = 1 - (1 - p) ** 4
+    const fade = 1 - p
+    const COUNT = 4
+    const reach = UNIT_PX * 1.3 * eased
+    const pulse = 1 + 0.3 * Math.sin(p * Math.PI * 4)
+    const size = Math.round(UNIT_PX * 0.85 * pulse)
+    ctx.save()
+    ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.globalAlpha = fade
+    for (let i = 0; i < COUNT; i++) {
+      const a = (Math.PI * 2 * i) / COUNT - Math.PI / 2
+      const ex = cx + Math.cos(a) * reach
+      const ey = cy + Math.sin(a) * reach
+      ctx.fillText('💢', ex, ey)
+    }
     ctx.restore()
   }
 

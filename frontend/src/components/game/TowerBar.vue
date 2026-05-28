@@ -2,11 +2,29 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore, type TowerBarCategory } from '@/stores/uiStore'
-import { TOWER_DEFS } from '@/data/tower-defs'
+import { TOWER_DEFS, MAGIC_MODE_COLORS, type TowerDef } from '@/data/tower-defs'
 import { TowerType } from '@/data/constants'
 
 const gameStore = useGameStore()
 const uiStore = useUiStore()
+
+// Mode of the Magic tower currently open in the build panel, so the bar's
+// Magic button echoes the debuff/buff colour while it is being configured.
+// towerUpgradeTick bump (on MAGIC_MODE_CHANGED) re-runs this reactively.
+const buildPanelMagicMode = computed(() => {
+  void gameStore.towerUpgradeTick
+  const id = uiStore.buildPanelTowerId
+  if (!id) return null
+  const tower = gameStore.getEngine()?.towers.find((t) => t.id === id)
+  return tower && tower.type === TowerType.MAGIC ? tower.magicMode ?? null : null
+})
+
+function towerColor(def: TowerDef): string {
+  if (def.type === TowerType.MAGIC && buildPanelMagicMode.value) {
+    return MAGIC_MODE_COLORS[buildPanelMagicMode.value]
+  }
+  return def.color
+}
 
 const barRef = ref<HTMLDivElement | null>(null)
 let ro: ResizeObserver | null = null
@@ -166,7 +184,7 @@ function isHighlighted(type: TowerType): boolean {
         :aria-pressed="isHighlighted(def.type)"
         :aria-disabled="!canAfford(def.cost)"
         :style="isHighlighted(def.type)
-          ? { background: def.cardColor, borderColor: def.cardColor }
+          ? { background: towerColor(def), borderColor: towerColor(def) }
           : null"
         @click="selectTower(def.type, def)"
       >
@@ -177,7 +195,7 @@ function isHighlighted(type: TowerType): boolean {
              the hexagon until their own 5c–5e sub-phases land. -->
         <span
           class="tower-icon"
-          :style="{ color: isHighlighted(def.type) ? '#fff' : def.cardColor }"
+          :style="{ color: isHighlighted(def.type) ? '#fff' : towerColor(def) }"
         >
           <svg
             v-if="def.type === TowerType.MAGIC"

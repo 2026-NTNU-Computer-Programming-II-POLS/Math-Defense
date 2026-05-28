@@ -154,7 +154,7 @@ const showTargetingMode = computed(() => {
 <template>
   <div v-if="tower && towerDef" class="tower-info-panel rune-panel">
     <header class="panel-header">
-      <span class="panel-icon" :style="{ background: towerDef.cardColor }" aria-hidden="true">
+      <span class="panel-icon" :style="{ background: towerDef.color }" aria-hidden="true">
         <!-- Visual Redesign Phase 5a/5b: preview chip mirrors the in-canvas
              instrument silhouette per tower type. -->
         <svg
@@ -238,7 +238,7 @@ const showTargetingMode = computed(() => {
         </svg>
       </span>
       <span class="panel-titles">
-        <span class="panel-title" :style="{ color: towerDef.cardColor }">{{ towerDef.nameEn }}</span>
+        <span class="panel-title" :style="{ color: towerDef.color }">{{ towerDef.nameEn }}</span>
         <span class="panel-coords">({{ tower.x }}, {{ tower.y }})</span>
       </span>
       <button class="close-btn" aria-label="Close" @click="close">
@@ -465,6 +465,11 @@ const showTargetingMode = computed(() => {
 details.stat-row--breakdown {
   display: flex;
   flex-direction: column;
+  /* Override align-items:center inherited from the shared .stat-row rule:
+     in this column flex it would centre + shrink-wrap the <summary>, leaving
+     no room for space-between so the label/value clump together. Stretch the
+     summary to full width instead. */
+  align-items: stretch;
   font-size: var(--text-xs);
   color: var(--charcoal-soft);
   padding: 9px 0;
@@ -484,6 +489,10 @@ details.stat-row--breakdown > summary {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* Fill the row so space-between pushes the label left and the clickable
+     value right; without an explicit width the flex box collapses to its
+     content and the two clump together (same <summary> quirk noted above). */
+  width: 100%;
 }
 details.stat-row--breakdown > summary::-webkit-details-marker { display: none; }
 details.stat-row--breakdown > summary:focus-visible {

@@ -33,6 +33,7 @@ import { TowerUpgradeSystem } from '@/systems/TowerUpgradeSystem'
 import { EnemyAbilitySystem } from '@/systems/EnemyAbilitySystem'
 import { SpellSystem } from '@/systems/SpellSystem'
 import { MontyHallSystem } from '@/systems/MontyHallSystem'
+import { EndpointFXSystem } from '@/systems/EndpointFXSystem'
 import { EnemyRenderer } from '@/renderers/EnemyRenderer'
 import { DeathParticleRenderer } from '@/renderers/DeathParticleRenderer'
 import { TowerRenderer } from '@/renderers/TowerRenderer'
@@ -87,6 +88,7 @@ export function registerSystems(game: Game, opts: RegisterSystemsOptions): void 
     ['towerUpgrade', new TowerUpgradeSystem()],
     ['spell', new SpellSystem()],
     ['montyHall', new MontyHallSystem()],
+    ['endpointFx', new EndpointFXSystem()],
     ['enemyRenderer', new EnemyRenderer()],
     ['deathParticleRenderer', new DeathParticleRenderer()],
     ['towerRenderer', new TowerRenderer()],

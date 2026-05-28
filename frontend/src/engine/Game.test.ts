@@ -9,7 +9,10 @@ vi.mock('./Renderer', () => ({
     clear(): void {}
     drawGrid(): void {}
     drawFunction(): void {}
-    drawFocusStar(): void {}
+    drawFocusMarker(): void {}
+    drawEndpointFragments(): void {}
+    drawEndpointTears(): void {}
+    drawEndpointAngry(): void {}
   },
 }))
 vi.mock('./InputManager', () => ({

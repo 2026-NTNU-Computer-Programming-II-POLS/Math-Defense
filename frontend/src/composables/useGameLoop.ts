@@ -12,8 +12,9 @@
  * canvas mount, retry/checkpoint, DPR re-sync, the per-frame timing mirror,
  * session-sync wiring, and the recorder lifetime tied to the engine.
  */
-import { onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { onMounted, onUnmounted, ref, shallowRef, watch, type Ref } from 'vue'
 import { Game } from '@/engine/Game'
+import { loadImage } from '@/services/imageCache'
 import { registerSystems } from '@/engine/register-systems'
 import { initWasm } from '@/math/WasmBridge'
 import { useGameStore } from '@/stores/gameStore'
@@ -57,7 +58,13 @@ export interface GameLoopOptions {
 }
 
 export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: GameLoopOptions = {}) {
-  const game = ref<Game | null>(null)
+  // shallowRef so the Game's deep entity arrays (towers, enemies, projectiles)
+  // aren't recursively wrapped in reactive Proxies — that wrapping not only
+  // adds per-frame overhead, it also breaks pointer-identity checks against
+  // the original Game instance (the Proxy is a distinct object, so
+  // `game.value === g` returns false even when they "wrap the same engine").
+  // Game state changes still surface to UI via the gameStore Pinia bridge.
+  const game = shallowRef<Game | null>(null)
   const ready = ref(false)
   const pathsVisible = ref(options.iaResult !== 'ignored')
   const generatedLevel = ref<GeneratedLevel | null>(options.generatedLevel ?? null)
@@ -162,6 +169,42 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
 
     const talentStore = useTalentStore()
     g.towerModifierProvider = (towerType) => talentStore.getTowerModifiers(towerType)
+
+    // Endpoint marker / hit-FX preferences — display-only, so the engine reads
+    // them via simple assignment and the watchers below keep them live.
+    // Custom image is decoded asynchronously; until it resolves the renderer
+    // falls back to the star body so the marker is never an empty halo.
+    function applyEndpointMarkerPrefs(): void {
+      const style = uiStore.endpointMarkerStyle
+      const customUrl = uiStore.endpointMarkerCustomDataUrl
+      g.endpointFx.style = uiStore.endpointHitFx
+      g.endpointMarker.style = style
+      if (style === 'custom' && customUrl) {
+        loadImage(customUrl)
+          .then((img) => {
+            // Guard against stale resolves after the user switches styles
+            // again or the engine has been torn down. game.value === g
+            // works because `game` is a shallowRef — a plain ref would
+            // proxy-wrap g and the identity check would always fail.
+            if (game.value !== g) return
+            if (uiStore.endpointMarkerStyle !== 'custom') return
+            if (uiStore.endpointMarkerCustomDataUrl !== customUrl) return
+            g.endpointMarker.customImage = img
+          })
+          .catch((e) => { console.warn('[useGameLoop] custom marker decode failed:', e) })
+      } else {
+        g.endpointMarker.customImage = null
+      }
+    }
+    applyEndpointMarkerPrefs()
+    unsubs.push(watch(
+      () => [
+        uiStore.endpointMarkerStyle,
+        uiStore.endpointMarkerCustomDataUrl,
+        uiStore.endpointHitFx,
+      ],
+      () => applyEndpointMarkerPrefs(),
+    ))
 
     try {
       // Register LEVEL_START/END handlers BEFORE registerSystems so the

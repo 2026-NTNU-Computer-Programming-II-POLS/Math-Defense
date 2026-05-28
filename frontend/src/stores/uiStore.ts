@@ -23,6 +23,16 @@ const SEEN_COUNTER_ENEMIES_PREF_KEY = 'mdf.seenCounterEnemies'
 // Pre-existing key set by TowerBar before this pref lived in uiStore — kept
 // verbatim so existing players don't lose their saved filter on upgrade.
 const TOWER_BAR_CATEGORY_PREF_KEY = 'mg.towerBar.category'
+const ENDPOINT_MARKER_STYLE_KEY = 'mdf.endpointMarker.style'
+const ENDPOINT_MARKER_CUSTOM_KEY = 'mdf.endpointMarker.customDataUrl'
+const ENDPOINT_HIT_FX_KEY = 'mdf.endpointHitFx'
+
+export type EndpointMarkerStyle = 'star' | 'gorilla' | 'custom'
+export type EndpointHitFxStyle = 'random' | 'fragments' | 'crying' | 'angry'
+
+// Cap the stored custom image so a stray multi-MB upload can't brick the
+// player's localStorage quota (~5 MB across all keys on most browsers).
+const ENDPOINT_MARKER_CUSTOM_MAX_BYTES = 3 * 1024 * 1024
 
 function loadPrincipleOverlayPref(): boolean {
   if (typeof window === 'undefined') return true
@@ -91,6 +101,33 @@ function loadTowerBarCategoryPref(): TowerBarCategory {
   return 'all'
 }
 
+function loadEndpointMarkerStyle(): EndpointMarkerStyle {
+  if (typeof window === 'undefined') return 'star'
+  try {
+    const raw = window.localStorage.getItem(ENDPOINT_MARKER_STYLE_KEY)
+    if (raw === 'star' || raw === 'gorilla' || raw === 'custom') return raw
+  } catch { /* private mode — fall through */ }
+  return 'star'
+}
+
+function loadEndpointMarkerCustom(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(ENDPOINT_MARKER_CUSTOM_KEY)
+    if (raw && raw.startsWith('data:image/')) return raw
+  } catch { /* private mode — fall through */ }
+  return null
+}
+
+function loadEndpointHitFx(): EndpointHitFxStyle {
+  if (typeof window === 'undefined') return 'fragments'
+  try {
+    const raw = window.localStorage.getItem(ENDPOINT_HIT_FX_KEY)
+    if (raw === 'random' || raw === 'fragments' || raw === 'crying' || raw === 'angry') return raw
+  } catch { /* private mode — fall through */ }
+  return 'fragments'
+}
+
 function loadSeenCounterEnemies(): Set<EnemyType> {
   if (typeof window === 'undefined') return new Set()
   try {
@@ -116,6 +153,14 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 export const useUiStore = defineStore('ui', () => {
   onScopeDispose(appBus.on('auth:logout', () => {
     if (modalVisible.value) dismissModal()
+    // Reset per-user endpoint-marker prefs so a different account signing
+    // in on the same device doesn't inherit the previous user's custom
+    // image / style. The localStorage watchers will persist the cleared
+    // defaults; the next user's /me hydration will then layer their own
+    // server-stored choice on top (or leave the defaults intact).
+    endpointMarkerStyle.value = 'star'
+    endpointMarkerCustomDataUrl.value = null
+    endpointHitFx.value = 'fragments'
   }))
 
   // currently selected tower type (tower bar selection)
@@ -247,6 +292,80 @@ export const useUiStore = defineStore('ui', () => {
 
   function setTowerBarCategory(c: TowerBarCategory): void {
     towerBarCategory.value = c
+  }
+
+  // Endpoint marker (P*) skin + custom upload + hit-FX preference. All three
+  // are display-only — they never enter the engine's deterministic state, so
+  // changing them mid-run is safe. The marker style and FX style are
+  // independent: switching the marker to 🦍 does not change the FX choice.
+  const endpointMarkerStyle = ref<EndpointMarkerStyle>(loadEndpointMarkerStyle())
+  const endpointMarkerCustomDataUrl = ref<string | null>(loadEndpointMarkerCustom())
+  const endpointHitFx = ref<EndpointHitFxStyle>(loadEndpointHitFx())
+  if (typeof window !== 'undefined') {
+    watch(endpointMarkerStyle, (v) => {
+      try { window.localStorage.setItem(ENDPOINT_MARKER_STYLE_KEY, v) }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+    watch(endpointMarkerCustomDataUrl, (v) => {
+      try {
+        if (v === null) window.localStorage.removeItem(ENDPOINT_MARKER_CUSTOM_KEY)
+        else window.localStorage.setItem(ENDPOINT_MARKER_CUSTOM_KEY, v)
+      }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+    watch(endpointHitFx, (v) => {
+      try { window.localStorage.setItem(ENDPOINT_HIT_FX_KEY, v) }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setEndpointMarkerStyle(v: EndpointMarkerStyle): void {
+    endpointMarkerStyle.value = v
+  }
+  function setEndpointMarkerCustomDataUrl(v: string | null): void {
+    // Hard cap: localStorage shares a ~5MB budget with every other mdf.* pref,
+    // so a 4MB selfie would push out audio settings + counter telegraphs.
+    if (v !== null && v.length > ENDPOINT_MARKER_CUSTOM_MAX_BYTES) {
+      throw new Error('Custom marker image too large (max 3 MB after resize)')
+    }
+    endpointMarkerCustomDataUrl.value = v
+  }
+  function setEndpointHitFx(v: EndpointHitFxStyle): void {
+    endpointHitFx.value = v
+  }
+
+  /**
+   * Hydrate the three endpoint-marker prefs from a /me response. Called by
+   * authStore once at login (NOT on every refreshProfile). Each field is
+   * applied only when the server returns a non-null value — `null` means
+   * "server has nothing here, keep whatever the local cache holds". This
+   * matters in two races:
+   *
+   *  1. User uploads an image; the PUT is in flight; LevelSelectView fires
+   *     /me which returns the still-null server row. Without this guard,
+   *     hydration would clear the local dataURL the user just uploaded.
+   *  2. An anonymous user sets local prefs, then logs in for the first time.
+   *     The server row is null; preserving local lets the user's choice
+   *     propagate up on the next sync rather than being wiped on login.
+   */
+  function applyServerEndpointMarker(payload: {
+    style?: EndpointMarkerStyle | null
+    customDataUrl?: string | null
+    hitFx?: EndpointHitFxStyle | null
+  }): void {
+    if (payload.style) endpointMarkerStyle.value = payload.style
+    if (payload.customDataUrl) {
+      // The setter throws if the dataURL exceeds the cap — but the server
+      // already enforces the same cap, so a payload coming back from /me
+      // should always fit. Wrap defensively so a malformed response doesn't
+      // crash the auth bootstrap.
+      try {
+        setEndpointMarkerCustomDataUrl(payload.customDataUrl)
+      } catch (e) {
+        console.warn('[uiStore] server endpoint marker dataURL rejected locally:', e)
+      }
+    }
+    if (payload.hitFx) endpointHitFx.value = payload.hitFx
   }
 
   // V3 Phase 6 — first-encounter telegraph. Persisted to localStorage so
@@ -433,6 +552,7 @@ export const useUiStore = defineStore('ui', () => {
     audioVolumeMusic, audioVolumeSfx, audioVolumeUi,
     sliderFallbackEnabled,
     towerBarCategory,
+    endpointMarkerStyle, endpointMarkerCustomDataUrl, endpointHitFx,
     seenCounterEnemies,
     showModal, showConfirm, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
@@ -443,6 +563,8 @@ export const useUiStore = defineStore('ui', () => {
     setAudioVolumeMusic, setAudioVolumeSfx, setAudioVolumeUi,
     setSliderFallbackEnabled,
     setTowerBarCategory,
+    setEndpointMarkerStyle, setEndpointMarkerCustomDataUrl, setEndpointHitFx,
+    applyServerEndpointMarker,
     markCounterEnemySeen, hasSeenCounterEnemy,
   }
 })

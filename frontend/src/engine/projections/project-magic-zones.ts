@@ -4,6 +4,7 @@
  * calling MagicTowerSystem.getTowerCurve() directly.
  */
 import { TowerType, GamePhase } from '@/data/constants'
+import { MAGIC_MODE_COLORS } from '@/data/tower-defs'
 import type { Game } from '@/engine/Game'
 import { BUFF_ZONE_MULTIPLIER, ZONE_WIDTH, type MagicTowerSystem } from '@/systems/MagicTowerSystem'
 import type { MagicZoneView } from './views'
@@ -27,6 +28,7 @@ export function projectMagicZones(game: Game): MagicZoneView[] {
       y: tower.y,
       range: tower.effectiveRange,
       mode,
+      color: MAGIC_MODE_COLORS[mode],
       curve,
       zoneHalfWidth,
     })

@@ -178,6 +178,8 @@ export interface MagicZoneView {
   readonly y: number
   readonly range: number
   readonly mode: 'debuff' | 'buff'
+  /** Tower identity colour — the zone is tinted with the tower's own hue. */
+  readonly color: string
   /** Evaluated curve function for the tower's expression. */
   readonly curve: (x: number) => number
   /**

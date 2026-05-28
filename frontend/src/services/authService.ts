@@ -27,6 +27,18 @@ export interface MeResponse {
   mfa_enabled?: boolean
   ia_unlock_earned?: boolean
   ia_recent_accuracy?: number
+  // Endpoint marker (P*) preferences persisted server-side. `null` (or
+  // omitted) means the player has not set this field on the server and the
+  // frontend should keep using its local default / current localStorage value.
+  endpoint_marker_style?: 'star' | 'gorilla' | 'custom' | null
+  endpoint_marker_custom_dataurl?: string | null
+  endpoint_hit_fx?: 'random' | 'fragments' | 'crying' | 'angry' | null
+}
+
+export interface EndpointMarkerUpdate {
+  style: 'star' | 'gorilla' | 'custom' | null
+  custom_dataurl: string | null
+  hit_fx: 'random' | 'fragments' | 'crying' | 'angry' | null
 }
 
 export const authService = {
@@ -55,6 +67,9 @@ export const authService = {
   },
   updateAvatar(avatarUrl: string | null) {
     return api.put<MeResponse>('/api/auth/profile/avatar', { avatar_url: avatarUrl })
+  },
+  updateEndpointMarker(payload: EndpointMarkerUpdate) {
+    return api.put<MeResponse>('/api/auth/profile/endpoint-marker', payload)
   },
   changePassword(currentPassword: string, newPassword: string) {
     return api.post<void>('/api/auth/change-password', {

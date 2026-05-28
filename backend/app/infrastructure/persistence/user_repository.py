@@ -77,6 +77,9 @@ class SqlAlchemyUserRepository:
             row.mfa_enabled = user.mfa_enabled
             row.totp_last_used_at = user.totp_last_used_at
             row.ia_recent_accuracy = user.ia_recent_accuracy
+            row.endpoint_marker_style = user.endpoint_marker_style
+            row.endpoint_marker_custom_dataurl = user.endpoint_marker_custom_dataurl
+            row.endpoint_hit_fx = user.endpoint_hit_fx
         else:
             row = UserModel(
                 id=user.id,
@@ -93,6 +96,9 @@ class SqlAlchemyUserRepository:
                 mfa_enabled=user.mfa_enabled,
                 totp_last_used_at=user.totp_last_used_at,
                 ia_recent_accuracy=user.ia_recent_accuracy,
+                endpoint_marker_style=user.endpoint_marker_style,
+                endpoint_marker_custom_dataurl=user.endpoint_marker_custom_dataurl,
+                endpoint_hit_fx=user.endpoint_hit_fx,
             )
             self._db.add(row)
         self._flush()
@@ -122,6 +128,9 @@ class SqlAlchemyUserRepository:
             mfa_enabled=row.mfa_enabled if row.mfa_enabled is not None else False,
             totp_last_used_at=_ensure_utc(row.totp_last_used_at),
             ia_recent_accuracy=row.ia_recent_accuracy if row.ia_recent_accuracy is not None else 0.0,
+            endpoint_marker_style=row.endpoint_marker_style,
+            endpoint_marker_custom_dataurl=row.endpoint_marker_custom_dataurl,
+            endpoint_hit_fx=row.endpoint_hit_fx,
         )
 
 
