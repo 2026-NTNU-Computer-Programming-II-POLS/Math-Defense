@@ -249,7 +249,7 @@ class SessionApplicationService:
         self,
         session_id: str,
         user_id: str,
-        score: int,
+        score: int | None,
         kills: int,
         waves_survived: int,
         kill_value: int | None = None,
@@ -330,8 +330,17 @@ class SessionApplicationService:
                     #     client that posts zero events stays bounded only by
                     #     the per-level cap — but it also lands on the board with
                     #     waves_survived=0, so such a forgery is at least visible.
+                # F-BUG-6 follow-up: the modern V2 client omits ``score`` in
+                # the end payload because the server is the sole authority on
+                # the final integer score (V2 leaderboard ranks by total_score
+                # anyway). Fall back to the latest in-flight value the client
+                # already PATCHed at WAVE_END. Without this substitution the
+                # aggregate's "must not be less than last reported" guard
+                # would 422 every legitimate V2 end-of-game submission whose
+                # session.score was advanced by at least one WAVE_END sync.
+                effective_score = session.score if score is None else score
                 result = GameResult(
-                    score=Score(score),
+                    score=Score(effective_score),
                     kills=kills,
                     waves_survived=waves_survived,
                 )

@@ -272,6 +272,26 @@ class TestAbuseCases:
         )
         assert res.status_code == 422
 
+    def test_end_without_score_uses_in_flight_value(self, client):
+        """F-BUG-6 follow-up: modern V2 clients omit ``score`` in the end
+        payload (the server is authoritative). With the prior schema default
+        of 0, that omission tripped the aggregate's "must not be less than
+        last reported" guard on every legitimate V2 session whose
+        session.score was advanced by at least one WAVE_END sync."""
+        token = _register_and_token(client, "v2_end_no_score")
+        sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
+        # Simulate a successful WAVE_END sync raising the in-flight score.
+        ok = client.patch(f"/api/sessions/{sid}", json={"score": 1500}, headers=_auth(token))
+        assert ok.status_code == 200
+        # End payload omits ``score`` — must succeed, with session.score retained.
+        res = client.post(
+            f"/api/sessions/{sid}/end",
+            json={"kills": 10, "waves_survived": 1},
+            headers=_auth(token),
+        )
+        assert res.status_code == 200
+        assert res.json()["score"] == 1500
+
     def test_end_score_below_in_flight_rejected(self, client):
         token = _register_and_token(client, "abuse_end_lt_score")
         sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
