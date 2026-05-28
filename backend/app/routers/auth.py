@@ -18,6 +18,7 @@ from app.schemas.auth import (
     AvatarUpdateRequest,
     ChangePasswordRequest,
     DisableMFARequest,
+    EndpointMarkerUpdateRequest,
     LoginRequest,
     MFAChallengeRequest,
     MFAConfirmRequest,
@@ -40,6 +41,36 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def _anon(identifier: object) -> str:
     """Stable, short fingerprint so logs stay correlatable without leaking PII."""
     return hashlib.sha256(str(identifier).encode("utf-8")).hexdigest()[:10]
+
+
+def _build_auth_me_response(
+    user: User,
+    *,
+    ia_unlock_earned: bool = False,
+) -> AuthMeResponse:
+    """Single source of truth for /me response shape.
+
+    All route handlers that return AuthMeResponse should go through this
+    helper so adding a new field is a one-line change rather than four
+    parallel edits. The ia_unlock_earned flag is computed only by GET /me
+    (the only caller that has the session-service handy); update routes
+    default to False — the client refetches /me to refresh it.
+    """
+    return AuthMeResponse(
+        id=user.id,
+        email=user.email,
+        player_name=user.player_name,
+        role=user.role.value,
+        created_at=user.created_at,
+        avatar_url=user.avatar_url,
+        is_email_verified=user.is_email_verified,
+        mfa_enabled=user.mfa_enabled,
+        ia_unlock_earned=ia_unlock_earned,
+        ia_recent_accuracy=user.ia_recent_accuracy,
+        endpoint_marker_style=user.endpoint_marker_style,
+        endpoint_marker_custom_dataurl=user.endpoint_marker_custom_dataurl,
+        endpoint_hit_fx=user.endpoint_hit_fx,
+    )
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -262,18 +293,7 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ):
     ia_unlock_earned = build_session_service(db).has_correct_ia_session(current_user.id)
-    return AuthMeResponse(
-        id=current_user.id,
-        email=current_user.email,
-        player_name=current_user.player_name,
-        role=current_user.role.value,
-        created_at=current_user.created_at,
-        avatar_url=current_user.avatar_url,
-        is_email_verified=current_user.is_email_verified,
-        mfa_enabled=current_user.mfa_enabled,
-        ia_unlock_earned=ia_unlock_earned,
-        ia_recent_accuracy=current_user.ia_recent_accuracy,
-    )
+    return _build_auth_me_response(current_user, ia_unlock_earned=ia_unlock_earned)
 
 
 @router.put("/profile/name", response_model=AuthMeResponse)
@@ -285,16 +305,7 @@ def update_player_name(
     current_user: User = Depends(get_current_user),
 ):
     user = build_auth_service(db).update_player_name(current_user.id, req.player_name)
-    return AuthMeResponse(
-        id=user.id,
-        email=user.email,
-        player_name=user.player_name,
-        role=user.role.value,
-        created_at=user.created_at,
-        avatar_url=user.avatar_url,
-        is_email_verified=user.is_email_verified,
-        mfa_enabled=user.mfa_enabled,
-    )
+    return _build_auth_me_response(user)
 
 
 @router.put("/profile/avatar", response_model=AuthMeResponse)
@@ -306,16 +317,30 @@ def update_avatar(
     current_user: User = Depends(get_current_user),
 ):
     user = build_auth_service(db).update_avatar(current_user.id, req.avatar_url)
-    return AuthMeResponse(
-        id=user.id,
-        email=user.email,
-        player_name=user.player_name,
-        role=user.role.value,
-        created_at=user.created_at,
-        avatar_url=user.avatar_url,
-        is_email_verified=user.is_email_verified,
-        mfa_enabled=user.mfa_enabled,
+    return _build_auth_me_response(user)
+
+
+@router.put("/profile/endpoint-marker", response_model=AuthMeResponse)
+@limiter.limit("10/minute")
+def update_endpoint_marker(
+    request: Request,
+    req: EndpointMarkerUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set the endpoint-marker style / custom image / hit-FX preferences.
+
+    Pydantic enforces enum + dataURL prefix + length at the edge; the User
+    aggregate re-validates everything and additionally checks base64
+    decode + magic bytes so a hand-crafted request can't bypass the FE.
+    """
+    user = build_auth_service(db).update_endpoint_marker(
+        current_user.id,
+        req.style,
+        req.custom_dataurl,
+        req.hit_fx,
     )
+    return _build_auth_me_response(user)
 
 
 # ── Email verification ──────────────────────────────────────────────────────

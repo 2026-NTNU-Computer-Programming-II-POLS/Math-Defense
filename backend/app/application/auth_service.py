@@ -396,6 +396,30 @@ class AuthApplicationService:
             self._uow.commit()
         return user
 
+    def update_endpoint_marker(
+        self,
+        user_id: str,
+        style: str | None,
+        custom_dataurl: str | None,
+        hit_fx: str | None,
+    ) -> User:
+        """Atomically update the endpoint-marker preferences (style + custom
+        dataURL + hit FX). All three fields are updated together so a single
+        DB write covers the transaction; the aggregate enforces invariants
+        (e.g. custom_dataurl is only allowed when style == 'custom').
+        """
+        with self._uow:
+            user = self._user_repo.find_by_id(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found")
+            try:
+                user.update_endpoint_marker(style, custom_dataurl, hit_fx)
+            except ValueError as e:
+                raise DomainValueError(str(e)) from e
+            self._user_repo.save(user)
+            self._uow.commit()
+        return user
+
     # ── Email verification ──────────────────────────────────────────────────
 
     def verify_email(self, token: str) -> None:

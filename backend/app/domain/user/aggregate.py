@@ -5,8 +5,17 @@ import math
 import uuid
 from datetime import datetime, UTC
 
+import base64
+import binascii
+
 from app.domain.user.constraints import (
     ALLOWED_AVATAR_URLS,
+    ALLOWED_ENDPOINT_HIT_FX_STYLES,
+    ALLOWED_ENDPOINT_MARKER_STYLES,
+    ENDPOINT_MARKER_DATAURL_MAX_LENGTH,
+    ENDPOINT_MARKER_DATAURL_PREFIXES,
+    ENDPOINT_MARKER_MAGIC_BYTES,
+    ENDPOINT_MARKER_MAX_DIMENSION,
     PLAYER_NAME_MAX_LENGTH,
     PLAYER_NAME_MIN_LENGTH,
 )
@@ -42,6 +51,9 @@ class User:
         mfa_enabled: bool = False,
         totp_last_used_at: datetime | None = None,
         ia_recent_accuracy: float = 0.0,
+        endpoint_marker_style: str | None = None,
+        endpoint_marker_custom_dataurl: str | None = None,
+        endpoint_hit_fx: str | None = None,
     ) -> None:
         if not isinstance(role, Role):
             raise ValueError("role must be a Role instance")
@@ -71,6 +83,13 @@ class User:
         # session records a correct Initial-Answer phase. See the Star-5 unlock
         # gate in app.application.session_service.
         self.ia_unlock_earned: bool = False
+        # Endpoint marker (P*) preferences — display-only, server-side
+        # persisted so the choice follows the player across devices. None
+        # means the player has not set this field and the FE should use its
+        # local default (star / fragments).
+        self.endpoint_marker_style: str | None = endpoint_marker_style
+        self.endpoint_marker_custom_dataurl: str | None = endpoint_marker_custom_dataurl
+        self.endpoint_hit_fx: str | None = endpoint_hit_fx
 
     @classmethod
     def create(
@@ -140,6 +159,134 @@ class User:
         if cleaned not in ALLOWED_AVATAR_URLS:
             raise ValueError("Invalid avatar URL")
         self.avatar_url = cleaned
+
+    def update_endpoint_marker(
+        self,
+        style: str | None,
+        custom_dataurl: str | None,
+        hit_fx: str | None,
+    ) -> None:
+        """Validate and assign endpoint-marker preferences in one atomic update.
+
+        All three arguments are independently nullable; passing `None` clears
+        the corresponding field. The aggregate enforces:
+
+        - style ∈ ALLOWED_ENDPOINT_MARKER_STYLES or None
+        - hit_fx ∈ ALLOWED_ENDPOINT_HIT_FX_STYLES or None
+        - custom_dataurl is allowed only when style == 'custom'; otherwise the
+          combination is rejected outright (we never silently drop user data)
+        - custom_dataurl, when present, must be a valid base64 dataURL with a
+          PNG or JPEG prefix, decode successfully, fit within the size cap,
+          and start with the corresponding magic-byte sentinel
+        """
+        validated_style = self._validate_endpoint_marker_style(style)
+        validated_fx = self._validate_endpoint_hit_fx(hit_fx)
+        validated_dataurl = self._validate_endpoint_marker_dataurl(
+            custom_dataurl, validated_style,
+        )
+        self.endpoint_marker_style = validated_style
+        self.endpoint_marker_custom_dataurl = validated_dataurl
+        self.endpoint_hit_fx = validated_fx
+
+    @staticmethod
+    def _validate_endpoint_marker_style(style: str | None) -> str | None:
+        if style is None:
+            return None
+        if not isinstance(style, str):
+            raise ValueError("endpoint_marker_style must be a string or None")
+        if style not in ALLOWED_ENDPOINT_MARKER_STYLES:
+            raise ValueError(
+                f"endpoint_marker_style must be one of "
+                f"{sorted(ALLOWED_ENDPOINT_MARKER_STYLES)}"
+            )
+        return style
+
+    @staticmethod
+    def _validate_endpoint_hit_fx(hit_fx: str | None) -> str | None:
+        if hit_fx is None:
+            return None
+        if not isinstance(hit_fx, str):
+            raise ValueError("endpoint_hit_fx must be a string or None")
+        if hit_fx not in ALLOWED_ENDPOINT_HIT_FX_STYLES:
+            raise ValueError(
+                f"endpoint_hit_fx must be one of "
+                f"{sorted(ALLOWED_ENDPOINT_HIT_FX_STYLES)}"
+            )
+        return hit_fx
+
+    @staticmethod
+    def _validate_endpoint_marker_dataurl(
+        dataurl: str | None,
+        style: str | None,
+    ) -> str | None:
+        if dataurl is None:
+            return None
+        if not isinstance(dataurl, str):
+            raise ValueError("endpoint_marker_custom_dataurl must be a string or None")
+        # Refuse the contradiction rather than silently clear: if the client
+        # sends an image with a style other than 'custom', it's a bug or an
+        # attempt to confuse the validation.
+        if style != 'custom':
+            raise ValueError(
+                "endpoint_marker_custom_dataurl is only allowed when "
+                "endpoint_marker_style == 'custom'"
+            )
+        if len(dataurl) > ENDPOINT_MARKER_DATAURL_MAX_LENGTH:
+            raise ValueError(
+                f"endpoint_marker_custom_dataurl exceeds "
+                f"{ENDPOINT_MARKER_DATAURL_MAX_LENGTH} bytes"
+            )
+        matched_prefix: str | None = None
+        for prefix in ENDPOINT_MARKER_DATAURL_PREFIXES:
+            if dataurl.startswith(prefix):
+                matched_prefix = prefix
+                break
+        if matched_prefix is None:
+            raise ValueError(
+                "endpoint_marker_custom_dataurl must start with one of: "
+                f"{', '.join(ENDPOINT_MARKER_DATAURL_PREFIXES)}"
+            )
+        encoded = dataurl[len(matched_prefix):]
+        if not encoded:
+            raise ValueError("endpoint_marker_custom_dataurl has empty base64 payload")
+        try:
+            # validate=True rejects any non-base64 character; the FE produces
+            # clean canvas.toDataURL output so this should always pass for
+            # legitimate input.
+            decoded = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as e:
+            raise ValueError(
+                "endpoint_marker_custom_dataurl base64 payload is invalid"
+            ) from e
+        magic = ENDPOINT_MARKER_MAGIC_BYTES[matched_prefix]
+        if not decoded.startswith(magic):
+            raise ValueError(
+                "endpoint_marker_custom_dataurl bytes do not match the declared image format"
+            )
+        # PNG-only: parse the IHDR chunk's declared dimensions to reject
+        # decompression-bomb headers (huge declared size in a small payload).
+        # The PNG spec mandates IHDR is the first chunk: bytes 8-11 are the
+        # chunk length, 12-15 the "IHDR" type, 16-19 the width, 20-23 the
+        # height (all big-endian uint32). JPEG dimension parsing requires
+        # walking SOF markers; we skip it because the FE never produces JPEG
+        # and the 3 MB payload cap bounds any JPEG attack budget.
+        if matched_prefix == 'data:image/png;base64,':
+            if len(decoded) < 24 or decoded[12:16] != b'IHDR':
+                raise ValueError(
+                    "endpoint_marker_custom_dataurl PNG is missing its IHDR chunk"
+                )
+            width = int.from_bytes(decoded[16:20], 'big')
+            height = int.from_bytes(decoded[20:24], 'big')
+            if (
+                width == 0 or height == 0
+                or width > ENDPOINT_MARKER_MAX_DIMENSION
+                or height > ENDPOINT_MARKER_MAX_DIMENSION
+            ):
+                raise ValueError(
+                    f"endpoint_marker_custom_dataurl PNG dimensions {width}x{height} "
+                    f"are out of range (max {ENDPOINT_MARKER_MAX_DIMENSION})"
+                )
+        return dataurl
 
     def update_ia_accuracy(self, value: float) -> None:
         """Set the rolling Initial-Answer accuracy (0.0–1.0). Clamps out-of-

@@ -4,6 +4,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain.user.constraints import (
     ALLOWED_AVATAR_URLS,
+    ALLOWED_ENDPOINT_HIT_FX_STYLES,
+    ALLOWED_ENDPOINT_MARKER_STYLES,
+    ENDPOINT_MARKER_DATAURL_MAX_LENGTH,
+    ENDPOINT_MARKER_DATAURL_PREFIXES,
     PLAYER_NAME_MIN_LENGTH,
     PLAYER_NAME_MAX_LENGTH,
 )
@@ -151,6 +155,12 @@ class AuthMeResponse(BaseModel):
     # was answered correctly. The frontend curve renderer reads this at
     # level start to fade y-axis labels (spec §17).
     ia_recent_accuracy: float = 0.0
+    # Endpoint marker (P*) preferences persisted server-side so the player's
+    # choice follows them across devices. Frontend uses these to hydrate
+    # uiStore on login; None means use the FE local default.
+    endpoint_marker_style: str | None = None
+    endpoint_marker_custom_dataurl: str | None = None
+    endpoint_hit_fx: str | None = None
 
 
 class UpdatePlayerNameRequest(BaseModel):
@@ -179,6 +189,61 @@ class AvatarUpdateRequest(BaseModel):
         # allowlist (single source of truth in domain.user.constraints).
         if v is not None and v not in ALLOWED_AVATAR_URLS:
             raise ValueError("Invalid avatar URL")
+        return v
+
+
+class EndpointMarkerUpdateRequest(BaseModel):
+    """PUT /api/auth/profile/endpoint-marker body.
+
+    All three fields are independently nullable; passing `None` clears the
+    corresponding stored value. This schema does fast-path validation so
+    the route returns 422 before the aggregate runs; the aggregate then
+    re-checks the same invariants as the canonical source of truth
+    (domain.user.aggregate.User.update_endpoint_marker).
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    style: str | None
+    custom_dataurl: str | None
+    hit_fx: str | None
+
+    @field_validator("style")
+    @classmethod
+    def style_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in ALLOWED_ENDPOINT_MARKER_STYLES:
+            raise ValueError(
+                "Invalid endpoint marker style — must be one of "
+                f"{sorted(ALLOWED_ENDPOINT_MARKER_STYLES)}"
+            )
+        return v
+
+    @field_validator("hit_fx")
+    @classmethod
+    def hit_fx_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in ALLOWED_ENDPOINT_HIT_FX_STYLES:
+            raise ValueError(
+                "Invalid endpoint hit FX — must be one of "
+                f"{sorted(ALLOWED_ENDPOINT_HIT_FX_STYLES)}"
+            )
+        return v
+
+    @field_validator("custom_dataurl")
+    @classmethod
+    def custom_dataurl_shape(cls, v: str | None) -> str | None:
+        # Only checks shape (prefix + length) at the Pydantic layer to keep
+        # 422s fast. Magic-byte validation lives in the aggregate so a single
+        # source of truth governs what bytes are accepted.
+        if v is None:
+            return v
+        if len(v) > ENDPOINT_MARKER_DATAURL_MAX_LENGTH:
+            raise ValueError(
+                f"custom_dataurl exceeds {ENDPOINT_MARKER_DATAURL_MAX_LENGTH} bytes"
+            )
+        if not any(v.startswith(p) for p in ENDPOINT_MARKER_DATAURL_PREFIXES):
+            raise ValueError(
+                "custom_dataurl must start with one of: "
+                + ", ".join(ENDPOINT_MARKER_DATAURL_PREFIXES)
+            )
         return v
 
 
