@@ -8,6 +8,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService, type MeResponse } from '@/services/authService'
+import { readCookie, SESSION_HINT_COOKIE_NAME } from '@/services/api'
 import { appBus } from '@/lib/app-bus'
 import router from '@/router'
 import { useTokenProbe } from '@/composables/useTokenProbe'
@@ -86,6 +87,12 @@ export const useAuthStore = defineStore('auth', () => {
     initializing.value = true
     initPromise.value = new Promise<void>((resolve) => { _initResolve = resolve })
     try {
+      // No hint cookie → no session. Skip the probe so unauthenticated
+      // visitors don't see /me + /refresh 401s in DevTools on every load.
+      if (!readCookie(SESSION_HINT_COOKIE_NAME)) {
+        user.value = null
+        return
+      }
       const res = await authService.me()
       user.value = mapMeResponseToUser(res)
       sessionExpired.value = false
@@ -113,10 +120,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Called by the api.ts 401 interceptor after a single refresh-and-retry has
-   * already failed — i.e. the refresh cookie is gone too and the session is
-   * truly over. Idempotent: concurrent 401s (e.g. probe + WAVE_END push) all
-   * land here but only the first one shows the modal and clears auth.
+   * Called by the api.ts 401 interceptor once the session is unrecoverable —
+   * either a refresh-and-retry already failed, or the non-httponly
+   * `has_session` hint cookie was absent so refresh was skipped (it would
+   * 401 anyway). Idempotent: concurrent 401s (e.g. probe + WAVE_END push)
+   * all land here but only the first one shows the modal and clears auth.
    *
    * Shows a sticky "Session expired" modal instead of silently redirecting
    * to /auth. Without this, a mid-game expiry would trigger the GameView

@@ -27,6 +27,11 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, ''
 
 export const CSRF_COOKIE_NAME = 'csrf_token'
 export const CSRF_HEADER_NAME = 'X-CSRF-Token'
+// Non-httponly hint set by the backend alongside the access cookie. Presence
+// means "you might have a live session, probing is worthwhile"; absence lets
+// the SPA skip /me + /refresh on cold load and avoid two console 401s for
+// every unauthenticated visitor.
+export const SESSION_HINT_COOKIE_NAME = 'has_session'
 const UNSAFE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
 
 // Endpoints whose 401 means "these credentials are wrong", not "your session
@@ -249,6 +254,13 @@ async function request<T>(
         && path !== REFRESH_PATH
       if (is401Recoverable && !authRefreshAttempted) {
         authRefreshAttempted = true
+        // Skip the refresh round-trip when the server hint says no session
+        // exists — refresh is guaranteed to 401 and the only effect would be
+        // a second red entry in DevTools.
+        if (!readCookie(SESSION_HINT_COOKIE_NAME)) {
+          await notifySessionExpired()
+          throw e
+        }
         const refreshed = await tryRefresh()
         if (refreshed) {
           // Don't bump `attempt`: a successful refresh always deserves one

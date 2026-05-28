@@ -32,6 +32,10 @@ from app.schemas.auth import (
 from app.infrastructure.audit_logger import record_audit_event
 
 REFRESH_COOKIE_NAME = "refresh_token"
+# Non-httponly hint cookie. Carries no secret — just a "1" that tells the SPA
+# whether to bother probing /me + /refresh on cold load. Eliminates the pair
+# of 401s that otherwise hit DevTools for every unauthenticated visitor.
+SESSION_HINT_COOKIE_NAME = "has_session"
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +89,16 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         max_age=settings.access_token_expire_minutes * 60,
         path="/api",
     )
+    # Path "/" so document.cookie can see it from any SPA route.
+    response.set_cookie(
+        key=SESSION_HINT_COOKIE_NAME,
+        value="1",
+        httponly=False,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        max_age=settings.refresh_token_expire_days * 86400,
+        path="/",
+    )
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
@@ -109,6 +123,13 @@ def _clear_auth_cookie(response: Response) -> None:
         secure=settings.cookie_secure,
         samesite="lax",
         path="/api",
+    )
+    response.delete_cookie(
+        key=SESSION_HINT_COOKIE_NAME,
+        httponly=False,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/",
     )
 
 
