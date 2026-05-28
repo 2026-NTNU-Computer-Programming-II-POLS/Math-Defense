@@ -428,45 +428,62 @@ export class Renderer {
   /**
    * Draw a blinking 5-pointed star at game coordinate `(gx, gy)` — the focus
    * point of the enemy paths (level endpoint P*). `time` (seconds) drives the
-   * pulse so the marker reads as "alive". Pure primitive: no state, colour
-   * sourced from the board palette gold.
+   * pulse so the marker reads as "alive". Pure primitive: no state. The star
+   * is a bright focal accent, so its colours live here as local constants
+   * rather than in the board palette (which holds only muted board ink).
    */
   drawFocusStar(gx: number, gy: number, time: number): void {
     const { ctx } = this
     const cx = gameToCanvasX(gx)
     const cy = gameToCanvasY(gy)
     const pulse = 0.5 + 0.5 * Math.sin(time * 4)
-    const outerR = UNIT_PX * 0.55
-    const innerR = outerR * 0.42
+    // Bright, prominent: a vivid gold star with a glowing white core.
+    const GOLD = '#F6C944'
+    const GOLD_EDGE = '#D69A1E'
+    const CORE = '#FFFBE6'
     const SPIKES = 5
+    const outerR = UNIT_PX * (0.72 + 0.1 * pulse)
+    const innerR = outerR * 0.44
+
+    const traceStar = (oR: number, iR: number): void => {
+      ctx.beginPath()
+      for (let i = 0; i < SPIKES * 2; i++) {
+        const r = i % 2 === 0 ? oR : iR
+        const angle = -Math.PI / 2 + (Math.PI / SPIKES) * i
+        const x = cx + Math.cos(angle) * r
+        const y = cy + Math.sin(angle) * r
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+    }
 
     ctx.save()
-    // Soft halo so the star reads against the hatched/gridded board.
-    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerR * 2)
-    glow.addColorStop(0, `rgba(173, 162, 132, ${0.35 * pulse})`)
-    glow.addColorStop(1, 'rgba(173, 162, 132, 0)')
+    // Strong pulsing halo so the marker pops against the board.
+    const glowR = outerR * 2.6
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR)
+    glow.addColorStop(0, `rgba(246, 201, 68, ${0.5 + 0.35 * pulse})`)
+    glow.addColorStop(0.5, `rgba(246, 201, 68, ${0.2 * pulse})`)
+    glow.addColorStop(1, 'rgba(246, 201, 68, 0)')
     ctx.fillStyle = glow
     ctx.beginPath()
-    ctx.arc(cx, cy, outerR * 2, 0, Math.PI * 2)
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.beginPath()
-    for (let i = 0; i < SPIKES * 2; i++) {
-      const r = i % 2 === 0 ? outerR : innerR
-      const angle = -Math.PI / 2 + (Math.PI / SPIKES) * i
-      const x = cx + Math.cos(angle) * r
-      const y = cy + Math.sin(angle) * r
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    }
-    ctx.closePath()
-    ctx.globalAlpha = 0.55 + 0.45 * pulse
-    ctx.fillStyle = this.palette.boardAxis
+    // Solid gold body (opaque — brightness comes from the colour, the blink
+    // from the halo and the bright core).
+    traceStar(outerR, innerR)
+    ctx.fillStyle = GOLD
     ctx.fill()
-    ctx.globalAlpha = 1
-    ctx.lineWidth = 1
-    ctx.strokeStyle = this.palette.boardAxis
+    ctx.lineWidth = 1.5
+    ctx.strokeStyle = GOLD_EDGE
     ctx.stroke()
+
+    // Bright pulsing inner core for extra sparkle.
+    traceStar(outerR * 0.5, innerR * 0.5)
+    ctx.globalAlpha = 0.55 + 0.45 * pulse
+    ctx.fillStyle = CORE
+    ctx.fill()
     ctx.restore()
   }
 
