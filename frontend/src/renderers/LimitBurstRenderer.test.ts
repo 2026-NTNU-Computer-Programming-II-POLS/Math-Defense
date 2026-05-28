@@ -23,6 +23,8 @@ function createCtxStub(): CanvasRenderingContext2D & { fillTexts: string[]; arcC
     stroke: noop,
     strokeText: noop,
     arc: () => { arcCalls += 1 },
+    rect: noop,
+    clip: noop,
     fillText: (text: string) => { fillTexts.push(text) },
     globalAlpha: 1,
     globalCompositeOperation: 'source-over',

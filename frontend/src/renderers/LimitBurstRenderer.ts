@@ -25,6 +25,7 @@
  */
 import { Events, UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import { clipToBoard } from '@/engine/render-helpers/clip-to-board'
 import { EffectLayer, type Effect } from './effects/EffectLayer'
 import type { Game, LimitBurstPayload } from '@/engine/Game'
 import type { Renderer } from '@/engine/Renderer'
@@ -88,10 +89,22 @@ export class LimitBurstRenderer extends EffectLayer<LimitEffect> {
   render(renderer: Renderer, _game: Game): void {
     if (this.effects.length === 0) return
     const { ctx } = renderer
+    // Shockwave radii scale by `range × UNIT_PX`, so a LIMIT tower placed
+    // near the grid border emits a ring that crosses the board edge. Clip
+    // only the ring — hit popups and result badges are floating text that
+    // ride above enemy / tower positions and need to remain visible even
+    // when they drift past the board's painted extent.
     for (const e of this.effects) {
-      if (e.kind === 'shockwave') this._drawShockwave(ctx, e)
-      else if (e.kind === 'hit') this._drawHit(ctx, e)
-      else this._drawBadge(ctx, e)
+      if (e.kind === 'shockwave') {
+        ctx.save()
+        clipToBoard(ctx)
+        this._drawShockwave(ctx, e)
+        ctx.restore()
+      } else if (e.kind === 'hit') {
+        this._drawHit(ctx, e)
+      } else {
+        this._drawBadge(ctx, e)
+      }
     }
   }
 
