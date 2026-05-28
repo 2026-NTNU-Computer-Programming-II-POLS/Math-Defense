@@ -66,11 +66,14 @@
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.manual-close:hover,
-.manual-close:focus-visible {
+.manual-close:hover {
   background: var(--gold-tint-select);
   border-color: var(--terracotta-deep);
-  outline: none;
+}
+
+.manual-close:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: 2px;
 }
 
 /* Underlined chapter selector — sits between header dashed divider and body. */
@@ -99,6 +102,12 @@
 }
 
 .manual-tab:hover {
+  color: var(--charcoal);
+}
+
+.manual-tab:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: 2px;
   color: var(--charcoal);
 }
 
@@ -141,10 +150,13 @@
   transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
-.manual-section-link:hover,
-.manual-section-link:focus-visible {
+.manual-section-link:hover {
   background: var(--gold-tint-hover);
-  outline: none;
+}
+
+.manual-section-link:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: -2px;
 }
 
 .manual-section-link--active {
