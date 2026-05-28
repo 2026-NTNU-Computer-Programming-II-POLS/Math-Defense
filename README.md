@@ -99,7 +99,7 @@ Path generation is polynomial-only; the trig / log evaluator is used by the Magi
 - **Achievements** — 29 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
 - **Talent Tree** — 26 nodes (19 base + 7 tier-2 advanced) across the 7 tower types. Base nodes form linear prerequisite chains; tier-2 nodes additionally require their parent at max level (`prerequisite_max_levels`). Each node has a `maxLevel` (2 or 3) and grants a per-tower attribute multiplier — including damage, range, attack/sweep speed, target count, zone width/strength, Magic zone duration/slow strength, Matrix damage-ramp rate/resonance, Limit burst bonus, and Calculus pet damage/speed/range/crit. Modifiers are snapshotted at tower placement, so re-build to refresh after reallocating. Free reset is supported.
 - **Avatar & profile** — unlocked along the way.
-- **Class & Territory** — students join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global.
+- **Class & Territory** — students join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global. Each activity has up to 50 slots and a teacher-configurable `student_slot_cap` (1–50, default 5) controlling how many slots a single student may hold.
 - **Leaderboard** — every completed non-practice run posts its TotalScore by star rating.
 
 ### Accessibility
@@ -174,7 +174,7 @@ Browser
 | Frontend | Vue 3.5 (Composition API, `<script setup>`), TypeScript 6.0 strict, Pinia 3, Vue Router 4, Vite 8, Vitest 4 |
 | Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
 | WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 17 exported math functions (plus `_malloc`/`_free`) |
-| Database | PostgreSQL 16 (43 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
+| Database | PostgreSQL 16 (45 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
 | Container | Docker, Docker Compose |
 | Replay | Versioned (`replay_version` 1=mulberry32+JS Math, 2=PCG+WASM bit-exact); server-side score recompute via `wasmtime-py` |
 
@@ -297,8 +297,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # ~28 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute)
-cd frontend && npm test            # ~83 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
+cd backend  && pytest              # ~32 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, CSRF cookie, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute, admin teacher provisioning)
+cd frontend && npm test            # ~84 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
