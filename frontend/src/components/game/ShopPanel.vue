@@ -334,7 +334,7 @@ function purchase(itemId: string, cost: number): void {
 
 .category-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   margin-bottom: 10px;
 }
@@ -342,13 +342,13 @@ function purchase(itemId: string, cost: number): void {
   background: rgba(245, 250, 254, 0.7);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: var(--text-2xs);
   color: var(--charcoal-soft);
   cursor: pointer;
   white-space: nowrap;
   font-family: var(--font-mono);
-  letter-spacing: 0.7px;
+  letter-spacing: 0.3px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
