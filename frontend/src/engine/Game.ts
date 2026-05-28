@@ -9,7 +9,13 @@ import { InputManager } from './InputManager'
 import { PhaseStateMachine } from './PhaseStateMachine'
 import { ShakeController } from './ShakeController'
 import { type GameState, createInitialState } from './GameState'
-import { GamePhase, Events, FIXED_DT, type TowerType } from '@/data/constants'
+import {
+  GamePhase,
+  Events,
+  FIXED_DT,
+  PERCEIVED_SPEED_OPTIONS,
+  type TowerType,
+} from '@/data/constants'
 import { mulberry32 } from '@/math/MathUtils'
 import { createPrng, prngNextF64, type PrngHandle } from '@/math/WasmBridge'
 import type { Tower, Enemy, Projectile, Pet, LimitResult, CalculusState, TargetingMode } from '@/entities/types'
@@ -334,6 +340,11 @@ export class Game {
   private _rafId: number | null = null
   private _lastTime = 0
   private _accumulator = 0
+  // Fractional sub-step ledger: each accumulator tick adds
+  // `perceivedSpeedMultiplier` worth of credit, and each sub-step drains 1.
+  // This lets 0.5× / 1× / 2× / 3× share one branch and lets non-integer
+  // multipliers behave correctly without rounding.
+  private _simulationCredit = 0
   private readonly _boundLoop: () => void
   // PCG handle owned when VITE_DETERMINISTIC_RNG=true. Disposed before
   // re-seeding (replayer reset path) and during destroy() so the WASM heap
@@ -498,7 +509,8 @@ export class Game {
   }
 
   setPerceivedSpeedMultiplier(multiplier: number): void {
-    const next = multiplier >= 2 ? 2 : 1
+    const opts: readonly number[] = PERCEIVED_SPEED_OPTIONS
+    const next = opts.includes(multiplier) ? multiplier : 1
     if (this.state.perceivedSpeedMultiplier === next) return
     this.state.perceivedSpeedMultiplier = next
     this.eventBus.emit(Events.PERCEIVED_SPEED_CHANGED, next)
@@ -511,6 +523,7 @@ export class Game {
     this._running = true
     this._lastTime = performance.now()
     this._accumulator = 0
+    this._simulationCredit = 0
     this._loop()
   }
 
@@ -564,18 +577,28 @@ export class Game {
     this._accumulator += frameTime
 
     while (this._accumulator >= FIXED_DT) {
-      const speedSteps = this.state.phase === GamePhase.WAVE
-        ? Math.max(1, Math.round(this.state.perceivedSpeedMultiplier))
-        : 1
-      for (let step = 0; step < speedSteps; step++) {
+      // Add this real-time tick's "simulation credit". In WAVE the credit
+      // grows by the user-selected multiplier (supports fractional values
+      // like 0.5); outside WAVE we pin it to one sub-step per real-time tick
+      // so BUILD / MENU never inherit a backlog from an earlier WAVE.
+      if (this.state.phase === GamePhase.WAVE) {
+        this._simulationCredit += this.state.perceivedSpeedMultiplier
+      } else {
+        this._simulationCredit = 1
+      }
+      while (this._simulationCredit >= 1) {
         this._update(FIXED_DT)
         this.time += FIXED_DT
-        // A sub-step can end the wave (e.g. the last enemy is cleared). Stop
-        // the remaining perceived-speed sub-steps so a non-WAVE phase never
-        // receives a doubled tick: the extra _update would advance `time` —
-        // and so the scored `timeTotal` — by a FIXED_DT that belongs to no
-        // wave and that timeExcludePrepare never subtracts back out.
-        if (this.state.phase !== GamePhase.WAVE) break
+        this._simulationCredit -= 1
+        // A sub-step can end the wave (e.g. the last enemy is cleared). Drop
+        // the remaining credit so a non-WAVE phase never receives an extra
+        // tick: that would advance `time` — and so the scored `timeTotal` —
+        // by a FIXED_DT that belongs to no wave and that timeExcludePrepare
+        // never subtracts back out.
+        if (this.state.phase !== GamePhase.WAVE) {
+          this._simulationCredit = 0
+          break
+        }
       }
       this._accumulator -= FIXED_DT
     }

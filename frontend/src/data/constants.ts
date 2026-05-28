@@ -24,6 +24,13 @@ export const INITIAL_GOLD = gameConstants.player.initialGold
 export const TARGET_FPS = gameConstants.loop.targetFps
 export const FIXED_DT   = 1 / TARGET_FPS  // Computed precisely to avoid the minor drift from JSON-rounded 0.016667
 
+// Wall-clock pacing options exposed by GameSpeedPanel. Score time advances at
+// 1× regardless of which option is selected; only the WAVE-phase simulation
+// rate changes. Values must include 1 (the default) and stay positive — the
+// loop uses each value as the per-tick "simulation credit" added during WAVE.
+export const PERCEIVED_SPEED_OPTIONS = [0.5, 1, 2, 3] as const
+export type PerceivedSpeed = (typeof PERCEIVED_SPEED_OPTIONS)[number]
+
 // ── Game phases ──
 export const GamePhase = {
   MENU:         'menu',

@@ -153,4 +153,60 @@ describe('Game perceived speed', () => {
     expect(update).toHaveBeenCalledTimes(1)
     expect(game.time).toBeCloseTo(FIXED_DT)
   })
+
+  it('runs three sub-steps per real-time tick at 3×', () => {
+    const update = vi.fn()
+    game.addSystem('probe', { update })
+    game.phase.forceTransition(GamePhase.WAVE)
+    game.state.phase = GamePhase.WAVE
+    game.setPerceivedSpeedMultiplier(3)
+
+    const internals = game as unknown as { _running: boolean; _lastTime: number; _loop(): void }
+    internals._running = true
+    internals._lastTime = 0
+    nowSpy.mockReturnValue(FIXED_DT * 1000)
+
+    internals._loop()
+
+    expect(update).toHaveBeenCalledTimes(3)
+    expect(game.time).toBeCloseTo(FIXED_DT * 3)
+  })
+
+  it('runs one sub-step every two real-time ticks at 0.5×', () => {
+    const update = vi.fn()
+    game.addSystem('probe', { update })
+    game.phase.forceTransition(GamePhase.WAVE)
+    game.state.phase = GamePhase.WAVE
+    game.setPerceivedSpeedMultiplier(0.5)
+
+    const internals = game as unknown as {
+      _running: boolean; _lastTime: number; _loop(): void
+    }
+    internals._running = true
+    internals._lastTime = 0
+
+    // First real-time tick → 0.5 credit, no sub-step yet.
+    nowSpy.mockReturnValue(FIXED_DT * 1000)
+    internals._loop()
+    expect(update).toHaveBeenCalledTimes(0)
+    expect(game.time).toBe(0)
+
+    // Second real-time tick → credit reaches 1.0, exactly one sub-step.
+    internals._running = true
+    nowSpy.mockReturnValue(FIXED_DT * 2000)
+    internals._loop()
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(game.time).toBeCloseTo(FIXED_DT)
+  })
+
+  it('rejects unsupported multiplier values by falling back to 1×', () => {
+    game.setPerceivedSpeedMultiplier(2)
+    expect(game.state.perceivedSpeedMultiplier).toBe(2)
+
+    game.setPerceivedSpeedMultiplier(4)
+    expect(game.state.perceivedSpeedMultiplier).toBe(1)
+
+    game.setPerceivedSpeedMultiplier(0.5)
+    expect(game.state.perceivedSpeedMultiplier).toBe(0.5)
+  })
 })
