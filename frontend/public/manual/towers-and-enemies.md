@@ -6,7 +6,7 @@ Quick-lookup tables for towers, enemies, spells, buffs, and Monty Hall rewards. 
 
 ## Towers
 
-Seven tower types, each tied to a real math concept. Stats below are the **base** tier; Tier 2 adds +25% damage and +10% range at 60% of base cost, and Tier 3 adds +50% damage and +20% range at 100% of base cost. Speed changes, if any, are tower-specific bonuses noted in each row.
+Seven tower types, each tied to a real math concept. Stats below are the **base** tier. Tier 2 adds +25% damage and +10% range at 60% of base cost; Tier 3 adds +50% damage, +20% range, **and a universal +15% attack speed** at 100% of base cost. The +15% speed reduces base cooldown by 15% and so has no effect on Calculus (whose base cooldown is 0). Any other per-tower bonuses (sweep speed, target count, crit, ramp, AoE width, pet stats) are listed in each row.
 
 ### Magic Tower — ✦
 
@@ -23,7 +23,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Math:** radian arcs, sector area
 - **Unlocked from:** Star 1
 - **Mechanic:** a needle sweeps a continuous **full 360°** circle; any enemy in range takes AoE damage every tick the needle crosses it. The configurable arc does not steer the sweep — it only marks the ×1.5 focus sector (see below).
-- **Tier 2/3:** sweep speed +20% / +40%; Tier 3 also widens the AoE band by +30%.
+- **Tier 2/3:** sweep speed +20% / +40%; Tier 3 also widens the AoE band by +0.3 rad (absolute, on top of the base 0.5 rad band — i.e. about +60% wider).
 - **Pick when:** the path makes a tight wrap around a small region — you cover it with one tower.
 
 ### Radar B — Rapid — ◑
@@ -77,7 +77,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 100 / 0 base / 10 / — (does not fire directly)
 - **Math:** derivatives, integrals, power rule
 - **Unlocked from:** Star 3
-- **Mechanic:** pick a monomial `f(x)`, then pick an operation — `f'`, `f''`, or `∫f` — and **solve it yourself**: type the resulting monomial. The panel never shows the answer; only a correct answer applies the operation. The result `C·x^n` spawns **C pets**, each whose trait is determined by **n** — homing speed, lifetime, damage profile, AoE radius. Pets fly out, home onto the nearest enemy, and detonate. The first operation is free; chaining another costs gold, while a wrong answer is rejected at no cost.
+- **Mechanic:** pick a monomial `f(x)`, then pick an operation — `f'`, `f''`, or `∫f` — and **solve it yourself**: type the resulting monomial. The panel never shows the answer; only a correct answer applies the operation. The result `C·x^n` spawns pets that home onto the nearest enemy and detonate. The exponent **n** picks the **trait** (`n=1` → slow, `n=2` → fast, `n=3` → heavy, `n ≥ 4` → basic), which sets per-pet damage / fire rate / movement speed (a "fast" pet hits softer but more often; a "heavy" pet hits hard but slow). The coefficient **C** is **log-compressed** into pet count — `floor(log₂(C+1))` pets — so a `99·x²` result spawns 6 fast pets, not 99. Talents add to that count; non-integer `|C|` becomes a damage multiplier on each pet. The first operation is free; chaining another costs gold; a wrong answer is rejected at no cost.
 - **Tier 2/3:** pet damage +25% / +50%; Tier 3 also +1 pet count and +20% pet speed.
 - **Pick when:** you want autonomous chip damage during waves or extra cleanup that doesn't need direct line-of-sight positioning.
 - **Exam tie-in:** AP Calculus AB Section I differentiation/integration of polynomials.
