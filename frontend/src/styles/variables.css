@@ -72,7 +72,7 @@
      Legacy semantic aliases — resolve to a canonical Morandi token so
      there is exactly one definition per colour value (review §3.2).
      ============================================================ */
-   --bg-base:         #a4b9d4;  /* page/scene bg — own value, distinct from --cream (grid) */
+   --bg-base:         var(--cream);
    --stone-light:     var(--stone-soft);
    --gold-bright:     var(--gold-soft);
    --gold-dim:        var(--gold-deep);
