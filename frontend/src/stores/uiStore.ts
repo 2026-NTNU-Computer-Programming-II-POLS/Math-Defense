@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch, onScopeDispose } from 'vue'
 import { appBus } from '@/lib/app-bus'
+import { clearCache as clearImageCache } from '@/services/imageCache'
 import type { TowerType, EnemyType } from '@/data/constants'
 import type { TowerCategory } from '@/data/tower-defs'
 
@@ -161,6 +162,12 @@ export const useUiStore = defineStore('ui', () => {
     endpointMarkerStyle.value = 'star'
     endpointMarkerCustomDataUrl.value = null
     endpointHitFx.value = 'fragments'
+    // Drop every imageCache entry — useGameLoop's per-URL eviction handles
+    // the in-game-session case, but a logout can happen from any view
+    // (ProfileView, LevelSelectView) where useGameLoop is unmounted and
+    // its watcher won't fire. Without this the previous user's decoded
+    // Image survives in module-level state for the next account.
+    clearImageCache()
   }))
 
   // currently selected tower type (tower bar selection)
@@ -311,7 +318,16 @@ export const useUiStore = defineStore('ui', () => {
         if (v === null) window.localStorage.removeItem(ENDPOINT_MARKER_CUSTOM_KEY)
         else window.localStorage.setItem(ENDPOINT_MARKER_CUSTOM_KEY, v)
       }
-      catch { /* storage may be disabled (private mode); silently ignore */ }
+      catch (err) {
+        // Surface QuotaExceededError so the in-memory ↔ on-disk divergence
+        // is observable; private-mode SecurityError stays silent (expected).
+        if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+          console.warn(
+            '[uiStore] localStorage quota exceeded — endpoint marker image not persisted; '
+            + 'value remains in memory for this session only.',
+          )
+        }
+      }
     })
     watch(endpointHitFx, (v) => {
       try { window.localStorage.setItem(ENDPOINT_HIT_FX_KEY, v) }
@@ -325,8 +341,14 @@ export const useUiStore = defineStore('ui', () => {
   function setEndpointMarkerCustomDataUrl(v: string | null): void {
     // Hard cap: localStorage shares a ~5MB budget with every other mdf.* pref,
     // so a 4MB selfie would push out audio settings + counter telegraphs.
+    // The server enforces the same cap on the resized dataURL — if a
+    // high-entropy source can't compress under it at 256×256, the upload
+    // can't be persisted on either side, so reject early.
     if (v !== null && v.length > ENDPOINT_MARKER_CUSTOM_MAX_BYTES) {
-      throw new Error('Custom marker image too large (max 3 MB after resize)')
+      throw new Error(
+        'Image too complex to compress under 3 MB after 256×256 resize — '
+        + 'please pick a simpler or smaller source image.',
+      )
     }
     endpointMarkerCustomDataUrl.value = v
   }

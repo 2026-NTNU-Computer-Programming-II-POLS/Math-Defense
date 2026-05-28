@@ -14,7 +14,7 @@
  */
 import { onMounted, onUnmounted, ref, shallowRef, watch, type Ref } from 'vue'
 import { Game } from '@/engine/Game'
-import { loadImage } from '@/services/imageCache'
+import { loadImage, evict as evictImage } from '@/services/imageCache'
 import { registerSystems } from '@/engine/register-systems'
 import { initWasm } from '@/math/WasmBridge'
 import { useGameStore } from '@/stores/gameStore'
@@ -174,12 +174,25 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
     // them via simple assignment and the watchers below keep them live.
     // Custom image is decoded asynchronously; until it resolves the renderer
     // falls back to the star body so the marker is never an empty halo.
+    //
+    // Eviction: imageCache is a module-level Map keyed by dataURL. Whenever
+    // the user switches images (upload another, clear, log out → uiStore
+    // reset), the previous dataURL is no longer referenced anywhere and
+    // would leak its 50–200 KB Image entry until full page reload. Tracking
+    // the prior URL here lets us drop it from the cache the moment it goes
+    // out of use.
+    let cachedCustomUrl: string | null = null
     function applyEndpointMarkerPrefs(): void {
       const style = uiStore.endpointMarkerStyle
       const customUrl = uiStore.endpointMarkerCustomDataUrl
       g.endpointFx.style = uiStore.endpointHitFx
       g.endpointMarker.style = style
+      if (cachedCustomUrl !== null && cachedCustomUrl !== customUrl) {
+        evictImage(cachedCustomUrl)
+        cachedCustomUrl = null
+      }
       if (style === 'custom' && customUrl) {
+        cachedCustomUrl = customUrl
         loadImage(customUrl)
           .then((img) => {
             // Guard against stale resolves after the user switches styles

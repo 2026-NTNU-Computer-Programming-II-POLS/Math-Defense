@@ -41,6 +41,16 @@ export function getCached(dataUrl: string): HTMLImageElement | null {
   return cache.get(dataUrl) ?? null
 }
 
+/**
+ * Drop a single cached entry. Used by useGameLoop when the player's custom
+ * marker dataURL changes — without this the prior dataURL lingers in the
+ * Map for the lifetime of the page even though nothing references it.
+ */
+export function evict(dataUrl: string): void {
+  cache.delete(dataUrl)
+  pending.delete(dataUrl)
+}
+
 export function clearCache(): void {
   cache.clear()
   pending.clear()
