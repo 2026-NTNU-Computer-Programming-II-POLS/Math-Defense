@@ -292,10 +292,13 @@ onMounted(async () => {
         >×</button>
       </div>
       <div class="talent-towers">
-      <div v-for="tw in TOWER_ORDER" :key="tw" class="tower-section">
-        <h3 class="tower-name" :style="{ color: TOWER_DEFS[tw]?.color }">
-          {{ TOWER_DEFS[tw]?.nameEn ?? tw }}
-        </h3>
+      <div
+        v-for="tw in TOWER_ORDER"
+        :key="tw"
+        class="tower-section"
+        :style="{ '--tower-color': TOWER_DEFS[tw]?.cardColor ?? TOWER_DEFS[tw]?.color }"
+      >
+        <h3 class="tower-name">{{ TOWER_DEFS[tw]?.nameEn ?? tw }}</h3>
         <div
           class="tower-tree"
           :style="{ '--max-cols': towerLayouts[tw]?.maxCols ?? 1 }"
@@ -310,10 +313,12 @@ onMounted(async () => {
             <div
               :class="['talent-node', {
                 maxed: layout.node.current_level >= layout.node.max_level,
+                allocated: layout.node.current_level >= 1 && layout.node.current_level < layout.node.max_level,
                 available: canAllocate(layout.node),
                 locked: !layout.prereqMet && layout.node.current_level < 1,
                 loading: allocatingNodeId === layout.node.id,
                 recommended: showRecommendation && recommendedNodeId === layout.node.id,
+                't2-node': (layout.node.prerequisite_max_levels?.length ?? 0) > 0,
               }]"
               @click="canAllocate(layout.node) && allocate(layout.node.id)"
             >
@@ -347,7 +352,7 @@ onMounted(async () => {
 .talent-view {
   position: relative;
   z-index: 1;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 40px auto;
   padding: 26px;
   display: flex;
@@ -383,22 +388,32 @@ onMounted(async () => {
 .talent-error { color: var(--clay-deep); }
 .talent-alloc-error { font-size: var(--text-xs); color: var(--clay-deep); text-align: center; }
 
-.talent-towers { display: flex; flex-direction: column; gap: 18px; }
+.talent-towers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 760px) {
+  .talent-towers { grid-template-columns: 1fr; }
+}
 
 .tower-section {
   background: rgba(245, 250, 254, 0.6);
   border: 1px solid var(--line);
+  border-left: 3px solid var(--tower-color, var(--line-strong));
   border-radius: 12px;
-  padding: 16px;
+  padding: 16px 16px 20px;
 }
 
 .tower-name {
   font-size: var(--text-sm);
   font-family: var(--font-mono);
-  color: var(--charcoal-soft);
+  color: var(--tower-color, var(--charcoal-soft));
   text-transform: uppercase;
   letter-spacing: 2px;
-  margin-bottom: 12px;
+  margin-bottom: 18px;
+  text-align: center;
 }
 
 /* Per-tower mini-tree grid: rows = tier depth, cols = max sibling width.
@@ -483,31 +498,47 @@ onMounted(async () => {
 
 .talent-node {
   position: relative;
-  width: 140px;
-  padding: 12px;
+  width: 100%;
+  max-width: 170px;
+  padding: 10px 12px;
   background: rgba(245, 250, 254, 0.7);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: default;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
 .talent-node.available {
   cursor: pointer;
-  border-color: var(--terracotta);
+  border-color: var(--tower-color, var(--terracotta));
 }
 
 .talent-node.available:hover {
   background: linear-gradient(135deg, rgba(168, 188, 203, 0.26), #fff);
+  box-shadow: 0 0 0 1px var(--tower-color, var(--terracotta));
+}
+
+.talent-node.allocated {
+  border-color: var(--tower-color, var(--terracotta));
+  background: rgba(245, 250, 254, 0.92);
 }
 
 .talent-node.maxed {
-  border-color: var(--terracotta);
+  border-color: var(--tower-color, var(--terracotta));
   background: linear-gradient(135deg, rgba(168, 188, 203, 0.26), #fff);
+  box-shadow: inset 0 0 0 1px var(--tower-color, var(--terracotta));
 }
 
-.talent-node.locked { opacity: 0.5; }
+.talent-node.locked { opacity: 0.45; }
 .talent-node.loading { opacity: 0.6; cursor: wait; }
+
+.talent-node.t2-node {
+  border-style: dashed;
+}
+.talent-node.t2-node.allocated,
+.talent-node.t2-node.maxed {
+  border-style: solid;
+}
 
 .talent-node.recommended {
   /* Override .locked dimming so the highlighted root remains visible even
