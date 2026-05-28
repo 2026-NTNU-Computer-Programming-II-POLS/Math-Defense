@@ -14,12 +14,17 @@ import type { Game } from '@/engine/Game'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import { projectPetScene } from '@/engine/projections/project-pets'
 import type { PetTrait } from '@/engine/projections/views'
+import { TOWER_DEFS } from '@/data/tower-defs'
+import { TowerType } from '@/data/constants'
 import { drawGlyphBody } from './primitives'
 
+// Pet trait colours mirror the identity colour of the tower each trait evokes
+// (n=1 → Radar B, n=2 → Matrix, n=3 → Limit) so the calculus pet reads as the
+// same family on-canvas; sourced from TOWER_DEFS to avoid a parallel palette.
 const TRAIT_COLORS: Record<PetTrait, string> = {
-  slow:  '#60a5fa',
-  fast:  '#facc15',
-  heavy: '#ef4444',
+  slow:  TOWER_DEFS[TowerType.RADAR_B].color,
+  fast:  TOWER_DEFS[TowerType.MATRIX].color,
+  heavy: TOWER_DEFS[TowerType.LIMIT].color,
   basic: '#a3a3a3',
 }
 

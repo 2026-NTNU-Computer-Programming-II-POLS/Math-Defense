@@ -6,6 +6,8 @@ import { CALCULUS_OP_COST } from '@/systems/CalculusTowerSystem'
 import type { CalculusTowerSystem, MonomialPreset } from '@/systems/CalculusTowerSystem'
 import { applyCalcOp, checkMonomialAnswer } from '@/math/monomial'
 import type { CalcOp } from '@/math/monomial'
+import { TOWER_DEFS } from '@/data/tower-defs'
+import { TowerType } from '@/data/constants'
 
 const props = defineProps<{ towerId: string }>()
 const gameStore = useGameStore()
@@ -29,10 +31,13 @@ const isChainOp = computed(() => !!calcState.value?.opApplied)
 const canAffordOp = computed(() => !isChainOp.value || gameStore.gold >= CALCULUS_OP_COST)
 
 type TraitKey = 'slow' | 'fast' | 'heavy' | 'basic'
+// Trait dot colours mirror the identity colour of the tower each trait evokes
+// (n=1 → Radar B, n=2 → Matrix, n=3 → Limit); sourced from TOWER_DEFS so the
+// panel and the on-canvas pet (PetRenderer) stay in sync from one palette.
 const TRAIT_INFO: Record<TraitKey, { label: string; color: string; desc: string }> = {
-  slow:  { label: 'Slow',  color: '#60a5fa', desc: 'Slows enemies in range' },
-  fast:  { label: 'Fast',  color: '#facc15', desc: 'Low dmg, fast attack' },
-  heavy: { label: 'Heavy', color: '#ef4444', desc: 'High dmg, slow attack' },
+  slow:  { label: 'Slow',  color: TOWER_DEFS[TowerType.RADAR_B].color, desc: 'Slows enemies in range' },
+  fast:  { label: 'Fast',  color: TOWER_DEFS[TowerType.MATRIX].color, desc: 'Low dmg, fast attack' },
+  heavy: { label: 'Heavy', color: TOWER_DEFS[TowerType.LIMIT].color, desc: 'High dmg, slow attack' },
   basic: { label: 'Basic', color: '#a3a3a3', desc: 'Standard pet' },
 }
 
