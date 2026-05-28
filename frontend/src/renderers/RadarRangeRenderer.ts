@@ -2,6 +2,7 @@ import type { Renderer } from '@/engine/Renderer'
 import type { Game } from '@/engine/Game'
 import { TowerType, GamePhase, UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
+import { clipToBoard } from '@/engine/render-helpers/clip-to-board'
 import {
   interceptPoint,
   isAngleInArc,
@@ -18,6 +19,15 @@ export class RadarRangeRenderer {
     if (game.state.phase !== GamePhase.WAVE && game.state.phase !== GamePhase.BUILD) return
     const { ctx } = renderer
 
+    // Range ring, focus-arc fill, sweep needle and scope brackets all scale
+    // by `effectiveRange`, so a tower placed near the grid border paints
+    // geometry past the painted board. Clip once for the whole pass — the
+    // "×1.5" focus-bonus label sits `radiusPx + 12` from tower centre and
+    // is clipped along with it; at extreme placements the label fades at
+    // the board edge, which is an acceptable trade for not leaking AoE
+    // visuals onto the surrounding backdrop.
+    ctx.save()
+    clipToBoard(ctx)
     for (const tower of game.towers) {
       if (tower.type !== TowerType.RADAR_A &&
           tower.type !== TowerType.RADAR_B &&
@@ -25,6 +35,7 @@ export class RadarRangeRenderer {
       if (!tower.configured) continue
       this._drawRange(ctx, game, tower)
     }
+    ctx.restore()
   }
 
   // Visual Redesign Phase 5b: each radar instrument gets a distinct arc
