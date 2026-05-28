@@ -154,7 +154,7 @@ const showTargetingMode = computed(() => {
 <template>
   <div v-if="tower && towerDef" class="tower-info-panel rune-panel">
     <header class="panel-header">
-      <span class="panel-title" :style="{ color: towerDef.color }">
+      <span class="panel-title" :style="{ color: towerDef.cardColor }">
         <!-- Visual Redesign Phase 5a/5b: preview chip mirrors the in-canvas
              instrument silhouette per tower type. -->
         <svg
