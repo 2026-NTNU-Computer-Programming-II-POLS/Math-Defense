@@ -425,41 +425,6 @@ export class Renderer {
     ctx.restore()
   }
 
-  /**
-   * Highlight the disclosure region — a rectangle that is guaranteed to
-   * contain exactly one common intersection of all level curves (= P*, the
-   * tower-defense goal). Player sees only the rectangle, not the precise
-   * point.
-   */
-  drawDisclosureRegion(region: {
-    readonly xMin: number
-    readonly xMax: number
-    readonly yMin: number
-    readonly yMax: number
-  }): void {
-    const { ctx } = this
-    const px = gameToCanvasX(region.xMin)
-    const py = gameToCanvasY(region.yMax)
-    const w = (region.xMax - region.xMin) * UNIT_PX
-    const h = (region.yMax - region.yMin) * UNIT_PX
-
-    ctx.save()
-    ctx.fillStyle = 'rgba(173, 162, 132, 0.12)'
-    ctx.fillRect(px, py, w, h)
-    ctx.strokeStyle = 'rgba(173, 162, 132, 0.85)'
-    ctx.lineWidth = 1.5
-    ctx.setLineDash([6, 4])
-    ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1)
-
-    ctx.setLineDash([])
-    ctx.fillStyle = 'rgba(173, 162, 132, 0.95)'
-    ctx.font = 'bold 11px monospace'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'top'
-    ctx.fillText('Goal here', px + 4, py + 4)
-    ctx.restore()
-  }
-
   drawFunction(
     fn: (x: number) => number,
     xMin: number,

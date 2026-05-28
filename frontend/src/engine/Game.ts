@@ -589,7 +589,6 @@ export class Game {
       const genCtx = isGeneratedLevelContext(this.levelContext) ? this.levelContext : null
 
       if (genCtx) {
-        renderer.drawDisclosureRegion(genCtx.region)
         if (this.state.pathsVisible) {
           for (const path of genCtx.paths) {
             for (const seg of path.segments) {
