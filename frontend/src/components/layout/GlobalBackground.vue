@@ -46,33 +46,97 @@ const mathGlyphs: Glyph[] = [
   { text: 'dy/dx',       layer: 'near', left: '6%',  top: '12%', size: '38px', duration: '16s', delay: '-5s',  drift: '26px',  rotate: '12deg' },
 ]
 
-// Constellation: fixed-position dots with dashed connecting lines that slowly
-// fade in and out. Coordinates are in a 100×100 SVG viewBox stretched across
-// the viewport with preserveAspectRatio=none; the strokes use
-// vector-effect=non-scaling-stroke so they stay 1 screen-px regardless of
-// stretch, and the dots are positioned with CSS % so they stay circular.
-interface Star { x: number; y: number }
-interface Edge { from: number; to: number; delay: number }
+// Constellation: dots and dashed connecting lines, regenerated on every
+// mount so each visit to the menu sees a different star map. Coordinates
+// are in a 100×100 SVG viewBox stretched across the viewport with
+// preserveAspectRatio=none; the strokes use vector-effect=non-scaling-stroke
+// so they stay 1 screen-px regardless of stretch, and the dots are
+// positioned with CSS % so they stay circular.
+//
+// Each star and edge carries its own pulse duration + negative phase delay,
+// so what is visible at any moment is a constantly-shifting *subset* of
+// the full graph — the shape never freezes, even within one session.
+interface Star {
+  x: number       // viewBox / percent units (0–100)
+  y: number
+  pulse: number   // seconds — full pulse cycle
+  delay: number   // negative seconds — phase offset
+  size: number    // px diameter
+  glow: number    // px box-shadow blur
+}
 
-const stars: Star[] = [
-  { x: 15, y: 25 }, // 0 — left cluster
-  { x: 28, y: 40 }, // 1
-  { x: 22, y: 58 }, // 2
-  { x: 70, y: 18 }, // 3 — right triangle
-  { x: 82, y: 32 }, // 4
-  { x: 75, y: 50 }, // 5
-  { x: 50, y: 82 }, // 6 — bottom pair
-  { x: 38, y: 88 }, // 7
+interface Edge {
+  from: number
+  to: number
+  pulse: number
+  delay: number
+}
+
+interface Zone { xMin: number; xMax: number; yMin: number; yMax: number }
+
+// Zones avoid the central column where the menu card lives.
+const ZONES: ReadonlyArray<Zone> = [
+  { xMin: 4,  xMax: 32, yMin: 8,  yMax: 28 }, // top-left
+  { xMin: 58, xMax: 94, yMin: 8,  yMax: 28 }, // top-right
+  { xMin: 2,  xMax: 16, yMin: 34, yMax: 68 }, // left side
+  { xMin: 84, xMax: 98, yMin: 34, yMax: 68 }, // right side
+  { xMin: 6,  xMax: 38, yMin: 76, yMax: 94 }, // bottom-left
+  { xMin: 60, xMax: 92, yMin: 76, yMax: 94 }, // bottom-right
 ]
 
-const edges: Edge[] = [
-  { from: 0, to: 1, delay: 0 },
-  { from: 1, to: 2, delay: 1.4 },
-  { from: 3, to: 4, delay: 2.8 },
-  { from: 4, to: 5, delay: 4.2 },
-  { from: 3, to: 5, delay: 5.6 },
-  { from: 6, to: 7, delay: 7.0 },
-]
+function rand(min: number, max: number): number {
+  return min + Math.random() * (max - min)
+}
+
+function makeStars(): Star[] {
+  const out: Star[] = []
+  for (const z of ZONES) {
+    for (let i = 0; i < 2; i++) {
+      const big = Math.random() < 0.25
+      out.push({
+        x: rand(z.xMin, z.xMax),
+        y: rand(z.yMin, z.yMax),
+        pulse: rand(11, 19),
+        delay: -rand(0, 14),
+        size: big ? 6 : 4 + Math.round(Math.random()),
+        glow: big ? 12 : 7,
+      })
+    }
+  }
+  return out
+}
+
+// Edges: pick up to MAX_EDGES random pairs whose euclidean distance falls in
+// a "feels like a constellation" band — too close → invisible, too far →
+// long wires across the viewport. Tuned against viewBox 0–100.
+function makeEdges(stars: Star[]): Edge[] {
+  const MIN_DIST = 6
+  const MAX_DIST = 34
+  const MAX_EDGES = 10
+  const candidates: { from: number; to: number }[] = []
+  for (let i = 0; i < stars.length; i++) {
+    for (let j = i + 1; j < stars.length; j++) {
+      const dx = stars[i].x - stars[j].x
+      const dy = stars[i].y - stars[j].y
+      const d = Math.sqrt(dx * dx + dy * dy)
+      if (d > MIN_DIST && d < MAX_DIST) candidates.push({ from: i, to: j })
+    }
+  }
+  // Fisher-Yates shuffle so the surviving subset is unbiased.
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+  }
+  return candidates.slice(0, MAX_EDGES).map((e) => ({
+    from: e.from,
+    to: e.to,
+    pulse: rand(18, 30),
+    delay: -rand(0, 22),
+  }))
+}
+
+const stars = makeStars()
+const edges = makeEdges(stars)
 </script>
 
 <template>
@@ -89,7 +153,10 @@ const edges: Edge[] = [
         :y1="stars[e.from].y"
         :x2="stars[e.to].x"
         :y2="stars[e.to].y"
-        :style="{ '--line-delay': `${e.delay}s` }"
+        :style="{
+          '--line-pulse': `${e.pulse}s`,
+          '--line-delay': `${e.delay}s`,
+        }"
       />
     </svg>
 
@@ -101,7 +168,10 @@ const edges: Edge[] = [
       :style="{
         left: `${s.x}%`,
         top: `${s.y}%`,
-        '--dot-delay': `${i * 0.9}s`,
+        '--dot-size': `${s.size}px`,
+        '--dot-glow': `${s.glow}px`,
+        '--dot-pulse': `${s.pulse}s`,
+        '--dot-delay': `${s.delay}s`,
       }"
     />
 
@@ -179,26 +249,35 @@ const edges: Edge[] = [
   stroke-dasharray: 3 6;
   vector-effect: non-scaling-stroke;
   opacity: 0;
-  animation: constellation-pulse 16s ease-in-out infinite;
+  animation: constellation-line-pulse var(--line-pulse, 22s) ease-in-out infinite;
   animation-delay: var(--line-delay, 0s);
 }
 
 .constellation-dot {
   position: absolute;
-  width: 5px;
-  height: 5px;
+  width: var(--dot-size, 5px);
+  height: var(--dot-size, 5px);
   border-radius: 50%;
   background: rgba(58, 76, 96, 0.45);
-  box-shadow: 0 0 8px rgba(120, 150, 175, 0.45);
+  box-shadow: 0 0 var(--dot-glow, 8px) rgba(120, 150, 175, 0.45);
   transform: translate(-50%, -50%);
   opacity: 0;
-  animation: constellation-pulse 12s ease-in-out infinite;
+  animation: constellation-dot-pulse var(--dot-pulse, 14s) ease-in-out infinite;
   animation-delay: var(--dot-delay, 0s);
 }
 
-@keyframes constellation-pulse {
+/* Stars: wider visible window (25–75%) so several are always lit and the
+   sky feels populated. */
+@keyframes constellation-dot-pulse {
   0%, 100% { opacity: 0; }
-  35%, 65% { opacity: 1; }
+  25%, 75% { opacity: 1; }
+}
+
+/* Lines: brief flicker (40–60%) so only a few edges are ever visible at
+   once, making the wired-up "shape" constantly morph. */
+@keyframes constellation-line-pulse {
+  0%, 100% { opacity: 0; }
+  40%, 60% { opacity: 1; }
 }
 
 /* ── Floating glyph base ── */
