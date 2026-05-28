@@ -422,12 +422,10 @@ onBeforeUnmount(() => {
       <PhaseFader />
       <div v-if="gameStore.isBuilding || gameStore.isWave" class="left-utility-stack">
         <div class="lb-label">Tools</div>
-        <!-- Shop is build-only (purchases need BUILD). GameSpeedPanel itself
-             handles the WAVE/BUILD split: it stays visible during BUILD to
-             pre-arm the next wave's speed and shows a "wave only" hint when
-             the multiplier isn't live yet. -->
+        <!-- Shop is build-only (purchases need BUILD). The speed toggle only
+             drives the loop during WAVE, so it is wave-only too. -->
         <ShopPanel v-if="gameStore.isBuilding" />
-        <GameSpeedPanel />
+        <GameSpeedPanel v-if="gameStore.isWave" />
 
         <!-- ACTIVE BUFFS label always shows; the token cards appear as buffs
              are acquired. -->

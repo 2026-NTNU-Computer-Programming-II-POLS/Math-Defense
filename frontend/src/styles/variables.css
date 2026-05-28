@@ -72,7 +72,7 @@
      Legacy semantic aliases — resolve to a canonical Morandi token so
      there is exactly one definition per colour value (review §3.2).
      ============================================================ */
-   --bg-base:         var(--cream);
+   --bg-base:         #a4b9d4;
    --stone-light:     var(--stone-soft);
    --gold-bright:     var(--gold-soft);
    --gold-dim:        var(--gold-deep);
@@ -127,6 +127,7 @@
    --gold-tint-select: rgba(173, 162, 132, 0.16);
    --gold-tint-faint: rgba(173, 162, 132, 0.06);
    --gold-tint-soft: rgba(173, 162, 132, 0.10);
+   --teal-tint:      rgba(143, 168, 163, 0.24);  /* active speed-toggle fill */
    --gold-shadow: 0 1px 4px rgba(79, 74, 72, 0.30);
    --gold-border: rgba(122, 113, 86, 0.55);
 

@@ -5,10 +5,8 @@ import { gameCommands } from '@/services/gameCommandService'
 
 const g = useGameStore()
 
-// The perceived-speed multiplier only drives the loop during WAVE. In BUILD
-// the toggle still works — it pre-arms the setting for the next wave — so the
-// panel stays visible but shows a hint that the change isn't live yet.
-const isLive = computed(() => g.isWave)
+// The perceived-speed multiplier only drives the loop during WAVE, so this
+// panel is rendered only in WAVE (see GameView). No BUILD pre-arm hint here.
 const isFast = computed(() => g.perceivedSpeedMultiplier >= 2)
 
 function toggleSpeed(): void {
@@ -17,75 +15,70 @@ function toggleSpeed(): void {
 </script>
 
 <template>
-  <div class="speed-panel" role="group" aria-label="Game speed; score timing is unchanged">
-    <button
-      type="button"
-      class="speed-cell"
-      :class="{ active: isFast }"
-      :aria-pressed="isFast"
-      :title="isLive
-        ? 'Toggle faster pace; score timing is unchanged'
-        : 'Speed applies once the wave starts; score timing is unchanged'"
-      @click="toggleSpeed"
-    >
-      {{ isFast ? '2x' : '1x' }}
-    </button>
-    <span v-if="!isLive" class="speed-hint">wave only</span>
-  </div>
+  <button
+    type="button"
+    class="speed-btn"
+    :class="{ active: isFast }"
+    :aria-pressed="isFast"
+    aria-label="Game speed; score timing is unchanged"
+    title="Toggle faster pace; score timing is unchanged"
+    @click="toggleSpeed"
+  >
+    <span class="speed-mult">{{ isFast ? '2x' : '1x' }}</span>
+    <span class="speed-label">Speed</span>
+  </button>
 </template>
 
 <style scoped>
-/* Speed tool — Morandi left-bar button (mockup .ptool.speed, teal accent) */
-.speed-panel {
+/* Speed tool — full-width left-bar toggle styled to match the Shop trigger
+   (mockup .ptool.speed, teal accent). Width fills the rail like .shop-icon-btn. */
+.speed-btn {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--card-surface);
+  color: var(--charcoal);
+  cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 5px;
-  background: rgba(245, 250, 254, 0.86);
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
+  gap: 1px;
   box-shadow: var(--shadow-sm);
   font-family: var(--font-mono);
-}
-
-.speed-cell {
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: rgba(245, 250, 254, 0.94);
-  color: var(--charcoal);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  cursor: pointer;
   transition:
     background 120ms,
     border-color 120ms,
     color 120ms;
 }
 
-.speed-cell:hover {
+.speed-btn:hover {
   background: #fff;
   border-color: var(--terracotta);
 }
 
-.speed-cell:focus-visible {
+.speed-btn:focus-visible {
   outline: 2px solid var(--terracotta-deep);
   outline-offset: 2px;
 }
 
-.speed-cell.active {
+.speed-btn.active {
   border-color: var(--teal-deep);
-  background: rgba(143, 168, 163, 0.24);
+  background: var(--teal-tint);
   color: var(--teal-deep);
 }
 
-.speed-hint {
+.speed-mult {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 1.15;
+}
+
+.speed-label {
   font-size: var(--text-2xs);
-  line-height: 1;
+  letter-spacing: 1px;
   color: var(--charcoal-soft);
-  white-space: nowrap;
+  line-height: 1.15;
 }
 </style>
