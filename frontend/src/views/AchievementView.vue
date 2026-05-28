@@ -70,7 +70,7 @@ onMounted(async () => {
         <span class="ach-count">{{ unlockedCount }} / {{ achievements.length }}</span>
         <span class="ach-points">{{ totalPoints }} TP earned</span>
       </div>
-      <button class="btn" @click="router.push('/profile')">← Back</button>
+      <button class="btn" @click="router.push({ name: 'menu' })">← Back</button>
     </header>
 
     <div class="ach-filters">
