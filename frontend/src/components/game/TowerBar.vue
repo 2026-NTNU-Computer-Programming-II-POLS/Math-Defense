@@ -353,18 +353,18 @@ function canAfford(cost: number): boolean {
   background: rgba(245, 250, 254, 0.7);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: var(--text-2xs);
+  padding: 2px 7px;
+  font-size: 0.625rem;
   color: var(--charcoal-soft);
   cursor: pointer;
   white-space: nowrap;
   font-family: var(--font-mono);
-  letter-spacing: 0.7px;
+  letter-spacing: 0.4px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
-  min-height: 26px;
+  min-height: 20px;
 }
 .chip:hover {
   border-color: var(--gold);
@@ -381,10 +381,10 @@ function canAfford(cost: number): boolean {
   box-shadow: 0 2px 6px rgba(122, 113, 86, 0.34);
 }
 .chip-count {
-  font-size: var(--text-2xs);
+  font-size: 0.625rem;
   color: var(--charcoal-soft);
   background: rgba(79, 74, 72, 0.08);
-  padding: 1px 5px;
+  padding: 0 4px;
   border-radius: 8px;
   font-weight: 700;
 }
@@ -486,9 +486,6 @@ function canAfford(cost: number): boolean {
   height: 14px;
 }
 .tower-icon-svg { width: 100%; height: 100%; }
-/* Name sits centred in the card. Uses the mono family to match the TOWERS
-   bar label, and a smaller size so even the longest name ("Calculus Tower")
-   stays inside the card frame without being clipped. */
 .tower-name {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
