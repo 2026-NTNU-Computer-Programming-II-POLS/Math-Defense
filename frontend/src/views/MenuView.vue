@@ -129,7 +129,7 @@ const manualOpen = ref(false)
             >
               Open
             </button>
-            <button class="btn btn-ghost account-btn" @click="auth.logout()">
+            <button class="btn account-btn" @click="auth.logout()">
               <span class="icon">⏻</span><span class="label">Log Out</span>
             </button>
           </div>
