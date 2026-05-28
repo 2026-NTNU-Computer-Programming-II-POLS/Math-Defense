@@ -396,7 +396,7 @@ class SessionApplicationService:
                 self._uow.commit()
                 logger.info(
                     "Session ended: session=%s user=%s score=%d",
-                    session.id, user_id, score,
+                    session.id, user_id, effective_score,
                 )
 
         if _catch_up_event is not None:
