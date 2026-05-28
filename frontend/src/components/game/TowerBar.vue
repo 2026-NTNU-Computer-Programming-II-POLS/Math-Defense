@@ -409,10 +409,12 @@ function canAfford(cost: number): boolean {
 .tower-list {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: 152px;
+  justify-content: start;
   gap: 5px;
   flex: 1;
   min-width: 0;
+  overflow-x: auto;
   border-left: 1px dashed var(--line);
   padding-left: 10px;
   margin-left: 6px;
@@ -495,8 +497,6 @@ function canAfford(cost: number): boolean {
   white-space: nowrap;
   width: 100%;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 /* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
    colour-blind players can identify tower type without relying on the
