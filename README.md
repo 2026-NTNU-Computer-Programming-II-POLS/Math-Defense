@@ -17,7 +17,7 @@ An educational tower defense where **math is the mechanic, not the gate**. The w
 | Radar B — Rapid | ◑ | Radian arcs | Fast single-target projectiles within a restricted arc; shortest cooldown in the roster | Star 2 |
 | Radar C — Sniper | ◒ | Radian arcs | Slow, heavy single-target shots at long range; highest base damage | Star 2 |
 | Matrix | ⊞ | Vectors & dot product | **Paired** tower system — fires nothing alone; base damage = dot product of the pair's grid-coordinate vectors; laser ramps damage the longer it locks on | Star 2 |
-| Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; the answer drives the effect — `±∞` gives max damage / heal, `±C` scales, `0` removes the tower (no refund), any non-limit constant disables it | Star 3 |
+| Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; answer drives the effect — `+∞` instakills every enemy in range (bypasses defensive caps), `+C` (finite positive) scales damage by `\|C\| × 1.5`, any other answer (`0`, `−C`, `−∞`) deals chip damage (`effectiveDamage × 0.10 × 1.5`) | Star 3 |
 | Calculus | ∫ | Derivatives & integrals (power rule) | Player picks a polynomial and applies `d/dx` or `∫`; the resulting `C·xⁿ` spawns `floor(log2(C+1))` autonomous pets (capped log-curve, not raw C) whose behaviour is determined by `n` (homing, lifetime, AoE) | Star 3 |
 
 Each tower has Tier 2 / Tier 3 upgrades (+25%/+50% damage, +10%/+20% range, plus type-specific bonuses).
@@ -46,15 +46,15 @@ Ten enemy types with distinct counter-play. `killValue` (not gold reward) drives
 | Enemy | HP | Spd | Reward | Dmg | KV | Special |
 |---|---|---|---|---|---|---|
 | General | 30 | 2.0 | 15 | 1 | 10 | Baseline |
-| Fast | 15 | 4.0 | 10 | 1 | 5 | 2× speed, thin HP |
-| Strong | 120 | 1.0 | 40 | 2 | 25 | Tanky |
-| Split | 40 | 2.0 | 15 | 1 | 5 | On death splits into 2 smaller Generals |
-| Helper | 35 | 2.0 | 30 | 1 | 15 | Aura: +5 HP/s and +20% speed to allies in r=3 — **kill first** |
-| Regenerator | 80 | 1.5 | 35 | 2 | 20 | Regens 18 HP/s — needs burst damage |
-| Bulwark | 220 | 0.9 | 50 | 3 | 30 | Takes only **40%** of tower damage; pets and player effects bypass the cut |
+| Fast | 15 | 4.0 | 8 | 1 | 5 | 2× speed, thin HP |
+| Strong | 120 | 1.0 | 38 | 2 | 25 | Tanky |
+| Split | 40 | 2.0 | 8 | 1 | 5 | On death splits into 2 smaller Generals |
+| Helper | 35 | 2.0 | 23 | 1 | 15 | Aura: +5 HP/s and +20% speed to allies in r=3 — **kill first** |
+| Regenerator | 80 | 1.5 | 30 | 2 | 20 | Regens 18 HP/s — needs burst damage |
+| Bulwark | 220 | 0.9 | 45 | 3 | 30 | Takes only **40%** of tower damage; pets and player effects bypass the cut |
 | Swarmling | 12 | 3.2 | 6 | 1 | 4 | Takes only **35%** of tower damage; pets bypass the modifier |
-| Boss Type-A | 500 | 0.8 | 200 | 99 | 100 | 200-HP shield; spawns a General every 8 s |
-| Boss Type-B | 600 | 0.7 | 300 | 99 | 150 | 250-HP shield; spawns a Fast every 8 s; triggers **Chain Rule challenge** at ~50% HP — correct answer = massive bonus damage + 100 gold; wrong = boss heals |
+| Boss Type-A | 500 | 0.8 | 150 | 99 | 100 | 200-HP shield; spawns a General every 8 s |
+| Boss Type-B | 600 | 0.7 | 225 | 99 | 150 | 250-HP shield; spawns a Fast every 8 s; triggers **Chain Rule challenge** at ~50% HP — correct answer instakills the boss + 100 gold; wrong answer = no heal, no penalty, boss returns to combat |
 
 ### Score formula
 
@@ -64,13 +64,13 @@ Computed in WASM (`compute_total_score` in `wasm/math_engine.c`) so the server c
 activeTime = max(0.001, timeTotal − Σ(time spent in Build Phase))
 S1         = killValue / activeTime                  (kill rate)
 S2         = killValue / costTotal       if costTotal > 0 else 0
-K          = 0.7·S1 + 0.3·S2   if S1 ≥ S2            (efficiency-weighted)
-             0.5·S1 + 0.5·S2   otherwise             (balanced)
-exponent   = 1 / max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer))
+alpha      = S1 / (S1 + S2)             if S1 + S2 > 0 else 0
+K          = alpha·S1 + (1 − alpha)·S2               (continuous blend)
+exponent   = 1 / sqrt(max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer)))
 TotalScore = max(0, K)^exponent                      (killValue = 0 → K = 0 → score = 0)
 ```
 
-Edge cases: no towers built (`costTotal = 0`) → `S2 = 0` and a 30% penalty (`K = 0.7·S1`); sitting in Build forever does not pad the timer.
+Edge cases: no towers built (`costTotal = 0`) → `S2 = 0`, alpha = 1, `K = S1` (no penalty); sitting in Build forever does not pad the timer.
 
 ### Monty Hall event
 
