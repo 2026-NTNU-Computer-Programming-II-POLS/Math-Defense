@@ -59,11 +59,11 @@ function makeRenderer(ctx: CanvasRenderingContext2D): Renderer {
     stoneDark: '#7a8da8',
     stoneLight: '#8ea1bd',
     axis: '#ffd700',
-    boardBase: '#E8EFF5',
-    boardBaseAlt: '#DCE5ED',
+    boardBase: '#DCE5ED',
+    boardBaseAlt: '#E8EFF5',
     boardAxis: '#ADA284',
     gridLine: 'rgba(79, 74, 72, 0.18)',
-    forbiddenFill: '#E8EFF5',
+    forbiddenFill: '#DCE5ED',
     forbiddenHatch: 'rgba(122, 141, 168, 0.55)',
   }
   return { ctx, palette } as unknown as Renderer
