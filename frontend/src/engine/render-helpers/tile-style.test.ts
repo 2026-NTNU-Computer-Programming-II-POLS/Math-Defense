@@ -16,11 +16,11 @@ describe('tileStyleFor', () => {
     expect(style.hatching).toBeFalsy()
   })
 
-  it('maps path to a solid border', () => {
+  it('maps path to a hatched style (prohibited, same as forbidden)', () => {
     const style = tileStyleFor('path')
-    expect(style.borderStyle).toBe('solid')
-    expect(style.border).toBeTypeOf('string')
-    expect(style.hatching).toBeFalsy()
+    expect(style.hatching).toBe(true)
+    expect(style.border).toBeUndefined()
+    expect(style.borderStyle).toBeUndefined()
   })
 
   it('returns a new style object per call (no shared mutable state)', () => {
