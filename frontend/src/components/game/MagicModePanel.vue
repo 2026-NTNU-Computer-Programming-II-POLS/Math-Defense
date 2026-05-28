@@ -27,10 +27,14 @@ const sliderExpression = computed(() => `${coeffA.value}*x^2 + ${coeffB.value}*x
 
 const tower = computed(() => {
   // Engine towers are plain objects; depend on towerUpgradeTick so this
-  // computed re-runs when magic mode / configured flips (see gameStore).
+  // computed re-runs when magic mode / configured flips (see gameStore). The
+  // snapshot spread yields a NEW reference each tick so Vue re-renders the
+  // mode toggle's active state — returning the mutated engine object directly
+  // would compare equal by identity and the highlight would never move.
   void gameStore.towerUpgradeTick
   const engine = gameStore.getEngine()
-  return engine?.towers.find((t) => t.id === props.towerId) ?? null
+  const t = engine?.towers.find((t) => t.id === props.towerId)
+  return t ? { ...t } : null
 })
 
 const inputExpr = ref('')
@@ -89,12 +93,14 @@ const placeholder = computed(() => {
   return 'e.g. 2*x^2 - x + 5  (use * for multiply)'
 })
 
-watch(tower, (t) => {
-  inputExpr.value = t?.magicExpression ?? ''
+// Reset only when the panel switches to a different tower — keyed on towerId,
+// not the tower snapshot, so a mode toggle (which bumps towerUpgradeTick and
+// produces a fresh snapshot every tick) doesn't wipe an in-progress, not-yet-
+// applied expression or the slider coefficients.
+watch(() => props.towerId, () => {
+  inputExpr.value = tower.value?.magicExpression ?? ''
   error.value = ''
-  // Reset sliders when switching towers so a previous tower's coefficients
-  // don't bleed into a freshly-opened panel. The defaults match the
-  // identity polynomial f(x) = x², which is a sensible starting curve.
+  // The defaults match the identity polynomial f(x) = x², a sensible start.
   coeffA.value = 1
   coeffB.value = 0
   coeffC.value = 0
@@ -157,13 +163,15 @@ function toggleMode(mode: MagicMode) {
       <p class="section-label">Mode</p>
       <div class="mode-btns">
         <button
-          class="btn"
+          class="btn mode-btn mode-btn--debuff"
           :class="{ active: tower.magicMode === 'debuff' }"
+          :aria-pressed="tower.magicMode === 'debuff'"
           @click="toggleMode('debuff')"
         >Debuff Zone</button>
         <button
-          class="btn"
+          class="btn mode-btn mode-btn--buff"
           :class="{ active: tower.magicMode === 'buff' }"
+          :aria-pressed="tower.magicMode === 'buff'"
           @click="toggleMode('buff')"
         >Buff Zone</button>
       </div>
@@ -254,15 +262,25 @@ function toggleMode(mode: MagicMode) {
 .hint { font-size: var(--text-2xs); color: var(--charcoal-soft); margin: 0; }
 .fn-locked { color: var(--clay-deep); opacity: 0.85; text-decoration: line-through; }
 .error-msg { font-size: var(--text-xs); color: var(--clay-deep); margin: 0; }
-/* Magic mode toggle — Debuff = dark purple, Buff = light purple. Pure text
-   labels; the inactive option fades to 0.55, the active one gains a purple
-   glow ring. Layout/padding identical so only the purple shade differs. */
+/* Magic mode toggle — both options share one style; only the hue differs,
+   carried by the per-button `--mode-c*` custom properties. A radio-style dot
+   (hollow → filled) plus an outline ring is the toggle indicator so the active
+   mode is unambiguous. */
 .mode-btns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
-.mode-btns .btn {
+.mode-btn {
+  --mode-c: var(--tw-magic-debuff);
+  --mode-c-deep: var(--tw-magic-debuff-deep);
+  --mode-c-soft: var(--tw-magic-debuff-soft);
+  gap: 6px;
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 8px 10px;
+  min-height: 0;
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
+  background: #fff;
+  color: var(--charcoal);
+  box-shadow: none;
   cursor: pointer;
   transition: all 0.14s ease;
   text-transform: none;
@@ -272,23 +290,36 @@ function toggleMode(mode: MagicMode) {
   white-space: normal;
   min-width: 0;
 }
-.mode-btns .btn:first-child {
-  background: linear-gradient(135deg, var(--tw-magic-debuff), var(--tw-magic-debuff-soft));
-  color: #fff;
-  border: 1px solid var(--tw-magic-debuff-deep);
+.mode-btn--buff {
+  --mode-c: var(--tw-magic-buff);
+  --mode-c-deep: var(--tw-magic-buff-deep);
+  --mode-c-soft: var(--tw-magic-buff-soft);
 }
-.mode-btns .btn:last-child {
-  background: linear-gradient(135deg, var(--tw-magic-buff), var(--tw-magic-buff-soft));
-  color: var(--tw-magic-buff-deep);
-  border: 1px solid var(--tw-magic-buff-deep);
+/* Radio-style toggle indicator. */
+.mode-btn::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--mode-c-deep);
+  background: transparent;
+  transition: background 0.14s ease;
 }
-.mode-btns .btn:hover { filter: brightness(1.06); }
-.mode-btns .btn:not(.active) { opacity: 0.55; }
-.mode-btns .btn:first-child.active {
-  box-shadow: 0 0 0 2px var(--tw-magic-debuff-soft), 0 4px 12px rgba(94, 74, 120, 0.32);
+.mode-btn:hover {
+  border-color: var(--mode-c-deep);
+  background: #fff;
+  transform: none;
+  box-shadow: none;
 }
-.mode-btns .btn:last-child.active {
-  box-shadow: 0 0 0 2px var(--tw-magic-buff-deep), 0 4px 12px rgba(140, 122, 168, 0.32);
+.mode-btn.active {
+  border-color: var(--mode-c-deep);
+  background: var(--mode-c-soft);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--mode-c-deep);
+}
+.mode-btn.active::before {
+  background: var(--mode-c-deep);
 }
 .slider-fn-input { gap: 6px; }
 /* Slider label carries the live a·x²+b·x+c formula — keep it readable

@@ -4,7 +4,7 @@
  * tower / game internals.
  */
 import { GamePhase, ANIM, TowerType } from '@/data/constants'
-import { TOWER_DEFS } from '@/data/tower-defs'
+import { TOWER_DEFS, MAGIC_MODE_COLORS } from '@/data/tower-defs'
 import { seedFor } from '@/math/seededRandom'
 import { selectRadarTargets, radarTargetCount } from '@/domain/combat/RadarTargeting'
 import { effectiveCooldown } from '@/entities/tower-stats'
@@ -79,7 +79,11 @@ export function projectTowerScene(game: Game): TowerSceneView {
       x: t.x,
       y: t.y,
       type: t.type,
-      color: t.color,
+      // Magic towers render in their mode colour (debuff/buff) so the body
+      // matches the zone band and mode toggle; all other towers use def colour.
+      color: t.type === TowerType.MAGIC && t.magicMode
+        ? MAGIC_MODE_COLORS[t.magicMode]
+        : t.color,
       configured: t.configured,
       disabled: t.disabled,
       glyph: TOWER_DEFS[t.type].glyph,

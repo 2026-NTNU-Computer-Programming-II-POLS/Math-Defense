@@ -28,6 +28,15 @@ function validateTowerDefs(defs: Record<string, TowerDef>): void {
 
 export type MagicMode = 'debuff' | 'buff'
 
+// On-canvas hue for a Magic tower per mode — mirrors the --tw-magic-debuff /
+// --tw-magic-buff design tokens (variables.css) so the placed tower body, its
+// zone-of-effect band, and the mode toggle all read as the same colour. A
+// Magic tower's render colour is mode-driven rather than the static def colour.
+export const MAGIC_MODE_COLORS: Record<MagicMode, string> = {
+  debuff: '#8A75A8', // --tw-magic-debuff
+  buff:   '#C8B5DA', // --tw-magic-buff
+}
+
 // Math discipline a tower's mechanic belongs to. Drives the TowerBar category
 // filter chips; also available to any future UI/curriculum surface that wants
 // to group towers by topic (e.g. an in-game tutorial index).
