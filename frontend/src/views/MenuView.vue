@@ -211,15 +211,18 @@ const manualOpen = ref(false)
   margin-bottom: 22px;
 }
 
-/* Menu nav buttons read as a list: icon pinned to a fixed left column so
-   every label starts at the same x and lines up down the stack. */
+/* Menu nav buttons: icon pinned to the left (inset from the edge) while the
+   label stays centred across the full button width. */
 .menu-card .btn-stack > .btn {
-  justify-content: flex-start;
+  justify-content: center;
+  position: relative;
 }
 
 .menu-card .btn-stack > .btn .icon {
-  width: var(--space-5);
-  text-align: center;
+  position: absolute;
+  left: var(--space-12);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* ── Sections ── */
