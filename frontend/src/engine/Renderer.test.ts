@@ -40,7 +40,7 @@ function createCtxStub(): CanvasRenderingContext2D & { calls: string[] } {
     rect: noop,
     clip: noop,
     fill: noop,
-    stroke: noop,
+    stroke: record('stroke'),
     save: noop,
     restore: noop,
     setLineDash: noop,
@@ -140,13 +140,14 @@ describe('Renderer.drawGrid', () => {
   it('paints differently for different TileClass values (style delegation)', () => {
     const layout = makeLayout((gx) => (gx < 10 ? 'path' : 'buildable'))
     renderer.drawGrid(layout)
-    // The path branch paints fill (1 fillRect per path cell). The buildable
-    // branch paints fill + dotted strokeRect. So strokeRect count reflects
-    // buildable cells.
+    // Every tile fills its cell (fillRect). Bordered tiles stroke only the
+    // edges that face a different TileClass — so `stroke` fires for both
+    // path (solid border) and buildable (dotted border) cells once at least
+    // one cell of each region exists.
     const fillRects = ctx.calls.filter((c) => c.startsWith('fillRect')).length
-    const strokeRects = ctx.calls.filter((c) => c.startsWith('strokeRect')).length
+    const strokes = ctx.calls.filter((c) => c.startsWith('stroke')).length
     expect(fillRects).toBeGreaterThan(0)
-    expect(strokeRects).toBeGreaterThan(0)
+    expect(strokes).toBeGreaterThan(0)
   })
 
   it('falls back to a checkerboard when no layout is provided', () => {

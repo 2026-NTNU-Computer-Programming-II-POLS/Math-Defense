@@ -12,6 +12,19 @@ import type { SegmentedPath } from '@/domain/path/segmented-path'
 import { tileStyleFor, type TileStyle } from './render-helpers/tile-style'
 
 /**
+ * Which edges of a single tile should be stroked. Set when the neighbour
+ * across that edge is a different `TileClass` (or off-grid). Building this
+ * once per cell and passing it to `_applyTileStyle` lets contiguous regions
+ * read as one clean outline instead of a noisy grid of per-cell rectangles.
+ */
+interface TileEdges {
+  readonly top: boolean
+  readonly bottom: boolean
+  readonly left: boolean
+  readonly right: boolean
+}
+
+/**
  * Renderer palette. Two concerns live here:
  *
  *  1. Board ink (`boardBase` / `boardBaseAlt` / `boardAxis` / `gridLine` /
@@ -133,7 +146,7 @@ export class Renderer {
         const px = gameToCanvasX(gx) - half
         const py = gameToCanvasY(gy) - half
         if (layout) {
-          this._paintTile(px, py, layout.classify(gx, gy))
+          this._paintTile(px, py, gx, gy, layout.classify(gx, gy), layout)
         } else {
           ctx.fillStyle = (gx + gy) % 2 === 0 ? this.palette.boardBase : this.palette.boardBaseAlt
           ctx.fillRect(px, py, UNIT_PX, UNIT_PX)
@@ -196,8 +209,18 @@ export class Renderer {
    * this method owns the canvas-specific translation (hatching → diagonal
    * strokes, dotted borders → dashed `stroke`). Private so tests can stub
    * `drawGrid` end-to-end without re-implementing the paint protocol.
+   *
+   * Borders are drawn one edge at a time, and only on edges whose neighbour
+   * is a different `TileClass`. Without this, adjacent same-class cells each
+   * stroke their full rectangle, producing a noisy grid of dotted/solid
+   * boxes; with it, contiguous regions read as a single clean perimeter.
    */
-  private _paintTile(px: number, py: number, cls: TileClass): void {
+  private _paintTile(
+    px: number, py: number,
+    gx: number, gy: number,
+    cls: TileClass,
+    layout: LevelLayoutService,
+  ): void {
     const style = tileStyleFor(cls)
     // Forbidden cells source their base fill from the board palette so the
     // backdrop colour has a single source of truth. Path/buildable carry
@@ -205,10 +228,29 @@ export class Renderer {
     const effective = cls === 'forbidden'
       ? { ...style, fill: this.palette.forbiddenFill }
       : style
-    this._applyTileStyle(px, py, effective)
+
+    // Game y increases upward; canvas y increases downward. Hence the
+    // visually-top edge of a canvas cell faces game (gx, gy + 1).
+    const sameClass = (ngx: number, ngy: number): boolean => {
+      if (ngx < GRID_MIN_X || ngx > GRID_MAX_X) return false
+      if (ngy < GRID_MIN_Y || ngy > GRID_MAX_Y) return false
+      return layout.classify(ngx, ngy) === cls
+    }
+    const edges: TileEdges = {
+      top:    !sameClass(gx, gy + 1),
+      bottom: !sameClass(gx, gy - 1),
+      left:   !sameClass(gx - 1, gy),
+      right:  !sameClass(gx + 1, gy),
+    }
+
+    this._applyTileStyle(px, py, effective, edges)
   }
 
-  private _applyTileStyle(px: number, py: number, style: TileStyle): void {
+  private _applyTileStyle(
+    px: number, py: number,
+    style: TileStyle,
+    edges: TileEdges,
+  ): void {
     const { ctx } = this
     ctx.fillStyle = style.fill
     ctx.fillRect(px, py, UNIT_PX, UNIT_PX)
@@ -230,13 +272,49 @@ export class Renderer {
       ctx.restore()
     }
 
-    if (style.border && style.borderStyle) {
+    const anyEdge = edges.top || edges.bottom || edges.left || edges.right
+    if (style.border && style.borderStyle && anyEdge) {
       ctx.save()
       ctx.strokeStyle = style.border
       ctx.lineWidth = 1
-      ctx.setLineDash(style.borderStyle === 'dotted' ? [2, 3] : [])
       // Inset by 0.5 so the 1px stroke renders crisply on integer pixel rows.
-      ctx.strokeRect(px + 0.5, py + 0.5, UNIT_PX - 1, UNIT_PX - 1)
+      const x0 = px + 0.5
+      const y0 = py + 0.5
+      const x1 = px + UNIT_PX - 0.5
+      const y1 = py + UNIT_PX - 0.5
+
+      if (style.borderStyle === 'dotted') {
+        // Phase-align dashes to absolute canvas coords so adjacent cells'
+        // dotted outlines stitch together cleanly instead of resetting the
+        // dash rhythm every UNIT_PX. Canvas resets the dash phase on each
+        // moveTo, so horizontal and vertical edges need separate strokes
+        // with their own `lineDashOffset`.
+        const DASH = [2, 3] as const
+        const PERIOD = 5
+        ctx.setLineDash([...DASH])
+        if (edges.top || edges.bottom) {
+          ctx.lineDashOffset = x0 % PERIOD
+          ctx.beginPath()
+          if (edges.top)    { ctx.moveTo(x0, y0); ctx.lineTo(x1, y0) }
+          if (edges.bottom) { ctx.moveTo(x0, y1); ctx.lineTo(x1, y1) }
+          ctx.stroke()
+        }
+        if (edges.left || edges.right) {
+          ctx.lineDashOffset = y0 % PERIOD
+          ctx.beginPath()
+          if (edges.left)  { ctx.moveTo(x0, y0); ctx.lineTo(x0, y1) }
+          if (edges.right) { ctx.moveTo(x1, y0); ctx.lineTo(x1, y1) }
+          ctx.stroke()
+        }
+      } else {
+        ctx.setLineDash([])
+        ctx.beginPath()
+        if (edges.top)    { ctx.moveTo(x0, y0); ctx.lineTo(x1, y0) }
+        if (edges.bottom) { ctx.moveTo(x0, y1); ctx.lineTo(x1, y1) }
+        if (edges.left)   { ctx.moveTo(x0, y0); ctx.lineTo(x0, y1) }
+        if (edges.right)  { ctx.moveTo(x1, y0); ctx.lineTo(x1, y1) }
+        ctx.stroke()
+      }
       ctx.restore()
     }
   }
