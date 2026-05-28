@@ -89,7 +89,7 @@ function setMode(mode: TargetingMode) {
 
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -107,6 +107,11 @@ function setMode(mode: TargetingMode) {
   font-family: var(--font-mono);
   transition: border-color 0.15s, background 0.15s, color 0.15s;
   min-height: 44px;
+  /* "STRONGEST" uppercased with letter-spacing in a 4-col grid inside the
+     320px drawer overflows by ~30px because the single word can't break.
+     Allow mid-word wrap as the safety valve. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .mode-btn:hover {
