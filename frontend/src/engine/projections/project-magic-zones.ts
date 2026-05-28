@@ -27,6 +27,7 @@ export function projectMagicZones(game: Game): MagicZoneView[] {
       y: tower.y,
       range: tower.effectiveRange,
       mode,
+      color: tower.color,
       curve,
       zoneHalfWidth,
     })

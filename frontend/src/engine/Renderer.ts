@@ -48,7 +48,7 @@ interface TileEdges {
 export interface RendererPalette {
   /** Tower instrument structure stroke (legacy name; not the board's base). */
   readonly stoneDark: string
-  /** Tower base-plate fill + soft accents (legacy name; not the board's alt). */
+  /** Tower base-plate fill — light blue (legacy name; not the board's alt). */
   readonly stoneLight: string
   /** Tower keyboard-focus halo (legacy name; not the board axis colour). */
   readonly axis: string
@@ -75,7 +75,7 @@ export interface RendererPalette {
 const BOARD_PALETTE: RendererPalette = Object.freeze({
   // Tower ink — restored to legacy values so TowerRenderer keeps its bite.
   stoneDark: '#7a8da8',
-  stoneLight: '#8ea1bd',
+  stoneLight: '#A8BCCB',  // --terracotta : light-blue tower base-plate fill
   axis: '#ffd700',
   // Board ink — Morandi light re-skin.
   boardBase: '#E8EFF5',      // --cream-soft : no-layout checkerboard base

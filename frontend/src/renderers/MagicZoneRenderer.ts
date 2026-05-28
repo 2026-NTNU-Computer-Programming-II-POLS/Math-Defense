@@ -22,18 +22,16 @@ export class MagicZoneRenderer {
   }
 
   private _drawZone(ctx: CanvasRenderingContext2D, view: MagicZoneView): void {
-    const fillColor = view.mode === 'debuff'
-      ? 'rgba(168, 85, 247, 0.22)'
-      : 'rgba(64, 184, 144, 0.22)'
-    const strokeColor = view.mode === 'debuff'
-      ? 'rgba(168, 85, 247, 0.6)'
-      : 'rgba(64, 184, 144, 0.6)'
+    // The zone is tinted with the tower's own colour (hex-alpha suffixes, the
+    // same convention TowerRenderer / RadarRangeRenderer use) so the band
+    // matches the Magic instrument body and tower button. Debuff vs buff is
+    // still distinguished by the band width, not by hue.
+    const fillColor = `${view.color}38`
+    const strokeColor = `${view.color}99`
     // Visual Redesign Phase 5a: a brighter centerline traces the actual
     // function curve so the band reads as "f(x) plotted on a parchment scroll"
     // — matching the new Magic instrument body.
-    const centerColor = view.mode === 'debuff'
-      ? 'rgba(228, 192, 255, 0.95)'
-      : 'rgba(168, 240, 208, 0.95)'
+    const centerColor = view.color
 
     ctx.save()
     ctx.lineWidth = 2
