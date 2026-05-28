@@ -48,6 +48,16 @@ def mint_csrf_cookie(response) -> None:
         secure=settings.cookie_secure,
         samesite="lax",
         path="/",
+        # Match the refresh cookie's TTL. A session-scope csrf cookie (no
+        # max_age) dies on browser close while refresh_token survives for
+        # refresh_token_expire_days. The asymmetry breaks the first POST
+        # /api/auth/refresh after a browser restart: H4 made /refresh
+        # CSRF-required when the refresh cookie is present, so a missing
+        # csrf cookie is a hard 403, which the frontend tryRefresh treats
+        # as session-expired. Double-submit security relies on the
+        # attacker not being able to read the cookie, not on rotation, so
+        # extending the lifetime is safe.
+        max_age=settings.refresh_token_expire_days * 86400,
     )
 
 
