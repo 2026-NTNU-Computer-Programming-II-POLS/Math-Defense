@@ -304,10 +304,6 @@ async function submit(): Promise<void> {
           </template>
         </div>
 
-        <p v-if="isLogin" class="demo-hint">
-          Demo Account: <code>demo@mathdefense.local</code> / <code>Demo1234</code>
-        </p>
-
         <div class="auth-foot">
           <button class="btn btn-ghost auth-block" @click="router.push('/')">
             ← Back to Menu
@@ -527,18 +523,6 @@ async function submit(): Promise<void> {
 
 .auth-switch a:hover {
   text-decoration: underline;
-}
-
-.demo-hint {
-  text-align: center;
-  font-size: var(--text-xs);
-  color: var(--muted);
-  margin: 0 0 14px;
-}
-
-.demo-hint code {
-  font-family: var(--font-mono);
-  color: var(--terracotta-deep);
 }
 
 .auth-foot {
