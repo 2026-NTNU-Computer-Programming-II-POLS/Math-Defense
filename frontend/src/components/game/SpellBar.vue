@@ -184,7 +184,7 @@ defineExpose({ castingSpell, castAtPosition })
   position: absolute;
   top: 2px;
   right: 3px;
-  font-size: 9px;
+  font-size: var(--text-2xs);
   line-height: 1;
   letter-spacing: -0.2px;
   color: var(--gold-deep);
