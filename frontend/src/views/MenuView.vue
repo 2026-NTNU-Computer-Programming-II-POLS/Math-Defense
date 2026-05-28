@@ -13,17 +13,23 @@ const manualOpen = ref(false)
 <template>
   <div class="menu-view">
     <div class="menu-hero">
-      <img
-        class="menu-logo"
-        src="/logo.png"
-        alt="Math Defense"
-        width="1069"
-        height="1389"
-      />
+      <div class="menu-logo-frame">
+        <img
+          class="menu-logo"
+          src="/logo.png"
+          alt="Math Defense"
+          width="1069"
+          height="1389"
+        />
+      </div>
       <p class="motto">Math is magic — defend the origin.</p>
     </div>
 
     <div class="card menu-card">
+      <span class="card-corner card-corner-tl" aria-hidden="true">✦</span>
+      <span class="card-corner card-corner-tr" aria-hidden="true">✦</span>
+      <span class="card-corner card-corner-bl" aria-hidden="true">✦</span>
+      <span class="card-corner card-corner-br" aria-hidden="true">✦</span>
       <button
         v-if="auth.isStudent || auth.isTeacher || !auth.isLoggedIn"
         class="btn btn-primary"
@@ -167,12 +173,74 @@ const manualOpen = ref(false)
   align-items: center;
 }
 
-.menu-logo {
-  display: block;
-  width: 220px;
-  height: auto;
-  max-width: 70vw;
+/* Magic-circle frame around the logo. Outer conic gold ring rotates
+   slowly; inner dashed ring counter-rotates. Both pause under
+   prefers-reduced-motion. */
+.menu-logo-frame {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  max-width: 64vw;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 14px;
+}
+
+.menu-logo-frame::before,
+.menu-logo-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.menu-logo-frame::before {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--gold) 60deg,
+    var(--gold-deep) 90deg,
+    transparent 180deg,
+    var(--gold) 240deg,
+    var(--gold-deep) 270deg,
+    transparent 360deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%, #000 100%);
+          mask: radial-gradient(circle, transparent 60%, #000 62%, #000 100%);
+  opacity: 0.8;
+  animation: menu-logo-ring-spin 30s linear infinite;
+}
+
+.menu-logo-frame::after {
+  inset: 14px;
+  border: 1px dashed var(--gold-border);
+  animation: menu-logo-ring-spin-rev 45s linear infinite;
+}
+
+.menu-logo {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 150px;
+  height: auto;
+  max-width: 50vw;
+}
+
+@keyframes menu-logo-ring-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes menu-logo-ring-spin-rev {
+  to { transform: rotate(-360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-logo-frame::before,
+  .menu-logo-frame::after {
+    animation: none;
+  }
 }
 
 /* `.card`, `.motto` and the `.btn` family are shared primitives in
@@ -180,10 +248,38 @@ const manualOpen = ref(false)
    collides with a plainer in-canvas label of the same name. */
 
 .menu-card {
+  position: relative;
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
+  border: 1.5px solid var(--gold-deep);
 }
+
+/* Inner dashed ring — second stroke of the double-border. Sits inside
+   .card's padding so content isn't covered. */
+.menu-card::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed var(--gold-border);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.card-corner {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1;
+  color: var(--gold-deep);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 1;
+}
+.card-corner-tl { top: 10px; left: 14px; }
+.card-corner-tr { top: 10px; right: 14px; }
+.card-corner-bl { bottom: 10px; left: 14px; }
+.card-corner-br { bottom: 10px; right: 14px; }
 
 /* The first .section-label inside each .menu-section has margin-top: 0,
    so the Start Game button would otherwise sit flush against "PROGRESSION".
