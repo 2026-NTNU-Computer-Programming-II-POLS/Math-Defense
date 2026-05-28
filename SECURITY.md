@@ -187,7 +187,7 @@ The following values must be set via environment variables or an `.env` file and
 | `TOTP_ENCRYPTION_KEY` | Fernet key (32 url-safe base64-encoded bytes) encrypting TOTP secrets at rest. Validated by `verify_key_configured()` at startup; boot fails fast if missing or malformed |
 | `PROXY_MODE` / `TRUSTED_PROXY_IPS` | When the backend runs behind nginx, set `PROXY_MODE=true` and list the proxy's IPs/CIDR blocks (e.g. `172.16.0.0/12`) so the rate limiter keys on the real client IP via `X-Forwarded-For` |
 
-The application logs which source supplied `SECRET_KEY` (environment variable or `.env` file) at startup so that operators can confirm the correct secret was loaded. Changing the secret key invalidates all issued JWTs immediately.
+The application detects whether `SECRET_KEY` came from the process environment or an `.env` file at startup and logs a one-line confirmation that the key was loaded; missing values are logged at `ERROR` (and Pydantic also raises before the log line is reached). Changing the secret key invalidates all issued JWTs immediately.
 
 **Important for operators**: The `.env` file must not be committed to version control. The repository provides a `.env.example` template with placeholder values. If real credentials have ever been committed to your repository's history, they should be treated as compromised and rotated, and the history should be cleaned with a tool such as `git-filter-repo`.
 

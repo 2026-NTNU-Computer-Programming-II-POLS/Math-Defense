@@ -105,10 +105,17 @@ class SessionEnd(BaseModel):
     # F-BUG-6: ``score`` is now optional. The frontend stopped sending a
     # client-computed value because the backend recomputes (`_verify_score`)
     # the canonical total from V2 inputs anyway, and trusting the client
-    # opens a Burp-replay path onto the leaderboard. Old clients (and
-    # tests) may still submit a value; we accept it for backward compat
-    # but the service ignores it for scoring purposes.
-    score: int = Field(default=0, ge=SCORE_MIN, le=SCORE_MAX)
+    # opens a Burp-replay path onto the leaderboard.
+    #
+    # Default is None (not 0): the modern V2 client omits the field entirely,
+    # and the application service substitutes ``session.score`` (the latest
+    # PATCHed in-flight value) when this is None. The previous ``default=0``
+    # silently turned every legitimate V2 end-of-game into a 422 via the
+    # aggregate's "must not be less than last reported" guard whenever any
+    # WAVE_END sync had succeeded (i.e. always, on a normal network). Legacy
+    # v1 clients (and tests) that DO submit a value still take that path;
+    # omitting it cleanly falls back to the server-authoritative score.
+    score: int | None = Field(default=None, ge=SCORE_MIN, le=SCORE_MAX)
     kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
     waves_survived: int = Field(ge=WAVES_MIN, le=WAVES_MAX)
 

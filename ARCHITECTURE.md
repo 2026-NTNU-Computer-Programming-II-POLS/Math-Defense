@@ -1,7 +1,7 @@
 # Math Defense — System Architecture
 
 > Comprehensive architecture reference for the Math Defense educational tower-defense game.
-> Generated 2026-05-08, refreshed 2026-05-16 from a full audit of source, schema, and deployment configuration.
+> Generated 2026-05-08, refreshed 2026-05-28 from a full audit of source, schema, and deployment configuration.
 
 This document describes the system from four complementary angles:
 
@@ -18,8 +18,8 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 
 | Path | Role |
 |---|---|
-| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~83 Vitest files. |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (43 migrations), ~28 pytest files. |
+| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~84 Vitest files. |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (45 migrations), ~30 pytest files. |
 | `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). Sources: `math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`, `Makefile`. |
 | `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
 | `shared/` | `game-constants.json` (canvas/grid/economy single source of truth) + `score_parity_fixtures.json` (cross-language score-formula fixtures). |
@@ -63,7 +63,7 @@ flowchart TB
         Infra --> Domain
     end
 
-    DB[("PostgreSQL 16<br/>Alembic: 43 migrations<br/>~23 tables")]
+    DB[("PostgreSQL 16<br/>Alembic: 45 migrations<br/>~23 tables")]
     Shared[/"shared/game-constants.json<br/>(parity-tested)"/]
 
     Client -- HTTPS --> Nginx
@@ -210,7 +210,7 @@ flowchart TB
     end
 
     subgraph Terr["Territory Context"]
-        GTA["GrabbingTerritoryActivity<br/>(deadline · settled)"]
+        GTA["GrabbingTerritoryActivity<br/>(deadline · settled ·<br/>student_slot_cap 1–50)"]
         TS[TerritorySlot]
         TO[TerritoryOccupation<br/>optimistic locking]
         TSU[TerritorySessionUse<br/>replay guard]
@@ -350,7 +350,7 @@ flowchart TB
         LbCmp[leaderboard/PersonalTimeline]
     end
 
-    subgraph Composables["Composables (~20 use*.ts)"]
+    subgraph Composables["Composables (20 use*.ts)"]
         Lifecycle["useGameLoop · useSessionSync · useStartRun · useEngineUiBridges · useEngineAudio · useUiAudio"]
         Auth["useAuth · useTokenProbe"]
         UI["useCanvasPlot · useKeyboardPlacement · useCountdown · useFirstEncounterCards · usePrincipleOverlay · useChallengePreviewPreference · useManual · useReducedMotion · useValuePop"]
@@ -432,6 +432,7 @@ flowchart TB
         IER[ImpactEffectRenderer]
         DPR[DeathParticleRenderer]
         TLR[TowerLifecycleRenderer]
+        LBR[LimitBurstRenderer]
         Prim[primitives.ts<br/>shared draw helpers]
     end
 
@@ -732,10 +733,10 @@ Normal · Fast · Tank · Split · Invisible · Boss-A (airborne, spawns minions
 | System | Mechanism | Persistence |
 |---|---|---|
 | Achievements | 29 definitions across 6 categories (combat, scoring, survival, efficiency, exploration, territory) | `user_achievements` (talent points awarded) |
-| Talent Tree | 26 nodes (19 base + 7 tier-2) / 7 tower types / prereq chains (incl. `prerequisite_max_levels` for tier-2) | `talent_allocations` |
+| Talent Tree | 26 nodes (19 base + 7 tier-2) / 7 tower types / prereq chains (incl. `prerequisite_max_levels` for tier-2); frontend renders per-tower mini-trees in a 2-column grid with tower-color theming and dashed borders on tier-2 nodes | `talent_allocations` |
 | Seasons | Time-windowed multipliers on talent points | `seasons` |
 | Leaderboard | Per-star DENSE_RANK + global rank | `leaderboard_entries` |
-| Grabbing Territory | Teacher activity, students seize slots by score | `territory_*` (optimistic locking) |
+| Grabbing Territory | Teacher activity (per-activity `student_slot_cap`, 1–50); students seize slots by score | `territory_*` (optimistic locking) |
 | Stealth Assessment | Beta-Bernoulli posteriors per Q-matrix evidence | `user_competency_state` |
 | Empirical Validity Probe | A/B groups; pre/post/delay forms; affect surveys | `study_*` (CSV export for analysis) |
 
@@ -851,14 +852,14 @@ All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~28 test files)
+### Backend (pytest, ~30 test files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
 - **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
 
-### Frontend (Vitest + happy-dom, ~83 test files)
+### Frontend (Vitest + happy-dom, ~84 test files)
 
 - Engine systems, GameState and PhaseStateMachine.
 - Domain policies (split, level-generator, path-validator, placement-policy).
@@ -889,6 +890,7 @@ All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::
 | Reflection text post-session | Articulation prompt; logged but not scored. |
 | Bayesian competency state | Stealth assessment without explicit probes per session; informs adaptive recommendations. |
 | Scoring duplicated client and server | Server is canonical for anti-cheat; client mirror keeps UX live. |
+| Visual Redesign (Phases 0–7 + Spell Re-skin 0–2) | Math-instrument tower silhouettes, glyph-body enemies, cyan-fringe pets, gold-fringe spell glyphs; all motion-heavy effects gated behind `useReducedMotion`. |
 
 ---
 
@@ -914,18 +916,18 @@ backend/
     application/                 # 15 *_service.py + ports.py + mappers.py
                                  # session_event_handlers.py wires SessionCompleted consumers
     infrastructure/
-      persistence/               # SqlAlchemy*Repository (15 files)
+      persistence/               # SqlAlchemy*Repository (16 files)
       unit_of_work.py
       login_guard.py   token_denylist.py   audit_logger.py
       email_service.py   scheduler.py   spectate_hub.py
       wasm_runtime.py            # wasmtime-py singleton, hosts math_engine.wasm
-    models/                      # SQLAlchemy ORM models (23 files, ~23 tables)
+    models/                      # SQLAlchemy ORM models (22 files, ~23 tables)
     routers/                     # FastAPI routers (13 thin adapters: achievement, admin, assessment,
                                  # auth, challenge, class_, game_session, leaderboard, recommendation,
                                  # replay, study, talent, territory)
     schemas/                     # Pydantic DTOs
-  alembic/                       # 43 migrations
-  tests/                         # ~28 pytest files
+  alembic/                       # 45 migrations
+  tests/                         # ~30 pytest files
 
 frontend/
   src/
@@ -934,21 +936,21 @@ frontend/
     stores/                      # Pinia: auth, game, talent, territory, ui
     views/                       # 26 page-level .vue files
     components/                  # common, layout, game (28 .vue), teacher, territory, leaderboard
-    composables/                 # ~20 use*.ts (lifecycle, auth, UI, data)
-    services/                    # api.ts + 17 per-domain clients
+    composables/                 # 20 use*.ts (lifecycle, auth, UI, data)
+    services/                    # api.ts + 18 per-domain clients
     engine/                      # Game.ts, GameState, PhaseStateMachine, EventBus,
                                  # Renderer, InputManager, register-systems,
                                  # audio/, event-handlers/, projections/,
                                  # render-helpers/, replay/
     systems/                     # 17 ECS-style systems (sibling of engine/)
-    renderers/                   # 12 canvas renderers + primitives.ts
+    renderers/                   # 13 canvas renderers + primitives.ts
     domain/                      # pure rules: combat, level, movement, path, placement,
                                  # scoring, study, wave
     math/                        # WasmBridge, MathUtils, evaluators, wasm/
     entities/                    # Tower/Enemy/Projectile/Pet types + factories
     data/                        # tower-defs, enemy-defs, achievement-defs, talent-defs, ...
     lib/   utils/   styles/      # misc helpers, shared utilities, global CSS
-  tests/                         # Vitest suites (~83 files including in-tree *.test.ts)
+  tests/                         # Vitest suites (~84 files including in-tree *.test.ts)
 
 wasm/                            # C99 sources (math_engine.c, prng.c/h, curve.c/h, level_gen.c/h) + Makefile (Emscripten)
 emsdk/                           # vendored toolchain

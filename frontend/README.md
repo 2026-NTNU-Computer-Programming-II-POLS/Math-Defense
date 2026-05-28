@@ -59,8 +59,11 @@ frontend/
 │   │   ├── common/
 │   │   │   ├── Modal.vue           Generic modal wrapper
 │   │   │   ├── ManualModal.vue     In-game manual modal (renders markdown from `public/manual/`)
-│   │   │   ├── MathDisplay.vue     KaTeX renderer wrapper
-│   │   │   └── LevelCard.vue       Level-selection card (emits 'select')
+│   │   │   ├── ManualModal.css     Manual modal styles (extracted from .vue)
+│   │   │   └── MathDisplay.vue     KaTeX renderer wrapper
+│   │   ├── layout/
+│   │   │   ├── AppShell.vue        Top-level app chrome (nav, header) wrapping router-view
+│   │   │   └── GlobalBackground.vue Procedural background; suppressed via `meta.hideGlobalBg`
 │   │   ├── game/
 │   │   │   ├── HUD.vue             Two-row HUD: star rating, kill value, IA indicator,
 │   │   │   │                       Monty Hall progress bar, spell bar, buff icons, prep timer
@@ -68,6 +71,8 @@ frontend/
 │   │   │   ├── StartWaveButton.vue Player-paced "Start Wave" control shown during BUILD
 │   │   │   ├── GameSpeedPanel.vue  Runtime game-speed multiplier control (×0.5 / ×1 / ×2 / ×3)
 │   │   │   ├── WaveForecast.vue    Build-phase preview of upcoming wave composition
+│   │   │   ├── WaveBanner.vue      Wave start/end banner overlay
+│   │   │   ├── PhaseFader.vue      Visual phase-transition fade overlay (reduced-motion aware)
 │   │   │   ├── BuildPanel.vue      Thin wrapper — delegates to TowerInfoPanel
 │   │   │   ├── TowerInfoPanel.vue  Unified stats + type-specific panel + upgrade button
 │   │   │   ├── BuildHint.vue       First-time placement hints
@@ -75,6 +80,7 @@ frontend/
 │   │   │   ├── ShopPanel.vue       In-BUILD shop for time-based buffs
 │   │   │   ├── SpellBar.vue        Spell cooldown buttons (Fireball / Frost Nova / Lightning / Haste)
 │   │   │   ├── SpellIcon.vue       Single spell icon (cooldown ring + glyph)
+│   │   │   ├── spell-icon-defs.ts  Spell glyph SVG path lookup used by `SpellIcon`
 │   │   │   ├── MagicModePanel.vue  Magic tower: function curve selection
 │   │   │   ├── RadarConfigPanel.vue Radar tower: arc start/end/restrict config
 │   │   │   ├── MatrixPairPanel.vue  Matrix tower: pair selection
@@ -115,6 +121,9 @@ frontend/
 │   │   ├── useCanvasPlot.ts              Canvas plotting helper for KaTeX-adjacent function previews
 │   │   ├── useAuth.ts                    Reactive auth helpers (email-based; role checks)
 │   │   ├── useLeaderboard.ts             Leaderboard fetch helpers
+│   │   ├── useManual.ts                  Fetch + reactive state for the in-app Manual viewer
+│   │   ├── useReducedMotion.ts           `prefers-reduced-motion` reactive flag (gates VFX / fades)
+│   │   ├── useValuePop.ts                Brief scale/colour pop animation hook for numeric readouts
 │   │   └── useKeyboardPlacement.ts       Arrow-key + Enter tower placement (WCAG 2.2 SC 2.1.1 — pointer-free)
 │   │
 │   ├── stores/                     Pinia stores (Vue reactivity layer)
@@ -156,6 +165,8 @@ frontend/
 │   ├── utils/
 │   │   ├── formatters.ts           Centralised presentation formatters (formatScore, etc.)
 │   │   ├── parseHistoryState.ts    Safely parse `history.state` payloads used by router guards
+│   │   ├── manualSections.ts       Markdown → section tree transform consumed by `useManual`
+│   │   ├── reducedMotion.ts        Static reduced-motion query helper used outside Vue setup scope
 │   │   └── simpleMarkdown.ts       Minimal markdown → HTML renderer used by `ManualModal`
 │   │
 │   ├── engine/                     Core engine — pure TS, no Vue imports
@@ -165,6 +176,7 @@ frontend/
 │   │   ├── EventBus.ts             Generic, type-safe pub/sub
 │   │   ├── InputManager.ts         Canvas mouse → game-unit coord events
 │   │   ├── Renderer.ts             Canvas-2D drawing primitives
+│   │   ├── ShakeController.ts      Decaying screen-shake controller (driven by combat/death events; reduced-motion aware)
 │   │   ├── register-systems.ts     Single place that constructs + registers every engine system
 │   │   ├── level-context.ts        Per-level runtime context (curve path, movement strategy, tile style)
 │   │   ├── generated-level-context.ts  Per-level runtime context for procedurally generated curves
@@ -180,7 +192,8 @@ frontend/
 │   │   │   ├── project-matrix-lasers.ts
 │   │   │   └── project-path-panel.ts   Path-panel viewport projection (world → screen pixels)
 │   │   ├── render-helpers/
-│   │   │   └── tile-style.ts           Tile-appearance lookup shared by grid + placement preview
+│   │   │   ├── tile-style.ts           Tile-appearance lookup shared by grid + placement preview
+│   │   │   └── clip-to-board.ts        Canvas-clip helper that masks effects to the play-grid rect
 │   │   ├── audio/                  HTMLAudioElement-based SFX layer
 │   │   │   ├── AssetManager.ts     Lazy-loaded clips, bus mix (music / sfx / ui), polyphony cap, jitter, crossfade
 │   │   │   └── sfx-defs.ts         SFX slug → URL + bus + mix params (see frontend/public/audio/)
@@ -191,7 +204,8 @@ frontend/
 │   │
 │   ├── domain/                     Domain policies (shared across systems)
 │   │   ├── combat/
-│   │   │   └── SplitPolicy.ts          Single source for Split enemy split rules
+│   │   │   ├── SplitPolicy.ts          Single source for Split enemy split rules
+│   │   │   └── RadarTargeting.ts       Shared Radar targeting-mode selection (closest/strongest/first/last)
 │   │   ├── level/
 │   │   │   ├── level-generator.ts      Reverse-endpoint curve generation algorithm
 │   │   │   ├── decoy-generator.ts      Decoy curve generation for Initial Answer screen
@@ -244,14 +258,18 @@ frontend/
 │   │
 │   ├── renderers/                  Draw entities to canvas (read-only state / projection input)
 │   │   ├── primitives.ts             Shared canvas primitives (text badges, bars, rings)
-│   │   ├── EnemyRenderer.ts          HP bar, shield bar (blue), helper aura circle
-│   │   ├── TowerRenderer.ts
+│   │   ├── EnemyRenderer.ts          HP bar, shield bar (blue), helper aura circle, glyph-body sprites
+│   │   ├── TowerRenderer.ts          Math-instrument tower sprites (re-skinned in Visual Redesign)
+│   │   ├── TowerLifecycleRenderer.ts Tower place / upgrade / refund VFX bursts
 │   │   ├── ProjectileRenderer.ts
+│   │   ├── ImpactEffectRenderer.ts   Projectile impact spark/ring VFX
+│   │   ├── DeathParticleRenderer.ts  Enemy-death particle bursts (reduced-motion gated)
 │   │   ├── MagicZoneRenderer.ts      Function curve zone overlay
 │   │   ├── RadarRangeRenderer.ts     Arc + sweep visualisation
 │   │   ├── MatrixLaserRenderer.ts    Laser beam between matrix pair
-│   │   ├── PetRenderer.ts            Pet projectile sprites
-│   │   ├── SpellEffectRenderer.ts    Expanding circle VFX for spells
+│   │   ├── PetRenderer.ts            Pet projectile sprites (cyan-fringe re-skin)
+│   │   ├── LimitBurstRenderer.ts     Limit tower outcome burst (±∞ / ±C / 0 variants)
+│   │   ├── SpellEffectRenderer.ts    Expanding circle VFX for spells (gold-fringe spell glyphs)
 │   │   └── CombatFeedbackRenderer.ts Floating damage/heal numbers + hit flashes
 │   │
 │   ├── entities/
@@ -266,7 +284,9 @@ frontend/
 │   │   ├── wasm-exports.d.ts       Ambient type decl for the generated math_engine module
 │   │   ├── MathUtils.ts            Coordinate conversion, findIntersections, sector test
 │   │   ├── RandomUtils.ts          hashStr / mulberry32 — single source used by 4 consumers
+│   │   ├── seededRandom.ts         Seeded PRNG wrapper used by deterministic content generation
 │   │   ├── rational.ts             Exact rational arithmetic (used by Limit / Calculus question generation)
+│   │   ├── monomial.ts             Monomial algebra helpers (factoring, simplification)
 │   │   ├── curve-types.ts          CurveDefinition union (polynomial/trig/log), coefficient bounds
 │   │   ├── curve-evaluator.ts      evaluate / derivative / isInDomain / curveToLatex (5 families)
 │   │   ├── curve-renderer.ts       Accepts CoordTransform callback (no canvas import)
@@ -301,6 +321,7 @@ frontend/
 │   ├── avatars/                    SVG avatars (alchemist / archer / knight / mage / scholar / wizard)
 │   ├── manual/                     In-game manual markdown (`game-mechanics.md`, `towers-and-enemies.md`)
 │   ├── logo.png                    Math Defense brand mark — used as favicon + MenuView/AuthView hero
+│   ├── logo-V1.png                 Legacy V1 brand mark (kept for migration references)
 │   └── icons.svg
 │
 ├── scripts/                        Repo tooling (run via `npm run …`)
@@ -308,6 +329,8 @@ frontend/
 │   ├── event-registry-check.ts       Verifies every emitted event has a registered handler
 │   ├── lint-chinese-comments.ts      Fails the build if any source file contains Chinese comments
 │   ├── lint-determinism.ts           Static checks for non-deterministic primitives in engine code
+│   ├── no-raw-px.ts                  Fails the build on raw `font-size: NNpx` outside the `html` root anchor
+│   ├── verify-wasm.ts                Verifies the WASM binary loads + matches the JS-fallback parity surface
 │   └── synth-audio.py                Regenerates `public/audio/*.wav` from a CC0/synth recipe
 │
 ├── dev/                            Dev-only benches (excluded from prod test run)
@@ -620,9 +643,9 @@ generateLevelDeterministic(starRating, prngHandle, multiset)  // full rejection-
 | Path | Component | Guard |
 |---|---|---|
 | `/` | `MenuView` | — |
-| `/auth` | `AuthView` | Redirect to `/` if already logged in |
-| `/level-select` | `LevelSelectView` | Requires auth (student) |
-| `/initial-answer` | `InitialAnswerView` | Requires auth (student) |
+| `/auth` | `AuthView` | — |
+| `/level-select` | `LevelSelectView` | Requires auth |
+| `/initial-answer` | `InitialAnswerView` | Requires auth |
 | `/game` | `GameView` | Requires auth; `beforeEnter` rejects entry without a parsed `history.state.level` payload |
 | `/leaderboard` | `LeaderboardView` | Requires auth |
 | `/rankings` | `RankingsView` | Requires auth |
@@ -704,7 +727,7 @@ frontend dev ports are bound to `127.0.0.1` only in compose.
 
 ## Testing
 
-Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships ~83 test files spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships ~84 test files spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
 
 - **Engine units** — `EventBus`, `Game`, `PhaseStateMachine`, `Renderer`, `level-context`, `engine/audio/AssetManager`, `engine/projections/project-path-panel`, `engine/projections/project-enemies`, `engine/render-helpers/tile-style`, `engine/__tests__/determinism` (replay reproducibility from `rng_seed`).
 - **Domain** — `domain/combat/SplitPolicy`, `domain/level/{level-generator, level-layout-service, placement-policy, checkpoint}`, `domain/movement/{vertical, x-driven}-movement-strategy`, `domain/path/{path-builder, path-progress-tracker, path-validator, segmented-path}`, `domain/scoring/score-calculator.parity` (frontend ↔ backend formula parity), `domain/wave/wave-generator`.

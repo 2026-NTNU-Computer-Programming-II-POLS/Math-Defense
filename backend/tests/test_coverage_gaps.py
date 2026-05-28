@@ -251,7 +251,9 @@ class TestAbuseCases:
         )
         assert ok.status_code == 200
 
-        # Now jump by > 50_000 in a single patch — aggregate should reject
+        # Now jump by an amount that exceeds the per-level delta cap
+        # (max_score_delta_for(1) = 3334). The level_cap check (5000) would also
+        # 422 this, but the delta cap is the first wall the request hits.
         bad = client.patch(
             f"/api/sessions/{sid}",
             json={"score": 100 + 60_000},
@@ -270,16 +272,65 @@ class TestAbuseCases:
         )
         assert res.status_code == 422
 
+    def test_end_without_score_uses_in_flight_value(self, client):
+        """F-BUG-6 follow-up: modern V2 clients omit ``score`` in the end
+        payload (the server is authoritative). With the prior schema default
+        of 0, that omission tripped the aggregate's "must not be less than
+        last reported" guard on every legitimate V2 session whose
+        session.score was advanced by at least one WAVE_END sync."""
+        token = _register_and_token(client, "v2_end_no_score")
+        sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
+        # Simulate a successful WAVE_END sync raising the in-flight score.
+        ok = client.patch(f"/api/sessions/{sid}", json={"score": 1500}, headers=_auth(token))
+        assert ok.status_code == 200
+        # End payload omits ``score`` — must succeed, with session.score retained.
+        res = client.post(
+            f"/api/sessions/{sid}/end",
+            json={"kills": 10, "waves_survived": 1},
+            headers=_auth(token),
+        )
+        assert res.status_code == 200
+        assert res.json()["score"] == 1500
+
     def test_end_score_below_in_flight_rejected(self, client):
         token = _register_and_token(client, "abuse_end_lt_score")
         sid = client.post("/api/sessions", json={"star_rating": 1}, headers=_auth(token)).json()["id"]
-        client.patch(f"/api/sessions/{sid}", json={"score": 5_000}, headers=_auth(token))
+        # Patch must stay within the per-level update delta cap
+        # (max_score_delta_for(1) = 3334) so the in-flight score actually lands.
+        # The original value (5_000) was below the old flat 50_000 cap but
+        # exceeds the tightened L1 cap and would 422 here instead of at /end.
+        client.patch(f"/api/sessions/{sid}", json={"score": 2_000}, headers=_auth(token))
         res = client.post(
             f"/api/sessions/{sid}/end",
             json={"score": 100, "kills": 1, "waves_survived": 1},
             headers=_auth(token),
         )
         assert res.status_code == 422
+
+
+# ── 4b. Per-level delta cap helper (max_score_delta_for) ────────────────────
+
+
+class TestMaxScoreDeltaHelper:
+    """Direct unit coverage of ``max_score_delta_for`` so the per-level cap
+    formula doesn't quietly drift. Pure-Python — no DB needed."""
+
+    def test_per_level_values(self):
+        from app.domain.constraints import max_score_delta_for
+        # ceil(LEVEL_MAX_SCORES / LEVEL_MAX_WAVES) * 2 → see constraints.py
+        assert max_score_delta_for(1) == 3334
+        assert max_score_delta_for(2) == 5000
+        assert max_score_delta_for(3) == 6000
+        assert max_score_delta_for(4) == 20000
+        assert max_score_delta_for(5) == 33334
+
+    def test_unknown_level_falls_back_to_legacy_cap(self):
+        from app.domain.constraints import max_score_delta_for
+        assert max_score_delta_for(99) == 50_000
+
+    def test_export_matches_loosest_legitimate_value(self):
+        from app.domain.constraints import MAX_SCORE_DELTA, max_score_delta_for
+        assert MAX_SCORE_DELTA == max(max_score_delta_for(lv) for lv in range(1, 6))
 
 
 # ── 5. FK-cascade on user deletion ──────────────────────────────────────────
@@ -322,6 +373,21 @@ class TestUserDeletionCascade:
             assert lb[0].session_id is None
         finally:
             db.close()
+
+        # H5: the leaderboard query must still surface the anonymised row (it
+        # was vanishing pre-fix because every query INNER-JOINed User and
+        # filtered ``user_id IS NOT NULL`` — directly negating the SET NULL
+        # migration intent).
+        res = client.get("/api/leaderboard")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["total"] == 1
+        assert len(body["entries"]) == 1
+        entry = body["entries"][0]
+        assert entry["score"] == 333
+        # Anonymisation applies to unauthenticated viewers, but the deleted-user
+        # sentinel passes through unchanged (it isn't a real identifier).
+        assert entry["player_name"] == "Deleted User"
 
 
 # ── 6. Parametrised SessionStatus × command matrix ──────────────────────────

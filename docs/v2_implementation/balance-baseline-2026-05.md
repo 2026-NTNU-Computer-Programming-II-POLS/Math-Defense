@@ -13,8 +13,8 @@ Pulled from `backend/app/domain/constraints.py` at audit time. Phase 2's "Constr
 | Constant | Location | Current value |
 |---|---|---|
 | `TOTAL_SCORE_MAX` | `constraints.py:22` | `1_000_000.0` |
-| `MAX_SCORE_DELTA` (per-wave) | `constraints.py:44` | `50_000` |
-| `MAX_WAVE` | `constraints.py:43` | `30` |
+| `max_score_delta_for(level)` (per-PATCH cap) | `constraints.py` | `ceil(LEVEL_MAX_SCORES[level] / LEVEL_MAX_WAVES[level]) × 2` → L1 3334, L2 5000, L3 6000, L4 20000, L5 33334. Was a flat `MAX_SCORE_DELTA = 50_000`; the flat constant now resolves to the loosest of the per-level values (33334). |
+| `MAX_WAVE` | `constraints.py` | `30` |
 
 ### `LEVEL_MAX_SCORES` (constraints.py:50)
 

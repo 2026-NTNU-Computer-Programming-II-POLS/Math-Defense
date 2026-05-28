@@ -10,6 +10,7 @@ from app.domain.user.aggregate import User
 from app.factories import build_class_service, build_leaderboard_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, get_current_user_optional
+from app.infrastructure.persistence.leaderboard_repository import DELETED_USER_LABEL
 from app.schemas.leaderboard import (
     LeaderboardEntryOut,
     LeaderboardResponse,
@@ -51,12 +52,17 @@ def get_leaderboard(
     )
     # M-08: anonymize player names for unauthenticated viewers to avoid
     # exposing student identities in an educational context.
+    # H5: the DELETED_USER_LABEL sentinel is not a real user identifier, so
+    # anonymising it would just produce noise ("D**********r"). Pass it
+    # through unchanged.
     def _display_name(r) -> str:
         if current_user is not None:
             return r.player_name
         name = r.player_name
         if not name:
             return "*"
+        if name == DELETED_USER_LABEL:
+            return name
         if len(name) <= 2:
             return name[0] + "*"
         return name[0] + "*" * (len(name) - 2) + name[-1]

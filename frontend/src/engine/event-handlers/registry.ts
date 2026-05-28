@@ -41,7 +41,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'composables/useEngineAudio',        handler: 'anonymous', purpose: 'Trigger phase-transition SFX' },
     { module: 'composables/useEngineUiBridges',    handler: 'anonymous', purpose: 'Bridge phase changes to UI store' },
     { module: 'systems/TowerPlacementSystem',      handler: 'anonymous', purpose: 'Clear placement preview on phase change' },
-    { module: 'composables/useKeyboardPlacement',  handler: 'anonymous', purpose: 'Show/hide keyboard cursor on BUILD entry/exit (§19)' },
+    { module: 'composables/useKeyboardPlacement',  handler: 'anonymous', purpose: 'Refresh legal positions on BUILD entry / hide cursor on BUILD exit (§19; cursor lazy-shows on first arrow key, sticky thereafter)' },
   ],
   LEVEL_START: [
     { module: 'composables/useGameLoop',            handler: 'anonymous', purpose: 'Generate path function for the level' },

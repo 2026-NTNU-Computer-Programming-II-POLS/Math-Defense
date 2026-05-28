@@ -85,7 +85,17 @@ async def lifespan(_app: FastAPI):
         conn.execute(text("SELECT pg_advisory_lock(:id)"), {"id": _MIGRATION_LOCK_ID})
         try:
             cfg = Config(str(_ALEMBIC_INI))
-            command.upgrade(cfg, "head")
+            try:
+                command.upgrade(cfg, "head")
+            except Exception:
+                # Surface alembic failures (corrupt alembic_version row,
+                # missing revision, etc.) in the app log. Without this the
+                # exception propagates up through Starlette's lifespan and
+                # the container appears to hang "unhealthy" with no
+                # diagnostic — see also `alembic current` on the running
+                # container for the underlying revision-resolution error.
+                logger.exception("Alembic upgrade failed; aborting startup")
+                raise
             logger.info("Alembic: schema at head")
         finally:
             conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": _MIGRATION_LOCK_ID})

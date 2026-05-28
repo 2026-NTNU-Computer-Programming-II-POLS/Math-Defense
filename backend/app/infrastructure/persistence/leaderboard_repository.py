@@ -21,6 +21,17 @@ def _effective_score(model):
     return func.coalesce(model.total_score, cast(model.score, Float))
 
 
+# H5 fix (audit 2026-05-03): the migration `e5b2c9d4a1f7` deliberately set
+# leaderboard.user_id ON DELETE SET NULL so a deleted user's historical scores
+# survive (anonymised) rather than vanishing from the rankings. Pre-fix, every
+# leaderboard query filtered ``user_id IS NOT NULL`` and INNER JOINed User —
+# negating the migration: deleted-user entries disappeared from both COUNTs
+# and rows, and the dense-rank subquery excluded them too (deflating surviving
+# ranks). Queries now LEFT OUTER JOIN User, drop the IS NOT NULL filter, and
+# substitute this label when ``player_name`` is NULL.
+DELETED_USER_LABEL = "Deleted User"
+
+
 class SqlAlchemyLeaderboardRepository:
 
     def __init__(self, db: DbSession):
@@ -89,8 +100,9 @@ class SqlAlchemyLeaderboardRepository:
         """
         # Backlog §23: challenge runs live on their own ranking surface and must
         # not inflate the global / per-level leaderboards. Filter them out here.
+        # H5: deleted-user rows (user_id IS NULL, kept by ON DELETE SET NULL)
+        # are intentionally counted and shown as DELETED_USER_LABEL.
         count_q = self._db.query(func.count(LeaderboardEntryModel.id)).filter(
-            LeaderboardEntryModel.user_id.isnot(None),
             LeaderboardEntryModel.challenge_id.is_(None),
         )
         if level is not None:
@@ -104,7 +116,6 @@ class SqlAlchemyLeaderboardRepository:
         eff_main = _effective_score(LeaderboardEntryModel)
         higher_distinct = select(func.count(func.distinct(eff_l2))).where(
             eff_l2 > eff_main,
-            L2.user_id.isnot(None),
             L2.challenge_id.is_(None),
         )
         if level is not None:
@@ -119,9 +130,9 @@ class SqlAlchemyLeaderboardRepository:
             LeaderboardEntryModel.kills.label("kills"),
             LeaderboardEntryModel.waves_survived.label("waves_survived"),
             LeaderboardEntryModel.created_at.label("created_at"),
-            User.player_name.label("player_name"),
+            func.coalesce(User.player_name, DELETED_USER_LABEL).label("player_name"),
             rank_col,
-        ).join(User, LeaderboardEntryModel.user_id == User.id).filter(
+        ).outerjoin(User, LeaderboardEntryModel.user_id == User.id).filter(
             LeaderboardEntryModel.challenge_id.is_(None),
         )
         if level is not None:
@@ -164,12 +175,11 @@ class SqlAlchemyLeaderboardRepository:
         """Challenge-scoped DENSE_RANK — restricted to entries tagged with
         ``challenge_id``. Mirrors the pattern in ``_query_ranked`` but with a
         simple equality predicate instead of a level filter (Backlog §23.5)."""
+        # H5: keep rows whose user was deleted (user_id IS NULL); display as
+        # DELETED_USER_LABEL.
         count_q = (
             self._db.query(func.count(LeaderboardEntryModel.id))
-            .filter(
-                LeaderboardEntryModel.user_id.isnot(None),
-                LeaderboardEntryModel.challenge_id == challenge_id,
-            )
+            .filter(LeaderboardEntryModel.challenge_id == challenge_id)
         )
         total = count_q.scalar() or 0
         if total == 0:
@@ -182,7 +192,6 @@ class SqlAlchemyLeaderboardRepository:
             select(func.count(func.distinct(eff_l2)))
             .where(
                 eff_l2 > eff_main,
-                L2.user_id.isnot(None),
                 L2.challenge_id == challenge_id,
             )
         )
@@ -199,10 +208,10 @@ class SqlAlchemyLeaderboardRepository:
                 LeaderboardEntryModel.kills.label("kills"),
                 LeaderboardEntryModel.waves_survived.label("waves_survived"),
                 LeaderboardEntryModel.created_at.label("created_at"),
-                User.player_name.label("player_name"),
+                func.coalesce(User.player_name, DELETED_USER_LABEL).label("player_name"),
                 rank_col,
             )
-            .join(User, LeaderboardEntryModel.user_id == User.id)
+            .outerjoin(User, LeaderboardEntryModel.user_id == User.id)
             .filter(LeaderboardEntryModel.challenge_id == challenge_id)
         )
 
@@ -244,9 +253,12 @@ class SqlAlchemyLeaderboardRepository:
             .where(MembershipModel.class_id == class_id)
         )
 
+        # Class-scoped view: a deleted user is no longer a class member, so by
+        # construction their entries cannot satisfy ``user_id IN class_members``
+        # — the H5 fix below is therefore inert for this query but is applied
+        # uniformly so the three ranking surfaces stay structurally identical.
         count_q = (
             self._db.query(func.count(LeaderboardEntryModel.id))
-            .filter(LeaderboardEntryModel.user_id.isnot(None))
             .filter(LeaderboardEntryModel.user_id.in_(student_ids_q))
             .filter(LeaderboardEntryModel.challenge_id.is_(None))
         )
@@ -260,7 +272,6 @@ class SqlAlchemyLeaderboardRepository:
         higher_distinct = (
             select(func.count(func.distinct(eff_l2)))
             .where(eff_l2 > eff_main)
-            .where(L2.user_id.isnot(None))
             .where(L2.user_id.in_(student_ids_q))
             .where(L2.challenge_id.is_(None))
         )
@@ -275,10 +286,10 @@ class SqlAlchemyLeaderboardRepository:
                 LeaderboardEntryModel.kills.label("kills"),
                 LeaderboardEntryModel.waves_survived.label("waves_survived"),
                 LeaderboardEntryModel.created_at.label("created_at"),
-                User.player_name.label("player_name"),
+                func.coalesce(User.player_name, DELETED_USER_LABEL).label("player_name"),
                 rank_col,
             )
-            .join(User, LeaderboardEntryModel.user_id == User.id)
+            .outerjoin(User, LeaderboardEntryModel.user_id == User.id)
             .filter(LeaderboardEntryModel.user_id.in_(student_ids_q))
             .filter(LeaderboardEntryModel.challenge_id.is_(None))
         )
