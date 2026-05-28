@@ -982,7 +982,7 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `HP_MIN / HP_MAX` | 0 / 100 |
 | `GOLD_MIN / GOLD_MAX` | 0 / 99 999 |
 | `MAX_WAVE` | 30 |
-| `MAX_SCORE_DELTA` | 50 000 (per-wave cap) |
+| `max_score_delta_for(level)` | per-level PATCH delta cap = `ceil(LEVEL_MAX_SCORES[level] / LEVEL_MAX_WAVES[level]) × 2` (L1 = 3 334 … L5 = 33 334). `MAX_SCORE_DELTA` is the loosest of those (33 334), retained as the backwards-compatible module export. |
 
 **Per-level per-session caps:**
 

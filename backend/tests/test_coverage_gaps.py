@@ -288,6 +288,31 @@ class TestAbuseCases:
         assert res.status_code == 422
 
 
+# ── 4b. Per-level delta cap helper (max_score_delta_for) ────────────────────
+
+
+class TestMaxScoreDeltaHelper:
+    """Direct unit coverage of ``max_score_delta_for`` so the per-level cap
+    formula doesn't quietly drift. Pure-Python — no DB needed."""
+
+    def test_per_level_values(self):
+        from app.domain.constraints import max_score_delta_for
+        # ceil(LEVEL_MAX_SCORES / LEVEL_MAX_WAVES) * 2 → see constraints.py
+        assert max_score_delta_for(1) == 3334
+        assert max_score_delta_for(2) == 5000
+        assert max_score_delta_for(3) == 6000
+        assert max_score_delta_for(4) == 20000
+        assert max_score_delta_for(5) == 33334
+
+    def test_unknown_level_falls_back_to_legacy_cap(self):
+        from app.domain.constraints import max_score_delta_for
+        assert max_score_delta_for(99) == 50_000
+
+    def test_export_matches_loosest_legitimate_value(self):
+        from app.domain.constraints import MAX_SCORE_DELTA, max_score_delta_for
+        assert MAX_SCORE_DELTA == max(max_score_delta_for(lv) for lv in range(1, 6))
+
+
 # ── 5. FK-cascade on user deletion ──────────────────────────────────────────
 
 class TestUserDeletionCascade:

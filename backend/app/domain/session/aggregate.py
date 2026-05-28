@@ -259,13 +259,20 @@ class GameSession:
         for why this is gated on a non-empty log.
         """
         self._assert_active("Session already ended, cannot resubmit")
-        # Reject end-payload scores that wildly exceed the most recent in-flight score
+        # Reject end-payload scores that drop below the most recent in-flight score
         if result.score.value < self.score:
             raise DomainValueError("final score must not be less than last reported score")
-        if result.score.value - self.score > max_score_delta_for(int(self.level)):
-            raise DomainValueError("final score delta exceeds plausibility cap")
-
-        # Per-level caps — reject impossible scores/kills/waves (C-02)
+        # Per-level caps — reject impossible scores/kills/waves (C-02).
+        # The original `result.score - self.score > MAX_SCORE_DELTA` defensive
+        # check was removed: it is strictly redundant with the level-cap check
+        # below (since both ``self.score`` and ``result.score`` are bounded by
+        # ``LEVEL_MAX_SCORES[level]`` via update_progress' clamp + this very
+        # check), and tightening the per-level delta — appropriate at PATCH
+        # cadence in update_progress — would falsely reject legitimate
+        # end-of-game submissions where every prior WAVE_END sync failed and
+        # the entire level's score arrives in one terminal request. The
+        # per-wave delta cap stays where it actually defends, in
+        # update_progress.
         level_cap = LEVEL_MAX_SCORES.get(int(self.level), SCORE_MAX)
         if result.score.value > level_cap:
             raise DomainValueError("final score exceeds level maximum")
