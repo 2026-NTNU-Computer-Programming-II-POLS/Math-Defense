@@ -14,6 +14,9 @@ function validateTowerDefs(defs: Record<string, TowerDef>): void {
     if (!def.glyph || def.glyph.length === 0) {
       throw new Error(`[tower-defs] ${type}: glyph must be a non-empty string`)
     }
+    if (!def.cardColor || !/^#[0-9A-Fa-f]{6}$/.test(def.cardColor)) {
+      throw new Error(`[tower-defs] ${type}: cardColor must be a #RRGGBB hex (got ${def.cardColor})`)
+    }
     if (def.upgrades.length === 0) throw new Error(`[tower-defs] ${type}: upgrades array is empty`)
     for (let i = 0; i < def.upgrades.length; i++) {
       const tier = def.upgrades[i]
@@ -24,6 +27,11 @@ function validateTowerDefs(defs: Record<string, TowerDef>): void {
 }
 
 export type MagicMode = 'debuff' | 'buff'
+
+// Math discipline a tower's mechanic belongs to. Drives the TowerBar category
+// filter chips; also available to any future UI/curriculum surface that wants
+// to group towers by topic (e.g. an in-game tutorial index).
+export type TowerCategory = 'geometry' | 'functions' | 'algebra' | 'calculus'
 
 export interface UpgradeTier {
   costPercent: number
@@ -38,6 +46,10 @@ export interface TowerDef {
   name: string
   nameEn: string
   color: string
+  // Muted Morandi accent used by out-of-canvas UI cards (TowerBar today;
+  // BuildPanel / TowerInfoPanel may adopt later). Softer than `color`, which
+  // is the bright on-canvas hue rendered by the engine.
+  cardColor: string
   cost: number
   damage: number
   range: number
@@ -49,6 +61,7 @@ export interface TowerDef {
   // Color-blind disambiguation: a unique Unicode glyph rendered alongside the
   // tower's hue-coded body so type is identifiable in greyscale (WCAG 2.2 SC 1.4.1).
   glyph: string
+  category: TowerCategory
   upgrades: UpgradeTier[]
 }
 
@@ -61,6 +74,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     name: 'Magic Tower',
     nameEn: 'Magic Tower',
     color: Colors.MAGIC,
+    cardColor: '#9C8BB0',
     cost: 60,
     damage: 8,
     range: 10,
@@ -70,6 +84,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Function curves (polynomial, trig, log)',
     examRelevance: "Polynomial and trigonometric curves appear on Taiwan's GSAT Math A and on AP Precalculus.",
     glyph: '✦',
+    category: 'functions',
     upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
   },
   [TowerType.RADAR_A]: {
@@ -77,6 +92,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     name: 'Radar A — Sweep',
     nameEn: 'Radar A — Sweep',
     color: Colors.RADAR_A,
+    cardColor: '#8FAA77',
     cost: 50,
     damage: 5,
     range: 6,
@@ -86,6 +102,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Radian intervals, arc sectors',
     examRelevance: 'Radian measure and arc identification are on the GSAT Math B unit and the AP Calculus AB exam.',
     glyph: '◐',
+    category: 'geometry',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { sweepSpeed: 0.2 } },
       { ...UPGRADE_TIER_3, extra: { sweepSpeed: 0.4, aoeWidth: 0.3 } },
@@ -96,6 +113,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     name: 'Radar B — Rapid',
     nameEn: 'Radar B — Rapid',
     color: Colors.RADAR_B,
+    cardColor: '#7D9BBE',
     cost: 65,
     damage: 8,
     range: 7,
@@ -105,6 +123,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Radian intervals, arc sectors',
     examRelevance: 'Radian measure and arc identification are on the GSAT Math B unit and the AP Calculus AB exam.',
     glyph: '◑',
+    category: 'geometry',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { targetCount: 1 } },
       { ...UPGRADE_TIER_3, extra: { targetCount: 2 } },
@@ -115,6 +134,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     name: 'Radar C — Sniper',
     nameEn: 'Radar C — Sniper',
     color: Colors.RADAR_C,
+    cardColor: '#B07E5C',
     cost: 90,
     damage: 40,
     range: 12,
@@ -124,6 +144,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Radian intervals, arc sectors',
     examRelevance: 'Radian measure and arc identification are on the GSAT Math B unit and the AP Calculus AB exam.',
     glyph: '◒',
+    category: 'geometry',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { critChance: 0.1 } },
       { ...UPGRADE_TIER_3, extra: { critChance: 0.2, critDamage: 0.5 } },
@@ -134,6 +155,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     name: 'Matrix Tower',
     nameEn: 'Matrix Tower',
     color: Colors.MATRIX,
+    cardColor: '#C9BB6E',
     cost: 80,
     damage: 1,
     range: 8,
@@ -143,6 +165,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Dot product, vectors',
     examRelevance: '2×2 matrices and the dot product are on the AST Math (學測數學) Linear Algebra unit.',
     glyph: '⊞',
+    category: 'algebra',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { rampRate: 0.2 } },
       { ...UPGRADE_TIER_3, extra: { rampRate: 0.4, targetCount: 1 } },
@@ -153,6 +176,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     name: 'Limit Tower',
     nameEn: 'Limit Tower',
     color: Colors.LIMIT,
+    cardColor: '#C9A99E',
     cost: 70,
     damage: 25,
     range: 8,
@@ -162,6 +186,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Limits, L\'Hôpital\'s rule',
     examRelevance: 'One-sided and infinite limits are on AP Calculus AB and the AST Calculus subject test.',
     glyph: '∞',
+    category: 'functions',
     upgrades: [UPGRADE_TIER_2, UPGRADE_TIER_3],
   },
   [TowerType.CALCULUS]: {
@@ -169,6 +194,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     name: 'Calculus Tower',
     nameEn: 'Calculus Tower',
     color: Colors.CALCULUS,
+    cardColor: '#9C958D',
     cost: 100,
     damage: 0,
     range: 10,
@@ -178,6 +204,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     mathConcept: 'Derivatives, integrals, power rule',
     examRelevance: 'Differentiation and integration of polynomials are on AP Calculus AB Section I.',
     glyph: '∫',
+    category: 'calculus',
     upgrades: [
       { ...UPGRADE_TIER_2, extra: { petDamage: 0.25 } },
       { ...UPGRADE_TIER_3, extra: { petDamage: 0.5, petCount: 1, petSpeed: 0.2 } },

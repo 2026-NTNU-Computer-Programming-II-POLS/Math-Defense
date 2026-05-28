@@ -2,24 +2,11 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
-import { TOWER_DEFS } from '@/data/tower-defs'
+import { TOWER_DEFS, type TowerCategory } from '@/data/tower-defs'
 import { TowerType } from '@/data/constants'
 
 const gameStore = useGameStore()
 const uiStore = useUiStore()
-
-// Per-tower card accent (mockup). Muted Morandi hues — softer than the bright
-// on-canvas Colors.* / def.color. The icon takes this colour on an idle card;
-// a selected card fills with it and flips its text/icon to white.
-const TOWER_CARD_COLOR: Record<TowerType, string> = {
-  [TowerType.MAGIC]:    '#9C8BB0',
-  [TowerType.RADAR_A]:  '#8FAA77',
-  [TowerType.RADAR_B]:  '#7D9BBE',
-  [TowerType.RADAR_C]:  '#B07E5C',
-  [TowerType.MATRIX]:   '#C9BB6E',
-  [TowerType.LIMIT]:    '#C9A99E',
-  [TowerType.CALCULUS]: '#9C958D',
-}
 
 const barRef = ref<HTMLDivElement | null>(null)
 let ro: ResizeObserver | null = null
@@ -61,18 +48,9 @@ onBeforeUnmount(() => {
 
 // ── Category filter ───────────────────────────────────────────────────────
 // Group towers by math discipline so the bar stays scannable as more towers
-// unlock. "All" is the default; the player can narrow the list with chips.
-type Category = 'all' | 'geometry' | 'functions' | 'algebra' | 'calculus'
-
-const TOWER_CATEGORY: Record<TowerType, Exclude<Category, 'all'>> = {
-  [TowerType.RADAR_A]: 'geometry',
-  [TowerType.RADAR_B]: 'geometry',
-  [TowerType.RADAR_C]: 'geometry',
-  [TowerType.MAGIC]:   'functions',
-  [TowerType.LIMIT]:   'functions',
-  [TowerType.MATRIX]:  'algebra',
-  [TowerType.CALCULUS]:'calculus',
-}
+// unlock. "All" is the bar's own UI-level filter — the per-tower categories
+// (`TowerDef.category`) come from data/tower-defs.
+type Category = 'all' | TowerCategory
 
 const CATEGORY_LABELS: Record<Category, string> = {
   all:       'All',
@@ -104,16 +82,14 @@ const unlockedTowers = computed(() =>
 
 const availableTowers = computed(() => {
   if (activeCategory.value === 'all') return unlockedTowers.value
-  return unlockedTowers.value.filter(
-    (def) => TOWER_CATEGORY[def.type] === activeCategory.value,
-  )
+  return unlockedTowers.value.filter((def) => def.category === activeCategory.value)
 })
 
 // Visible categories — only show chips for groups that actually have at
 // least one unlocked tower, so early-game players don't see empty filters.
 const visibleCategories = computed<Category[]>(() => {
   const present = new Set<Category>()
-  for (const def of unlockedTowers.value) present.add(TOWER_CATEGORY[def.type])
+  for (const def of unlockedTowers.value) present.add(def.category)
   const out: Category[] = ['all']
   for (const c of ['geometry', 'functions', 'algebra', 'calculus'] as const) {
     if (present.has(c)) out.push(c)
@@ -134,7 +110,7 @@ watch(visibleCategories, (vis) => {
 
 function categoryCount(c: Category): number {
   if (c === 'all') return unlockedTowers.value.length
-  return unlockedTowers.value.filter((def) => TOWER_CATEGORY[def.type] === c).length
+  return unlockedTowers.value.filter((def) => def.category === c).length
 }
 
 // U-3: when the player clicks an unaffordable tower we used to still toggle
@@ -206,7 +182,7 @@ function isHighlighted(type: TowerType): boolean {
         :aria-pressed="isHighlighted(def.type)"
         :aria-disabled="!canAfford(def.cost)"
         :style="isHighlighted(def.type)
-          ? { background: TOWER_CARD_COLOR[def.type], borderColor: TOWER_CARD_COLOR[def.type] }
+          ? { background: def.cardColor, borderColor: def.cardColor }
           : null"
         @click="selectTower(def.type, def)"
       >
@@ -217,7 +193,7 @@ function isHighlighted(type: TowerType): boolean {
              the hexagon until their own 5c–5e sub-phases land. -->
         <span
           class="tower-icon"
-          :style="{ color: isHighlighted(def.type) ? '#fff' : TOWER_CARD_COLOR[def.type] }"
+          :style="{ color: isHighlighted(def.type) ? '#fff' : def.cardColor }"
         >
           <svg
             v-if="def.type === TowerType.MAGIC"
