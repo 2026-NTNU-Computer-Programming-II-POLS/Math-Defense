@@ -6,8 +6,8 @@
  * or game state, which keeps the policy unit-testable and re-usable for
  * alternate renderers (e.g. DOM previews, tests). See spec §8.1.
  *
- * The board reads as a single light surface (one fill, `#E8EFF5`, the
- * --cream-soft board tone, distinct from the --cream page behind it).
+ * The board reads as a single light surface (one fill, `#F2F7FB`, the
+ * --cream-bright board tone, near-white so it pops off the --cream page).
  * Legality is encoded by exactly one signal: gray diagonal
  * hatching marks every cell where a tower is *prohibited*. Both `path`
  * (the enemy route) and `forbidden` carry that hatch; `buildable` is left
@@ -46,12 +46,12 @@ export function tileStyleFor(cls: TileClass): TileStyle {
   switch (cls) {
     case 'path':
       return {
-        fill: '#E8EFF5',       // gray hatch (same as forbidden): towers prohibited
+        fill: '#F2F7FB',       // gray hatch (same as forbidden): towers prohibited
         hatching: true,
       }
     case 'buildable':
       return {
-        fill: '#E8EFF5',       // plain board tone — buildable cells carry no border
+        fill: '#F2F7FB',       // plain board tone — buildable cells carry no border
       }
     case 'forbidden':
       return {

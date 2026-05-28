@@ -72,11 +72,11 @@ const BOARD_PALETTE: RendererPalette = Object.freeze({
   stoneLight: '#8ea1bd',
   axis: '#ffd700',
   // Board ink — Morandi light re-skin.
-  boardBase: '#E8EFF5',      // --cream-soft : grid background (distinct from --cream page)
-  boardBaseAlt: '#DCE5ED',   // --cream      : checkerboard alt
-  boardAxis: '#ADA284',      // --gold       : muted khaki axes / ticks
+  boardBase: '#F2F7FB',      // --cream-bright : grid background (near-white, pops off --cream page)
+  boardBaseAlt: '#E8EFF5',   // --cream-soft   : checkerboard alt
+  boardAxis: '#ADA284',      // --gold         : muted khaki axes / ticks
   gridLine: 'rgba(79, 74, 72, 0.18)', // --divider : graph-paper thin lines
-  forbiddenFill: '#E8EFF5',  // blends with board; gray hatch is the signal
+  forbiddenFill: '#F2F7FB',  // blends with board; gray hatch is the signal
   forbiddenHatch: 'rgba(122, 141, 168, 0.55)', // stoneDark hue — diagonal stripes
 })
 
