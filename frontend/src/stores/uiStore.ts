@@ -6,6 +6,11 @@ import { defineStore } from 'pinia'
 import { ref, watch, onScopeDispose } from 'vue'
 import { appBus } from '@/lib/app-bus'
 import type { TowerType, EnemyType } from '@/data/constants'
+import type { TowerCategory } from '@/data/tower-defs'
+
+// UI-side category filter for TowerBar. 'all' is the bar's own
+// show-everything sentinel; the rest mirror data/tower-defs `TowerCategory`.
+export type TowerBarCategory = 'all' | TowerCategory
 
 const PRINCIPLE_OVERLAY_PREF_KEY = 'mdf.principleOverlayEnabled'
 const AUDIO_MUTED_PREF_KEY = 'mdf.audioMuted'
@@ -15,6 +20,9 @@ const AUDIO_VOLUME_SFX_KEY = 'mdf.audioVolume.sfx'
 const AUDIO_VOLUME_UI_KEY = 'mdf.audioVolume.ui'
 const SLIDER_FALLBACK_PREF_KEY = 'mdf.sliderFallbackEnabled'
 const SEEN_COUNTER_ENEMIES_PREF_KEY = 'mdf.seenCounterEnemies'
+// Pre-existing key set by TowerBar before this pref lived in uiStore — kept
+// verbatim so existing players don't lose their saved filter on upgrade.
+const TOWER_BAR_CATEGORY_PREF_KEY = 'mg.towerBar.category'
 
 function loadPrincipleOverlayPref(): boolean {
   if (typeof window === 'undefined') return true
@@ -69,6 +77,18 @@ function loadBusVolumePref(key: string, fallback: number): number {
   } catch {
     return fallback
   }
+}
+
+function loadTowerBarCategoryPref(): TowerBarCategory {
+  if (typeof window === 'undefined') return 'all'
+  try {
+    const raw = window.localStorage.getItem(TOWER_BAR_CATEGORY_PREF_KEY)
+    if (
+      raw === 'all' || raw === 'geometry' || raw === 'functions'
+      || raw === 'algebra' || raw === 'calculus'
+    ) return raw
+  } catch { /* localStorage unavailable (private mode); fall through */ }
+  return 'all'
 }
 
 function loadSeenCounterEnemies(): Set<EnemyType> {
@@ -213,6 +233,20 @@ export const useUiStore = defineStore('ui', () => {
 
   function setSliderFallbackEnabled(v: boolean): void {
     sliderFallbackEnabled.value = v
+  }
+
+  // TowerBar's category filter ('all' | math discipline). Persisted so the
+  // player's last narrowing survives reloads and run boundaries.
+  const towerBarCategory = ref<TowerBarCategory>(loadTowerBarCategoryPref())
+  if (typeof window !== 'undefined') {
+    watch(towerBarCategory, (v) => {
+      try { window.localStorage.setItem(TOWER_BAR_CATEGORY_PREF_KEY, v) }
+      catch { /* storage may be disabled (private mode); silently ignore */ }
+    })
+  }
+
+  function setTowerBarCategory(c: TowerBarCategory): void {
+    towerBarCategory.value = c
   }
 
   // V3 Phase 6 — first-encounter telegraph. Persisted to localStorage so
@@ -398,6 +432,7 @@ export const useUiStore = defineStore('ui', () => {
     audioMuted, audioVolume,
     audioVolumeMusic, audioVolumeSfx, audioVolumeUi,
     sliderFallbackEnabled,
+    towerBarCategory,
     seenCounterEnemies,
     showModal, showConfirm, closeModal, dismissModal, selectTower,
     clearSelectedTower, openBuildPanel, closeBuildPanel, hideBuildPanel,
@@ -407,6 +442,7 @@ export const useUiStore = defineStore('ui', () => {
     setAudioVolume,
     setAudioVolumeMusic, setAudioVolumeSfx, setAudioVolumeUi,
     setSliderFallbackEnabled,
+    setTowerBarCategory,
     markCounterEnemySeen, hasSeenCounterEnemy,
   }
 })

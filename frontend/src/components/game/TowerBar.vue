@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { useUiStore } from '@/stores/uiStore'
-import { TOWER_DEFS, type TowerCategory } from '@/data/tower-defs'
+import { useUiStore, type TowerBarCategory } from '@/stores/uiStore'
+import { TOWER_DEFS } from '@/data/tower-defs'
 import { TowerType } from '@/data/constants'
 
 const gameStore = useGameStore()
@@ -49,10 +49,10 @@ onBeforeUnmount(() => {
 // ── Category filter ───────────────────────────────────────────────────────
 // Group towers by math discipline so the bar stays scannable as more towers
 // unlock. "All" is the bar's own UI-level filter — the per-tower categories
-// (`TowerDef.category`) come from data/tower-defs.
-type Category = 'all' | TowerCategory
-
-const CATEGORY_LABELS: Record<Category, string> = {
+// (`TowerDef.category`) come from data/tower-defs. The active selection
+// itself, along with its localStorage persistence, lives in uiStore so the
+// state survives the bar's own mount/unmount cycles.
+const CATEGORY_LABELS: Record<TowerBarCategory, string> = {
   all:       'All',
   geometry:  'Geometry',
   functions: 'Functions',
@@ -60,37 +60,21 @@ const CATEGORY_LABELS: Record<Category, string> = {
   calculus:  'Calculus',
 }
 
-const STORAGE_KEY = 'mg.towerBar.category'
-const activeCategory = ref<Category>(loadCategory())
-
-function loadCategory(): Category {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY)
-    if (v && v in CATEGORY_LABELS) return v as Category
-  } catch { /* localStorage unavailable (private mode / SSR-ish) — fall through */ }
-  return 'all'
-}
-
-function setCategory(c: Category) {
-  activeCategory.value = c
-  try { localStorage.setItem(STORAGE_KEY, c) } catch { /* ignore quota / disabled storage */ }
-}
-
 const unlockedTowers = computed(() =>
   Object.values(TOWER_DEFS).filter((def) => def.unlockLevel <= gameStore.level),
 )
 
 const availableTowers = computed(() => {
-  if (activeCategory.value === 'all') return unlockedTowers.value
-  return unlockedTowers.value.filter((def) => def.category === activeCategory.value)
+  if (uiStore.towerBarCategory === 'all') return unlockedTowers.value
+  return unlockedTowers.value.filter((def) => def.category === uiStore.towerBarCategory)
 })
 
 // Visible categories — only show chips for groups that actually have at
 // least one unlocked tower, so early-game players don't see empty filters.
-const visibleCategories = computed<Category[]>(() => {
-  const present = new Set<Category>()
+const visibleCategories = computed<TowerBarCategory[]>(() => {
+  const present = new Set<TowerBarCategory>()
   for (const def of unlockedTowers.value) present.add(def.category)
-  const out: Category[] = ['all']
+  const out: TowerBarCategory[] = ['all']
   for (const c of ['geometry', 'functions', 'algebra', 'calculus'] as const) {
     if (present.has(c)) out.push(c)
   }
@@ -103,12 +87,12 @@ const visibleCategories = computed<Category[]>(() => {
 // "calculus" then started a fresh run at level 1 where Calculus isn't
 // unlocked), silently fall back so they see towers instead of an empty bar.
 watch(visibleCategories, (vis) => {
-  if (!vis.includes(activeCategory.value)) {
-    activeCategory.value = vis.includes('all') ? 'all' : vis[0]
+  if (!vis.includes(uiStore.towerBarCategory)) {
+    uiStore.setTowerBarCategory(vis.includes('all') ? 'all' : vis[0])
   }
 }, { immediate: true })
 
-function categoryCount(c: Category): number {
+function categoryCount(c: TowerBarCategory): number {
   if (c === 'all') return unlockedTowers.value.length
   return unlockedTowers.value.filter((def) => def.category === c).length
 }
@@ -155,11 +139,11 @@ function isHighlighted(type: TowerType): boolean {
         <button
           v-for="c in visibleCategories"
           :key="c"
-          :class="['chip', { 'chip--active': activeCategory === c }]"
+          :class="['chip', { 'chip--active': uiStore.towerBarCategory === c }]"
           role="tab"
-          :aria-selected="activeCategory === c"
+          :aria-selected="uiStore.towerBarCategory === c"
           :aria-label="`Show ${CATEGORY_LABELS[c]} towers (${categoryCount(c)})`"
-          @click="setCategory(c)"
+          @click="uiStore.setTowerBarCategory(c)"
         >
           {{ CATEGORY_LABELS[c] }}
           <span class="chip-count">{{ categoryCount(c) }}</span>
