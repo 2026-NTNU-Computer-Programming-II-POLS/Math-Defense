@@ -262,7 +262,7 @@ async function pushEndpointMarkerToServer(): Promise<void> {
         ? ui.endpointMarkerCustomDataUrl
         : null,
       hit_fx: ui.endpointHitFx,
-    })
+    }, { signal: controller.signal })
     endpointMarkerSyncError.value = ''
   } catch (e) {
     if (controller.signal.aborted) return
@@ -543,8 +543,9 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
             </button>
           </div>
           <p class="marker-upload-hint">
-            JPG or PNG · up to {{ ENDPOINT_MARKER_MAX_UPLOAD_MB }} MB ·
+            JPG or PNG · source up to {{ ENDPOINT_MARKER_MAX_UPLOAD_MB }} MB ·
             resized to {{ ENDPOINT_MARKER_RESIZE_PX }}×{{ ENDPOINT_MARKER_RESIZE_PX }}
+            (processed image must compress under 3 MB)
           </p>
           <p v-if="endpointMarkerUploadError" class="marker-upload-error">
             {{ endpointMarkerUploadError }}

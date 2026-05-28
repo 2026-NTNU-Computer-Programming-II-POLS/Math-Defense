@@ -1,4 +1,4 @@
-import { api, readCookie, CSRF_COOKIE_NAME, CSRF_HEADER_NAME, REQUEST_TIMEOUT_MS } from './api'
+import { api, readCookie, CSRF_COOKIE_NAME, CSRF_HEADER_NAME, REQUEST_TIMEOUT_MS, type ApiOptions } from './api'
 
 export interface TokenResponse {
   token_type: string
@@ -68,8 +68,11 @@ export const authService = {
   updateAvatar(avatarUrl: string | null) {
     return api.put<MeResponse>('/api/auth/profile/avatar', { avatar_url: avatarUrl })
   },
-  updateEndpointMarker(payload: EndpointMarkerUpdate) {
-    return api.put<MeResponse>('/api/auth/profile/endpoint-marker', payload)
+  updateEndpointMarker(payload: EndpointMarkerUpdate, opts: ApiOptions = {}) {
+    // signal is threaded through so ProfileView's rapid-change abort cancels
+    // the in-flight PUT — without this the abort only flipped the local
+    // controller flag and two PUTs could land at the server out of order.
+    return api.put<MeResponse>('/api/auth/profile/endpoint-marker', payload, opts)
   },
   changePassword(currentPassword: string, newPassword: string) {
     return api.post<void>('/api/auth/change-password', {
