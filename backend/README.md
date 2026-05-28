@@ -15,7 +15,7 @@ REST API server for Math Defense: authentication (incl. refresh-token rotation, 
 | Rate Limiting | slowapi (per-IP) + per-account login throttle |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
 | WASM host | wasmtime-py 44.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
-| Testing | pytest 9 + pytest-asyncio (28 test files) |
+| Testing | pytest 9 + pytest-asyncio (30 test files) |
 
 ---
 
@@ -124,7 +124,7 @@ backend/
 │   │   ├── class_pending_invite.py  Pending email invites awaiting acceptance
 │   │   ├── removed_class_membership.py  Re-join blocklist
 │   │   ├── email_verification_token.py  One-use email tokens
-│   │   ├── territory.py           GrabbingTerritoryActivity + TerritorySlot + TerritoryOccupation
+│   │   ├── territory.py           GrabbingTerritoryActivity (incl. teacher-configurable `student_slot_cap` 1–50, default 5) + TerritorySlot (CHECK slot_index 0..49) + TerritoryOccupation
 │   │   ├── season.py              Season (windowed achievement multipliers; CHECK ends_at > starts_at)
 │   │   ├── challenge.py           Challenge (constraints JSONB; soft-delete via deleted_at)
 │   │   ├── competency_state.py    UserCompetencyState (composite PK user_id + competency; Beta α/β)
@@ -164,15 +164,17 @@ backend/
 ├── data/
 │   └── math_engine.wasm           Shipped WASM blob (mirrors frontend/public/wasm) — backs wasm_runtime singleton
 │
-├── alembic/                       Alembic migration environment (versions/ + env.py) — 43 revisions through cc3d4e5f6a8b_remove_calculus_pet_hp_allocations (current head)
+├── alembic/                       Alembic migration environment (versions/ + env.py) — 45 revisions through ee5f6a7b8c9d_territory_student_slot_cap (current head)
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
-├── tests/                         28 files
+├── tests/                         30 files
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py                       — register / login / me / logout
 │   ├── test_auth_lockout.py               — per-account lockout window + exponential backoff
 │   ├── test_token_denylist.py             — JWT JTI revocation after logout
 │   ├── test_refresh_token.py              — refresh-token rotation + reuse detection
+│   ├── test_csrf_cookie.py                — CSRF double-submit cookie enforcement on unsafe methods
+│   ├── test_admin_create_teacher.py       — Admin teacher-provisioning endpoint + RBAC
 │   ├── test_game_session.py
 │   ├── test_session_repository.py         — repo-level invariants and cumulative stats
 │   ├── test_leaderboard.py
@@ -449,7 +451,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/activities` | 10/min | Create Grabbing Territory activity (teacher; optional `class_id` to scope) |
+| POST | `/api/activities` | 10/min | Create Grabbing Territory activity (teacher; optional `class_id` to scope; `slot_count` ≤ 50; optional `student_slot_cap` 1–50, default 5) |
 | GET | `/api/activities` | 30/min | List activities visible to caller (optional `?class_id=` filter) |
 | GET | `/api/activities/{id}` | 30/min | Activity + slots + current occupations |
 | POST | `/api/activities/{id}/slots/{slot_id}/play` | 30/min | Seize or counter-seize a slot using a completed session (student; cap enforced) |
@@ -597,7 +599,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                       # 28 test files
+pytest                                       # 30 test files
 pytest tests/test_session_aggregate.py -v    # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v        # audit-driven edge cases
 pytest tests/test_territory.py -v            # territory integration tests
