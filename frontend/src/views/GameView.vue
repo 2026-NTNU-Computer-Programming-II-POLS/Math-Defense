@@ -302,7 +302,7 @@ const shellRef = ref<HTMLDivElement | null>(null)
 // MAX_SCALE caps upscaling so the pixel-art canvas stays legible without
 // becoming excessively blocky on very large / 4K displays. Screens smaller
 // than the world still scale down freely.
-const MAX_SCALE = 2.5
+const MAX_SCALE = 3.0
 
 function calcScale(W: number, H: number) {
   const pad = 2
