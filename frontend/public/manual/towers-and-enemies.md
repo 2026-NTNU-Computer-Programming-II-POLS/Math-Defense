@@ -218,7 +218,7 @@ Switch via the small targeting toggle on the tower panel.
 
 ## Talent Tree (Persistent)
 
-Twenty-six nodes across the seven tower types: nineteen base nodes (Magic 3, Radar A 2, Radar B 3, Radar C 3, Matrix 3, Limit 2, Calculus 3) plus seven advanced **"tier-2"** nodes — one per tower — that each require their parent base node at max level. Prerequisites within each tower form linear chains.
+Twenty-six nodes across the seven tower types: nineteen base nodes (Magic 3, Radar A 2, Radar B 3, Radar C 3, Matrix 3, Limit 2, Calculus 3) plus seven advanced **"tier-2"** nodes — one per tower — that each require their parent base node at max level. Prerequisites within each tower form linear chains. The Talent Tree view renders each tower as its own mini-tree (two-column grid, tower-color theming, dashed border on the tier-2 cap node) so the prerequisite path inside a tower is visible at a glance.
 
 | Tier | Per-tower coverage | Magnitude |
 |---|---|---|
