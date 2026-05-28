@@ -425,6 +425,51 @@ export class Renderer {
     ctx.restore()
   }
 
+  /**
+   * Draw a blinking 5-pointed star at game coordinate `(gx, gy)` — the focus
+   * point of the enemy paths (level endpoint P*). `time` (seconds) drives the
+   * pulse so the marker reads as "alive". Pure primitive: no state, colour
+   * sourced from the board palette gold.
+   */
+  drawFocusStar(gx: number, gy: number, time: number): void {
+    const { ctx } = this
+    const cx = gameToCanvasX(gx)
+    const cy = gameToCanvasY(gy)
+    const pulse = 0.5 + 0.5 * Math.sin(time * 4)
+    const outerR = UNIT_PX * 0.55
+    const innerR = outerR * 0.42
+    const SPIKES = 5
+
+    ctx.save()
+    // Soft halo so the star reads against the hatched/gridded board.
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerR * 2)
+    glow.addColorStop(0, `rgba(173, 162, 132, ${0.35 * pulse})`)
+    glow.addColorStop(1, 'rgba(173, 162, 132, 0)')
+    ctx.fillStyle = glow
+    ctx.beginPath()
+    ctx.arc(cx, cy, outerR * 2, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.beginPath()
+    for (let i = 0; i < SPIKES * 2; i++) {
+      const r = i % 2 === 0 ? outerR : innerR
+      const angle = -Math.PI / 2 + (Math.PI / SPIKES) * i
+      const x = cx + Math.cos(angle) * r
+      const y = cy + Math.sin(angle) * r
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.closePath()
+    ctx.globalAlpha = 0.55 + 0.45 * pulse
+    ctx.fillStyle = this.palette.boardAxis
+    ctx.fill()
+    ctx.globalAlpha = 1
+    ctx.lineWidth = 1
+    ctx.strokeStyle = this.palette.boardAxis
+    ctx.stroke()
+    ctx.restore()
+  }
+
   drawFunction(
     fn: (x: number) => number,
     xMin: number,

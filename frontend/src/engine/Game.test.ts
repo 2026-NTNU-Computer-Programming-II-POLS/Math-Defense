@@ -9,6 +9,7 @@ vi.mock('./Renderer', () => ({
     clear(): void {}
     drawGrid(): void {}
     drawFunction(): void {}
+    drawFocusStar(): void {}
   },
 }))
 vi.mock('./InputManager', () => ({

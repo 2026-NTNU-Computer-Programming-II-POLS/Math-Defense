@@ -597,6 +597,7 @@ export class Game {
             }
           }
         }
+        renderer.drawFocusStar(genCtx.endpoint.x, genCtx.endpoint.y, this.time)
       } else {
         renderer.drawSegmentBoundaries(this.levelContext.path, this.hud.hoveredSegmentId)
         for (const seg of this.levelContext.path.segments) {
