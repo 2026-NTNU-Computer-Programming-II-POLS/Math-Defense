@@ -71,7 +71,7 @@ backend/
 │   │   ├── season_service.py              List + upsert seasonal windows
 │   │   ├── talent_service.py              Allocate + reset + runtime modifiers
 │   │   ├── class_service.py               CRUD, student join, reflections feed
-│   │   ├── admin_service.py               Teacher/class/student paginated views + set_user_active
+│   │   ├── admin_service.py               Teacher/class/student paginated views + set_user_active + create_teacher
 │   │   ├── territory_service.py           Activity lifecycle + slot occupation + rankings (+ with-meta + external)
 │   │   ├── territory_recommendation_service.py  Per-activity slot recommendation (Backlog §28)
 │   │   ├── assessment_service.py          Applies evidence to Beta posteriors; apply_evidence_in_open_uow for atomic chaining
@@ -144,7 +144,7 @@ backend/
 │   │   ├── achievement.py         /api/achievements + GET /api/seasons (sibling seasons_router)
 │   │   ├── talent.py              /api/talents
 │   │   ├── class_.py              /api/classes (+ /reflections, /regenerate-code, /students)
-│   │   ├── admin.py               /api/admin (teachers / students / classes / set-active / seasons CRUD)
+│   │   ├── admin.py               /api/admin (teachers / provision teacher / students / classes / set-active / seasons CRUD)
 │   │   ├── territory.py           /api/activities (+ /rankings, /rankings/with-meta, /external-rankings)
 │   │   ├── assessment.py          /api/assessment — class-scoped Beta posteriors for the teacher dashboard
 │   │   ├── recommendation.py      /api/recommendation/me + /api/recommendation/territory/{id}
@@ -397,6 +397,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | Method | Path | Rate | Description |
 |---|---|---|---|
 | GET | `/api/admin/teachers?page=&per_page=` | 30/min | Paginated teacher accounts |
+| POST | `/api/admin/teachers` | 5/min | Provision a new teacher account (admin only); returns the created user |
 | GET | `/api/admin/students?page=&per_page=` | 30/min | Paginated student accounts |
 | GET | `/api/admin/classes?page=&per_page=` | 30/min | Paginated classes |
 | PATCH | `/api/admin/users/{user_id}/active` | 30/min | Soft-ban / unban a user (sets `is_active`) |
@@ -658,6 +659,7 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter), keyed by client IP.
 | `POST /classes/{id}/regenerate-code` | 5/min |
 | `POST /classes/{id}/students`, `DELETE /classes/{id}/students/{student_id}` | 30/min |
 | `GET /admin/teachers`, `/admin/classes`, `/admin/students`, `PATCH /admin/users/{id}/active` | 30/min |
+| `POST /admin/teachers` | 5/min |
 | `POST /activities`, `/activities/{id}/settle` | 10/min, 5/min |
 | `GET /activities`, `/activities/{id}`, `/activities/{id}/rankings`, `/activities/{id}/external-rankings` | 30/min |
 | `GET /activities/{id}/rankings/with-meta` | 60/min |
