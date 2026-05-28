@@ -124,6 +124,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
     { module: 'systems/EconomySystem',     handler: 'anonymous', purpose: 'Apply HP damage unless shielded' },
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger enemy-reached SFX' },
     { module: 'systems/CombatSystem',       handler: 'anonymous', purpose: 'Trigger origin-breach screen shake (Visual Redesign Phase 1)' },
+    { module: 'systems/EndpointFXSystem',   handler: 'anonymous', purpose: 'Spawn marker hit FX (fragments / crying / angry) on the endpoint' },
   ],
   TOWER_ATTACK: [
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger heavy or light attack SFX based on tower type' },

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { useUiStore } from '@/stores/uiStore'
+import { useUiStore, type EndpointHitFxStyle } from '@/stores/uiStore'
 import { authService } from '@/services/authService'
 import { achievementService, type AchievementSummary } from '@/services/achievementService'
 import { talentService, type TalentTreeOut } from '@/services/talentService'
@@ -143,6 +143,14 @@ onBeforeUnmount(() => {
     clearTimeout(pwSuccessTimer)
     pwSuccessTimer = null
   }
+  if (endpointMarkerSyncTimer !== null) {
+    clearTimeout(endpointMarkerSyncTimer)
+    endpointMarkerSyncTimer = null
+  }
+  if (endpointMarkerSyncInFlight) {
+    endpointMarkerSyncInFlight.abort()
+    endpointMarkerSyncInFlight = null
+  }
 })
 
 // M12: mirror the backend allowlist client-side. Any avatar_url that doesn't
@@ -164,6 +172,143 @@ async function selectAvatar(url: string): Promise<void> {
     avatarError.value = 'Failed to save avatar'
   } finally {
     avatarSaving.value = false
+  }
+}
+
+// Endpoint marker — custom image upload. The uploaded file is resized to a
+// 256×256 letterboxed dataURL so localStorage keeps headroom for other
+// mdf.* prefs and the canvas draw stays cheap regardless of source size.
+const ENDPOINT_MARKER_RESIZE_PX = 256
+const ENDPOINT_MARKER_MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+const ENDPOINT_MARKER_MAX_UPLOAD_MB = ENDPOINT_MARKER_MAX_UPLOAD_BYTES / (1024 * 1024)
+// JPG/PNG only — keep formats predictable for canvas decode + avoid SVG
+// XSS via foreignObject, animated GIFs that would look broken statically,
+// and WebP which Safari decoded inconsistently across past versions.
+const ENDPOINT_MARKER_ALLOWED_MIME: ReadonlyArray<string> = ['image/jpeg', 'image/png']
+const ENDPOINT_MARKER_ALLOWED_EXT: ReadonlyArray<string> = ['.jpg', '.jpeg', '.png']
+const endpointMarkerUploadError = ref('')
+
+function hasAllowedExtension(name: string): boolean {
+  const lower = name.toLowerCase()
+  return ENDPOINT_MARKER_ALLOWED_EXT.some((ext) => lower.endsWith(ext))
+}
+
+async function onEndpointMarkerFileChange(ev: Event): Promise<void> {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  // Reset the input so re-selecting the same file fires `change` again.
+  input.value = ''
+  if (!file) return
+  endpointMarkerUploadError.value = ''
+  // Reject by MIME + extension. Browsers occasionally report
+  // `application/octet-stream` for valid jpg/png from older OS file pickers,
+  // so the extension check is the belt-and-suspenders fallback.
+  const mimeOk = ENDPOINT_MARKER_ALLOWED_MIME.includes(file.type)
+  const extOk = hasAllowedExtension(file.name)
+  if (!mimeOk && !extOk) {
+    endpointMarkerUploadError.value = 'Only JPG or PNG images are supported'
+    return
+  }
+  if (file.size > ENDPOINT_MARKER_MAX_UPLOAD_BYTES) {
+    endpointMarkerUploadError.value = `Image must be under ${ENDPOINT_MARKER_MAX_UPLOAD_MB} MB`
+    return
+  }
+  try {
+    const dataUrl = await resizeImageToDataUrl(file, ENDPOINT_MARKER_RESIZE_PX)
+    ui.setEndpointMarkerCustomDataUrl(dataUrl)
+    // Also push the new image to the server. We bypass the debounce here:
+    // an upload is a deliberate single action, not a slider drag, so going
+    // straight to the request avoids a wasted 350 ms.
+    void pushEndpointMarkerToServer()
+  } catch (e) {
+    endpointMarkerUploadError.value = e instanceof Error ? e.message : 'Failed to load image'
+  }
+}
+
+function clearEndpointMarkerCustom(): void {
+  ui.setEndpointMarkerCustomDataUrl(null)
+  endpointMarkerUploadError.value = ''
+  void pushEndpointMarkerToServer()
+}
+
+// Server sync — fire after any of the three endpoint-marker fields change.
+// The local store update is optimistic (UI reflects the change immediately);
+// the PUT is best-effort. A network failure surfaces via the inline error
+// slot but doesn't roll back the local choice — the value persists in
+// localStorage and will reconcile on the next successful sync.
+const ENDPOINT_MARKER_SYNC_DEBOUNCE_MS = 350
+const endpointMarkerSyncError = ref('')
+let endpointMarkerSyncTimer: ReturnType<typeof setTimeout> | null = null
+let endpointMarkerSyncInFlight: AbortController | null = null
+
+function queueEndpointMarkerSync(): void {
+  if (endpointMarkerSyncTimer !== null) clearTimeout(endpointMarkerSyncTimer)
+  endpointMarkerSyncTimer = setTimeout(() => {
+    endpointMarkerSyncTimer = null
+    void pushEndpointMarkerToServer()
+  }, ENDPOINT_MARKER_SYNC_DEBOUNCE_MS)
+}
+
+async function pushEndpointMarkerToServer(): Promise<void> {
+  // Only sync if the user is logged in; anonymous flows keep local-only.
+  if (!auth.user) return
+  if (endpointMarkerSyncInFlight) endpointMarkerSyncInFlight.abort()
+  const controller = new AbortController()
+  endpointMarkerSyncInFlight = controller
+  try {
+    await authService.updateEndpointMarker({
+      style: ui.endpointMarkerStyle,
+      custom_dataurl: ui.endpointMarkerStyle === 'custom'
+        ? ui.endpointMarkerCustomDataUrl
+        : null,
+      hit_fx: ui.endpointHitFx,
+    })
+    endpointMarkerSyncError.value = ''
+  } catch (e) {
+    if (controller.signal.aborted) return
+    endpointMarkerSyncError.value = e instanceof Error
+      ? `Could not save to server: ${e.message}`
+      : 'Could not save to server'
+  } finally {
+    if (endpointMarkerSyncInFlight === controller) endpointMarkerSyncInFlight = null
+  }
+}
+
+function onEndpointMarkerStyleChange(style: 'star' | 'gorilla' | 'custom'): void {
+  ui.setEndpointMarkerStyle(style)
+  queueEndpointMarkerSync()
+}
+
+function onEndpointHitFxChange(fx: EndpointHitFxStyle): void {
+  ui.setEndpointHitFx(fx)
+  queueEndpointMarkerSync()
+}
+
+async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
+  const sourceUrl = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('Could not decode image'))
+      el.src = sourceUrl
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas 2D unavailable')
+    // Letterbox-fit: preserve aspect, transparent padding.
+    const scale = Math.min(size / img.width, size / img.height)
+    const drawW = img.width * scale
+    const drawH = img.height * scale
+    const dx = (size - drawW) / 2
+    const dy = (size - drawH) / 2
+    ctx.clearRect(0, 0, size, size)
+    ctx.drawImage(img, dx, dy, drawW, drawH)
+    return canvas.toDataURL('image/png')
+  } finally {
+    URL.revokeObjectURL(sourceUrl)
   }
 }
 </script>
@@ -329,6 +474,98 @@ async function selectAvatar(url: string): Promise<void> {
             Test sound
           </button>
         </div>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="section-title">Endpoint Marker</h3>
+        <p class="endpoint-marker-help">
+          The marker drawn at the curves' common intersection (P*) — the
+          enemy goal in each level.
+        </p>
+        <div class="marker-style-row">
+          <label class="marker-radio">
+            <input
+              type="radio"
+              :value="'star'"
+              :checked="ui.endpointMarkerStyle === 'star'"
+              name="endpoint-marker-style"
+              @change="onEndpointMarkerStyleChange('star')"
+            />
+            <span class="marker-radio-label">⭐ Star <span class="marker-radio-default">(default)</span></span>
+          </label>
+          <label class="marker-radio">
+            <input
+              type="radio"
+              :value="'gorilla'"
+              :checked="ui.endpointMarkerStyle === 'gorilla'"
+              name="endpoint-marker-style"
+              @change="onEndpointMarkerStyleChange('gorilla')"
+            />
+            <span class="marker-radio-label">🦍 Gorilla</span>
+          </label>
+          <label class="marker-radio">
+            <input
+              type="radio"
+              :value="'custom'"
+              :checked="ui.endpointMarkerStyle === 'custom'"
+              name="endpoint-marker-style"
+              @change="onEndpointMarkerStyleChange('custom')"
+            />
+            <span class="marker-radio-label">Custom image</span>
+          </label>
+        </div>
+        <div v-if="ui.endpointMarkerStyle === 'custom'" class="marker-custom-row">
+          <div class="marker-custom-preview">
+            <img
+              v-if="ui.endpointMarkerCustomDataUrl"
+              :src="ui.endpointMarkerCustomDataUrl"
+              alt="Custom marker"
+            />
+            <span v-else class="marker-custom-empty">No image</span>
+          </div>
+          <div class="marker-custom-actions">
+            <label class="btn marker-upload-btn">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                class="marker-upload-input"
+                @change="onEndpointMarkerFileChange"
+              />
+              {{ ui.endpointMarkerCustomDataUrl ? 'Replace image' : 'Upload image' }}
+            </label>
+            <button
+              v-if="ui.endpointMarkerCustomDataUrl"
+              type="button"
+              class="btn marker-clear-btn"
+              @click="clearEndpointMarkerCustom"
+            >
+              Clear
+            </button>
+          </div>
+          <p class="marker-upload-hint">
+            JPG or PNG · up to {{ ENDPOINT_MARKER_MAX_UPLOAD_MB }} MB ·
+            resized to {{ ENDPOINT_MARKER_RESIZE_PX }}×{{ ENDPOINT_MARKER_RESIZE_PX }}
+          </p>
+          <p v-if="endpointMarkerUploadError" class="marker-upload-error">
+            {{ endpointMarkerUploadError }}
+          </p>
+        </div>
+        <label class="settings-row volume-row">
+          <span class="settings-label volume-label">Hit effect</span>
+          <select
+            class="settings-range marker-fx-select"
+            :value="ui.endpointHitFx"
+            @change="onEndpointHitFxChange(($event.target as HTMLSelectElement).value as EndpointHitFxStyle)"
+          >
+            <option value="fragments">Fragments (default)</option>
+            <option value="crying">Crying</option>
+            <option value="angry">Angry</option>
+            <option value="random">Random</option>
+          </select>
+        </label>
+        <p v-if="endpointMarkerSyncError" class="marker-upload-error">
+          {{ endpointMarkerSyncError }}
+        </p>
       </div>
 
       <div class="pw-section">
@@ -577,4 +814,102 @@ async function selectAvatar(url: string): Promise<void> {
 }
 
 .back-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
+
+/* ── Endpoint marker settings ── */
+.endpoint-marker-help {
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+.marker-style-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+.marker-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--charcoal);
+}
+.marker-radio input {
+  accent-color: var(--terracotta);
+  cursor: pointer;
+}
+.marker-radio-label { display: inline-flex; align-items: center; gap: 4px; }
+.marker-radio-default {
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
+}
+.marker-custom-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: rgba(245, 250, 254, 0.6);
+}
+.marker-custom-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  align-self: flex-start;
+}
+.marker-custom-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.marker-custom-empty {
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
+}
+.marker-custom-actions { display: flex; gap: 8px; }
+.marker-upload-btn {
+  position: relative;
+  font-size: var(--text-xs);
+  overflow: hidden;
+}
+.marker-upload-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.marker-clear-btn {
+  font-size: var(--text-xs);
+  border-color: var(--line);
+  color: var(--charcoal-soft);
+}
+.marker-clear-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
+.marker-upload-error { font-size: var(--text-xs); color: var(--clay-deep); margin: 0; }
+.marker-upload-hint {
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
+  margin: 0;
+}
+.marker-fx-select {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-family: var(--font-main);
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: rgba(245, 250, 254, 0.85);
+  color: var(--charcoal);
+  cursor: pointer;
+}
 </style>

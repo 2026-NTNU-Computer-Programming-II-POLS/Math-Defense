@@ -39,6 +39,30 @@ function mapMeResponseToUser(res: MeResponse): User {
   }
 }
 
+/**
+ * Push the endpoint marker preferences from a /me response into uiStore.
+ * Lazy-imported so authStore stays free of an eager uiStore dependency
+ * (uiStore in turn imports authStore via the modal-on-logout subscription;
+ * lazy import breaks the would-be cycle).
+ */
+async function hydrateEndpointMarkerFromMe(res: MeResponse): Promise<void> {
+  if (
+    res.endpoint_marker_style === undefined
+    && res.endpoint_marker_custom_dataurl === undefined
+    && res.endpoint_hit_fx === undefined
+  ) return
+  try {
+    const { useUiStore } = await import('@/stores/uiStore')
+    useUiStore().applyServerEndpointMarker({
+      style: res.endpoint_marker_style ?? null,
+      customDataUrl: res.endpoint_marker_custom_dataurl,
+      hitFx: res.endpoint_hit_fx ?? null,
+    })
+  } catch (e) {
+    console.warn('[authStore] endpoint marker hydration failed:', e)
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const initializing = ref(false)
@@ -66,6 +90,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = mapMeResponseToUser(res)
       sessionExpired.value = false
       probe.start()
+      void hydrateEndpointMarkerFromMe(res)
     } catch {
       user.value = null
     } finally {
@@ -133,6 +158,13 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await authService.me()
       user.value = mapMeResponseToUser(res)
+      // Intentionally NOT calling hydrateEndpointMarkerFromMe here:
+      // refreshProfile is invoked by LevelSelectView on mount, which races
+      // with an in-flight pushEndpointMarkerToServer fired by a fresh upload
+      // in ProfileView. If /me lands first the response still has the old
+      // (or null) marker fields, which would wipe the user's just-uploaded
+      // image from the local cache. Marker hydration happens once at init();
+      // after that, local + PUT is the source of truth.
     } catch {
       // 401 handler in api.ts deals with auth failures; transient errors are
       // intentionally swallowed so Star-5 keeps its previous gating state.
