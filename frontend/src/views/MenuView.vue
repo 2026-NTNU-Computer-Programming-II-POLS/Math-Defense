@@ -185,6 +185,13 @@ const manualOpen = ref(false)
   margin: 0 auto;
 }
 
+/* The first .section-label inside each .menu-section has margin-top: 0,
+   so the Start Game button would otherwise sit flush against "PROGRESSION".
+   Restore a breathing gap that matches the inter-section spacing. */
+.menu-card > .btn.btn-primary {
+  margin-bottom: 22px;
+}
+
 /* ── Sections ── */
 .menu-section + .menu-section {
   border-top: 1px dashed var(--line-strong);
