@@ -271,7 +271,6 @@ function toggleMode(mode: MagicMode) {
   --mode-c: var(--tw-magic-debuff);
   --mode-c-deep: var(--tw-magic-debuff-deep);
   --mode-c-soft: var(--tw-magic-debuff-soft);
-  gap: 6px;
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 8px 10px;
@@ -295,31 +294,18 @@ function toggleMode(mode: MagicMode) {
   --mode-c-deep: var(--tw-magic-buff-deep);
   --mode-c-soft: var(--tw-magic-buff-soft);
 }
-/* Radio-style toggle indicator. */
-.mode-btn::before {
-  content: '';
-  flex: 0 0 auto;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: 2px solid var(--mode-c-deep);
-  background: transparent;
-  transition: background 0.14s ease;
-}
 .mode-btn:hover {
   border-color: var(--mode-c-deep);
   background: #fff;
   transform: none;
   box-shadow: none;
 }
+/* Selected mode — thin gray outline + the mode's soft tint. */
 .mode-btn.active {
-  border-color: var(--mode-c-deep);
+  border-color: var(--muted);
   background: var(--mode-c-soft);
   font-weight: 700;
-  box-shadow: 0 0 0 2px var(--mode-c-deep);
-}
-.mode-btn.active::before {
-  background: var(--mode-c-deep);
+  box-shadow: 0 0 0 1px var(--muted);
 }
 .slider-fn-input { gap: 6px; }
 /* Slider label carries the live a·x²+b·x+c formula — keep it readable
