@@ -538,60 +538,52 @@ async function submit(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px;
-  border: 1px dashed var(--axis);
-  border-radius: 4px;
-  opacity: 0.85;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
 }
 
 .dev-hint-title {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--axis);
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal-soft);
   letter-spacing: 1px;
   text-align: center;
-  opacity: 0.7;
 }
 
 .dev-hint-item {
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-column-gap: 8px;
+  grid-column-gap: 10px;
   align-items: center;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--axis);
-  border-radius: 2px;
+  padding: 8px 10px;
+  background: rgba(245, 250, 254, 0.85);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
   font: inherit;
-  color: var(--axis);
+  color: var(--charcoal);
 }
 
 .dev-hint-item:hover {
-  background: var(--axis);
-  color: var(--stone-dark);
+  background: var(--cream-soft);
+  border-color: var(--terracotta-deep);
 }
 
 .dev-hint-role {
   grid-row: span 2;
   font-size: var(--text-xs);
-  font-weight: bold;
+  font-weight: 700;
   letter-spacing: 1px;
-  text-shadow: var(--gold-shadow);
+  color: var(--charcoal);
 }
 
 .dev-hint-credential {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--gold);
-  text-shadow: var(--gold-shadow);
+  color: var(--terracotta-deep);
   word-break: break-all;
-}
-
-.dev-hint-item:hover .dev-hint-credential {
-  color: var(--stone-dark);
-  text-shadow: none;
 }
 </style>
