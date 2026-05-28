@@ -242,11 +242,14 @@ onBeforeUnmount(() => {
 }
 .hud::-webkit-scrollbar { display: none; }
 
-/* Sub-HUD strip (mockup .gh-subhud, ~68px) */
+/* Sub-HUD strip (mockup .gh-subhud). Shrunk from 68→52 to clear the top
+   row of the game grid (canvas y≤124 was covering game y=14..13). The
+   tallest child is the 44px spell button, so 52px leaves 4px breathing
+   top/bottom; the MH pill and Prep timer fit comfortably. */
 .hud-row2 {
   position: absolute;
   top: var(--hud-height, 56px); left: 0; right: 0;
-  height: 68px;
+  height: 52px;
   background: rgba(220, 229, 237, 0.78);
   border-bottom: 1px solid var(--line);
   display: flex;
