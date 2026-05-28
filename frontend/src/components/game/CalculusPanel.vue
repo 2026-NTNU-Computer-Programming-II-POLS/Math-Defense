@@ -380,7 +380,7 @@ function submitAnswer() {
   font-size: var(--text-xs);
   font-family: var(--font-mono);
   background: var(--cream-soft);
-  color: #ffffff;
+  color: var(--charcoal);
   border: 1px solid var(--gold);
   border-radius: 4px;
 }
