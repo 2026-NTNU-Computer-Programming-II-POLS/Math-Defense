@@ -34,14 +34,14 @@ function onClick(): void {
    .gh-startwave): circular play icon + BEGIN eyebrow + START WAVE label. */
 .start-wave-btn {
   position: absolute;
-  top: calc(var(--hud-height, 56px) + 10px);
+  top: calc(var(--hud-height, 56px) + 8px);
   right: 18px;
   z-index: var(--z-action);
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-  border-radius: 14px;
+  gap: 10px;
+  padding: 7px 16px;
+  border-radius: 12px;
   background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
   border: 1px solid var(--gold-deep);
   color: #fff;
@@ -60,11 +60,11 @@ function onClick(): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.28);
-  font-size: var(--text-sm);
+  font-size: var(--text-2xs);
   flex-shrink: 0;
 }
 
@@ -77,14 +77,14 @@ function onClick(): void {
 .sw-eyebrow {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   text-transform: uppercase;
   opacity: 0.85;
 }
 .sw-main {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 700;
-  letter-spacing: 1.5px;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 </style>
