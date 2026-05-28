@@ -9,6 +9,7 @@ export interface ActivityInfo {
   settled: boolean
   settled_at: string | null
   settled_by: string | null
+  student_slot_cap: number
   created_at: string
 }
 
@@ -92,6 +93,7 @@ export const territoryService = {
     deadline: string
     class_id?: string | null
     slots: SlotDefinition[]
+    student_slot_cap?: number
   }) {
     return api.post<ActivityInfo>('/api/activities', payload)
   },

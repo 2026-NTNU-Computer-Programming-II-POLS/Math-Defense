@@ -101,6 +101,7 @@ class SqlAlchemyTerritoryRepository:
             row.settled_at = activity.settled_at
             row.settled_by = activity.settled_by
             row.class_id = activity.class_id
+            row.student_slot_cap = activity.student_slot_cap
         else:
             row = ActivityModel(
                 id=activity.id,
@@ -109,6 +110,7 @@ class SqlAlchemyTerritoryRepository:
                 title=activity.title,
                 deadline=activity.deadline,
                 settled=activity.settled,
+                student_slot_cap=activity.student_slot_cap,
                 created_at=activity.created_at,
             )
             self._db.add(row)
@@ -520,6 +522,7 @@ class SqlAlchemyTerritoryRepository:
             settled=row.settled,
             settled_at=_ensure_utc(row.settled_at),
             settled_by=row.settled_by,
+            student_slot_cap=row.student_slot_cap,
             created_at=_ensure_utc(row.created_at),
         )
 
