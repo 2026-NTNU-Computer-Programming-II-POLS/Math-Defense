@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { GamePhase, Events } from '@/data/constants'
+import { GamePhase } from '@/data/constants'
 import { formatScore } from '@/utils/formatters'
 import { MONTY_HALL_THRESHOLDS_BY_STAR } from '@/data/monty-hall-defs'
 import { useValuePop } from '@/composables/useValuePop'
@@ -94,49 +94,6 @@ const prepTime = computed(() => {
   return Math.floor(g.timeTotal)
 })
 
-// Live buff countdown. BuffSystem only emits ACTIVE_BUFFS_CHANGED on
-// add/expire, so buff.remainingTime is a snapshot — interpolate from
-// activeBuffsSnapshotTime to drain the displayed values in step with
-// timeTotal (~2 Hz via useGameLoop's RAF mirror).
-function liveBuffRemaining(buff: { remainingTime: number }): number {
-  return Math.max(0, buff.remainingTime - (g.timeTotal - g.activeBuffsSnapshotTime))
-}
-function liveBuffSeconds(buff: { remainingTime: number }): number {
-  return Math.ceil(liveBuffRemaining(buff))
-}
-
-// SVG countdown ring geometry — r = 15.5 in a 36×36 viewBox. The fill
-// circle drains via stroke-dashoffset as the remaining fraction shrinks,
-// giving a clock-like readout around the buff token.
-const RING_CIRCUMFERENCE = 2 * Math.PI * 15.5
-
-function ringOffset(buff: { remainingTime: number; totalDuration: number }): number {
-  const frac = buff.totalDuration > 0
-    ? liveBuffRemaining(buff) / buff.totalDuration
-    : 0
-  return RING_CIRCUMFERENCE * (1 - Math.min(1, Math.max(0, frac)))
-}
-
-// ─── Buff expiry ghosts ───────────────────────────────────────────────
-// When a timed buff's countdown hits zero its token would otherwise just
-// vanish. Instead we keep a short-lived "ghost" that flashes a ✓ and fades
-// out, so the player gets an unmistakable "the buff ended" signal. Driven
-// by the BUFF_EXPIRED engine event — a store diff cannot tell a genuine
-// timeout apart from the level-start buff cleanup.
-interface BuffGhost { id: string; name: string; letter: string }
-const EXPIRY_GHOST_MS = 1100
-const expiringGhosts = ref<BuffGhost[]>([])
-let ghostSeq = 0
-let unsubBuffExpired: (() => void) | null = null
-
-function spawnExpiryGhost(name: string): void {
-  const id = `ghost_${ghostSeq++}`
-  expiringGhosts.value = [...expiringGhosts.value, { id, name, letter: name[0] ?? '?' }]
-  window.setTimeout(() => {
-    expiringGhosts.value = expiringGhosts.value.filter((gh) => gh.id !== id)
-  }, EXPIRY_GHOST_MS)
-}
-
 // HUD height publish
 const hudRef = ref<HTMLDivElement | null>(null)
 let hudRo: ResizeObserver | null = null
@@ -148,18 +105,6 @@ function publishHudHeight(h: number): void {
 }
 
 onMounted(() => {
-  // Subscribe to buff expiry so a token can flash a ✓ ghost as it ends.
-  // HUD mounts after the engine is wired (SpellBar, a child, relies on the
-  // same access), but guard anyway and warn in dev if the timing slips.
-  const engine = g.getEngine()
-  if (engine) {
-    unsubBuffExpired = engine.eventBus.on(Events.BUFF_EXPIRED, ({ name }) => {
-      spawnExpiryGhost(name)
-    })
-  } else if (import.meta.env.DEV) {
-    console.warn('[HUD] engine not ready at mount — buff-expiry flash disabled')
-  }
-
   const el = hudRef.value
   if (!el) return
   publishHudHeight(el.offsetHeight)
@@ -172,8 +117,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   hudRo?.disconnect()
   hudRo = null
-  unsubBuffExpired?.()
-  unsubBuffExpired = null
 })
 </script>
 
@@ -254,7 +197,8 @@ onBeforeUnmount(() => {
     </div>
   </div>
 
-  <!-- Second row: Monty Hall progress + Spell bar + Active buffs -->
+  <!-- Second row: Monty Hall progress + Spell bar. Active buffs live in the
+       left utility rail (rendered by GameView), not here. -->
   <div class="hud-row2">
     <!-- Monty Hall progress -->
     <div class="mh-progress" title="Progress toward next Monty Hall event">
@@ -267,49 +211,6 @@ onBeforeUnmount(() => {
 
     <!-- Spell bar -->
     <SpellBar />
-
-    <!-- Active buffs — circular countdown tokens + expiry-flash ghosts -->
-    <div
-      v-if="g.activeBuffs.length > 0 || expiringGhosts.length > 0"
-      class="active-buffs"
-    >
-      <div
-        v-for="buff in g.activeBuffs"
-        :key="buff.id"
-        class="buff-icon"
-        role="img"
-        :aria-label="`${buff.name}: ${liveBuffSeconds(buff)} seconds remaining`"
-        :title="`${buff.name} — ${liveBuffSeconds(buff)}s left`"
-      >
-        <svg class="buff-ring" viewBox="0 0 36 36" aria-hidden="true">
-          <circle class="ring-track" cx="18" cy="18" r="15.5" />
-          <circle
-            class="ring-fill"
-            cx="18"
-            cy="18"
-            r="15.5"
-            :stroke-dasharray="RING_CIRCUMFERENCE"
-            :style="{ strokeDashoffset: `${ringOffset(buff)}px` }"
-          />
-        </svg>
-        <span class="buff-letter">{{ buff.name[0] }}</span>
-        <span class="buff-timer">{{ liveBuffSeconds(buff) }}s</span>
-      </div>
-      <div
-        v-for="ghost in expiringGhosts"
-        :key="ghost.id"
-        class="buff-icon buff-icon--expired"
-        role="img"
-        :aria-label="`${ghost.name} expired`"
-        :title="`${ghost.name} expired`"
-      >
-        <svg class="buff-ring" viewBox="0 0 36 36" aria-hidden="true">
-          <circle class="ring-track" cx="18" cy="18" r="15.5" />
-        </svg>
-        <span class="buff-letter">{{ ghost.letter }}</span>
-        <span class="buff-timer expired-mark" aria-hidden="true">&#10003;</span>
-      </div>
-    </div>
 
     <!-- Prep timer -->
     <div v-if="prepTime !== null" class="prep-timer">
@@ -491,95 +392,6 @@ onBeforeUnmount(() => {
   height: 100%;
   background: linear-gradient(90deg, var(--plum), var(--plum-deep));
   transition: width 300ms ease-out;
-}
-
-/* Active buffs — circular countdown tokens with sage chrome. The SVG ring
-   drains as the buff's remaining fraction shrinks (a clock-like readout);
-   the centre shows the buff initial and integer seconds remaining. */
-.active-buffs {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-}
-.buff-icon {
-  position: relative;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(126, 144, 119, 0.42);
-  border-radius: 8px;
-  background: rgba(173, 187, 166, 0.22);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  line-height: 1;
-}
-.buff-ring {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  /* Drain clockwise starting from 12 o'clock. */
-  transform: rotate(-90deg);
-}
-.ring-track {
-  fill: rgba(212, 168, 64, 0.08);
-  stroke: rgba(255, 255, 255, 0.12);
-  stroke-width: 3;
-}
-.ring-fill {
-  fill: none;
-  stroke: var(--gold-bright);
-  stroke-width: 3;
-  stroke-linecap: round;
-  /* The 2 Hz data ticks interpolate smoothly across the gap — mirrors the
-     shop panel's draining-indicator transition. */
-  transition: stroke-dashoffset 480ms linear;
-}
-.buff-letter {
-  position: relative;
-  font-size: var(--text-2xs);
-  color: var(--gold);
-  font-weight: bold;
-}
-.buff-timer {
-  position: relative;
-  font-size: var(--text-xs);
-  color: var(--gold-bright);
-  font-weight: bold;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Expiry ghost — a buff whose timer just hit zero. Flashes a green ✓ and
-   fades out over EXPIRY_GHOST_MS so the player registers that it ended. */
-.buff-icon--expired {
-  animation: buff-expire-flash 1100ms ease-out forwards;
-}
-/* Bright green for green-on-dark legibility — matches .ia-correct's tone
-   on the same HUD bar; the --hp-green token (#048634) is tuned for lighter
-   panel backgrounds and reads too dark here. */
-.buff-icon--expired .ring-track { stroke: #60f090; }
-.buff-icon--expired .buff-letter { color: #60f090; }
-.expired-mark {
-  color: #60f090;
-  font-size: var(--text-sm);
-}
-@keyframes buff-expire-flash {
-  0%   { transform: scale(1);    opacity: 1; }
-  18%  { transform: scale(1.22); opacity: 1; }
-  45%  { transform: scale(1);    opacity: 1; }
-  100% { transform: scale(0.92); opacity: 0; }
-}
-/* Reduced motion — drop the scale bounce + ring tween, keep the colour
-   flash and an opacity fade so the expiry signal still reads. */
-@media (prefers-reduced-motion: reduce) {
-  .ring-fill { transition: none; }
-  .buff-icon--expired { animation: buff-expire-fade 1100ms ease-out forwards; }
-}
-@keyframes buff-expire-fade {
-  0%, 60% { opacity: 1; }
-  100%    { opacity: 0; }
 }
 
 /* Prep timer */

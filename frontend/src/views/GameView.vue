@@ -385,11 +385,6 @@ onBeforeUnmount(() => {
       <AchievementToast :achievements="newlyUnlockedAchievements" />
       <PrincipleOverlay :principle-id="currentPrincipleId" @dismiss="clearPrinciple" />
       <HUD />
-      <!-- Bottom-left corner controls — system buttons + practice badge in
-           one horizontal row. Kept clear of the top-right so they never
-           overlap the HUD buff-countdown rings or the FunctionPanel, and
-           bottom-LEFT (not bottom-right) so they clear the TowerInfoPanel.
-           Anchored above the TowerBar — same idiom as StartWaveButton. -->
       <!-- Top-right HUD actions: Manual (?) + Exit, beside the IA pill. -->
       <div class="hud-actions">
         <button
@@ -560,14 +555,11 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
-/* Bottom-left corner controls — one horizontal row (system buttons +
-   practice badge) anchored above the TowerBar, the same idiom as
-   StartWaveButton / TowerInfoPanel. Sitting at bottom-LEFT keeps it clear
-   of the HUD buff-countdown rings, the FunctionPanel, and the
-   TowerInfoPanel (all top/bottom-right). The container is click-through
-   (this overrides the `.game-overlay > *` auto rule above — note the
-   higher-specificity selector); only the buttons catch pointer events, so
-   the gaps between row items never swallow canvas input. */
+/* Bottom-left practice-mode badge slot — anchored above the TowerBar at
+   bottom-LEFT so it clears the right-side FunctionPanel / TowerInfoPanel.
+   The container is click-through (the higher-specificity selector overrides
+   `.game-overlay > *` above); the badge itself is also pointer-events:none,
+   so the slot never swallows canvas input. */
 .game-overlay > .corner-controls {
   position: absolute;
   left: 16px;

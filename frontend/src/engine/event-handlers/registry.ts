@@ -285,7 +285,6 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   ],
   BUFF_EXPIRED: [
     { module: 'composables/useEngineAudio', handler: 'anonymous', purpose: 'Trigger buff-expire SFX' },
-    { module: 'components/game/HUD',        handler: 'anonymous', purpose: 'Spawn an expiry-flash ghost when a timed buff ends' },
   ],
 
   // ── Pedagogy ──
