@@ -37,14 +37,14 @@ export function bindEngineUiBridges(g: Game): (() => void)[] {
       && 'params' in tower
       && typeof (tower as { params: unknown }).params === 'object'
     ) {
-      uiStore.openBuildPanel((tower as Tower).id)
+      uiStore.openBuildPanel((tower as Tower).id, (tower as Tower).type)
     } else {
       uiStore.closeBuildPanel()
     }
   }))
 
   offs.push(g.eventBus.on(Events.TOWER_PLACED, (tower) => {
-    uiStore.openBuildPanel(tower.id)
+    uiStore.openBuildPanel(tower.id, tower.type)
     uiStore.setBuildHintStep(2)
   }))
 

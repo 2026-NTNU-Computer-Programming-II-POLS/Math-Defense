@@ -160,6 +160,11 @@ function selectTower(type: TowerType, def: { cost: number }): void {
 function canAfford(cost: number): boolean {
   return gameStore.gold >= cost
 }
+
+function isHighlighted(type: TowerType): boolean {
+  return uiStore.selectedTowerType === type
+    || (uiStore.buildPanelVisible && uiStore.buildPanelTowerType === type)
+}
 </script>
 
 <template>
@@ -192,15 +197,15 @@ function canAfford(cost: number): boolean {
         :key="def.type"
         :class="[
           'tower-btn',
-          { selected: uiStore.selectedTowerType === def.type },
+          { selected: isHighlighted(def.type) },
           { unaffordable: !canAfford(def.cost) },
           { shaking: shakingType === def.type },
         ]"
         :data-tooltip="`${def.description} — ${def.mathConcept} · Cost: ${def.cost} gold\nOn the exam: ${def.examRelevance}`"
         :aria-label="`${def.nameEn}, ${def.mathConcept}, cost ${def.cost} gold${canAfford(def.cost) ? '' : ', unaffordable'}`"
-        :aria-pressed="uiStore.selectedTowerType === def.type"
+        :aria-pressed="isHighlighted(def.type)"
         :aria-disabled="!canAfford(def.cost)"
-        :style="uiStore.selectedTowerType === def.type
+        :style="isHighlighted(def.type)
           ? { background: TOWER_CARD_COLOR[def.type], borderColor: TOWER_CARD_COLOR[def.type] }
           : null"
         @click="selectTower(def.type, def)"

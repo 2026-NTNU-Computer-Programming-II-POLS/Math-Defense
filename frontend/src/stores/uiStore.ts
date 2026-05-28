@@ -104,6 +104,11 @@ export const useUiStore = defineStore('ui', () => {
   // Build Panel (parameter configuration panel)
   const buildPanelVisible = ref(false)
   const buildPanelTowerId = ref<string | null>(null)  // shown after clicking a placed tower
+  // Tower type behind the open build panel. selectedTowerType is cleared the
+  // moment a tower is placed (so the next cell click doesn't place again), but
+  // the matching tower-bar button should stay highlighted until the build
+  // panel closes — this ref drives that highlight.
+  const buildPanelTowerType = ref<TowerType | null>(null)
 
   // Buff Card Panel
   const buffPanelVisible = ref(false)
@@ -355,18 +360,21 @@ export const useUiStore = defineStore('ui', () => {
     selectedTowerType.value = null
   }
 
-  function openBuildPanel(towerId: string): void {
+  function openBuildPanel(towerId: string, towerType: TowerType | null = null): void {
     buildPanelTowerId.value = towerId
+    buildPanelTowerType.value = towerType
     buildPanelVisible.value = true
   }
 
   function closeBuildPanel(): void {
     buildPanelVisible.value = false
     buildPanelTowerId.value = null
+    buildPanelTowerType.value = null
   }
 
   function hideBuildPanel(): void {
     buildPanelVisible.value = false
+    buildPanelTowerType.value = null
   }
 
   function setBuildHintStep(step: number): void {
@@ -379,7 +387,7 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     selectedTowerType,
-    buildPanelVisible, buildPanelTowerId,
+    buildPanelVisible, buildPanelTowerId, buildPanelTowerType,
     buffPanelVisible,
     modalVisible, modalTitle, modalMessage, modalCallback,
     modalConfirmMode, modalConfirmLabel, modalCancelLabel,
