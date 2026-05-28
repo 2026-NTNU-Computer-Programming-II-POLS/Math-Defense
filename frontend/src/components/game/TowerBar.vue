@@ -333,6 +333,8 @@ function canAfford(cost: number): boolean {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
+  justify-self: center;
+  padding-left: 8px;
 }
 
 /* Header grid: the TOWERS label occupies the first cell and the category
@@ -407,8 +409,7 @@ function canAfford(cost: number): boolean {
 .tower-list {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 144px;
-  justify-content: start;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 5px;
   flex: 1;
   min-width: 0;
@@ -497,6 +498,8 @@ function canAfford(cost: number): boolean {
   white-space: nowrap;
   width: 100%;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Per-tower glyph (WCAG 2.2 SC 1.4.1): an extra hue-independent cue so
    colour-blind players can identify tower type without relying on the
