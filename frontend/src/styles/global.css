@@ -161,6 +161,187 @@ body {
    "dashed-rule" variant stays scoped in MenuView / InitialAnswerView /
    ScoreResultView. */
 
+/* ── Ornate frame — double border + L-bracket corners.
+   Pairs with `.card` to mark ceremonial gateway surfaces (menu, auth,
+   pre-game, level-select). Requires four `.card-corner` spans inside
+   the element. */
+.card-ornate {
+  position: relative;
+  border: 2px solid var(--gold-deep);
+  box-shadow: var(--shadow), 0 0 0 4px var(--gold-tint-soft);
+}
+
+.card-ornate::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1.5px dashed var(--gold-deep);
+  border-radius: inherit;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.card-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 1;
+}
+.card-corner-tl {
+  top: -2px; left: -2px;
+  border-top: 2px solid var(--gold-deep);
+  border-left: 2px solid var(--gold-deep);
+  border-top-left-radius: 6px;
+}
+.card-corner-tr {
+  top: -2px; right: -2px;
+  border-top: 2px solid var(--gold-deep);
+  border-right: 2px solid var(--gold-deep);
+  border-top-right-radius: 6px;
+}
+.card-corner-bl {
+  bottom: -2px; left: -2px;
+  border-bottom: 2px solid var(--gold-deep);
+  border-left: 2px solid var(--gold-deep);
+  border-bottom-left-radius: 6px;
+}
+.card-corner-br {
+  bottom: -2px; right: -2px;
+  border-bottom: 2px solid var(--gold-deep);
+  border-right: 2px solid var(--gold-deep);
+  border-bottom-right-radius: 6px;
+}
+
+/* Modifier — brackets sit fully inside the parent's border box.
+   Required when the parent uses `overflow: hidden`, which would
+   otherwise clip the -2px overshoot. */
+.card-corner--inset.card-corner-tl { top: 2px; left: 2px; }
+.card-corner--inset.card-corner-tr { top: 2px; right: 2px; }
+.card-corner--inset.card-corner-bl { bottom: 2px; left: 2px; }
+.card-corner--inset.card-corner-br { bottom: 2px; right: 2px; }
+
+/* ── Magic-circle frame — rotating gold ring + dashed inner orbit.
+   Wraps a logo (`<img class="logo-ring__img">` recommended).
+   Modifier `.logo-ring--sm` shrinks for tighter contexts like auth. */
+.logo-ring {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  max-width: 64vw;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-ring--sm {
+  width: 150px;
+  height: 150px;
+  max-width: 48vw;
+}
+
+.logo-ring::before,
+.logo-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.logo-ring::before {
+  background:
+    repeating-conic-gradient(
+      var(--gold-deep) 0deg,
+      var(--gold-deep) 2deg,
+      transparent 2deg,
+      transparent 15deg
+    ),
+    conic-gradient(
+      from 0deg,
+      var(--gold) 0deg,
+      var(--terracotta-deep) 90deg,
+      var(--gold-deep) 180deg,
+      var(--terracotta-deep) 270deg,
+      var(--gold) 360deg
+    );
+  -webkit-mask: radial-gradient(
+    circle,
+    transparent 55%,
+    #000 58%,
+    #000 88%,
+    transparent 92%
+  );
+          mask: radial-gradient(
+    circle,
+    transparent 55%,
+    #000 58%,
+    #000 88%,
+    transparent 92%
+  );
+  filter: drop-shadow(0 0 6px var(--gold-tint));
+  animation: logo-ring-spin 24s linear infinite;
+}
+
+.logo-ring::after {
+  inset: 8px;
+  border: 2px dashed var(--gold-deep);
+  opacity: 0.85;
+  animation:
+    logo-ring-spin-rev 38s linear infinite,
+    logo-ring-pulse 4s ease-in-out infinite;
+}
+
+.logo-ring__img {
+  position: relative;
+  z-index: 2;
+  display: block;
+}
+
+.logo-cardinal {
+  position: absolute;
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  color: var(--gold-deep);
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 0 6px var(--gold-tint);
+  animation: logo-cardinal-pulse 3s ease-in-out infinite;
+}
+.logo-cardinal-n { top: 2%;  left: 50%; transform: translate(-50%, -50%); }
+.logo-cardinal-s { bottom: 2%; left: 50%; transform: translate(-50%, 50%); }
+.logo-cardinal-e { top: 50%; right: 2%; transform: translate(50%, -50%); }
+.logo-cardinal-w { top: 50%; left: 2%;  transform: translate(-50%, -50%); }
+.logo-cardinal-e,
+.logo-cardinal-w { animation-delay: 1.5s; }
+
+.logo-ring--sm .logo-cardinal { font-size: var(--text-sm); }
+
+@keyframes logo-ring-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes logo-ring-spin-rev {
+  to { transform: rotate(-360deg); }
+}
+@keyframes logo-ring-pulse {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; }
+}
+@keyframes logo-cardinal-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-ring::before,
+  .logo-ring::after,
+  .logo-cardinal {
+    animation: none;
+  }
+}
+
 /* ── Italic tagline under a view title — shared primitive ── */
 .motto {
   font-size: var(--text-base);
