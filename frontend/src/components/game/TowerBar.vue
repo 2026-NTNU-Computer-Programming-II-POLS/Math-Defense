@@ -409,12 +409,11 @@ function canAfford(cost: number): boolean {
 .tower-list {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 152px;
+  grid-auto-columns: 144px;
   justify-content: start;
   gap: 5px;
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
   border-left: 1px dashed var(--line);
   padding-left: 10px;
   margin-left: 6px;
@@ -424,7 +423,7 @@ function canAfford(cost: number): boolean {
    tower-btn border-radius, so no !important specificity hack is needed. */
 .tower-btn {
   display: flex; flex-direction: column; align-items: center;
-  gap: 1px; padding: 3px 8px;
+  gap: 1px; padding: 3px 4px;
   background: rgba(245, 250, 254, 0.86);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -490,9 +489,9 @@ function canAfford(cost: number): boolean {
 .tower-icon-svg { width: 100%; height: 100%; }
 .tower-name {
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: 0.625rem;
   color: #222;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
   font-weight: 700;
   white-space: nowrap;
   width: 100%;
@@ -503,8 +502,8 @@ function canAfford(cost: number): boolean {
    colour of .tower-icon. Lives inline with the label. */
 .tower-glyph {
   display: inline-block;
-  margin-right: 4px;
-  font-size: var(--text-xs);
+  margin-right: 3px;
+  font-size: 0.625rem;
   color: var(--terracotta-deep);
   font-weight: bold;
 }
