@@ -393,6 +393,44 @@ body {
   border-color: var(--gold);
 }
 
+/* Out-of-canvas variant: when a .rune-input sits inside a light .rune-panel
+   (Admin / Profile / ClassView / ChallengeBuilder / RankingsView /
+   TeacherTerritorySetup), the dark stone+gold canvas styling clashes with
+   the cream panel. Switch to a panel-matching light palette. In-canvas
+   inputs (MatrixInputPanel, IntegralPanel) are not under .rune-panel, so
+   they keep the original look. */
+.rune-panel .rune-input {
+  background: var(--cream-soft);
+  border-color: var(--line-strong);
+  color: var(--charcoal);
+}
+
+.rune-panel .rune-input::placeholder {
+  color: var(--charcoal-soft);
+  opacity: 0.7;
+}
+
+.rune-panel .rune-input:focus {
+  border-color: var(--terracotta-deep);
+  box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28);
+}
+
+.rune-panel .rune-input:disabled {
+  background: rgba(232, 239, 245, 0.5);
+  color: var(--charcoal-soft);
+  cursor: not-allowed;
+}
+
+/* Chrome / Safari autofill paints email + password fields yellow, which
+   would override the cream background. Repaint with an inset shadow. */
+.rune-panel .rune-input:-webkit-autofill,
+.rune-panel .rune-input:-webkit-autofill:hover,
+.rune-panel .rune-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--cream-soft) inset;
+  -webkit-text-fill-color: var(--charcoal);
+  caret-color: var(--charcoal);
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--stone-dark); }
