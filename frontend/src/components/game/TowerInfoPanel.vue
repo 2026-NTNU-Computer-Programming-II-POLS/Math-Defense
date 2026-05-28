@@ -484,6 +484,10 @@ details.stat-row--breakdown > summary {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* Fill the row so space-between pushes the label left and the clickable
+     value right; without an explicit width the flex box collapses to its
+     content and the two clump together (same <summary> quirk noted above). */
+  width: 100%;
 }
 details.stat-row--breakdown > summary::-webkit-details-marker { display: none; }
 details.stat-row--breakdown > summary:focus-visible {
