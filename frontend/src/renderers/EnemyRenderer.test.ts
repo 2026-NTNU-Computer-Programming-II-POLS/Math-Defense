@@ -182,10 +182,10 @@ describe('EnemyRenderer — Phase 6a/6b/6c/6d/6e/6f glyph bodies', () => {
     expect(() => renderer.render(makeRenderer(ctx), game)).not.toThrow()
   })
 
-  // Phase 6f — Boss A's flickering QED halo is deterministic on
-  // sin(time, index), but exercising several time points helps catch any
-  // drift in the orbit math under the stubbed context.
-  it('renders bossA equation body with flickering QED halo without throwing', () => {
+  // Phase 6f — Boss A's body is a large `∀` ringed by flickering equation
+  // fragments; the flicker is deterministic on sin(time, index), but advancing
+  // the clock exercises the orbit + flicker math under the stubbed context.
+  it('renders bossA quantifier body with orbiting equation fragments without throwing', () => {
     const game = createMockGame()
     game.enemies.push(createMockEnemy({ type: 'bossA' as EnemyType, x: 5, y: 5 }))
     const renderer = new EnemyRenderer()

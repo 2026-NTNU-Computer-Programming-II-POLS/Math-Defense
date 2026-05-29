@@ -20,7 +20,13 @@ const REGENERATOR_LIM_SCALE = 0.55
 // from a distance — purely a "this thing is doing something" cue.
 const HELPER_SIGMA_BREATH = 0.06
 
-// Phase 6e: Bulwark's `∥` body. The glyph reads as two thick parallel walls.
+// Phase 6e: Bulwark's two-parallel-walls body. Drawn as self-rendered bars
+// (not the Unicode `∥` glyph) because U+2225 is absent from many non-Windows
+// monospace/serif fallbacks and would render as a tofu box. Geometry is in
+// unit fractions of `size`; the renderer scales around the body origin.
+const BULWARK_BAR_HALF_SEP = 0.18 // x-offset of each bar's centre from origin
+const BULWARK_BAR_WIDTH = 0.16
+const BULWARK_BAR_HEIGHT = 0.72
 // Rivet positions are unit fractions of `size` — two per bar, top and bottom —
 // transplanted from the legacy pauldron treatment so the "armoured" identity
 // survives the body swap.
@@ -33,19 +39,24 @@ const SWARMLING_SATELLITE_COUNT = 3
 const SWARMLING_SATELLITE_SCALE = 0.42
 const SWARMLING_ORBIT_RADIUS = 0.46
 
-// Phase 6f: Boss A wears its unsolvable equation as a body. The string is long,
-// so it renders at ~28% of `size` to fit the silhouette. A halo of flickering
-// "QED" boxes orbits the upper hemisphere where the slime crown used to sit.
-const BOSS_A_EQUATION_GLYPH = '∀x. f(x) ≠ 0'
-const BOSS_A_EQUATION_SCALE = 0.28
-const BOSS_A_QED_COUNT = 5
-const BOSS_A_QED_RADIUS = 0.62
+// Phase 6f: Boss A's body is a single large `∀` quantifier — a boss-scale
+// silhouette that reads at a glance. The "unsolvable equation" identity moves
+// to flickering fragments orbiting the body (same big-body + satellites
+// structure as Boss B), instead of cramming the whole equation into a 28%
+// body that lost all presence. Fragments use the gold accent + a deterministic
+// sin-flicker keyed by index + time (no Math.random).
+const BOSS_A_BODY_GLYPH = '∀'
+const BOSS_A_BODY_SCALE = 0.62
+const BOSS_A_FRAGMENTS = ['f(x)', '≠', '0'] as const
+const BOSS_A_FRAGMENT_RADIUS = 0.66
+const BOSS_A_FRAGMENT_SCALE = 0.26
 // Phase 6f: Boss B is a Mobius-strip paradox loop. The body is a lemniscate
-// (figure-8) traced with the chromatic-fringe recipe; satellites of `↻`
-// orbit the loop replacing the legacy crown halo.
+// (figure-8) traced with the chromatic-fringe recipe; self-drawn loop-arrow
+// satellites orbit the loop replacing the legacy crown halo. The arrow is
+// path-drawn (not the Unicode `↻` glyph) because U+21BB is missing from many
+// non-Windows fallback fonts and would render as a tofu box.
 const BOSS_B_SATELLITE_COUNT = 4
 const BOSS_B_SATELLITE_RADIUS = 0.68
-const BOSS_B_SATELLITE_GLYPH = '↻'
 
 // Phase 6c: Split's fraction-body layout. Numerator above, vinculum at center,
 // denominator below. dy values are unit fractions of `size` (renderer scales).
@@ -320,7 +331,7 @@ export class EnemyRenderer {
       // save block so it survives the body translate/scale here.
       drawGlyphBody(ctx, px, py, size * REGENERATOR_LIM_SCALE, 'lim', enemy.color)
     } else if (enemy.type === 'bulwark') {
-      drawGlyphBody(ctx, px, py, size, '∥', enemy.color)
+      this._drawParallelBars(ctx, px, py, size, enemy.color)
       // Rivet dots on each bar — light grey caps over the glyph fringe so the
       // "armoured" read survives at small sizes where the ∥ thickness alone
       // would not.
@@ -353,19 +364,21 @@ export class EnemyRenderer {
         })
       }
     } else if (enemy.type === 'bossA') {
-      drawGlyphBody(ctx, px, py, size * BOSS_A_EQUATION_SCALE, BOSS_A_EQUATION_GLYPH, enemy.color)
-      // Halo of "QED" boxes orbiting the upper hemisphere; per-box flicker
-      // gives the unsolvable feel without using Math.random (deterministic
-      // sin wave keyed by index + time).
-      for (let i = 0; i < BOSS_A_QED_COUNT; i++) {
-        const ang = -Math.PI + (i / (BOSS_A_QED_COUNT - 1)) * Math.PI + this._time * 0.4 + phase
+      drawGlyphBody(ctx, px, py, size * BOSS_A_BODY_SCALE, BOSS_A_BODY_GLYPH, enemy.color)
+      // The unsolvable equation orbits the quantifier as flickering fragments;
+      // per-fragment flicker gives the "never resolves" feel without using
+      // Math.random (deterministic sin wave keyed by index + time).
+      for (let i = 0; i < BOSS_A_FRAGMENTS.length; i++) {
+        const ang = (i / BOSS_A_FRAGMENTS.length) * Math.PI * 2 + this._time * 0.5 + phase
         const flicker = Math.sin(this._time * 6 + i * 1.7) * 0.5 + 0.5
-        if (flicker < 0.25) continue
-        const sx = px + Math.cos(ang) * size * BOSS_A_QED_RADIUS
-        const sy = py + Math.sin(ang) * size * BOSS_A_QED_RADIUS * 0.55
+        if (flicker < 0.2) continue
+        const sx = px + Math.cos(ang) * size * BOSS_A_FRAGMENT_RADIUS
+        const sy = py + Math.sin(ang) * size * BOSS_A_FRAGMENT_RADIUS * 0.55
         ctx.save()
-        ctx.globalAlpha *= 0.4 + flicker * 0.6
-        drawGlyphBody(ctx, sx, sy, size * 0.22, 'QED', '#fbbf24', { fringe: false })
+        ctx.globalAlpha *= 0.45 + flicker * 0.55
+        drawGlyphBody(ctx, sx, sy, size * BOSS_A_FRAGMENT_SCALE, BOSS_A_FRAGMENTS[i], '#fbbf24', {
+          fringe: false,
+        })
         ctx.restore()
       }
     } else if (enemy.type === 'bossB') {
@@ -374,15 +387,12 @@ export class EnemyRenderer {
       // recipe as drawGlyphBody so identity sits inside the math-error
       // vocabulary.
       this._drawLemniscate(ctx, px, py, size, enemy.color)
-      // Halo of orbiting `↻` paradox-loop satellites.
+      // Halo of orbiting loop-arrow paradox satellites.
       for (let i = 0; i < BOSS_B_SATELLITE_COUNT; i++) {
         const ang = (i / BOSS_B_SATELLITE_COUNT) * Math.PI * 2 + this._time * 0.8 + phase
         const sx = px + Math.cos(ang) * size * BOSS_B_SATELLITE_RADIUS
         const sy = py + Math.sin(ang) * size * BOSS_B_SATELLITE_RADIUS * 0.6
-        drawGlyphBody(ctx, sx, sy, size * 0.32, BOSS_B_SATELLITE_GLYPH, '#f0abfc', {
-          rotation: ang,
-          fringe: false,
-        })
+        this._drawLoopArrow(ctx, sx, sy, size * 0.17, '#f0abfc', ang)
       }
     } else {
       // General — gait wobble is a tiny back-and-forth tilt.
@@ -425,11 +435,11 @@ export class EnemyRenderer {
           outline: false,
         })
       } else if (enemy.type === 'bulwark') {
-        drawGlyphBody(ctx, px, py, size, '∥', '#bfeaff', { fringe: false, outline: false })
+        this._drawParallelBars(ctx, px, py, size, '#bfeaff', { fringe: false, outline: false })
       } else if (enemy.type === 'swarmling') {
         drawGlyphBody(ctx, px, py, size * 0.78, 'ε', '#bfeaff', { fringe: false, outline: false })
       } else if (enemy.type === 'bossA') {
-        drawGlyphBody(ctx, px, py, size * BOSS_A_EQUATION_SCALE, BOSS_A_EQUATION_GLYPH, '#bfeaff', {
+        drawGlyphBody(ctx, px, py, size * BOSS_A_BODY_SCALE, BOSS_A_BODY_GLYPH, '#bfeaff', {
           fringe: false,
           outline: false,
         })
@@ -574,6 +584,129 @@ export class EnemyRenderer {
         outline: false,
       })
     }
+    ctx.restore()
+  }
+
+  /**
+   * Bulwark's two-parallel-walls body. Self-drawn (not the Unicode `∥`) so it
+   * never falls back to a tofu box on systems without U+2225. Mirrors the
+   * `drawGlyphBody` recipe: cyan/magenta chromatic fringe → dark outline →
+   * solid fill, applied to two vertical bars.
+   */
+  private _drawParallelBars(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    size: number,
+    color: string,
+    options: { fringe?: boolean; outline?: boolean } = {},
+  ): void {
+    const { fringe = true, outline = true } = options
+    const barW = size * BULWARK_BAR_WIDTH
+    const barH = size * BULWARK_BAR_HEIGHT
+    const sep = size * BULWARK_BAR_HALF_SEP
+    const top = py - barH / 2
+    const fringeOffset = size * 0.07
+
+    const fillBars = (fill: string, ox: number): void => {
+      ctx.fillStyle = fill
+      ctx.fillRect(px - sep - barW / 2 + ox, top, barW, barH)
+      ctx.fillRect(px + sep - barW / 2 + ox, top, barW, barH)
+    }
+
+    if (fringe) {
+      ctx.save()
+      ctx.globalAlpha *= 0.55
+      ctx.globalCompositeOperation = 'lighter'
+      fillBars('#00d6ff', -fringeOffset)
+      fillBars('#ff2bd6', fringeOffset)
+      ctx.restore()
+    }
+
+    if (outline) {
+      ctx.save()
+      ctx.strokeStyle = '#15111d'
+      ctx.lineWidth = Math.max(1, size / 14)
+      ctx.lineJoin = 'round'
+      ctx.strokeRect(px - sep - barW / 2, top, barW, barH)
+      ctx.strokeRect(px + sep - barW / 2, top, barW, barH)
+      ctx.restore()
+    }
+
+    ctx.save()
+    fillBars(color, 0)
+    ctx.restore()
+  }
+
+  /**
+   * Boss B's orbiting paradox satellite — a circular "reload/loop" arrow drawn
+   * as a path (not the Unicode `↻`) so it never tofu-boxes on systems missing
+   * U+21BB. An open arc with an arrowhead at one end; dark outline then colour.
+   */
+  private _drawLoopArrow(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    radius: number,
+    color: string,
+    rotation: number,
+  ): void {
+    const lw = Math.max(1.5, radius / 3.2)
+    const gap = 1.1 // radians of opening left for the arrowhead
+    const start = gap / 2
+    const end = Math.PI * 2 - gap / 2
+
+    // Arrowhead at the `end` of the arc, pointing along the (CCW) tangent.
+    const ex = Math.cos(end) * radius
+    const ey = Math.sin(end) * radius
+    const tx = -Math.sin(end)
+    const ty = Math.cos(end)
+    const radx = Math.cos(end)
+    const rady = Math.sin(end)
+    const head = radius * 0.7
+    const wing = radius * 0.55
+    const tipX = ex + tx * head
+    const tipY = ey + ty * head
+    const baseX = ex - tx * head * 0.2
+    const baseY = ey - ty * head * 0.2
+
+    const traceArc = (): void => {
+      ctx.beginPath()
+      ctx.arc(0, 0, radius, start, end)
+    }
+    const traceHead = (): void => {
+      ctx.beginPath()
+      ctx.moveTo(tipX, tipY)
+      ctx.lineTo(baseX + radx * wing, baseY + rady * wing)
+      ctx.lineTo(baseX - radx * wing, baseY - rady * wing)
+      ctx.closePath()
+    }
+
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate(rotation)
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    // Dark outline pass for readability against the fringed body.
+    ctx.strokeStyle = '#15111d'
+    ctx.fillStyle = '#15111d'
+    ctx.lineWidth = lw + Math.max(1, radius / 5)
+    traceArc()
+    ctx.stroke()
+    traceHead()
+    ctx.fill()
+    ctx.stroke()
+
+    // Colour pass.
+    ctx.strokeStyle = color
+    ctx.fillStyle = color
+    ctx.lineWidth = lw
+    traceArc()
+    ctx.stroke()
+    traceHead()
+    ctx.fill()
+
     ctx.restore()
   }
 

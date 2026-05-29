@@ -9,10 +9,28 @@
  * across operating systems; the chain pins a math-capable family first,
  * with Courier/serif fallbacks so the silhouette is never missing.
  * Kept as a module-level constant so every glyph-body callsite shares the
- * exact same font string (CI render-smoke test can baseline against it).
+ * exact same font string.
+ *
+ * NOTE: this stack falls through to Courier/monospace/serif on every
+ * non-Windows platform (Cambria Math is Windows-only; STIX Two Math is not
+ * bundled). Glyph bodies must therefore stick to code points that exist in
+ * those fallback fonts — enforced by `glyph-fallback-safety.test.ts`, which
+ * is the actual cross-platform guard (the render-smoke tests only assert the
+ * draw methods do not throw; they stub `fillText`, so they cannot catch a
+ * symbol that would render as a tofu box).
  */
 export const GLYPH_BODY_FONT_STACK =
   `'Cambria Math', 'STIX Two Math', 'Courier New', Courier, monospace, serif`
+
+/**
+ * Visual Redesign Phase 6 polish: chromatic-aberration fringe on a glyph
+ * smaller than this collapses into sub-pixel mud rather than reading as an
+ * "error" halo, so it is suppressed below the floor. Pets render at a fixed
+ * 18px, spell glyphs at 17px+, and towers are larger — so in practice this
+ * only affects the smallest enemy glyphs (swarmling core, split fraction
+ * parts, regenerator `lim`), which read more cleanly as a flat fill anyway.
+ */
+export const FRINGE_MIN_SIZE = 12
 
 export interface GlyphBodyOptions {
   /** Rotation in radians applied after translating to (px, py). */
@@ -76,7 +94,7 @@ export function drawGlyphBody(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
-  if (fringe) {
+  if (fringe && size >= FRINGE_MIN_SIZE) {
     ctx.save()
     ctx.globalAlpha = fringeAlpha
     ctx.globalCompositeOperation = 'lighter'
