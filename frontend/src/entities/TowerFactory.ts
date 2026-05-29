@@ -69,6 +69,13 @@ export function createTower(
     tower.arcStart = 0
     tower.arcEnd = Math.PI / 2
     tower.arcRestrict = false
+    // Radar towers ship with a fully playable default arc (unrestricted full
+    // sweep), so — unlike Magic/Limit/Calculus, which genuinely need player
+    // input — they must fire automatically on placement (spec: "towers fire
+    // automatically"). Mark them configured so RadarTowerSystem.update doesn't
+    // skip them before the player opens the arc panel. Re-applying the panel
+    // still re-seeds the needle via RADAR_ARC_CHANGED.
+    tower.configured = true
   }
 
   if (type === TowerType.RADAR_B || type === TowerType.RADAR_C) {
