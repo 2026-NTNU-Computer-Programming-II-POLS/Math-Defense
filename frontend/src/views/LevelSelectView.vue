@@ -142,6 +142,7 @@ async function startLevel() {
           class="star-card"
           :class="{ selected: selectedStar === star, locked: isStarLocked(star) }"
           :title="isStarLocked(star) ? STAR_5_LOCK_TOOLTIP : undefined"
+          :disabled="isStarLocked(star) || undefined"
           :aria-disabled="isStarLocked(star) || undefined"
           @click="selectStar(star)"
         >
