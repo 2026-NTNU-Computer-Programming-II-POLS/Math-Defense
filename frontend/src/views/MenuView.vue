@@ -134,13 +134,11 @@ const manualOpen = ref(false)
             </button>
           </div>
         </template>
-        <button
-          v-else
-          class="btn"
-          @click="router.push({ name: 'auth' })"
-        >
-          <span class="icon">⬡</span><span class="label">Log In / Register</span>
-        </button>
+        <div v-else class="btn-stack">
+          <button class="btn" @click="router.push({ name: 'auth' })">
+            <span class="icon">⬡</span><span class="label">Log In / Register</span>
+          </button>
+        </div>
       </div>
     </div>
 
