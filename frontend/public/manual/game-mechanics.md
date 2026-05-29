@@ -158,10 +158,10 @@ Four single-cast abilities on cooldown. Cost gold, fire instantly, no math input
 
 | Spell | Glyph | Cost | Cooldown | Target | Effect |
 |---|---|---|---|---|---|
-| Fireball | eˣ | 80 | 12 s | area (r=3) | 60 damage AoE — exponential blow-up |
-| Frost Nova | lim → 0 | 60 | 15 s | area (r=4) | slow to 40% speed for 5 s — enemy speed limits to zero |
-| Lightning | δ | 100 | 18 s | single | 150 damage one enemy — Dirac delta spike |
-| Haste | d/dt | 120 | 25 s | self | +tower attack speed for 8 s — derivative of position |
+| Exponential | eˣ | 80 | 12 s | area (r=3) | 60 damage AoE — the value blows up exponentially |
+| Asymptote | →0 | 60 | 15 s | area (r=4) | slow to 40% speed for 5 s — speed driven asymptotically to zero |
+| Impulse | δ | 100 | 18 s | single | 150 damage one enemy — a Dirac-delta spike at a single point |
+| Acceleration | dv/dt | 120 | 25 s | self | +tower attack speed for 8 s — the rate of change of velocity |
 
 Spells are your reactive layer — towers handle the steady pressure, spells handle the surprises (a burst of fast enemies, a boss low on HP, an unfavourable Monty Hall draw).
 

@@ -134,13 +134,13 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 
 | Threat | Why standard towers struggle | What to do |
 |---|---|---|
-| Regenerator | constant HP regen | Burst damage (Radar C, Lightning spell). Damage over Time (DoT) alone is unreliable. |
-| Bulwark | takes only 40% tower damage | Calculus pets, Fireball/Lightning spells, and Monty-Hall power-ups bypass the cut. Matrix laser ramps through it. |
-| Swarmling | -65% tower damage; bursty | Calculus pets ignore the modifier. Frost Nova to slow the cluster. |
-| Helper | buffs nearby allies | Kill the Helper *first*. Radar C or a Lightning spell are reliable openers. |
+| Regenerator | constant HP regen | Burst damage (Radar C, Impulse spell). Damage over Time (DoT) alone is unreliable. |
+| Bulwark | takes only 40% tower damage | Calculus pets, Exponential/Impulse spells, and Monty-Hall power-ups bypass the cut. Matrix laser ramps through it. |
+| Swarmling | -65% tower damage; bursty | Calculus pets ignore the modifier. Asymptote to slow the cluster. |
+| Helper | buffs nearby allies | Kill the Helper *first*. Radar C or an Impulse spell are reliable openers. |
 | Split | doubles into smaller mobs | Place AoE (Magic curve, Radar A sweep) where the children will spawn. |
 | Boss A | shield + minion pressure | Sustained DPS on the shield; a Matrix pair locks on for ramp damage. |
-| Boss B | shield + chain-rule gate + post-split adds | Answer the chain rule correctly to insta-kill (boss still splits into a Strong + Fast pair, so have Fireball / Frost Nova ready for the cleanup). |
+| Boss B | shield + chain-rule gate + post-split adds | Answer the chain rule correctly to insta-kill (boss still splits into a Strong + Fast pair, so have Exponential / Asymptote ready for the cleanup). |
 
 ---
 
@@ -150,17 +150,17 @@ Cast from the spell bar. Cost gold, fire instantly, share no resource pool with 
 
 | Spell | Glyph | Cost | Cooldown | Effect |
 |---|---|---|---|---|
-| **Fireball** | eˣ | 80 | 12 s | 60 damage in a r=3 AoE around the click point — exponential blow-up reads as explosive |
-| **Frost Nova** | lim → 0 | 60 | 15 s | Slow enemies in r=4 to 40% speed for 5 s — enemy speed limits to zero |
-| **Lightning** | δ | 100 | 18 s | 150 damage to a single targeted enemy — Dirac delta, a single-point spike |
-| **Haste** | d/dt | 120 | 25 s | Boost tower attack speed for 8 s (self-cast) — derivative of position, i.e. go faster |
+| **Exponential** | eˣ | 80 | 12 s | 60 damage in a r=3 AoE around the click point — the value blows up exponentially |
+| **Asymptote** | →0 | 60 | 15 s | Slow enemies in r=4 to 40% speed for 5 s — their speed is driven asymptotically toward zero |
+| **Impulse** | δ | 100 | 18 s | 150 damage to a single targeted enemy — a Dirac-delta spike, all the energy at one point |
+| **Acceleration** | dv/dt | 120 | 25 s | Boost tower attack speed for 8 s (self-cast) — the rate of change of velocity |
 
 When to cast:
 
-- **Frost Nova** opens a Helper-led wave so you can kill the Helper first.
-- **Lightning** finishes a Boss that's chunked through its shield.
-- **Fireball** clears Swarmling bursts and Split children at the choke.
-- **Haste** is the panic button when a wave is denser than you priced for.
+- **Asymptote** opens a Helper-led wave so you can kill the Helper first.
+- **Impulse** finishes a Boss that's chunked through its shield.
+- **Exponential** clears Swarmling bursts and Split children at the choke.
+- **Acceleration** is the panic button when a wave is denser than you priced for.
 
 ---
 

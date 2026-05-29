@@ -148,11 +148,11 @@ The Track-B redesign tracked in [`docs/V3_surgicalPlan/Visual_Redesign_Plan.md`]
 
 **Phase 6.5 — Pet visual alignment.** Decision: **6.5-A taken** (align). Pets are recast as math-helper glyphs sharing the construction recipe of enemies but with a **cyan-only fringe** so allied vs. hostile reads at a glance. Glyph mapping: `½` (slow) / `→` (fast) / `×` (heavy) / `+` (basic). The legacy allied aura ring + orbiting satellites are retained as the "friendly buff field" cue. Rationale: pets are visible on the same field as towers and enemies; leaving them on cartoon art creates a third visual style at odds with both. Cost was ~1 day; risk is zero (the fringe-color override is additive to `drawGlyphBody`, defaulting to the hostile cyan/magenta pair so no enemy callsite changed).
 
-**Spells — re-skin completed (Spell_Reskin_Plan Phases 0–2, 2026-05-16).** `SpellEffectRenderer` was migrated to extend `EffectLayer` (Phase 0) and each spell rebuilt as a glyph-centred composition (Phase 1, Option A): Fireball = `eˣ` rising from cast point with expanding shockwave rings; Frost Nova = `lim → 0` with concentric contour rings collapsing inward (load-bearing motion that distinguishes it from the Regenerator's static `lim`); Lightning = `δ` at the strike point with a chromatic vertical bolt; Haste = `d/dt` drifting upward over a green/gold aura with radiating speed lines. All four use the player-action **gold-only fringe** (`#ffd700` / `#c47206`) — distinct from enemies (cyan/magenta) and pets (cyan-only). The same glyph mapping appears on `SpellBar.vue` icons and in the `public/manual/*.md` spell tables. Reduced-motion contract (Phase 2) is documented in the **Reduced-motion contract** paragraph below.
+**Spells — re-skin completed (Spell_Reskin_Plan Phases 0–2, 2026-05-16); concept-rename 2026-05-29.** `SpellEffectRenderer` was migrated to extend `EffectLayer` (Phase 0) and each spell rebuilt as a glyph-centred composition (Phase 1, Option A). The 2026-05-29 rename made each spell's name *be* its math operator (internal ids unchanged): Exponential (`fireball`) = `eˣ` rising from cast point with expanding shockwave rings; Asymptote (`slow`) = `→0` with concentric contour rings collapsing inward (load-bearing motion that distinguishes it from the Regenerator's static `lim`; dropping `lim` from the glyph also removed the symbol collision); Impulse (`lightning`) = `δ` at the strike point with a chromatic vertical bolt; Acceleration (`haste`) = `dv/dt` drifting upward over a green/gold aura with radiating speed lines. All four use the player-action **gold-only fringe** (`#ffd700` / `#c47206`) — distinct from enemies (cyan/magenta) and pets (cyan-only). The same name + glyph mapping appears on `SpellBar.vue` icons (rendered as `<text>` in the shared math font stack) and in the `public/manual/*.md` spell tables. Reduced-motion contract (Phase 2) is documented in the **Reduced-motion contract** paragraph below.
 
 **Event surface added by the redesign.** `Events.TOWER_FIRED` (emitted by `CombatSystem` at projectile spawn) and `Events.ENEMY_DYING` (emitted by `SplitPolicy.killEnemy` for combat kills only — origin-breach removals stay instant). Both are registered in `EVENT_HANDLER_REGISTRY` and gated by `npm run event-registry-check`. The `Enemy.dying / dyingTimer / deathMaxTime` fields extend the entity lifecycle so corpses can play a ~0.35 s (regular) or ~1.20 s (boss) death animation without holding up the combat resolution — `alive` flips to `false` at t=0 exactly as before.
 
-**Reduced-motion contract.** `useReducedMotion` (`composables/useReducedMotion.ts`) and the engine-side `prefersReducedMotion()` helper provide a single source of truth. When the user opts in: `ShakeController` produces zero offset; `DeathParticleRenderer` halves both particle count and lifetime; `TowerLifecycleRenderer` collapses the upgrade pillar + rune sweep to a static colored flash; HUD value-pops drop the scale keyframe but keep the colour flash. `SpellEffectRenderer` drops each spell's motion-intensive layer — Fireball loses the expanding shockwave rings (heat bloom kept as static flash); Frost Nova drops the inward-collapsing contour rings (`→ 0` arrow inside the glyph carries the Regenerator differentiator per Spell_Reskin_Plan §2.4); Lightning drops the chromatic offset passes and renders a single white bolt; Haste drops the upward drift + radiating speed lines (aura halo + static glyph kept above the tower). Identity-bearing visuals (silhouette, colour, glyph) are never removed.
+**Reduced-motion contract.** `useReducedMotion` (`composables/useReducedMotion.ts`) and the engine-side `prefersReducedMotion()` helper provide a single source of truth. When the user opts in: `ShakeController` produces zero offset; `DeathParticleRenderer` halves both particle count and lifetime; `TowerLifecycleRenderer` collapses the upgrade pillar + rune sweep to a static colored flash; HUD value-pops drop the scale keyframe but keep the colour flash. `SpellEffectRenderer` drops each spell's motion-intensive layer — Exponential loses the expanding shockwave rings (heat bloom kept as static flash); Asymptote drops the inward-collapsing contour rings (the `→0` glyph itself carries the Regenerator differentiator per Spell_Reskin_Plan §2.4); Impulse drops the chromatic offset passes and renders a single white bolt; Acceleration drops the upward drift + radiating speed lines (aura halo + static glyph kept above the tower). Identity-bearing visuals (silhouette, colour, glyph) are never removed.
 
 ---
 
@@ -206,12 +206,12 @@ The historical "buff card draw" has been replaced by two distinct systems.
 
 ### 7.1 Active Spells (4) — cast during a wave
 
-| Spell | Cost | Cooldown | Effect |
-|-------|------|----------|--------|
-| Fireball | 80 g | 12 s | 60 AoE damage, radius 3 |
-| Frost Nova (`slow`) | 60 g | 15 s | Slow enemies to 40% speed inside radius 4 for 5 s |
-| Lightning | 100 g | 18 s | 150 single-target damage |
-| Haste | 120 g | 25 s | +tower attack speed for 8 s |
+| Spell | Glyph | Cost | Cooldown | Effect |
+|-------|-------|------|----------|--------|
+| Exponential (`fireball`) | eˣ | 80 g | 12 s | 60 AoE damage, radius 3 |
+| Asymptote (`slow`) | →0 | 60 g | 15 s | Slow enemies to 40% speed inside radius 4 for 5 s |
+| Impulse (`lightning`) | δ | 100 g | 18 s | 150 single-target damage |
+| Acceleration (`haste`) | dv/dt | 120 g | 25 s | +tower attack speed for 8 s |
 
 ### 7.2 Shop Buffs (8) — bought during the Build Phase, time-based stacks
 

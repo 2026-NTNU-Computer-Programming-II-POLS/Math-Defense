@@ -78,7 +78,7 @@ frontend/
 │   │   │   ├── BuildHint.vue       First-time placement hints
 │   │   │   ├── FirstEncounterCard.vue  First-encounter explanation card (driven by `useFirstEncounterCards`)
 │   │   │   ├── ShopPanel.vue       In-BUILD shop for time-based buffs
-│   │   │   ├── SpellBar.vue        Spell cooldown buttons (Fireball / Frost Nova / Lightning / Haste)
+│   │   │   ├── SpellBar.vue        Spell cooldown buttons (Exponential / Asymptote / Impulse / Acceleration)
 │   │   │   ├── SpellIcon.vue       Single spell icon (cooldown ring + glyph)
 │   │   │   ├── spell-icon-defs.ts  Spell glyph SVG path lookup used by `SpellIcon`
 │   │   │   ├── MagicModePanel.vue  Magic tower: function curve selection
@@ -251,7 +251,7 @@ frontend/
 │   │   ├── MovementSystem.ts          Path movement with arc-length correction
 │   │   ├── WaveSystem.ts              Enemy spawn queue driven by domain/wave/wave-generator
 │   │   ├── BuffSystem.ts              Time-based buff/curse strategy map; applyExternalBuff() public API
-│   │   ├── SpellSystem.ts             4 spells (Fireball/Frost Nova/Lightning/Haste) + cooldown mgmt
+│   │   ├── SpellSystem.ts             4 spells (Exponential/Asymptote/Impulse/Acceleration) + cooldown mgmt
 │   │   ├── MontyHallSystem.ts         Kill-value threshold triggers; door reveal + switch logic; reward injection
 │   │   ├── EconomySystem.ts           Gold on kill (×goldMultiplier), HP on origin reach, wave bonuses
 │   │   └── __tests__/                 Vitest unit tests
@@ -306,7 +306,7 @@ frontend/
 │   │   ├── counter-enemy-info.ts   Counter-enemy UI metadata used by panels + first-encounter cards
 │   │   ├── difficulty-defs.ts      DIFFICULTY_TABLE, MultisetEntry, pickRandomMultiset
 │   │   ├── buff-defs.ts            Time-based buff/curse IDs, labels, effect strategies (30+ effects)
-│   │   ├── spell-defs.ts           4 spell definitions (Fireball/Frost Nova/Lightning/Haste)
+│   │   ├── spell-defs.ts           4 spell definitions (Exponential/Asymptote/Impulse/Acceleration)
 │   │   ├── monty-hall-defs.ts      Kill-value thresholds per star rating; door reward pool
 │   │   ├── achievement-defs.ts     Achievement definitions (5 categories) — lint-tested against trait-praise vocabulary
 │   │   ├── talent-defs.ts          26 talent node definitions (19 base + 7 tier-2 advanced, prereq chains across 7 tower types)
@@ -471,7 +471,7 @@ Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_ST
 | `LimitTowerSystem` | Presents lim question; resolves ±∞/±C/0 outcome; applies range effect |
 | `CalculusTowerSystem` | Derivative/integral picker; spawns Pet entities managed by `PetCombatSystem` |
 | `PetCombatSystem` | Homing movement for Pet projectiles toward nearest enemy; applies damage on contact; prunes expired or out-of-range pets |
-| `SpellSystem` | Fireball (AoE), Frost Nova (slow), Lightning (single), Haste (tower-speed buff); cooldown per spell |
+| `SpellSystem` | Exponential (AoE), Asymptote (slow), Impulse (single), Acceleration (tower-speed buff); cooldown per spell |
 | `MontyHallSystem` | Kill-value thresholds per star rating; door reveal logic; injects rewards via `BuffSystem.applyExternalBuff()` |
 | `MovementSystem` | Advances enemies along CurvePath/SegmentedPath via matching strategy; reads `speedBoost` + `enemySpeedMultiplier` |
 | `WaveSystem` | Reads wave schedule; spawns via `EnemyFactory`; detects clear, emits `WAVE_END` |

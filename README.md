@@ -80,7 +80,7 @@ When cumulative kill-value crosses a star-specific threshold, the wave pauses. P
 
 Shop (Build Phase, time-based, stack independently): Sharpen Blades (+20% damage), Overclock (+15% attack speed), Far Sight (+15% range), Quagmire (-15% enemy speed), Corrode Armor (+10% enemy damage taken), Heal 5/10, Ward Shield (halve next 3 damage hits), Prospector (2× gold).
 
-Spells (cast any time, gold-cost, cooldown-gated): **Fireball** (60 AoE r=3, 80g/12s), **Frost Nova** (slow to 40% in r=4 for 5s, 60g/15s), **Lightning** (150 single-target, 100g/18s), **Haste** (+tower attack speed 8s, 120g/25s).
+Spells (cast any time, gold-cost, cooldown-gated): **Exponential** `eˣ` (60 AoE r=3, 80g/12s), **Asymptote** `→0` (slow to 40% in r=4 for 5s, 60g/15s), **Impulse** `δ` (150 single-target, 100g/18s), **Acceleration** `dv/dt` (+tower attack speed 8s, 120g/25s).
 
 ### Difficulty (star rating)
 
