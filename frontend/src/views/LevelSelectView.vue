@@ -53,8 +53,8 @@ const starDescriptions: Record<number, string> = {
   1: 'Learn the ropes',
   2: 'Steady waves',
   3: 'Real pressure',
-  4: 'Few mistakes',
-  5: 'Solve Initial Answer first',
+  4: 'No room for error',
+  5: 'Mastery only',
 }
 
 const STAR_5_LOCK_TOOLTIP =
@@ -141,8 +141,8 @@ async function startLevel() {
           :key="star"
           class="star-card"
           :class="{ selected: selectedStar === star, locked: isStarLocked(star) }"
-          :disabled="isStarLocked(star)"
           :title="isStarLocked(star) ? STAR_5_LOCK_TOOLTIP : undefined"
+          :disabled="isStarLocked(star) || undefined"
           :aria-disabled="isStarLocked(star) || undefined"
           @click="selectStar(star)"
         >

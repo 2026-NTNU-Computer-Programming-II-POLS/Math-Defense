@@ -128,7 +128,7 @@ describe('TowerUpgradeSystem', () => {
       expect(game.towers).toHaveLength(0)
     })
 
-    it('applies goldMultiplier to the refund amount', () => {
+    it('the goldMultiplier perk raises the gold refund but never above actual spend', () => {
       game.state.goldMultiplier = 2
       const tower = createMockTower({ type: TowerType.MAGIC, cost: 100, level: 1 })
       game.towers.push(tower)
@@ -136,15 +136,19 @@ describe('TowerUpgradeSystem', () => {
 
       game.eventBus.emit(Events.TOWER_REFUND, { towerId: tower.id })
 
-      // base = 50, refund = round(50 * 2) = 100
+      // base = 50; buff would give round(50 * 2) = 100, capped at spent (100).
+      // The player recovers up to 100% of spend during a gold buff, but the
+      // sell is at best break-even — never profitable.
       expect(game.state.gold).toBe(400)
-      expect(game.state.costTotal).toBe(0) // 100 - 100
+      // costTotal sinks only the un-multiplied base, so it tracks real spend
+      // and cannot be driven below the tower's true cost.
+      expect(game.state.costTotal).toBe(50) // 100 - base(50)
     })
 
-    // Q15: refund uses the derived goldMultiplier, so two stacked buffs
-    // (×2 + ×3 → bonus 3 → multiplier 4) refund 4× the base — not 6× as the
-    // old multiplicative pipeline did.
-    it('refund honours the additive stacked multiplier (×2 + ×3 → 4×)', () => {
+    // Anti-exploit: under a strong stacked gold buff the gold refund is capped
+    // at spend (no net gold printing) and costTotal sinks only the base (never
+    // negative), so S2 = killValue / costTotal cannot be inflated by churn.
+    it('caps the refund at spend and keeps costTotal non-negative under a ×4 buff', () => {
       game.state.goldMultiplierBonus = 3
       game.state.goldMultiplier = 1 + game.state.goldMultiplierBonus
       const tower = createMockTower({ type: TowerType.MAGIC, cost: 100, level: 1 })
@@ -153,10 +157,11 @@ describe('TowerUpgradeSystem', () => {
 
       game.eventBus.emit(Events.TOWER_REFUND, { towerId: tower.id })
 
-      // base = floor(100/2) = 50, refund = round(50 * 4) = 200 (was 300 under
-      // the old 2×*3× = 6× compounding).
-      expect(game.state.gold).toBe(500) // 300 starting + 200 refund
-      expect(game.state.costTotal).toBe(-100) // 100 - 200
+      // base = 50; round(50 * 4) = 200 would print gold + drive costTotal to
+      // -100 under the old pipeline. Now: goldRefund = min(200, spent=100) = 100,
+      // costTotal -= base(50).
+      expect(game.state.gold).toBe(400) // 300 starting + 100 (capped) refund
+      expect(game.state.costTotal).toBe(50) // 100 - 50, not -100
     })
 
     it('emits TOWER_REFUND_RESULT success when tower exists', () => {

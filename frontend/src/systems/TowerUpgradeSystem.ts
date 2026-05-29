@@ -89,9 +89,18 @@ export class TowerUpgradeSystem {
     const tower = game.towers[idx]
     game.towers.splice(idx, 1)
     const base = Math.floor(tower.cost / 2) + Math.floor((tower.upgradeSpend ?? 0) / 2)
-    const refund = Math.round(base * game.state.goldMultiplier)
-    game.economy.changeGold(refund)
-    game.economy.addCost(-refund)
+    // Gold side keeps the Q15 "selling during a gold-multiplier buff is worth
+    // more" perk, but is capped at the tower's actual spend so a buy+sell loop
+    // can never print net gold (the previous `round(base * goldMultiplier)`
+    // returned up to 6×/4× the base, profiting under a ×3 buff).
+    const spent = tower.cost + (tower.upgradeSpend ?? 0)
+    const goldRefund = Math.min(Math.round(base * game.state.goldMultiplier), spent)
+    game.economy.changeGold(goldRefund)
+    // costTotal is the anti-cheat scoring denominator (S2 = killValue /
+    // costTotal). It must track real spend, so sink only the un-multiplied
+    // base — this also keeps costTotal from being driven negative (and the
+    // S2 score inflated) by selling under a gold buff.
+    game.economy.addCost(-base)
     game.getSystem('buff')?.onTowerRemoved(game, towerId)
     game.eventBus.emit(Events.TOWER_REFUND_RESULT, { success: true, towerId })
   }
