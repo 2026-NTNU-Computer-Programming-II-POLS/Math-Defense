@@ -9,7 +9,12 @@ import type { Tower, LimitResult } from '@/entities/types'
 
 // A wrong or degenerate limit answer no longer removes the tower or heals
 // enemies — it clamps the tower to a weak chip of its effective damage.
-const WRONG_ANSWER_CHIP = 0.10
+// Raised 0.10 → 0.35 so the common "degenerate / wrong" outcome (≈62.5% of
+// generated questions resolve to zero / −c / −inf / constant) leaves the
+// tower as a modest AoE chipper rather than near-dead weight. A correct
+// `+C` answer (≥ 1.0× effective) and the `+∞` instakill are still strictly
+// better, so the floor lifts the downside without flattening the payoff.
+const WRONG_ANSWER_CHIP = 0.35
 
 // Phase 6 Q8: LIMIT is a charge-up burst tower. The existing 3 s cooldown is
 // the charge window; when it elapses the tower releases an AoE blast at

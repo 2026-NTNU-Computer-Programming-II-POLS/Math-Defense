@@ -63,7 +63,8 @@ describe('LimitTowerSystem — V3 de-fear', () => {
   })
 
   // Phase 6 Q8: every burst hit is multiplied by BURST_MULTIPLIER (1.5×).
-  // The chip path is `effectiveDamage * 0.10 * 1.5 = 0.15 × effectiveDamage`.
+  // The chip path is `effectiveDamage * 0.35 * 1.5 = 0.525 × effectiveDamage`
+  // (chip floor raised 0.10 → 0.35).
   it('chip damage applies the burst multiplier (zero / constant / -c / -inf)', () => {
     for (const outcome of ['zero', 'constant', '-c', '-inf'] as LimitOutcome[]) {
       const game = createMockGame({ phase: GamePhase.WAVE })
@@ -81,8 +82,8 @@ describe('LimitTowerSystem — V3 de-fear', () => {
 
       sys.update(1, game)
 
-      // 20 * 0.10 * 1.5 = 3 chip damage per cooldown.
-      expect(enemy.hp).toBeCloseTo(100 - 20 * 0.10 * BURST_MULTIPLIER, 5)
+      // 20 * 0.35 * 1.5 = 10.5 chip damage per cooldown.
+      expect(enemy.hp).toBeCloseTo(100 - 20 * 0.35 * BURST_MULTIPLIER, 5)
 
       sys.destroy()
     }
