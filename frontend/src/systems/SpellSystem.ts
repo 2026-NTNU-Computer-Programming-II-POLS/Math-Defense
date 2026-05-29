@@ -158,7 +158,7 @@ export class SpellSystem implements GameSystem {
       'ALL_TOWERS_DAMAGE_MULTIPLY_1_5',
       'ALL_TOWERS_DAMAGE_DIVIDE_1_5',
       duration,
-      'Haste',
+      'Acceleration',
       game,
     )
   }

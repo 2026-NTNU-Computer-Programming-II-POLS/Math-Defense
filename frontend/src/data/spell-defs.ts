@@ -19,8 +19,8 @@ export interface SpellDef {
 export const SPELL_DEFS: SpellDef[] = [
   {
     id: 'fireball',
-    name: 'Fireball',
-    description: 'AoE damage to enemies in radius',
+    name: 'Exponential',
+    description: 'AoE burst whose value blows up exponentially across the radius',
     cost: 80,
     cooldown: 12,
     targetMode: 'area',
@@ -32,8 +32,8 @@ export const SPELL_DEFS: SpellDef[] = [
   },
   {
     id: 'slow',
-    name: 'Frost Nova',
-    description: 'Temporarily slow enemies in area',
+    name: 'Asymptote',
+    description: 'Drive enemy speed asymptotically toward zero in an area',
     cost: 60,
     cooldown: 15,
     targetMode: 'area',
@@ -45,8 +45,8 @@ export const SPELL_DEFS: SpellDef[] = [
   },
   {
     id: 'lightning',
-    name: 'Lightning',
-    description: 'High single-target damage',
+    name: 'Impulse',
+    description: 'A single-target Dirac-delta spike concentrating all the energy at one point',
     cost: 100,
     cooldown: 18,
     targetMode: 'single',
@@ -56,8 +56,8 @@ export const SPELL_DEFS: SpellDef[] = [
   },
   {
     id: 'haste',
-    name: 'Haste',
-    description: 'Accelerate all towers briefly',
+    name: 'Acceleration',
+    description: 'Speeds up every tower briefly, like velocity rising at rate dv/dt',
     cost: 120,
     cooldown: 25,
     targetMode: 'self',

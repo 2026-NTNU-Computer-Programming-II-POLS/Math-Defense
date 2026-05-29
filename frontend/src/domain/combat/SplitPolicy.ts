@@ -104,7 +104,7 @@ export type DamageSource =
   | 'towerTick'  // continuous per-frame tower damage already scaled by dt (Radar A sweep, Matrix laser)
   | 'dot'        // damage-over-time tick, already scaled by dt (Magic debuff zone)
   | 'pet'        // Calculus pet attack (discrete)
-  | 'spell'      // player-cast spell (Fireball / Lightning)
+  | 'spell'      // player-cast spell (Exponential / Impulse)
   | 'effect'     // power-up / event-driven damage (Monty Hall buff)
 
 // Discrete hits are subject to the per-hit cap (damageCapPerHit); continuous

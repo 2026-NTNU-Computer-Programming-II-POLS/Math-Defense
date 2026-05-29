@@ -136,17 +136,13 @@ defineExpose({ castingSpell, castAtPosition })
   background: #fff;
   border-color: var(--spell-color, var(--terracotta));
   transform: translateY(-1px);
-  /* Cascades into SpellIcon's `.spell-icon-path` — keeps the icon outline-first
-     but ignites a soft fill on hover so the active state still feels tangible. */
-  --spell-icon-fill-opacity: 0.14;
 }
 
 /* Specificity bump (`:not(:disabled)`) so a hovered button mid-cast keeps the
-   casting fill (0.22) rather than collapsing to the lighter hover fill. */
+   casting glow rather than collapsing to the lighter hover border. */
 .spell-btn.casting:not(:disabled) {
   border-color: var(--spell-color, var(--gold-deep));
   box-shadow: 0 0 8px var(--spell-color, var(--gold-soft));
-  --spell-icon-fill-opacity: 0.22;
 }
 
 .spell-btn.on-cooldown {

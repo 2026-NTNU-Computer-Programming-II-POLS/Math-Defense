@@ -2,35 +2,44 @@
 // `data/spell-defs.ts` so the in-canvas VFX colour (which the SpellEffectRenderer
 // owns, tuned against the playfield) stays decoupled from the muted Morandi
 // stroke colour used by the HUD chrome.
+//
+// The `glyph` per spell is the same math symbol the SpellEffectRenderer paints
+// on the playfield and the manual lists in its glyph column — button, cast VFX,
+// and manual now show one operator per spell (Spell concept-rename, 2026-05-29):
+// Exponential `eˣ` / Asymptote `→0` / Impulse `δ` / Acceleration `dv/dt`.
 export interface SpellIconDef {
   color: string
-  path: string
+  glyph: string
+  // Glyph strings differ in length (1 char `δ` vs 5-char `dv/dt`), so each
+  // carries its own font size (in the 0–32 SVG user space) to stay balanced in
+  // the button. Not a CSS `font-size` declaration — `no-raw-px` does not apply.
+  fontSize: number
 }
 
 export const SPELL_ICON_DEFS: Record<string, SpellIconDef> = {
   fireball: {
     color: '#C97A5A',
-    path: 'M 16 6 L 27 26 L 5 26 Z',
+    glyph: 'eˣ',
+    fontSize: 18,
   },
   slow: {
     color: '#8AB4CF',
-    // Three lines crossing at the centre at proper 60° hexagonal symmetry.
-    path: 'M 16 4 V 28 M 5.6 10 L 26.4 22 M 5.6 22 L 26.4 10',
+    glyph: '→0',
+    fontSize: 15,
   },
   lightning: {
     color: '#C9B86A',
-    // Mirror-symmetric zigzag: front edge (top tip → notch → bottom tip)
-    // and back edge match in length so the bolt reads as a single stroke.
-    path: 'M 19 4 L 10 17 L 16 17 L 13 28 L 22 15 L 16 15 Z',
+    glyph: 'δ',
+    fontSize: 20,
   },
   haste: {
     color: '#9CCDAE',
-    // Double chevron centred on x=16 (bbox 8–24).
-    path: 'M 8 9 L 15 16 L 8 23 M 17 9 L 24 16 L 17 23',
+    glyph: 'dv/dt',
+    fontSize: 13,
   },
 }
 
-const FALLBACK: SpellIconDef = { color: '#6F6A65', path: '' }
+const FALLBACK: SpellIconDef = { color: '#6F6A65', glyph: '?', fontSize: 18 }
 
 export function getSpellIconDef(spellId: string): SpellIconDef {
   return SPELL_ICON_DEFS[spellId] ?? FALLBACK

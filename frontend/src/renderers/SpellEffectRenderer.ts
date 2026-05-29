@@ -2,7 +2,7 @@
  * SpellEffectRenderer — glyph-centred spell VFX.
  *
  * Visual Redesign Spell Re-skin (Phase 1, Option A): each spell paints a
- * math-symbol body (eˣ / lim→0 / δ / d/dt) on top of its own resolve
+ * math-symbol body (eˣ / →0 / δ / dv/dt) on top of its own resolve
  * geometry, with a gold-only chromatic fringe so spells read as the
  * "player action" category — distinct from enemy (cyan/magenta) and pet
  * (cyan-only) glyph bodies.
@@ -78,16 +78,16 @@ export class SpellEffectRenderer extends EffectLayer<SpellVfx> {
     const ctx = renderer.ctx
     const reduced = prefersReducedMotion()
     for (const vfx of this.effects) {
-      if (vfx.spellId === 'fireball') this._drawFireball(ctx, vfx, reduced)
-      else if (vfx.spellId === 'slow') this._drawFrostNova(ctx, vfx, reduced)
-      else if (vfx.spellId === 'lightning') this._drawLightning(ctx, vfx, reduced)
-      else if (vfx.spellId === 'haste') this._drawHaste(ctx, vfx, reduced)
+      if (vfx.spellId === 'fireball') this._drawExponential(ctx, vfx, reduced)
+      else if (vfx.spellId === 'slow') this._drawAsymptote(ctx, vfx, reduced)
+      else if (vfx.spellId === 'lightning') this._drawImpulse(ctx, vfx, reduced)
+      else if (vfx.spellId === 'haste') this._drawAcceleration(ctx, vfx, reduced)
       else this._drawFallback(ctx, vfx)
     }
   }
 
-  // ── Fireball: eˣ glyph rising from cast point with an outward shockwave.
-  private _drawFireball(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
+  // ── Exponential: eˣ glyph rising from cast point with an outward shockwave.
+  private _drawExponential(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
     const p = clamp01(vfx.age / vfx.maxAge)
     const out = easeOutQuart(p)
     const alpha = 1 - p
@@ -136,8 +136,8 @@ export class SpellEffectRenderer extends EffectLayer<SpellVfx> {
     ctx.restore()
   }
 
-  // ── Frost Nova: lim → 0 glyph with concentric rings collapsing inward.
-  private _drawFrostNova(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
+  // ── Asymptote: →0 glyph with concentric rings collapsing inward.
+  private _drawAsymptote(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
     const p = clamp01(vfx.age / vfx.maxAge)
     const inward = easeInOut(p)
     const alpha = 1 - p * 0.85
@@ -160,8 +160,8 @@ export class SpellEffectRenderer extends EffectLayer<SpellVfx> {
     if (!reduced) {
       // Four contour rings collapsing inward toward zero — the load-bearing
       // motion that distinguishes this spell from the Regenerator's static
-      // `lim` glyph. Reduced motion drops this; the `→ 0` arrow inside the
-      // glyph carries the differentiator (Spell_Reskin_Plan §2.4).
+      // `lim` glyph. Reduced motion drops this; the `→0` glyph itself (no
+      // `lim`) already reads distinct from the enemy (Spell_Reskin_Plan §2.4).
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       for (let i = 0; i < 4; i++) {
@@ -180,19 +180,19 @@ export class SpellEffectRenderer extends EffectLayer<SpellVfx> {
       ctx.setLineDash([])
     }
 
-    // Glyph body — `lim → 0` shows the arrow + target so the operator
-    // motivation is legible even if the contour-collapse animation is
-    // pruned by reduced motion (Phase 2).
+    // Glyph body — `→0` shows the arrow + target so the operator motivation
+    // (speed driven asymptotically to zero) is legible even if the
+    // contour-collapse animation is pruned by reduced motion (Phase 2).
     ctx.globalAlpha = 0.45 + alpha * 0.55
-    drawGlyphBody(ctx, px, py, glyphSize, 'lim→0', vfx.color, {
+    drawGlyphBody(ctx, px, py, glyphSize, '→0', vfx.color, {
       fringeColors: SPELL_FRINGE,
       fringeOffset: glyphSize * 0.06,
     })
     ctx.restore()
   }
 
-  // ── Lightning: δ glyph at the target with a chromatic vertical bolt.
-  private _drawLightning(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
+  // ── Impulse: δ glyph at the target with a chromatic vertical bolt.
+  private _drawImpulse(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
     const p = clamp01(vfx.age / vfx.maxAge)
     const flash = 1 - easeInOut(p)
     const alpha = 1 - p
@@ -232,8 +232,8 @@ export class SpellEffectRenderer extends EffectLayer<SpellVfx> {
     ctx.restore()
   }
 
-  // ── Haste: d/dt glyph drifting upward above the cast point.
-  private _drawHaste(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
+  // ── Acceleration: dv/dt glyph drifting upward above the cast point.
+  private _drawAcceleration(ctx: CanvasRenderingContext2D, vfx: SpellVfx, reduced: boolean): void {
     const p = clamp01(vfx.age / vfx.maxAge)
     const out = easeOutQuart(p)
     const alpha = 1 - p
@@ -273,9 +273,9 @@ export class SpellEffectRenderer extends EffectLayer<SpellVfx> {
       }
     }
 
-    // d/dt glyph drifts upward.
+    // dv/dt glyph drifts upward.
     ctx.globalAlpha = 0.5 + alpha * 0.5
-    drawGlyphBody(ctx, px, py - drift, glyphSize, 'd/dt', vfx.color, {
+    drawGlyphBody(ctx, px, py - drift, glyphSize, 'dv/dt', vfx.color, {
       fringeColors: SPELL_FRINGE,
       fringeOffset: glyphSize * 0.08,
     })
