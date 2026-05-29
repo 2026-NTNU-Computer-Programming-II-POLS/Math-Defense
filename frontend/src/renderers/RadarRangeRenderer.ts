@@ -4,10 +4,12 @@ import { TowerType, GamePhase, UNIT_PX } from '@/data/constants'
 import { gameToCanvasX, gameToCanvasY } from '@/math/MathUtils'
 import { clipToBoard } from '@/engine/render-helpers/clip-to-board'
 import {
+  arcSpan,
   interceptPoint,
   isAngleInArc,
   radarProjectileSpeed,
   radarTargetCount,
+  relAngle,
   selectRadarTargets,
 } from '@/domain/combat/RadarTargeting'
 import type { Tower } from '@/entities/types'
@@ -106,7 +108,7 @@ export class RadarRangeRenderer {
         ctx.lineTo(x2, y2)
         ctx.stroke()
       }
-      this._drawSweepNeedle(ctx, tower, px, py, radiusPx, color, arcStart, arcEnd)
+      this._drawSweepNeedle(ctx, tower, px, py, radiusPx, color, arcStart, arcEnd, restricted)
       this._drawArcBonusLabel(ctx, px, py, radiusPx, color, arcStart, arcEnd)
     } else if (tower.type === TowerType.RADAR_B) {
       ctx.strokeStyle = `${color}55`
@@ -176,6 +178,7 @@ export class RadarRangeRenderer {
     color: string,
     arcStart: number,
     arcEnd: number,
+    restricted: boolean,
   ): void {
     const angle = tower.sweepAngle
     if (angle === undefined) return
@@ -183,9 +186,23 @@ export class RadarRangeRenderer {
       + (tower.upgradeExtras?.['aoeWidth'] ?? 0)
       + (tower.talentMods['aoe_width'] ?? 0)
 
-    // Half-band wedge (paint first so the needle reads on top of it).
-    const bandStart = -angle - aoeWidth
-    const bandEnd = -angle + aoeWidth
+    // Half-band wedge in WORLD angles (paint first so the needle reads on top).
+    // In restrict mode the band is clamped to the sector so it never bleeds
+    // past the walls — matching that the sweep also ignores enemies outside
+    // the arc. Canvas y is inverted, so world angle `w` maps to canvas `-w`.
+    let bandStart: number
+    let bandEnd: number
+    if (restricted) {
+      const span = arcSpan(arcStart, arcEnd)
+      const s = Math.min(span, relAngle(angle, arcStart))
+      const loWorld = arcStart + Math.max(0, s - aoeWidth)
+      const hiWorld = arcStart + Math.min(span, s + aoeWidth)
+      bandStart = -hiWorld
+      bandEnd = -loWorld
+    } else {
+      bandStart = -angle - aoeWidth
+      bandEnd = -angle + aoeWidth
+    }
     ctx.fillStyle = `${color}22`
     ctx.beginPath()
     ctx.moveTo(px, py)

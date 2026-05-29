@@ -22,9 +22,9 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 50 / 5 / 6 / 0.5 s
 - **Math:** radian arcs, sector area
 - **Unlocked from:** Star 1
-- **Mechanic:** a needle sweeps a continuous **full 360°** circle; any enemy in range takes AoE damage every tick the needle crosses it. The configurable arc does not steer the sweep — it only marks the ×1.5 focus sector (see below).
-- **Tier 2/3:** sweep speed +20% / +40%; Tier 3 also widens the AoE band by +0.3 rad (absolute, on top of the base 0.5 rad band — i.e. about +60% wider).
-- **Pick when:** the path makes a tight wrap around a small region — you cover it with one tower.
+- **Mechanic:** a needle sweeps around the tower and **pings** each enemy once as the beam passes over it — one clean hit per pass, not a continuous drip. It hits *every* enemy the beam crosses, so it shines against packed groups, but its per-enemy damage is deliberately low (a stationary enemy is struck once per revolution). Faster sweep speed = more passes = more damage. By default the needle circles the **full 360°** and the configurable arc only marks the ×1.5 focus sector; with **Restrict attacks to arc** on, the needle becomes a windshield wiper that oscillates strictly *inside* the sector (and ignores everything outside it).
+- **Tier 2/3:** sweep speed +20% / +40% — and because the sweep now pings per pass, that speed directly raises damage; Tier 3 also widens the detection band by +0.3 rad (on top of the base 0.5 rad half-band, ~+60% wider catch).
+- **Pick when:** a crowd of low-HP enemies funnels through a region — one Radar A tags the whole group every pass. Restrict it to a tight wiper over the chokepoint to concentrate the sweep where the path actually is.
 
 ### Radar B — Rapid — ◑
 

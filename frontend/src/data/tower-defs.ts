@@ -104,7 +104,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     range: 6,
     cooldown: 0.5,
     unlockLevel: 1,
-    description: 'Continuous sweep around circle, AoE damage on contact.',
+    description: 'A needle sweeps the circle and pings every enemy the beam passes — one hit per pass, low per-enemy but unlimited targets. Faster sweep = more hits. Restrict to confine the wiper to a chosen arc.',
     mathConcept: 'Radian intervals, arc sectors',
     examRelevance: 'Radian measure and arc identification are on the GSAT Math B unit and the AP Calculus AB exam.',
     glyph: '◐',

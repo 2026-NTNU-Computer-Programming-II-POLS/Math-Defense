@@ -119,11 +119,30 @@ function isInArc(tower: Tower, enemy: Enemy): boolean {
 // zero-width, matching what RadarRangeRenderer draws.
 export function isAngleInArc(angle: number, start: number, end: number): boolean {
   const TWO_PI = 2 * Math.PI
-  const rawSpan = end - start
-  // |span| ≥ 2π means the arc covers the whole circle (in either winding).
-  if (Math.abs(rawSpan) >= TWO_PI - 1e-9) return true
-  let span = rawSpan
-  if (span < 0) span += TWO_PI // end < start → the arc wraps once past 0
-  const rel = (((angle - start) % TWO_PI) + TWO_PI) % TWO_PI
-  return rel <= span
+  // A full circle (|raw span| ≥ 2π) contains every angle.
+  if (Math.abs(end - start) >= TWO_PI - 1e-9) return true
+  return relAngle(angle, start) <= arcSpan(start, end)
+}
+
+// Wrap an arbitrary angle into [0, 2π). The canonical range the renderer and
+// the containment test both expect.
+export function normalizeTwoPi(a: number): number {
+  const TWO_PI = 2 * Math.PI
+  return ((a % TWO_PI) + TWO_PI) % TWO_PI
+}
+
+// CCW distance from `start` to `angle`, in [0, 2π). Shared by isAngleInArc and
+// RADAR_A's restrict-mode sweep so they agree on where the sector begins.
+export function relAngle(angle: number, start: number): number {
+  return normalizeTwoPi(angle - start)
+}
+
+// Width of the configurable arc in [0, 2π]. A |raw span| ≥ 2π is a full
+// circle; a negative raw span wraps once past 0 (end < start). Matches the
+// span semantics isAngleInArc relies on.
+export function arcSpan(start: number, end: number): number {
+  const TWO_PI = 2 * Math.PI
+  const raw = end - start
+  if (Math.abs(raw) >= TWO_PI - 1e-9) return TWO_PI
+  return raw < 0 ? raw + TWO_PI : raw
 }

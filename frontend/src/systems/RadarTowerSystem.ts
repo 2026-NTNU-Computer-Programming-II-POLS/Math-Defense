@@ -1,7 +1,7 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { distance } from '@/math/MathUtils'
 import { applyDamage } from '@/domain/combat/SplitPolicy'
-import { interceptPoint, radarProjectileSpeed, selectRadarTargets, radarTargetCount, isAngleInArc } from '@/domain/combat/RadarTargeting'
+import { interceptPoint, radarProjectileSpeed, selectRadarTargets, radarTargetCount, isAngleInArc, arcSpan, relAngle, normalizeTwoPi } from '@/domain/combat/RadarTargeting'
 import { effectiveCooldown } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower, Enemy, Projectile, TargetingMode } from '@/entities/types'
@@ -18,6 +18,14 @@ function makeProjectile(
 
 export class RadarTowerSystem {
   private _sweepAngles = new Map<string, number>()
+  // Per-tower sweep direction (+1 / −1) used only in arc-restrict mode, where
+  // the needle oscillates like a windshield wiper inside [arcStart, arcEnd]
+  // instead of circling the full 360°.
+  private _sweepDirs = new Map<string, number>()
+  // Per-tower set of enemy ids currently inside the needle's detection band.
+  // RADAR_A deals one discrete "ping" when an enemy first enters the band
+  // (rising edge), not every frame — so sweep speed scales hit rate.
+  private _inBand = new Map<string, Set<string>>()
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
@@ -30,6 +38,11 @@ export class RadarTowerSystem {
         tower.arcEnd = arcEnd
         tower.arcRestrict = restrict
         tower.configured = true
+        // Re-seed the needle so a freshly restricted sweep starts on the arc's
+        // edge rather than wherever the full-circle pass had left it.
+        this._sweepAngles.delete(towerId)
+        this._sweepDirs.delete(towerId)
+        this._inBand.delete(towerId)
       }),
       game.eventBus.on(Events.TOWER_TARGETING_CHANGED, ({ towerId, mode }: { towerId: string; mode: TargetingMode }) => {
         const tower = game.towers.find((t) => t.id === towerId)
@@ -38,6 +51,8 @@ export class RadarTowerSystem {
       }),
       game.eventBus.on(Events.LEVEL_START, () => {
         this._sweepAngles.clear()
+        this._sweepDirs.clear()
+        this._inBand.clear()
       }),
     )
   }
@@ -46,6 +61,8 @@ export class RadarTowerSystem {
     this._unsubs.forEach((fn) => fn())
     this._unsubs = []
     this._sweepAngles.clear()
+    this._sweepDirs.clear()
+    this._inBand.clear()
   }
 
   update(dt: number, game: Game): void {
@@ -62,14 +79,18 @@ export class RadarTowerSystem {
   }
 
   private _updateSweep(tower: Tower, dt: number, game: Game): void {
-    let angle = this._sweepAngles.get(tower.id) ?? 0
     const upgradeSweep = tower.upgradeExtras?.['sweepSpeed'] ?? 0
     const sweepSpeed = 2.0 * (1 + (tower.talentMods['sweep_speed'] ?? 0) + upgradeSweep)
-    angle += sweepSpeed * dt
-    if (angle > 2 * Math.PI) angle -= 2 * Math.PI
+    const restricted = tower.arcRestrict ?? false
+    const arcStart = tower.arcStart ?? 0
+    const arcEnd = tower.arcEnd ?? Math.PI / 2
+
+    const angle = this._advanceNeedle(tower, sweepSpeed * dt, restricted, arcStart, arcEnd)
     this._sweepAngles.set(tower.id, angle)
-    // Mirror onto the entity so projectTowerScene can surface it to the
-    // RadarRangeRenderer without reaching into this system's private Map.
+    // Mirror onto the entity so projectTowerScene / RadarRangeRenderer can
+    // surface it without reaching into this system's private Map. In restrict
+    // mode this value stays within [arcStart, arcEnd], so the painted needle
+    // never crosses the sector walls.
     tower.sweepAngle = angle
 
     const range = tower.effectiveRange
@@ -79,27 +100,70 @@ export class RadarTowerSystem {
       + (tower.upgradeExtras?.['aoeWidth'] ?? 0)
       + (tower.talentMods['aoe_width'] ?? 0)
 
+    // Discrete "ping" per sweep pass. The needle deals one hit when an enemy
+    // FIRST enters its band (rising edge), not every frame the band overlaps.
+    // A stationary enemy is therefore struck once per revolution, so faster
+    // sweep speed = more passes = more damage (the upgrade/talent now scales
+    // DPS, which the old continuous dt-tick model left flat). It also keeps
+    // single-target output low and crowd-clear wide: every enemy the band
+    // crosses on a pass is pinged, with no per-target accumulation.
+    const prevBand = this._inBand.get(tower.id)
+    const nowBand = new Set<string>()
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
       const d = distance(tower.x, tower.y, enemy.x, enemy.y)
       if (d > range) continue
-      if (tower.arcRestrict && !this._isInArc(tower, enemy)) continue
+      if (restricted && !this._isInArc(tower, enemy)) continue
       // allow-non-deterministic-math: visual/geometric arc check, not in RNG draw schedule (follow-up: MovementSystem audit per construction plan §8).
       const enemyAngle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
       const angleDiff = Math.abs(normalizeAngle(enemyAngle - angle))
       if (angleDiff < aoeWidth) {
-        // Focus-sector bonus keyed on the ENEMY's angle, not the sweep
-        // needle's — same basis as RADAR_B/C (_getArcBonusForTarget), so all
-        // three radars agree on what "inside the arc" means. Keying it on the
-        // needle smeared the ×1.5 across the arc edge by ±aoeWidth.
-        // applyDamage (via _dealDamage) already resets enemy.hitFlashAge to 0
-        // each tick, so MovementSystem's age + EnemyRenderer's overlay give a
-        // free per-tick glow while the needle is on the enemy — no extra
-        // hit-flash plumbing needed here for A4.
-        const arcBonus = this._getArcBonus(tower, enemyAngle)
-        this._dealDamage(enemy, tower.effectiveDamage * arcBonus * dt, game)
+        nowBand.add(enemy.id)
+        if (!prevBand?.has(enemy.id)) {
+          // Focus-sector bonus keyed on the ENEMY's angle, not the sweep
+          // needle's — same basis as RADAR_B/C (_getArcBonusForTarget), so all
+          // three radars agree on what "inside the arc" means.
+          const arcBonus = this._getArcBonus(tower, enemyAngle)
+          // 'towerHit' (discrete) rather than 'towerTick': each ping is a
+          // whole, undivided hit, so it routes through the same defensive
+          // pipeline (cap / armor) and damage-feedback popup as a projectile.
+          applyDamage(enemy, tower.effectiveDamage * arcBonus, game, 'towerHit')
+        }
       }
     }
+    this._inBand.set(tower.id, nowBand)
+  }
+
+  // Advance the sweep needle by `step` radians and return its new angle in
+  // [0, 2π). Free mode circles the full 360°; restrict mode oscillates inside
+  // the configured sector so neither the needle nor its detection band ever
+  // leaves [arcStart, arcEnd].
+  private _advanceNeedle(
+    tower: Tower,
+    step: number,
+    restricted: boolean,
+    arcStart: number,
+    arcEnd: number,
+  ): number {
+    let angle = this._sweepAngles.get(tower.id)
+    if (angle === undefined) angle = restricted ? arcStart : 0
+
+    if (!restricted) {
+      angle += step
+      return normalizeTwoPi(angle)
+    }
+
+    const span = arcSpan(arcStart, arcEnd)
+    let dir = this._sweepDirs.get(tower.id) ?? 1
+    // Phase = CCW distance of the needle from the arc start, clamped into the
+    // span (snaps an out-of-arc needle onto the near wall on the first tick).
+    let s = relAngle(angle, arcStart)
+    if (s > span) s = span
+    s += dir * step
+    if (s >= span) { s = span; dir = -1 }
+    else if (s <= 0) { s = 0; dir = 1 }
+    this._sweepDirs.set(tower.id, dir)
+    return normalizeTwoPi(arcStart + s)
   }
 
   private _updateRapid(tower: Tower, dt: number, game: Game): void {
@@ -189,11 +253,6 @@ export class RadarTowerSystem {
     // allow-non-deterministic-math: visual/geometric arc check, not in RNG draw schedule (follow-up: MovementSystem audit per construction plan §8).
     const angle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
     return isAngleInArc(angle, tower.arcStart ?? 0, tower.arcEnd ?? Math.PI / 2)
-  }
-
-  private _dealDamage(enemy: Enemy, amount: number, game: Game): void {
-    // Radar A's sweep is continuous, dt-scaled damage.
-    applyDamage(enemy, amount, game, 'towerTick')
   }
 
 }

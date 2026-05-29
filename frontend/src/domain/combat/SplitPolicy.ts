@@ -100,8 +100,8 @@ export function killEnemy(enemy: Enemy, game: CombatGameContext): void {
 // What kind of damage a caller deals. Callers declare their source; they never
 // know about armor, evasion, or per-hit caps — applyDamage owns all of that.
 export type DamageSource =
-  | 'towerHit'   // discrete instantaneous tower hit  (Radar B/C projectile, Limit pulse)
-  | 'towerTick'  // continuous per-frame tower damage already scaled by dt (Radar A sweep, Matrix laser)
+  | 'towerHit'   // discrete instantaneous tower hit  (Radar A sweep ping, Radar B/C projectile, Limit pulse)
+  | 'towerTick'  // continuous per-frame tower damage already scaled by dt (Matrix laser)
   | 'dot'        // damage-over-time tick, already scaled by dt (Magic debuff zone)
   | 'pet'        // Calculus pet attack (discrete)
   | 'spell'      // player-cast spell (Exponential / Impulse)

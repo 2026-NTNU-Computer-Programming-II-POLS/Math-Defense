@@ -82,10 +82,128 @@ describe('RadarTowerSystem — RADAR_A focus-sector bonus', () => {
     game.towers.push(tower)
     game.enemies.push(inArc, outArc)
 
-    system.update(0.5, game)
+    // Restrict mode oscillates the needle from arcStart (1.0); update(0.15)
+    // advances it 2.0×0.15 = 0.3 rad to 1.3, landing the band on the in-arc
+    // enemy. The out-of-arc enemy is hard-filtered regardless of needle angle.
+    system.update(0.15, game)
 
     expect(damageTaken(outArc)).toBe(0)
     expect(damageTaken(inArc)).toBeGreaterThan(0)
+  })
+})
+
+// Task: RADAR_A is a discrete "ping per pass" tower (was a flat dt-scaled
+// continuous beam). Each enemy is struck once when it first enters the sweep
+// band, then again only after the needle comes back around — so a faster
+// sweep deals proportionally more damage, which the old model ignored.
+describe('RadarTowerSystem — RADAR_A per-pass ping model', () => {
+  let game: ReturnType<typeof createMockGame>
+  let system: RadarTowerSystem
+
+  beforeEach(() => {
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+  })
+
+  it('pings an in-band enemy once per pass, not every frame', () => {
+    // Enemy at angle 0 (the needle's free-mode start). Default arc [0, π/2]
+    // grants it the ×1.5 focus bonus → one ping = effectiveDamage × 1.5.
+    const tower = createMockTower({
+      type: TowerType.RADAR_A, x: 0, y: 0,
+      effectiveDamage: 5, effectiveRange: 5,
+    })
+    game.towers.push(tower)
+    const enemy = enemyAtAngle(0, 3)
+    game.enemies.push(enemy)
+
+    // Five small ticks keep the needle (0 → 0.16 rad) inside the 0.5 band the
+    // whole time. A continuous model would have dealt five slices; the ping
+    // model deals exactly one hit on the rising edge.
+    for (let i = 0; i < 5; i++) system.update(0.016, game)
+
+    expect(damageTaken(enemy)).toBeCloseTo(5 * 1.5, 5)
+  })
+
+  it('faster sweep speed deals more damage over the same time', () => {
+    function damageOver(seconds: number, sweepTalent: number): number {
+      const g = createMockGame({ phase: GamePhase.WAVE })
+      const s = new RadarTowerSystem()
+      s.init(g)
+      const t = createMockTower({
+        type: TowerType.RADAR_A, x: 0, y: 0,
+        effectiveDamage: 5, effectiveRange: 5,
+        talentMods: sweepTalent ? { sweep_speed: sweepTalent } : {},
+      })
+      g.towers.push(t)
+      const e = createMockEnemy({ x: 3, y: 0, hp: 1e6, maxHp: 1e6 })
+      g.enemies.push(e)
+      const steps = Math.round(seconds / 0.016)
+      for (let i = 0; i < steps; i++) s.update(0.016, g)
+      return e.maxHp - e.hp
+    }
+
+    const base = damageOver(10, 0)       // ω = 2.0 rad/s
+    const fast = damageOver(10, 1.0)     // ω = 4.0 rad/s → ~2× the passes
+    expect(base).toBeGreaterThan(0)
+    expect(fast).toBeGreaterThan(base * 1.5)
+  })
+})
+
+// Task: when "Restrict attacks to arc" is on, the sweep needle must oscillate
+// like a windshield wiper strictly inside [arcStart, arcEnd] — it must never
+// circle past the sector walls (the renderer reads tower.sweepAngle directly).
+describe('RadarTowerSystem — RADAR_A restrict-mode wiper bounds', () => {
+  let game: ReturnType<typeof createMockGame>
+  let system: RadarTowerSystem
+
+  beforeEach(() => {
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+  })
+
+  it('keeps the needle inside the arc and reverses at both walls', () => {
+    const tower = createMockTower({
+      type: TowerType.RADAR_A, x: 0, y: 0,
+      arcStart: 1.0, arcEnd: 2.0, arcRestrict: true,
+      effectiveRange: 5,
+    })
+    game.towers.push(tower)
+
+    let min = Infinity
+    let max = -Infinity
+    // ~8 s at ω = 2.0 over a 1.0 rad span sweeps the wiper back and forth many
+    // times, so it must visit both edges while never leaving the sector.
+    for (let i = 0; i < 500; i++) {
+      system.update(0.016, game)
+      const a = tower.sweepAngle!
+      if (a < min) min = a
+      if (a > max) max = a
+    }
+
+    expect(min).toBeGreaterThanOrEqual(1.0 - 1e-6)
+    expect(max).toBeLessThanOrEqual(2.0 + 1e-6)
+    // Confirm it actually oscillates across the span, not just sits at a wall.
+    expect(min).toBeLessThan(1.1)
+    expect(max).toBeGreaterThan(1.9)
+  })
+
+  it('free (unrestricted) sweep still circles the full 360°', () => {
+    const tower = createMockTower({
+      type: TowerType.RADAR_A, x: 0, y: 0,
+      arcStart: 1.0, arcEnd: 2.0, arcRestrict: false,
+      effectiveRange: 5,
+    })
+    game.towers.push(tower)
+
+    let max = -Infinity
+    for (let i = 0; i < 300; i++) {
+      system.update(0.016, game)
+      if (tower.sweepAngle! > max) max = tower.sweepAngle!
+    }
+    // A full circle reaches angles well outside the [1.0, 2.0] focus sector.
+    expect(max).toBeGreaterThan(3.0)
   })
 })
 
