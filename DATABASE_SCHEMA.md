@@ -27,6 +27,9 @@ erDiagram
         boolean mfa_enabled         "DEFAULT false"
         datetime totp_last_used_at  "nullable — TOTP replay guard"
         float   ia_recent_accuracy  "DEFAULT 0.0; CHECK 0–1 — last-10 IA fraction"
+        string  endpoint_marker_style          "nullable — CHECK NULL or star|gorilla|custom"
+        text    endpoint_marker_custom_dataurl "nullable — custom marker image data URL"
+        string  endpoint_hit_fx                "nullable — CHECK NULL or random|fragments|crying|angry"
         datetime created_at
         datetime updated_at         "auto-update"
     }
@@ -372,10 +375,13 @@ Central identity table. Stores authentication credentials, MFA state, and profil
 | `mfa_enabled` | `Boolean` | NO | DEFAULT `false` |
 | `totp_last_used_at` | `DateTime(tz)` | YES | TOTP step-replay guard — set on every accepted code |
 | `ia_recent_accuracy` | `Float` | NO | SERVER DEFAULT `0.0`; `CHECK(0.0 ≤ ia_recent_accuracy ≤ 1.0)` (`ck_user_ia_accuracy_range`). Rolling fraction of last 10 IA-correct sessions; drives Star-1 concrete-fading on the path renderer |
+| `endpoint_marker_style` | `String(16)` | YES | `CHECK(endpoint_marker_style IS NULL OR endpoint_marker_style IN ('star','gorilla','custom'))` (`ck_user_endpoint_marker_style`). Endpoint marker (P\*) display preference, persisted server-side so the choice follows the player across devices. NULL = FE local default. Added in `ff6a7b8c9d0e` |
+| `endpoint_marker_custom_dataurl` | `Text` | YES | Custom endpoint-marker image stored as a data URL; only meaningful when `endpoint_marker_style = 'custom'`. Added in `ff6a7b8c9d0e` |
+| `endpoint_hit_fx` | `String(16)` | YES | `CHECK(endpoint_hit_fx IS NULL OR endpoint_hit_fx IN ('random','fragments','crying','angry'))` (`ck_user_endpoint_hit_fx`). Endpoint hit-effect preference. NULL = FE local default. Added in `ff6a7b8c9d0e` |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated on write by a PG `BEFORE UPDATE` trigger (`users_update_timestamp`, created in `b2_fix_h06_h07_h10`) |
 
-**Constraints:** `UNIQUE(username)`, `UNIQUE(email)`, `CHECK(ia_recent_accuracy BETWEEN 0.0 AND 1.0)` (`ck_user_ia_accuracy_range`)  
+**Constraints:** `UNIQUE(username)`, `UNIQUE(email)`, `CHECK(ia_recent_accuracy BETWEEN 0.0 AND 1.0)` (`ck_user_ia_accuracy_range`), `CHECK(endpoint_marker_style IS NULL OR endpoint_marker_style IN ('star','gorilla','custom'))` (`ck_user_endpoint_marker_style`), `CHECK(endpoint_hit_fx IS NULL OR endpoint_hit_fx IN ('random','fragments','crying','angry'))` (`ck_user_endpoint_hit_fx`)  
 **Indexes:** None beyond PK + unique columns
 
 ---
@@ -1045,10 +1051,11 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `bb2c3d4e5f7a` | **Merge migration** for the two heads `aa1d2e3f4a6` and `e5_territory_session_use_cascade`. Also expands `classes` for Tier-C class management: adds `description / subject / school_year / capacity / color / icon / archived_at` plus `ck_classes_capacity_positive` and `ix_classes_archived_at`; creates `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` |
 | `cc3d4e5f6a8b` | Balance Overhaul Phase 4 (Q10): `DELETE FROM talent_allocations WHERE talent_node_id = 'calculus_pet_hp'`. Node was renamed `calculus_pet_range`; orphaned allocations are removed so spent-TP recovery (`achievement_service.compute_remaining_talent_points`) reflects the rename automatically |
 | `dd4e5f6a7b8c` | Tighten `territory_slots.slot_index` CHECK from `>= 0` to `BETWEEN 0 AND 49`. Combined with the existing `UNIQUE(activity_id, slot_index)` and sequential 0-based assignment, this caps per-activity slot count at 50 at the DB layer (matching `CreateActivityRequest.max_length=50`) so paths that bypass the application service still can't exceed the limit. Renames constraint `ck_territory_slot_index_nonneg` → `ck_territory_slot_index_range` |
-| `ee5f6a7b8c9d` | **Current head.** Add `grabbing_territory_activities.student_slot_cap INTEGER NOT NULL DEFAULT 5` plus `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Surfaces the previously hard-coded `TERRITORY_CAP_PER_STUDENT = 5` as a per-activity, teacher-configurable column; default of 5 preserves existing behaviour for backfilled rows |
+| `ee5f6a7b8c9d` | Add `grabbing_territory_activities.student_slot_cap INTEGER NOT NULL DEFAULT 5` plus `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Surfaces the previously hard-coded `TERRITORY_CAP_PER_STUDENT = 5` as a per-activity, teacher-configurable column; default of 5 preserves existing behaviour for backfilled rows |
+| `ff6a7b8c9d0e` | **Current head.** Add `users.endpoint_marker_style String(16) NULL`, `users.endpoint_marker_custom_dataurl Text NULL`, `users.endpoint_hit_fx String(16) NULL` plus CHECK allowlists `ck_user_endpoint_marker_style` (NULL or `star`/`gorilla`/`custom`) and `ck_user_endpoint_hit_fx` (NULL or `random`/`fragments`/`crying`/`angry`). Moves the endpoint-marker (P\*) display preferences from localStorage-only to server-side persistence so the player's choice follows them across devices. All columns nullable with no server default — legacy rows stay valid and NULL means the FE uses its local default |
 
 > **Branched history**: Two parallel merges exist in the chain.
 > 1. After `q1f2a3b4c5d6` (gameplay — practice mode) and `a3b4c5d6e7f8` (auth — lockout backoff), `r2a3b4c5d6e7` merges them and also creates the `seasons` table.
-> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `ee5f6a7b8c9d` is the current single head (linear chain `bb2c3d4e5f7a` → `cc3d4e5f6a8b` → `dd4e5f6a7b8c` → `ee5f6a7b8c9d`).
+> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `ff6a7b8c9d0e` is the current single head (linear chain `bb2c3d4e5f7a` → `cc3d4e5f6a8b` → `dd4e5f6a7b8c` → `ee5f6a7b8c9d` → `ff6a7b8c9d0e`).
 
 > **Earlier history**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create.

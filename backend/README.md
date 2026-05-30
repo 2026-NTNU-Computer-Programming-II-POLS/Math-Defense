@@ -14,8 +14,8 @@ REST API server for Math Defense: authentication (incl. refresh-token rotation, 
 | Auth | PyJWT (HS256) + bcrypt + pyotp (TOTP) |
 | Rate Limiting | slowapi (per-IP) + per-account login throttle |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
-| WASM host | wasmtime-py 44.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
-| Testing | pytest 9 + pytest-asyncio (30 test files) |
+| WASM host | wasmtime-py 45.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
+| Testing | pytest 9 + pytest-asyncio (31 test files) |
 
 ---
 
@@ -109,7 +109,7 @@ backend/
 │   │       └── email_verification_repository.py  One-use email verification token store
 │   │
 │   ├── models/                    SQLAlchemy ORM models
-│   │   ├── user.py                User (email, player_name, avatar_url, role, is_active, totp_*, ia_recent_accuracy, password_version)
+│   │   ├── user.py                User (email, player_name, avatar_url, role, is_active, totp_*, ia_recent_accuracy, password_version, endpoint_marker_style/custom_dataurl/hit_fx)
 │   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields, reflection_text, practice_mode, is_preview, rng_seed, replay_version, challenge_id)
 │   │   ├── leaderboard.py         LeaderboardEntry (unique session_id; user_id nullable via SET NULL; challenge_id nullable)
 │   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline + lockout_count for backoff)
@@ -138,7 +138,7 @@ backend/
 │   │   ├── replay.py · season.py · study.py · territory.py
 │   │
 │   ├── routers/                   HTTP adapters — thin controllers; error translation lives in main.py
-│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile / verify-email / mfa/*)
+│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile/{name,avatar,endpoint-marker} / verify-email / mfa/*)
 │   │   ├── game_session.py        /api/sessions (CRUD + /reflection)
 │   │   ├── leaderboard.py         /api/leaderboard (+ /me for personal timeline)
 │   │   ├── achievement.py         /api/achievements + GET /api/seasons (sibling seasons_router)
@@ -159,15 +159,16 @@ backend/
 │   └── utils/
 │       ├── security.py            hash_password, verify_password, create_access_token, decode_token
 │       ├── totp.py                TOTP secret generation + provisioning-URI / verify helpers
+│       ├── encryption.py          Fernet encrypt/decrypt for TOTP secrets at rest; verify_key_configured() fail-fast startup check
 │       └── integrity.py           is_constraint_violation() — matches PG constraint name on IntegrityError.orig.diag
 │
 ├── data/
 │   └── math_engine.wasm           Shipped WASM blob (mirrors frontend/public/wasm) — backs wasm_runtime singleton
 │
-├── alembic/                       Alembic migration environment (versions/ + env.py) — 45 revisions through ee5f6a7b8c9d_territory_student_slot_cap (current head)
+├── alembic/                       Alembic migration environment (versions/ + env.py) — 46 revisions through ff6a7b8c9d0e_add_endpoint_marker_to_users (current head)
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
-├── tests/                         30 files
+├── tests/                         31 files
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py                       — register / login / me / logout
 │   ├── test_auth_lockout.py               — per-account lockout window + exponential backoff
@@ -192,6 +193,7 @@ backend/
 │   ├── test_class_extensions.py           — co-teachers, groups, pending invites
 │   ├── test_territory.py                  — activity lifecycle, seize/counter-seize, cap, settlement
 │   ├── test_avatar_parity.py              — backend ↔ frontend avatar whitelist parity
+│   ├── test_endpoint_marker.py            — endpoint-marker prefs: schema + aggregate (magic-byte / PNG-dimension checks) + route round-trip + FE/BE parity
 │   ├── test_q_matrix.py                   — Q-matrix lookup + competency mapping
 │   ├── test_competency_estimator.py       — Beta posterior update (Bayesian stealth assessment)
 │   ├── test_assessment_router.py          — /api/assessment posteriors endpoint + RBAC
@@ -200,8 +202,8 @@ backend/
 │   ├── test_recommender.py                — adaptive recommendation against synthetic posteriors
 │   └── test_wasm_runtime.py               — wasmtime-py singleton load + ReplayUnavailableError + thread-safety (FU-A); v2 strict-rejection lives in test_score_verify.py
 │
-├── requirements.txt               Runtime dependencies (FastAPI 0.136, SQLAlchemy 2.0, psycopg v3, Alembic 1.18, PyJWT, slowapi, bcrypt, pyotp, wasmtime 44, etc.)
-├── requirements-dev.txt           Includes runtime + pytest 9 / pytest-asyncio 1.3
+├── requirements.txt               Runtime dependencies (FastAPI 0.136, SQLAlchemy 2.0, psycopg v3, Alembic 1.18, PyJWT, slowapi, bcrypt, pyotp, zxcvbn, wasmtime 45, etc.)
+├── requirements-dev.txt           Includes runtime + pytest 9 / pytest-asyncio 1.4
 ├── postgres/                      Helper scripts for the postgres service (init / role bootstrap)
 └── Dockerfile                     Two-stage build (emsdk wasm-builder → python:3.13-slim runtime)
 ```
@@ -226,7 +228,7 @@ Pure Python — no SQLAlchemy, no FastAPI, no Pydantic.
 
 Use-case orchestration. One method per user intent. Services depend on the `UnitOfWork` protocol declared in `application/ports.py`, never directly on SQLAlchemy.
 
-- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / verify_email / resend_verification_email / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_avatar`.
+- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / verify_email / resend_verification_email / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_avatar / update_endpoint_marker`.
 - **`SessionApplicationService`** — `create_session` (abandons stale sessions >2h and any existing active one, with one IntegrityError retry against the partial-unique index), `get_active_for_user`, `update_session`, `abandon_session`, `end_session` (transitions to COMPLETED and dispatches `SessionCompleted` through the event bus), `attach_reflection`, `has_correct_ia_session`.
 - **`SessionEventBus`** (in `session_event_handlers.py`) — dispatches `SessionCompleted` to three independent handlers, each in its own UoW so a downstream failure cannot roll back the durable session row:
   1. `LeaderboardInsertHandler` — idempotent insert (skipped when `practice_mode` or `is_preview` is true); `ConstraintViolationError` on the unique session-id constraint is the expected duplicate-delivery outcome.
@@ -294,6 +296,7 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 | GET | `/api/auth/me` | 30/min | Current user + IA unlock state + rolling IA accuracy |
 | PUT | `/api/auth/profile/name` | 10/min | Update `player_name` |
 | PUT | `/api/auth/profile/avatar` | 10/min | Update `avatar_url` (whitelist-checked) |
+| PUT | `/api/auth/profile/endpoint-marker` | 10/min | Update endpoint-marker prefs (`style` ∈ star/gorilla/custom, optional `custom_dataurl` PNG/JPEG, `hit_fx` ∈ random/fragments/crying/angry); aggregate re-validates magic bytes + PNG dimensions |
 | GET | `/api/auth/verify-email?token=` | 10/min | One-use email verification |
 | POST | `/api/auth/resend-verification` | 3/min | Re-issue verification email |
 | POST | `/api/auth/mfa/setup` | 5/min | Generate TOTP secret + provisioning URI |
@@ -481,6 +484,9 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `password_version` | Integer | Bumped on password change to invalidate older JWTs |
 | `is_email_verified`, `mfa_enabled`, `totp_secret`, `totp_last_used_at` | — | Verification + TOTP MFA (step-replay guard) |
 | `ia_recent_accuracy` | Float | Rolling fraction of last 10 IA-correct sessions; drives Star-1 concrete-fading |
+| `endpoint_marker_style` | String(16) | Nullable; CHECK ∈ `star`/`gorilla`/`custom`; player's P\* endpoint-marker style (NULL = FE default) |
+| `endpoint_marker_custom_dataurl` | Text | Nullable; PNG/JPEG data-URL for a custom endpoint marker (only valid when style = `custom`) |
+| `endpoint_hit_fx` | String(16) | Nullable; CHECK ∈ `random`/`fragments`/`crying`/`angry`; endpoint hit-effect style |
 | `created_at`, `updated_at` | DateTime | Auto-managed |
 
 ### GameSession
@@ -599,7 +605,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                       # 30 test files
+pytest                                       # 31 test files
 pytest tests/test_session_aggregate.py -v    # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v        # audit-driven edge cases
 pytest tests/test_territory.py -v            # territory integration tests
@@ -636,7 +642,7 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter), keyed by client IP.
 | `POST /auth/refresh` | 30/min |
 | `POST /auth/change-password` | 5/min |
 | `GET /auth/me` | 30/min |
-| `PUT /auth/profile/name`, `PUT /auth/profile/avatar` | 10/min |
+| `PUT /auth/profile/name`, `PUT /auth/profile/avatar`, `PUT /auth/profile/endpoint-marker` | 10/min |
 | `GET /auth/verify-email` | 10/min |
 | `POST /auth/resend-verification` | 3/min |
 | `POST /auth/mfa/setup`, `/mfa/confirm`, `/mfa/disable` | 5/min |

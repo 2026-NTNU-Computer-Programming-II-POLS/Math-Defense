@@ -18,8 +18,8 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 
 | Path | Role |
 |---|---|
-| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~84 Vitest files. |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (45 migrations), ~30 pytest files. |
+| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~87 Vitest files. |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (46 migrations), ~31 pytest files. |
 | `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). Sources: `math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`, `Makefile`. |
 | `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
 | `shared/` | `game-constants.json` (canvas/grid/economy single source of truth) + `score_parity_fixtures.json` (cross-language score-formula fixtures). |
@@ -29,7 +29,7 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 | `docker-compose.prod.yml` | Production: self-contained images, nginx + TLS termination. |
 | `nginx.conf`, `nginx-tls.conf`, `security-headers.conf` | SPA fallback + `/api` reverse proxy + shared security/CSP header snippet (included by both nginx configs). |
 | `Math_Defense_Spec.md` | V1 design spec (superseded but retained for V2 lineage). |
-| `DATABASE_SCHEMA.md` | Full ERD: ~23 tables, constraints, indexes, migration history. |
+| `DATABASE_SCHEMA.md` | Full ERD: 29 tables, constraints, indexes, migration history. |
 | `SECURITY.md` | Auth flow, JWT/bcrypt, lockout, MFA, CSRF, CSP, audit logging. |
 
 ---
@@ -63,7 +63,7 @@ flowchart TB
         Infra --> Domain
     end
 
-    DB[("PostgreSQL 16<br/>Alembic: 45 migrations<br/>~23 tables")]
+    DB[("PostgreSQL 16<br/>Alembic: 46 migrations<br/>29 tables")]
     Shared[/"shared/game-constants.json<br/>(parity-tested)"/]
 
     Client -- HTTPS --> Nginx
@@ -181,7 +181,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph Auth["Auth Context"]
-        U[User Aggregate<br/>password_version · role]
+        U[User Aggregate<br/>password_version · role<br/>endpoint-marker prefs]
         LA[LoginAttempt]
         DT[DeniedToken]
         RT[RefreshToken]
@@ -292,7 +292,7 @@ sequenceDiagram
 
 | Router | Mount | Highlights |
 |---|---|---|
-| `auth.py` | `/api/auth` | register, login, logout, me, refresh; CSRF + lockout-aware |
+| `auth.py` | `/api/auth` | register, login, logout, me, refresh; profile sub-routes (`PUT /profile/name`, `/profile/avatar`, `/profile/endpoint-marker`); CSRF + lockout-aware |
 | `game_session.py` | `/api/sessions` | create, active, patch, end, abandon |
 | `leaderboard.py` | `/api/leaderboard` | DENSE_RANK per star, manual submit, personal timeline |
 | `achievement.py` | `/api/achievements` | list, summary |
@@ -401,6 +401,7 @@ flowchart TB
         SpS[SpellSystem]
         MHS[MontyHallSystem]
         ES[EconomySystem]
+        EFX[EndpointFXSystem<br/>endpoint-marker hit FX]
     end
 
     subgraph DomainPolicies["domain/* (pure rules)"]
@@ -472,6 +473,7 @@ flowchart TB
 | `assessmentService`, `recommendationService` | `/api/assessment/*`, `/api/recommendation/*` |
 | `challengeService` | `/api/challenges/*` |
 | `studyService` | `/api/study/*` |
+| `imageCache` | client-side decode/cache of avatar & endpoint-marker data URLs (no HTTP) |
 
 ---
 
@@ -620,6 +622,9 @@ erDiagram
         string role
         int password_version
         float ia_recent_accuracy
+        string endpoint_marker_style "nullable, CHECK allowlist"
+        text endpoint_marker_custom_dataurl "nullable"
+        string endpoint_hit_fx "nullable, CHECK allowlist"
     }
     GAME_SESSIONS {
         uuid id PK
@@ -852,14 +857,14 @@ All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~30 test files)
+### Backend (pytest, ~31 test files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
 - **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
 
-### Frontend (Vitest + happy-dom, ~84 test files)
+### Frontend (Vitest + happy-dom, ~87 test files)
 
 - Engine systems, GameState and PhaseStateMachine.
 - Domain policies (split, level-generator, path-validator, placement-policy).
@@ -891,6 +896,7 @@ All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::
 | Bayesian competency state | Stealth assessment without explicit probes per session; informs adaptive recommendations. |
 | Scoring duplicated client and server | Server is canonical for anti-cheat; client mirror keeps UX live. |
 | Visual Redesign (Phases 0–7 + Spell Re-skin 0–2) | Math-instrument tower silhouettes, glyph-body enemies, cyan-fringe pets, gold-fringe spell glyphs; all motion-heavy effects gated behind `useReducedMotion`. |
+| Endpoint-marker customization persisted on `users` | Per-player marker style / custom image / hit-FX preferences (`endpoint_marker_style`, `endpoint_marker_custom_dataurl`, `endpoint_hit_fx`, DB-level CHECK allowlists) saved via `PUT /api/auth/profile/endpoint-marker` and replayed deterministically by `EndpointFXSystem` (`random` resolves through `game.rng`). |
 
 ---
 
@@ -921,13 +927,13 @@ backend/
       login_guard.py   token_denylist.py   audit_logger.py
       email_service.py   scheduler.py   spectate_hub.py
       wasm_runtime.py            # wasmtime-py singleton, hosts math_engine.wasm
-    models/                      # SQLAlchemy ORM models (22 files, ~23 tables)
+    models/                      # SQLAlchemy ORM models (22 files, 29 tables)
     routers/                     # FastAPI routers (13 thin adapters: achievement, admin, assessment,
                                  # auth, challenge, class_, game_session, leaderboard, recommendation,
                                  # replay, study, talent, territory)
     schemas/                     # Pydantic DTOs
-  alembic/                       # 45 migrations
-  tests/                         # ~30 pytest files
+  alembic/                       # 46 migrations
+  tests/                         # ~31 pytest files
 
 frontend/
   src/
@@ -937,12 +943,12 @@ frontend/
     views/                       # 26 page-level .vue files
     components/                  # common, layout, game (28 .vue), teacher, territory, leaderboard
     composables/                 # 20 use*.ts (lifecycle, auth, UI, data)
-    services/                    # api.ts + 18 per-domain clients
+    services/                    # api.ts + 19 per-domain clients (incl. imageCache)
     engine/                      # Game.ts, GameState, PhaseStateMachine, EventBus,
                                  # Renderer, InputManager, register-systems,
                                  # audio/, event-handlers/, projections/,
                                  # render-helpers/, replay/
-    systems/                     # 17 ECS-style systems (sibling of engine/)
+    systems/                     # 18 ECS-style systems (sibling of engine/)
     renderers/                   # 13 canvas renderers + primitives.ts
     domain/                      # pure rules: combat, level, movement, path, placement,
                                  # scoring, study, wave
@@ -950,16 +956,16 @@ frontend/
     entities/                    # Tower/Enemy/Projectile/Pet types + factories
     data/                        # tower-defs, enemy-defs, achievement-defs, talent-defs, ...
     lib/   utils/   styles/      # misc helpers, shared utilities, global CSS
-  tests/                         # Vitest suites (~84 files including in-tree *.test.ts)
+  tests/                         # Vitest suites (~87 files including in-tree *.test.ts)
 
 wasm/                            # C99 sources (math_engine.c, prng.c/h, curve.c/h, level_gen.c/h) + Makefile (Emscripten)
 emsdk/                           # vendored toolchain
 shared/                          # game-constants.json + score_parity_fixtures.json
-docs/                            # this file + analysis docs
+docs/                            # analysis / audit / educational-theory docs
 docker-compose.yml               # dev
 docker-compose.prod.yml          # prod
 nginx.conf  nginx-tls.conf  security-headers.conf  # reverse proxy + TLS + shared headers
-DATABASE_SCHEMA.md   SECURITY.md   Math_Defense_Spec.md   README.md
+ARCHITECTURE.md  DATABASE_SCHEMA.md  SECURITY.md  Math_Defense_Spec.md  README.md  # repo-root docs
 ```
 
 ---

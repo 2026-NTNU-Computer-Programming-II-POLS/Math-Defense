@@ -48,7 +48,7 @@ If the same refresh token is presented twice (typically because an attacker has 
 
 ### Token Revocation
 
-On logout, the token's `jti` is inserted into a persistent PostgreSQL deny-list table with its expiry timestamp. A background janitor task runs every 10 minutes and bulk-deletes rows whose `expires_at` has passed, so the table stays bounded without touching the hot insertion path. This means revocation survives application restarts.
+On logout, the token's `jti` is inserted into a persistent PostgreSQL deny-list table with its expiry timestamp. A background janitor task (`_auth_store_janitor`, started from the app lifespan) runs every 10 minutes and bulk-deletes both expired deny-list rows (`expires_at <= now`) and stale `login_attempts` rows in one transaction, so neither table grows on the hot insertion/read path. This means revocation survives application restarts. `is_denied()` filters on `expires_at > now` at read time, so an expired row is never treated as a live revocation even before the janitor removes it.
 
 Password changes increment the user's `password_version` field. Any token whose `pv` claim does not match the current value is rejected at the dependency level before reaching route handlers.
 
@@ -87,14 +87,16 @@ Key field-level validations:
 - **Player name**: trimmed of whitespace, 1–50 characters.
 - **Avatar URL**: validated against a strict whitelist of six known SVG paths under `/avatars/`; arbitrary URLs are rejected.
 - **TOTP code**: must match `^\d{6}$` (exactly six digits) on every MFA enrolment, challenge, and disable request.
+- **Endpoint-marker style / hit-FX**: the `PUT /api/auth/profile/endpoint-marker` body accepts only `style ∈ {star, gorilla, custom}` and `hit_fx ∈ {random, fragments, crying, angry}` (whitelists in `domain/user/constraints.py`).
+- **Endpoint-marker custom image (`endpoint_marker_custom_dataurl`)**: this is the one user-supplied free-form field on the profile and is validated in depth rather than stored as opaque text. The Pydantic schema (`EndpointMarkerUpdateRequest`) fast-rejects on prefix and length (must start with `data:image/png;base64,` or `data:image/jpeg;base64,`, max 3 MiB). The `User` aggregate (`update_endpoint_marker`) then re-validates everything as the canonical source of truth: it base64-decodes with `validate=True`, confirms the decoded bytes start with the declared format's magic-byte sentinel (PNG `\x89PNG\r\n\x1a\n` / JPEG `\xff\xd8\xff`), and for PNGs parses the IHDR chunk to reject declared dimensions above 1024×1024 (a decompression-bomb guard). No image library (Pillow) is invoked and the bytes are never decoded or rendered server-side — they are stored as a string and only ever echoed back to the owner's own client, so the value is not a server-side XSS or RCE surface. The 3 MiB cap and per-route rate limit bound storage-inflation abuse.
 
-These validations are applied at the schema boundary, not only in the database layer.
+These validations are applied at the schema boundary and re-enforced in the domain aggregate, not only in the database layer.
 
 ---
 
 ## SQL Injection
 
-The application uses SQLAlchemy's ORM for all database interactions. No raw SQL strings were observed in the codebase. Parameterized queries are used throughout, including the PostgreSQL-specific `INSERT ... ON CONFLICT` statements in the login guard and token deny-list.
+The application uses SQLAlchemy's ORM and Core expression language for the overwhelming majority of database interactions. A small number of hand-written `text()` statements exist for operations the ORM does not express cleanly — PostgreSQL advisory locks (`pg_advisory_lock` for migration serialisation, `pg_advisory_xact_lock` in the session and territory repositories) and `SELECT ... FOR UPDATE` row locks in the competency-state and talent repositories. Every one of these binds its inputs as named parameters (`:uid`, `:id`, `:a`, `:s`); none interpolates a user-controlled value into the SQL string, so they are not an injection surface. Parameterized queries are used throughout, including the PostgreSQL-specific `INSERT ... ON CONFLICT` statements in the login guard and token deny-list. No SQL string is built by concatenating untrusted input.
 
 ---
 
@@ -148,11 +150,11 @@ Per-IP rate limits are enforced via `slowapi`. The auth-critical endpoints are l
 
 ## HTTP Security Headers
 
-nginx applies the following security headers to all responses in the production configuration. A `SecurityHeadersMiddleware` in the FastAPI app independently re-asserts the subset that is safe to set everywhere (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, plus `Cache-Control: no-store` on `/api/auth/*`), so even direct backend access — for example via the dev compose port — still carries those baseline headers. HSTS, COOP, CORP, and CSP are applied by nginx only and rely on the production deployment topology.
+nginx applies the following security headers to all responses in the production configuration. A `SecurityHeadersMiddleware` in the FastAPI app independently re-asserts the subset that is safe to set everywhere (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, plus `Cache-Control: no-store` on `/api/auth/*`), so even direct backend access — for example via the dev compose port — still carries those baseline headers. HSTS, COOP, CORP, and CSP are applied by nginx only and rely on the production deployment topology. HSTS, COOP, and CORP live in the shared `security-headers.conf` `include`, which is pulled into both the plain-HTTP `nginx.conf` server block and the TLS `nginx-tls.conf` block, so these headers are emitted by either nginx config; the CSP `add_header` is declared inline in each server block (it is not part of the shared include).
 
 | Header | Value |
 |---|---|
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains` (TLS configuration only) |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains` |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |

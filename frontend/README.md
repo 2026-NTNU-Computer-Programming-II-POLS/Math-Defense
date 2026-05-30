@@ -8,7 +8,7 @@ The frontend hosts both the Vue 3 UI layer and the entire game engine. It render
 |---|---|
 | Framework | Vue 3 (Composition API, `<script setup>`) |
 | State | Pinia 3 |
-| Router | Vue Router 4 |
+| Router | Vue Router 5 |
 | Build | Vite 8 |
 | Language | TypeScript 6.0 (strict, `erasableSyntaxOnly`, `verbatimModuleSyntax`) |
 | Rendering | HTML5 Canvas 2D |
@@ -35,7 +35,7 @@ frontend/
 │   │   ├── GameView.vue            Game container (canvas + HUD overlay)
 │   │   ├── ScoreResultView.vue     Post-game score breakdown (S1/S2/K/TotalScore)
 │   │   ├── LeaderboardView.vue     Score table
-│   │   ├── ProfileView.vue         User profile + achievement/talent summary cards
+│   │   ├── ProfileView.vue         User profile + achievement/talent summary cards + endpoint-marker customization (star/gorilla/custom image upload, hit-FX picker)
 │   │   ├── AchievementView.vue     Achievement gallery (5 categories, season multipliers)
 │   │   ├── TalentTreeView.vue      Talent tree allocation UI (26 nodes, 7 tower types)
 │   │   ├── ClassView.vue           Student: list/join classes; Teacher: create/manage classes
@@ -135,27 +135,27 @@ frontend/
 │   │
 │   ├── services/                   Backend API clients
 │   │   ├── api.ts                          fetch wrapper; auto-attaches Bearer token; ApiError
-│   │   ├── authService.ts                  register(email, playerName, password, role) / login / me / logout
+│   │   ├── authService.ts                  register(email, password, playerName, role) / login / me / logout / updatePlayerName / updateAvatar / updateEndpointMarker
 │   │   ├── sessionService.ts               create / update / end / abandon / getActive (V2 fields, rng_seed, practice_mode)
 │   │   ├── sessionLifecycleService.ts      High-level orchestration around session creation + end / score submit
 │   │   ├── gameCommandService.ts           Server-authoritative game commands (when backend governs a run)
 │   │   ├── levelGenerationService.ts       Fetches deterministic level definitions / decoys from the backend
 │   │   ├── waveService.ts                  Wave-schedule fetch / regeneration helpers
-│   │   ├── leaderboardService.ts           fetchLeaderboard, submitScore, fetchPersonalTimeline
-│   │   ├── achievementService.ts           fetchAchievements, fetchSummary
-│   │   ├── seasonService.ts                listSeasons, upsertSeason (admin)
-│   │   ├── talentService.ts                fetchTree, fetchModifiers, allocate, reset
-│   │   ├── classService.ts                 createClass, listClasses, joinByCode, deleteClass
-│   │   ├── adminService.ts                 listTeachers, listClasses, listStudents
-│   │   ├── rankingService.ts               fetchRankings (4 ranking types)
+│   │   ├── leaderboardService.ts           get, getForChallenge, getMyHistory (personal timeline)
+│   │   ├── achievementService.ts           list, summary, unlockedIds (memoised), invalidateUnlockedIds
+│   │   ├── seasonService.ts                list, listAdmin, create (admin)
+│   │   ├── talentService.ts                getTree, getModifiers, allocate, reset
+│   │   ├── classService.ts                 Class CRUD + roster/groups/co-teachers/invites/reflections (createClass, listClasses, joinByCode, … many helpers)
+│   │   ├── adminService.ts                 getTeachers, getClasses, getStudents, createTeacher
+│   │   ├── rankingService.ts               getGlobal, getByClass, getInternal, getExternal
 │   │   ├── territoryService.ts             createActivity, listActivities, getActivity, playTerritory, getRankings, settleActivity
 │   │   ├── territory/
 │   │   │   ├── challengeMode.ts            Per-slot challenge-mode helpers
 │   │   │   └── rankingSort.ts              Ranking sort + tiebreak helpers
-│   │   ├── assessmentService.ts            fetchClassPosteriors(classId) — Beta posteriors for the teacher dashboard
-│   │   ├── recommendationService.ts        fetchMyRecommendation() — adaptive star + talent steer
-│   │   ├── challengeService.ts             CRUD for generative challenges; fetch + run + leaderboard
-│   │   └── studyService.ts                 enroll(), submitProbe(), submitAffect(), exportCsv() (admin)
+│   │   ├── assessmentService.ts            classPosteriors(classId) — Beta posteriors for the teacher dashboard
+│   │   ├── recommendationService.ts        me() — adaptive star + talent steer
+│   │   ├── challengeService.ts             create / get / listMine / rename / updateConstraints / remove (generative challenges)
+│   │   └── studyService.ts                 enroll(), submitProbe(), submitAffect()
 │   │
 │   ├── router/index.ts             Routes with RBAC guards (protected / admin / teacher / student sets)
 │   │
@@ -254,9 +254,11 @@ frontend/
 │   │   ├── SpellSystem.ts             4 spells (Exponential/Asymptote/Impulse/Acceleration) + cooldown mgmt
 │   │   ├── MontyHallSystem.ts         Kill-value threshold triggers; door reveal + switch logic; reward injection
 │   │   ├── EconomySystem.ts           Gold on kill (×goldMultiplier), HP on origin reach, wave bonuses
+│   │   ├── EndpointFXSystem.ts        Transient hit FX on the endpoint marker (P*) when an enemy breaches — fragments/crying/angry burst (driven by uiStore endpoint-marker prefs; replay-safe via game.rng)
 │   │   └── __tests__/                 Vitest unit tests
 │   │
 │   ├── renderers/                  Draw entities to canvas (read-only state / projection input)
+│   │   ├── effects/EffectLayer.ts    Base class for transient-effect render systems (spawn/age/prune); extended by EndpointFXSystem
 │   │   ├── primitives.ts             Shared canvas primitives (text badges, bars, rings)
 │   │   ├── EnemyRenderer.ts          HP bar, shield bar (blue), helper aura circle, glyph-body sprites
 │   │   ├── TowerRenderer.ts          Math-instrument tower sprites (re-skinned in Visual Redesign)
@@ -403,6 +405,8 @@ interface GameState {
   timeTotal: number
   timeExcludePrepare: number[]
   prepPhaseStart: number
+  pausePhaseStart: number           // MONTY_HALL / CHAIN_RULE pause start (excluded from score time)
+  perceivedSpeedMultiplier: number  // wall-clock pacing only; score time advances at 1×
 
   // V2 Initial Answer
   initialAnswer: 0 | 1
@@ -414,12 +418,17 @@ interface GameState {
 
   // Buff flags
   shieldActive: boolean
+  shieldHitsRemaining: number
+  shieldReductionFactor: number  // per-hit multiplier while shield absorbs (1 = inactive)
   goldMultiplier: number       // derived = 1 + goldMultiplierBonus (consumers read this)
   goldMultiplierBonus: number  // additive accumulator owned by BuffSystem (Q15)
   freeTowerNext: boolean
   freeTowerCharges: number
   enemySpeedMultiplier: number
   enemyVulnerability: number
+  towerDamageBonus: number     // additive tower-buff accumulators; effective = 1 + bonus
+  towerRangeBonus: number
+  towerSpeedBonus: number
 
   // Active buffs (time-based)
   activeBuffs: ActiveBuffEntry[]
@@ -440,8 +449,7 @@ Valid transitions:
   MENU          → LEVEL_SELECT | BUILD
   LEVEL_SELECT  → BUILD | MENU
   BUILD         → WAVE | GAME_OVER | MENU
-  WAVE          → BUILD | MONTY_HALL | LEVEL_END | GAME_OVER | CHAIN_RULE | BUFF_SELECT
-  BUFF_SELECT   → BUILD                        (legacy path; normal flow skips this)
+  WAVE          → MONTY_HALL | BUILD | LEVEL_END | GAME_OVER | CHAIN_RULE
   MONTY_HALL    → BUILD | GAME_OVER
   CHAIN_RULE    → WAVE | GAME_OVER
   LEVEL_END     → LEVEL_SELECT | MENU | BUILD
@@ -477,6 +485,12 @@ Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_ST
 | `WaveSystem` | Reads wave schedule; spawns via `EnemyFactory`; detects clear, emits `WAVE_END` |
 | `BuffSystem` | Time-based active buffs; 30+ effect strategies; `applyExternalBuff()` for SpellSystem + MontyHallSystem |
 | `EconomySystem` | Gold on `ENEMY_KILLED` (`killValue × goldMultiplier`); HP damage on `ENEMY_REACHED_ORIGIN`; wave completion bonus |
+| `EndpointFXSystem` | On `ENEMY_REACHED_ORIGIN`, spawns a transient burst on the endpoint marker (P*): `fragments` (default) / `crying` / `angry`. Style read from `game.endpointFx` (set from `uiStore.endpointHitFx`); `random` resolves via `game.rng` so replays reproduce the same FX. Suppressed when the marker is hidden (`pathsVisible === false`) |
+
+There are **18 update systems** in `src/systems/` (the 17 above plus
+`EndpointFXSystem`); all are constructed and ordered in
+`engine/register-systems.ts`, which also registers the canvas renderers
+alongside them.
 
 ---
 
@@ -489,7 +503,7 @@ onMounted:
   await initWasm()
   g = new Game(canvas)
   registerSystems(g)                                      // engine/register-systems.ts
-  g.towerModifierProvider = () => talentStore.getModifiers()   // Pinia → engine
+  g.towerModifierProvider = (towerType) => talentStore.getTowerModifiers(towerType)   // Pinia → engine
   useEngineUiBridges(g)        // TOWER_PLACED → BuildPanel, TOWER_SELECTED, BuildHint, principle overlay
   useEngineAudio(g)            // engine events → AssetManager (sfx + music bus)
   useSessionSync().bind(g)     → backend session lifecycle
@@ -523,7 +537,7 @@ User actions emit events through the store — `BuildPanel.vue` calls `TowerInfo
 | State | Description |
 |---|---|
 | `token` | JWT access token (persisted to `localStorage`) |
-| `user` | `{ id, email, playerName, role, avatarUrl }` or `null` |
+| `user` | `{ id, email, player_name, role, avatar_url, ia_unlock_earned, ia_recent_accuracy }` (snake_case, mapped from `/auth/me`) or `null` |
 | `initializing` | `true` while `me()` is in-flight on boot |
 
 Computed: `isLoggedIn`, `isAdmin`, `isTeacher`, `isStudent`.
@@ -543,12 +557,14 @@ Mirrors a subset of `GameState` for Vue reactivity:
 | `activeBuffs` | Currently active time-based buffs |
 | `spellCooldowns` | Remaining cooldown per spell ID |
 | `montyHallNextIndex` | Next Monty Hall threshold index |
+| `perceivedSpeedMultiplier` | Mirror of the runtime game-speed selection (×0.5/×1/×2/×3) |
+| `leadEnemyX` | Lead-enemy X coordinate fed each frame by `MovementSystem` (drives the path panel) |
 
-Computed: `isBuilding`, `isWave`, `hpPercent`.
+Computed: `isBuilding`, `isWave`, `isBuff`, `isMontyHall`, `hpPercent`.
 
 ### `talentStore`
 
-Caches talent allocations fetched from the backend. Exposes `getTowerModifiers(towerType)` returning `{ damageMultiplier, rangeMultiplier, speedMultiplier, petMultiplier }`. Used by `useGameLoop` to inject modifiers into `TowerFactory` via `game.towerModifierProvider`.
+Caches the per-tower attribute modifiers fetched from the backend (`load()` → `talentService.getModifiers()`), stored as `modifiers: Record<TowerType, Record<attribute, number>>`. Exposes `getTowerModifiers(towerType)` (the attribute map for one tower type) and `getStatBonus(towerType, attribute)` plus `loaded` / `clear`. `useGameLoop` wires `game.towerModifierProvider = (towerType) => talentStore.getTowerModifiers(towerType)` so the engine reads talent bonuses without importing Pinia. Cleared on `auth:logout`.
 
 ### `territoryStore`
 
@@ -558,6 +574,14 @@ Territory activity list and current activity detail for the Territory views.
 
 Panel visibility, selected tower type, build-hint step, modal state, and audio preferences (master / music / sfx / ui volume + mutes) consumed by `useUiAudio` and `AssetManager`.
 
+Also owns the **endpoint-marker** preferences (persisted to `localStorage` and synced server-side):
+
+- `endpointMarkerStyle: 'star' | 'gorilla' | 'custom'` — the glyph drawn at the curves' common intersection (P*); default `'star'`.
+- `endpointMarkerCustomDataUrl: string | null` — resized data-URL for the `'custom'` style.
+- `endpointHitFx: 'random' | 'fragments' | 'crying' | 'angry'` — burst played when an enemy breaches the marker; default `'fragments'`.
+
+`applyServerEndpointMarker()` hydrates these from `/auth/me`; `ProfileView` exposes the picker + custom-image upload and pushes changes via `authService.updateEndpointMarker` (`PUT /api/auth/profile/endpoint-marker`). `useGameLoop` copies the resolved values onto `game.endpointMarker` / `game.endpointFx` so the renderer and `EndpointFXSystem` honour them.
+
 ---
 
 ## Services
@@ -565,26 +589,26 @@ Panel visibility, selected tower type, build-hint step, modal state, and audio p
 | Service | Methods |
 |---|---|
 | `api.ts` | `request<T>(path, opts)` — fetch wrapper with auto Bearer token + `ApiError` class |
-| `authService.ts` | `register(email, playerName, password, role)`, `login(email, password)`, `me()`, `logout()` |
-| `sessionService.ts` | `createSession(starRating)`, `getActiveSession()`, `updateSession(id, patch)`, `endSession(id, result)`, `abandonSession(id)` |
+| `authService.ts` | `register(email, password, playerName, role='student')`, `login(email, password)`, `me()`, `logout()`, `updatePlayerName`, `updateAvatar`, `updateEndpointMarker(payload)` |
+| `sessionService.ts` | `create(...)`, `getActive()`, `update(id, patch)`, `end(id, result)`, `abandon(id)`, `submitReflection(id, text)`, `appendReplayEvents(...)`, `getReplay(id)` |
 | `sessionLifecycleService.ts` | High-level orchestration: open a session, attach engine, submit the final score in one flow |
 | `gameCommandService.ts` | Issues server-authoritative game commands (used when the backend governs a run) |
 | `levelGenerationService.ts` | Fetches deterministic level definitions / decoy curves from the backend |
 | `waveService.ts` | Wave-schedule fetch and regeneration helpers |
-| `leaderboardService.ts` | `fetchLeaderboard({ starRating, page, perPage })`, `submitScore(payload)`, `fetchPersonalTimeline` |
-| `achievementService.ts` | `fetchAchievements()`, `fetchSummary()` |
-| `talentService.ts` | `fetchTree()`, `fetchModifiers()`, `allocate(nodeId)`, `reset()` |
-| `classService.ts` | `createClass(name)`, `listClasses()`, `joinByCode(code)`, `deleteClass(id)` |
-| `adminService.ts` | `listTeachers()`, `listClasses()`, `listStudents()` |
-| `rankingService.ts` | `fetchRankings(type, options)` |
+| `leaderboardService.ts` | `get(level?, page, perPage)`, `getForChallenge(challengeId, page, perPage)`, `getMyHistory(level?)` (personal-best timeline). Scores are submitted through the session-end flow, not here |
+| `achievementService.ts` | `list()`, `summary()`, `unlockedIds()` (memoised set), `invalidateUnlockedIds()` |
+| `talentService.ts` | `getTree()`, `getModifiers()`, `allocate(nodeId)`, `reset()` |
+| `classService.ts` | Full class CRUD + roster + organisation: `createClass`, `listClasses`, `getClass`, `renameClass`, `updateClass`, `deleteClass`, `archiveClass` / `unarchiveClass`, `transferOwnership`, `addStudent` / `bulkAddStudents` / `removeStudent` / `moveStudent`, `listStudents`, `joinByCode`, `claimInvites`, `regenerateCode`, `joinQr`, co-teacher + invite + group + reflection + leaderboard/report helpers |
+| `adminService.ts` | `getTeachers()`, `getClasses()`, `getStudents()`, `createTeacher(payload)` |
+| `rankingService.ts` | `getGlobal(page, perPage)`, `getByClass(classId, …)`, `getInternal(activityId)`, `getExternal(activityId)` |
 | `territoryService.ts` | `createActivity(payload)`, `listActivities(classId?)`, `getActivity(id)`, `playTerritory(activityId, slotId, sessionId)`, `getRankings(activityId)`, `settleActivity(activityId)` |
 | `territory/challengeMode.ts` | Per-slot challenge-mode constraint helpers |
 | `territory/rankingSort.ts` | Ranking sort + tiebreak helpers |
-| `assessmentService.ts` | `fetchClassPosteriors(classId)` — `{ student_id, competency, alpha, beta, mean, recommend_next }` rows |
-| `recommendationService.ts` | `fetchMyRecommendation()` — adaptive star-rating + suggested talent node |
-| `seasonService.ts` | `listSeasons()`, `upsertSeason(payload)` (admin) |
-| `challengeService.ts` | `createChallenge`, `listChallenges({ mine })`, `getChallenge(id)`, `renameChallenge(id, payload)`, `updateConstraints(id, payload)`, `deleteChallenge(id)` |
-| `studyService.ts` | `enroll(studyId)`, `submitProbe(studyId, form, responses)`, `submitAffect(studyId, phase, responses)`, `exportCsv()` (admin) |
+| `assessmentService.ts` | `classPosteriors(classId)` — Beta posteriors per student/competency for the teacher dashboard |
+| `recommendationService.ts` | `me()` — adaptive star-rating + suggested talent node |
+| `seasonService.ts` | `list()`, `listAdmin()`, `create(req)` (admin) |
+| `challengeService.ts` | `create(payload)`, `get(id)`, `listMine()`, `rename(id, title, description)`, `updateConstraints(id, constraints)`, `remove(id)` |
+| `studyService.ts` | `enroll(studyId)`, `submitProbe(studyId, form, responses)`, `submitAffect(studyId, phase, anxietyItems, motivationItems)` |
 
 ---
 
@@ -727,15 +751,15 @@ frontend dev ports are bound to `127.0.0.1` only in compose.
 
 ## Testing
 
-Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships ~84 test files spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships **87 `*.test.ts` files** under `frontend/src/` (plus one `*.bench.ts` under `dev/`, excluded from the prod run) spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
 
-- **Engine units** — `EventBus`, `Game`, `PhaseStateMachine`, `Renderer`, `level-context`, `engine/audio/AssetManager`, `engine/projections/project-path-panel`, `engine/projections/project-enemies`, `engine/render-helpers/tile-style`, `engine/__tests__/determinism` (replay reproducibility from `rng_seed`).
-- **Domain** — `domain/combat/SplitPolicy`, `domain/level/{level-generator, level-layout-service, placement-policy, checkpoint}`, `domain/movement/{vertical, x-driven}-movement-strategy`, `domain/path/{path-builder, path-progress-tracker, path-validator, segmented-path}`, `domain/scoring/score-calculator.parity` (frontend ↔ backend formula parity), `domain/wave/wave-generator`.
-- **Systems** (`systems/__tests__/`) — `BuffSystem` + `BuffSystem.duration` + `BuffSystem.effects`, `CalculusTowerSystem`, `CombatSystem`, `CounterEnemy.e2e`, `EconomySystem`, `EnemyAbilitySystem`, `LimitTowerSystem`, `MovementSystem`, `TowerInterferenceSystem`, `TowerPlacementSystem`, `TowerUpgradeSystem`, `WaveSystem`.
-- **Components / views / composables** — `views/{GameView, InitialAnswerView, LevelSelectView}`, `components/game/{FunctionPanel, LimitQuestionPanel, RadarConfigPanel, PrincipleOverlay, WaveForecast}`, `components/uiStore` (via `stores/uiStore.test.ts`), `composables/{useSessionSync, useKeyboardPlacement, useFirstEncounterCards, principle-defs}`.
-- **Data / lints** — `data/tower-defs`, `data/achievement-defs` (bans trait-praise vocabulary; requires verb-led descriptions), `entities/{EnemyFactory, tower-stats}`, `math/{rational, limit-evaluator, curve-evaluator, curve-renderer}`.
+- **Engine units** — `EventBus`, `Game`, `PhaseStateMachine`, `Renderer`, `level-context`, `generated-level-context`, `engine/audio/AssetManager`, `engine/projections/{project-path-panel, project-enemies, project-towers}`, `engine/render-helpers/tile-style`, `engine/__tests__/determinism` (replay reproducibility from `rng_seed`).
+- **Domain** — `domain/combat/{SplitPolicy, RadarTargeting}`, `domain/level/{level-generator, level-layout-service, placement-policy, checkpoint}`, `domain/movement/{vertical, x-driven}-movement-strategy`, `domain/path/{path-builder, path-progress-tracker, path-validator, segmented-path}`, `domain/scoring/score-calculator.parity` (frontend ↔ backend formula parity), `domain/wave/wave-generator`.
+- **Systems** (`systems/__tests__/`) — `BuffSystem` + `BuffSystem.duration` + `BuffSystem.effects`, `CalculusTowerSystem`, `CombatSystem`, `CounterEnemy.e2e`, `EconomySystem`, `EnemyAbilitySystem`, `EndpointFXSystem`, `LimitTowerSystem`, `MagicTowerSystem`, `MatrixTowerSystem`, `MontyHallSystem`, `MovementSystem`, `PetCombatSystem`, `RadarTowerSystem`, `TowerInterferenceSystem`, `TowerPlacementSystem`, `TowerUpgradeSystem`, `WaveSystem`.
+- **Components / views / composables** — `views/{GameView, InitialAnswerView, LevelSelectView}`, `components/game/{FunctionPanel, LimitQuestionPanel, RadarConfigPanel, CalculusPanel, PrincipleOverlay, WaveForecast}`, `stores/uiStore`, `composables/{useSessionSync, useKeyboardPlacement, useFirstEncounterCards, principle-defs}`.
+- **Data / lints** — `data/tower-defs`, `data/achievement-defs` (bans trait-praise vocabulary; requires verb-led descriptions), `entities/{EnemyFactory, TowerFactory, tower-stats, PetFactory}`, `math/{rational, monomial, limit-evaluator, curve-evaluator, curve-renderer}`.
 - **WASM parity** — `WasmBridge.test.ts` pins the JS fallback surface; `WasmBridge.curve.test.ts` / `WasmBridge.prng.test.ts` cover JS-only parity for curve and PRNG subsystems; `WasmBridge.wasm.test.ts` and the four `*.wasm.test.ts` siblings (`curve`, `prng`, `intersect`, `spawn`, `levelgen`) load the compiled binary under Node and assert bit-level parity for each subsystem (skipped if the WASM build is absent).
-- **Renderer** — `renderers/CombatFeedbackRenderer.test.ts` covers floating-number / hit-flash output.
+- **Renderers** — `renderers/{CombatFeedbackRenderer, LimitBurstRenderer, PetRenderer, SpellEffectRenderer, TowerRenderer, EnemyRenderer, glyph-fallback-safety}` cover floating-number / hit-flash output, burst variants, glyph-body sprites, and font-fallback safety.
 
 ---
 

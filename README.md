@@ -17,7 +17,7 @@ An educational tower defense where **math is the mechanic, not the gate**. The w
 | Radar B — Rapid | ◑ | Radian arcs | Fast single-target projectiles within a restricted arc; shortest cooldown in the roster | Star 2 |
 | Radar C — Sniper | ◒ | Radian arcs | Slow, heavy single-target shots at long range; highest base damage | Star 2 |
 | Matrix | ⊞ | Vectors & dot product | **Paired** tower system — fires nothing alone; base damage = dot product of the pair's grid-coordinate vectors; laser ramps damage the longer it locks on | Star 2 |
-| Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; answer drives the effect — `+∞` instakills every enemy in range (bypasses defensive caps), `+C` (finite positive) scales damage by `\|C\| × 1.5`, any other answer (`0`, `−C`, `−∞`) deals chip damage (`effectiveDamage × 0.10 × 1.5`) | Star 3 |
+| Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; answer drives the effect — `+∞` instakills every enemy in range (bypasses defensive caps), `+C` (finite positive) scales damage by `\|C\| × 1.5`, any other answer (`0`, `−C`, `−∞`) deals chip damage (`effectiveDamage × 0.35 × 1.5`) | Star 3 |
 | Calculus | ∫ | Derivatives & integrals (power rule) | Player picks a polynomial and applies `d/dx` or `∫`; the resulting `C·xⁿ` spawns `floor(log2(C+1))` autonomous pets (capped log-curve, not raw C) whose behaviour is determined by `n` (homing, lifetime, AoE) | Star 3 |
 
 Each tower has Tier 2 / Tier 3 upgrades (+25%/+50% damage, +10%/+20% range, plus type-specific bonuses).
@@ -98,7 +98,7 @@ Path generation is polynomial-only; the trig / log evaluator is used by the Magi
 
 - **Achievements** — 29 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
 - **Talent Tree** — 26 nodes (19 base + 7 tier-2 advanced) across the 7 tower types. Base nodes form linear prerequisite chains; tier-2 nodes additionally require their parent at max level (`prerequisite_max_levels`). Each node has a `maxLevel` (2 or 3) and grants a per-tower attribute multiplier — including damage, range, attack/sweep speed, target count, zone width/strength, Magic zone duration/slow strength, Matrix damage-ramp rate/resonance, Limit burst bonus, and Calculus pet damage/speed/range/crit. Modifiers are snapshotted at tower placement, so re-build to refresh after reallocating. Free reset is supported.
-- **Avatar & profile** — unlocked along the way.
+- **Avatar & profile** — unlocked along the way. Profile customization also covers the **endpoint marker** (the origin rune you defend): pick a marker style (`star` / `gorilla` / `custom` data-URL upload) and a hit-effect animation (`random` / `fragments` / `crying` / `angry`), validated at the schema, domain-aggregate, and DB-constraint layers.
 - **Class & Territory** — students join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global. Each activity has up to 50 slots and a teacher-configurable `student_slot_cap` (1–50, default 5) controlling how many slots a single student may hold.
 - **Leaderboard** — every completed non-practice run posts its TotalScore by star rating.
 
@@ -171,10 +171,10 @@ Browser
 
 | Layer | Technology |
 |---|---|
-| Frontend | Vue 3.5 (Composition API, `<script setup>`), TypeScript 6.0 strict, Pinia 3, Vue Router 4, Vite 8, Vitest 4 |
+| Frontend | Vue 3.5 (Composition API, `<script setup>`), TypeScript 6.0 strict, Pinia 3, Vue Router 5, Vite 8, Vitest 4 |
 | Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
 | WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 17 exported math functions (plus `_malloc`/`_free`) |
-| Database | PostgreSQL 16 (45 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
+| Database | PostgreSQL 16 (46 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
 | Container | Docker, Docker Compose |
 | Replay | Versioned (`replay_version` 1=mulberry32+JS Math, 2=PCG+WASM bit-exact); server-side score recompute via `wasmtime-py` |
 
@@ -195,7 +195,7 @@ MENU
                       └─ GAME_OVER (HP reaches 0)
 ```
 
-Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend. The `BUFF_SELECT` phase remains valid in the FSM but is no longer part of the main flow — shop-based purchases during BUILD replaced the end-of-wave buff card draw.
+Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend. The `BUFF_SELECT` phase survives only as a `GamePhase` enum value for V1 compatibility — the `PhaseStateMachine` defines no transitions into it, so the V2 flow never enters it; shop-based purchases during BUILD replaced the end-of-wave buff card draw.
 
 ---
 
@@ -297,8 +297,8 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # ~32 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, CSRF cookie, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute, admin teacher provisioning)
-cd frontend && npm test            # ~84 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
+cd backend  && pytest              # ~31 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, CSRF cookie, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute, admin teacher provisioning)
+cd frontend && npm test            # ~87 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
@@ -320,7 +320,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 ### System references
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — System topology, DDD layering, ECS engine, WASM bridge, deployment, and testing in one place
-- **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** — ERD for 30+ tables, constraints, indexes, and Alembic migration history
+- **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** — ERD for 29 tables, constraints, indexes, and Alembic migration history
 - **[SECURITY.md](SECURITY.md)** — Threat model, auth flow (JWT/bcrypt/MFA), lockout, CSRF, CSP, audit logging
 - **[Math_Defense_Spec.md](Math_Defense_Spec.md)** — Original game-design specification
 - **[docs/Educational_Theory_Analysis.md](docs/Educational_Theory_Analysis.md)** — Theory-driven design audit mapping each game mechanic to authoritative learning theories (APA 7 citations)
