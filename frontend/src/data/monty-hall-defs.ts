@@ -70,7 +70,7 @@ export const MONTY_HALL_REWARD_POOL: MontyHallReward[] = [
     name: 'Time Warp',
     description: 'All enemies slowed by 40% for 20s',
     effectId: 'ENEMY_SPEED_MULTIPLIER_0_6',
-    revertId: 'ENEMY_SPEED_MULTIPLIER_RESET',
+    revertId: 'ENEMY_SPEED_RESTORE_0_6',
     duration: 20,
     minStar: 2,
   },

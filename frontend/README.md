@@ -424,8 +424,10 @@ interface GameState {
   goldMultiplierBonus: number  // additive accumulator owned by BuffSystem (Q15)
   freeTowerNext: boolean
   freeTowerCharges: number
-  enemySpeedMultiplier: number
-  enemyVulnerability: number
+  enemySpeedMultiplier: number // derived: max(0.1, 1 + enemySpeedBonus)
+  enemyVulnerability: number   // derived: max(0, 1 + enemyVulnBonus)
+  enemySpeedBonus: number      // additive enemy-debuff accumulators (overlapping debuffs compose)
+  enemyVulnBonus: number
   towerDamageBonus: number     // additive tower-buff accumulators; effective = 1 + bonus
   towerRangeBonus: number
   towerSpeedBonus: number

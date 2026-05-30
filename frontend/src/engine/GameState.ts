@@ -64,6 +64,13 @@ export interface GameState {
   freeTowerCharges: number
   enemySpeedMultiplier: number
   enemyVulnerability: number        // damage multiplier on enemies (default 1.0)
+  // Enemy-debuff accumulators (mirror goldMultiplierBonus). The effective values
+  // above are derived: enemySpeedMultiplier = max(0.1, 1 + enemySpeedBonus) and
+  // enemyVulnerability = max(0, 1 + enemyVulnBonus). Each enemy buff adds its
+  // delta and its revert subtracts only that delta, so overlapping debuffs
+  // compose and one expiring buff never wipes another still-active one.
+  enemySpeedBonus: number
+  enemyVulnBonus: number
 
   // Tower buff bonuses — additive accumulators (mirror goldMultiplierBonus
   // pattern). Effective multiplier = 1 + bonus. Reads happen in tower-stats
@@ -119,6 +126,8 @@ export function createInitialState(): GameState {
     freeTowerCharges: 0,
     enemySpeedMultiplier: 1,
     enemyVulnerability: 1,
+    enemySpeedBonus: 0,
+    enemyVulnBonus: 0,
     towerDamageBonus: 0,
     towerRangeBonus: 0,
     towerSpeedBonus: 0,

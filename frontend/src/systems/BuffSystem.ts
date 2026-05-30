@@ -27,6 +27,16 @@ function recomputeGoldMult(g: Game): void {
   g.state.goldMultiplier = 1 + g.state.goldMultiplierBonus
 }
 
+// Enemy debuffs stack additively (same accumulator pattern as gold/tower). Each
+// buff adds a delta to the bonus; the effective multipliers are derived here so
+// an expiring buff's revert — which subtracts only its own delta — can never
+// wipe a still-active concurrent debuff. The 0.1 speed floor stops stacked
+// slows from freezing enemies outright; vulnerability is floored at 0.
+function recomputeEnemyMods(g: Game): void {
+  g.state.enemySpeedMultiplier = Math.max(0.1, snap(1 + g.state.enemySpeedBonus))
+  g.state.enemyVulnerability = Math.max(0, snap(1 + g.state.enemyVulnBonus))
+}
+
 // Bug #1+#2 fix: tower buffs no longer mutate per-tower damageBonus/rangeBonus/
 // cooldown. They mutate global state.tower*Bonus accumulators (mirroring the
 // gold-multiplier pattern from Q15). Effective stats are read from the
@@ -96,13 +106,22 @@ const effectStrategies: Record<string, EffectFn> = {
     recalcRange(g)
   },
 
-  // Enemy modifiers
-  ENEMY_SPEED_MULTIPLIER_0_85: (g) => { g.state.enemySpeedMultiplier = 0.85 },
-  ENEMY_SPEED_MULTIPLIER_0_6: (g) => { g.state.enemySpeedMultiplier = 0.6 },
-  ENEMY_SPEED_MULTIPLIER_1_5: (g) => { g.state.enemySpeedMultiplier = 1.5 },
-  ENEMY_SPEED_MULTIPLIER_RESET: (g) => { g.state.enemySpeedMultiplier = 1.0 },
-  ENEMY_VULNERABILITY_1_1: (g) => { g.state.enemyVulnerability = 1.1 },
-  ENEMY_VULNERABILITY_RESET: (g) => { g.state.enemyVulnerability = 1.0 },
+  // Enemy modifiers — additive deltas + per-effect reverts. (Bug fix: these used
+  // to be absolute SET with a shared *_RESET revert, so an expiring debuff reset
+  // the global multiplier to 1.0 and silently cancelled any other still-active
+  // enemy debuff. Now each apply adds a delta and each revert subtracts only its
+  // own, mirroring the gold/tower accumulators.) 0.85→-0.15, 0.6→-0.4, 1.5→+0.5.
+  ENEMY_SPEED_MULTIPLIER_0_85: (g) => { g.state.enemySpeedBonus = snap(g.state.enemySpeedBonus - 0.15); recomputeEnemyMods(g) },
+  ENEMY_SPEED_RESTORE_0_85:    (g) => { g.state.enemySpeedBonus = snap(g.state.enemySpeedBonus + 0.15); recomputeEnemyMods(g) },
+  ENEMY_SPEED_MULTIPLIER_0_6:  (g) => { g.state.enemySpeedBonus = snap(g.state.enemySpeedBonus - 0.4); recomputeEnemyMods(g) },
+  ENEMY_SPEED_RESTORE_0_6:     (g) => { g.state.enemySpeedBonus = snap(g.state.enemySpeedBonus + 0.4); recomputeEnemyMods(g) },
+  ENEMY_SPEED_MULTIPLIER_1_5:  (g) => { g.state.enemySpeedBonus = snap(g.state.enemySpeedBonus + 0.5); recomputeEnemyMods(g) },
+  ENEMY_SPEED_RESTORE_1_5:     (g) => { g.state.enemySpeedBonus = snap(g.state.enemySpeedBonus - 0.5); recomputeEnemyMods(g) },
+  // Hard reset (defensive full clear): zero the accumulator.
+  ENEMY_SPEED_MULTIPLIER_RESET: (g) => { g.state.enemySpeedBonus = 0; recomputeEnemyMods(g) },
+  ENEMY_VULNERABILITY_1_1:     (g) => { g.state.enemyVulnBonus = snap(g.state.enemyVulnBonus + 0.1); recomputeEnemyMods(g) },
+  ENEMY_VULN_RESTORE_1_1:      (g) => { g.state.enemyVulnBonus = snap(g.state.enemyVulnBonus - 0.1); recomputeEnemyMods(g) },
+  ENEMY_VULNERABILITY_RESET:   (g) => { g.state.enemyVulnBonus = 0; recomputeEnemyMods(g) },
 
   // Player / economy
   HEAL_3: (g) => { g.economy.changeHp(3) },

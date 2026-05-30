@@ -61,7 +61,7 @@ export const PURCHASABLE_BUFFS: BuffDef[] = [
     cost: 90,
     duration: 30,
     effectId: 'ENEMY_SPEED_MULTIPLIER_0_85',
-    revertId: 'ENEMY_SPEED_MULTIPLIER_RESET',
+    revertId: 'ENEMY_SPEED_RESTORE_0_85',
   },
   {
     id: 'shop_weak_10',
@@ -72,7 +72,7 @@ export const PURCHASABLE_BUFFS: BuffDef[] = [
     cost: 110,
     duration: 40,
     effectId: 'ENEMY_VULNERABILITY_1_1',
-    revertId: 'ENEMY_VULNERABILITY_RESET',
+    revertId: 'ENEMY_VULN_RESTORE_1_1',
   },
 
   // ── Defense / Utility ──

@@ -305,4 +305,49 @@ describe('BuffSystem (V2 shop-based)', () => {
     game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_atk', cost: 1 })
     expect(game.state.gold).toBe(initialGold - 50) // catalog cost, not 1
   })
+
+  // Bug fix regression: enemy debuffs used absolute SET with a shared *_RESET
+  // revert, so an expiring debuff reset the global multiplier to 1.0 and wiped
+  // any other still-active enemy debuff. They now use additive accumulators with
+  // per-effect reverts (mirroring the gold-multiplier pattern), so overlapping
+  // debuffs compose and each reverts independently.
+  describe('enemy debuffs stack additively and revert independently', () => {
+    it('starts at multiplier 1 with bonus 0', () => {
+      expect(game.state.enemySpeedMultiplier).toBe(1)
+      expect(game.state.enemySpeedBonus).toBe(0)
+      expect(game.state.enemyVulnerability).toBe(1)
+      expect(game.state.enemyVulnBonus).toBe(0)
+    })
+
+    it('two overlapping slows compose; the shorter one expiring keeps the longer', () => {
+      // Quagmire (-15%, 30s) then Time Warp (-40%, 20s).
+      system.applyExternalBuff('ENEMY_SPEED_MULTIPLIER_0_85', 'ENEMY_SPEED_RESTORE_0_85', 30, 'Quagmire', game)
+      system.applyExternalBuff('ENEMY_SPEED_MULTIPLIER_0_6', 'ENEMY_SPEED_RESTORE_0_6', 20, 'Time Warp', game)
+      // bonus = -0.15 - 0.4 = -0.55 → multiplier 0.45
+      expect(game.state.enemySpeedMultiplier).toBeCloseTo(0.45)
+      expect(game.state.activeBuffs).toHaveLength(2)
+
+      // Time Warp expires first; the previous bug would reset the multiplier to
+      // 1.0 here, cancelling Quagmire. It must stay at -15% (0.85).
+      system.update(21, game)
+      expect(game.state.enemySpeedMultiplier).toBeCloseTo(0.85)
+      expect(game.state.activeBuffs).toHaveLength(1)
+
+      system.update(10, game) // Quagmire expires
+      expect(game.state.enemySpeedMultiplier).toBeCloseTo(1)
+      expect(game.state.activeBuffs).toHaveLength(0)
+    })
+
+    it('two overlapping vulnerability buffs compose and revert independently', () => {
+      system.applyExternalBuff('ENEMY_VULNERABILITY_1_1', 'ENEMY_VULN_RESTORE_1_1', 40, 'Corrode A', game)
+      system.applyExternalBuff('ENEMY_VULNERABILITY_1_1', 'ENEMY_VULN_RESTORE_1_1', 20, 'Corrode B', game)
+      expect(game.state.enemyVulnerability).toBeCloseTo(1.2)
+
+      system.update(21, game) // B expires; A (40s) remains
+      expect(game.state.enemyVulnerability).toBeCloseTo(1.1)
+
+      system.update(20, game) // A expires
+      expect(game.state.enemyVulnerability).toBeCloseTo(1)
+    })
+  })
 })
