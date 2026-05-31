@@ -63,9 +63,9 @@ A summary of the design evolution since the original v3 draft. The remainder of 
 
 The world **is** a 2D Cartesian plane.
 
-- The origin `(0, 0)` is a glowing magic rune the player must defend; enemies reaching it drain HP.
+- `P*` — the unique point shared by every path curve in the level — is a glowing magic rune the player must defend; it sits at a random position on the plane (not necessarily the origin), and enemies reaching it drain HP.
 - Towers occupy lattice points (e.g. `(3, 5)`).
-- Enemies spawn at grid-edge points and march toward the origin along procedurally generated **polynomial paths** (degree 1–3, depending on star).
+- Enemies spawn at grid-edge points and march toward `P*` along procedurally generated **polynomial paths** (degree 1–3, depending on star).
 - All tower ranges are expressed as geometric regions on the plane (sectors, polynomial zones, intervals, etc.).
 
 ### Procedural Paths
@@ -73,7 +73,7 @@ The world **is** a 2D Cartesian plane.
 At run start, the WASM `generate_level` routine samples a multiset of polynomial curves whose composition depends on the star tier. A rejection-sampling loop (≤ 8 batches × 50 attempts) ensures:
 
 1. The curves share **exactly one** common intersection inside a chosen disclosure rectangle.
-2. Spawn points sit on the grid boundary; each enemy walks along one curve toward `(0, 0)`.
+2. Spawn points sit on the grid boundary; each enemy walks along one curve toward `P*`.
 
 | Star | Path multiset | Waves | Enemy mix |
 |------|---------------|-------|-----------|
@@ -102,7 +102,7 @@ Medieval-fantasy × pixel art.
 | Limit tower | Crimson with limit glyph (∞) |
 | Calculus tower | Amber (∫) |
 | Enemies | Red family with shape-coded silhouettes |
-| Origin rune | Pulsing gold glow |
+| P* rune | Pulsing gold glow |
 
 **Build Phase panels** use a parchment-on-stone treatment, gold borders, monospace input fonts, and label every field with its math term. The confirm button reads **"Cast Spell"** rather than "OK".
 
@@ -387,7 +387,7 @@ A separate "Grabbing Territory" activity layer hosts classroom competition with 
 ```
 Build Phase                              Wave Phase
 ┌───────────────────────────────┐        ┌───────────────────────────────┐
-│ • See enemy path equations    │        │ • Enemies march toward origin │
+│ • See enemy path equations    │        │ • Enemies march toward P*     │
 │ • Place / configure towers    │        │ • Towers fire automatically   │
 │ • Curve / range preview       │ ─────► │ • Tower parameters locked     │
 │   (with terminology labels)   │        │ • Cast spells on cooldown     │

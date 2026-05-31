@@ -6,7 +6,7 @@ A strategic tower-defense game where **math is the mechanic, not the gate**. The
 
 ## 1. The Goal
 
-The world is a coordinate plane. The **origin (0, 0)** is a glowing rune you must defend. Enemies spawn at the edge of the grid and walk along a mathematical curve toward the origin. Every enemy that reaches the origin damages it. When the origin's HP hits zero, the run ends.
+The world is a coordinate plane. **P\*** — the single point where every path curve in the level crosses — is a glowing rune you must defend; it appears at a random spot on the plane, not necessarily the centre. Enemies spawn at the edge of the grid and walk along a mathematical curve toward P\*. Every enemy that reaches P\* damages it. When P\*'s HP hits zero, the run ends.
 
 You win a level by surviving every wave (3–5 waves depending on star rating).
 
@@ -55,7 +55,7 @@ Between phases the engine may inject special events:
 
 | Resource | Source | Sink |
 |---|---|---|
-| **HP** | starts at 20 (`initialHp`) | each enemy that reaches the origin deals its `damage` |
+| **HP** | starts at 20 (`initialHp`) | each enemy that reaches P\* deals its `damage` |
 | **Gold** | start with 200–320 by star; earned on kill (`enemy.reward × goldMultiplier`); wave-clear bonus | tower placement, tower upgrades, shop buffs, spells |
 | **Score** | computed at run end from the killValue/cost/time/HP record (each kill adds `killValue` to the in-run score counter) | — |
 | **Kill Value** | accumulator of enemy "worth" killed this run | drives Monty Hall thresholds and the score formula |

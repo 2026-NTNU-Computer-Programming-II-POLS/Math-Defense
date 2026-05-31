@@ -2,13 +2,15 @@
   <img src="logo-ring.svg" alt="Math Defense logo" width="220" />
 </p>
 
+<p align="center"><em>Let the numbers fall like rain of war — the node is mine forevermore.</em></p>
+
 # Math Defense
 
 An educational tower defense game that teaches mathematics through gameplay. Players build mathematical towers — each embodying a different math concept — to defeat enemies following a procedurally generated path.
 
 ## Concept
 
-An educational tower defense where **math is the mechanic, not the gate**. The world is a coordinate plane; the **origin (0, 0)** is the rune you must defend. Enemies spawn at the grid edge and walk along procedurally generated polynomial curves toward the origin. Each tower type corresponds to a real math topic — the functions you choose, the angles you sweep, the limits you evaluate *are* the attacks.
+An educational tower defense where **math is the mechanic, not the gate**. The world is a coordinate plane; the rune you must defend is **P\*** — the unique common intersection of every path curve in the level, placed at a random point on the plane. Enemies spawn at the grid edge and walk along procedurally generated polynomial curves toward P\*. Each tower type corresponds to a real math topic — the functions you choose, the angles you sweep, the limits you evaluate *are* the attacks.
 
 | Tower | Glyph | Math Concept | How It Works | Unlocked |
 |---|---|---|---|---|
@@ -98,7 +100,7 @@ Path generation is polynomial-only; the trig / log evaluator is used by the Magi
 
 - **Achievements** — 29 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
 - **Talent Tree** — 26 nodes (19 base + 7 tier-2 advanced) across the 7 tower types. Base nodes form linear prerequisite chains; tier-2 nodes additionally require their parent at max level (`prerequisite_max_levels`). Each node has a `maxLevel` (2 or 3) and grants a per-tower attribute multiplier — including damage, range, attack/sweep speed, target count, zone width/strength, Magic zone duration/slow strength, Matrix damage-ramp rate/resonance, Limit burst bonus, and Calculus pet damage/speed/range/crit. Modifiers are snapshotted at tower placement, so re-build to refresh after reallocating. Free reset is supported.
-- **Avatar & profile** — unlocked along the way. Profile customization also covers the **endpoint marker** (the origin rune you defend): pick a marker style (`star` / `gorilla` / `custom` data-URL upload) and a hit-effect animation (`random` / `fragments` / `crying` / `angry`), validated at the schema, domain-aggregate, and DB-constraint layers.
+- **Avatar & profile** — unlocked along the way. Profile customization also covers the **endpoint marker** (the P\* rune you defend): pick a marker style (`star` / `gorilla` / `custom` data-URL upload) and a hit-effect animation (`random` / `fragments` / `crying` / `angry`), validated at the schema, domain-aggregate, and DB-constraint layers.
 - **Class & Territory** — students join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global. Each activity has up to 50 slots and a teacher-configurable `student_slot_cap` (1–50, default 5) controlling how many slots a single student may hold.
 - **Leaderboard** — every completed non-practice run posts its TotalScore by star rating.
 

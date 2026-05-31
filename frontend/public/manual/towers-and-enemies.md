@@ -120,7 +120,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 **Boss Type-A (`bossA`)**
 - Shield HP is absorbed first (the blue overhead bar). While the shield is up, all tower damage hits the shield, not the underlying HP.
 - Minion spawn every 8 s. Killing the minion gives normal General rewards.
-- HP-99 contact: one Boss reaching the origin will essentially end the run. Stop them well before then.
+- HP-99 contact: one Boss reaching P\* will essentially end the run. Stop them well before then.
 
 **Boss Type-B (`bossB`)**
 - Shield + Fast-minion spawn behave as above.
@@ -210,7 +210,7 @@ Each combat tower can be set to one of:
 - **Closest** — shortest distance to tower (default; smooth coverage)
 - **Strongest** — highest current HP (Bosses, Bulwark)
 - **First** — furthest along the path (kill before they get close)
-- **Last** — nearest to the origin (catch leaks)
+- **Last** — nearest to P\* (catch leaks)
 
 Switch via the small targeting toggle on the tower panel.
 

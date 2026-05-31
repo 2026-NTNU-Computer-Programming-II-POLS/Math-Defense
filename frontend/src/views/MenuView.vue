@@ -26,7 +26,7 @@ const manualOpen = ref(false)
           height="1389"
         />
       </div>
-      <p class="motto">Math is magic — defend the origin.</p>
+      <p class="motto">Let the numbers fall like rain of war — the node is mine forevermore.</p>
     </div>
 
     <div class="card card-ornate menu-card">
