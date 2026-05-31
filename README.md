@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Logo.png" alt="Math Defense logo" width="220" />
+  <img src="logo-ring.svg" alt="Math Defense logo" width="220" />
 </p>
 
 # Math Defense
