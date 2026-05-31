@@ -81,7 +81,6 @@ class SqlAlchemyUserRepository:
         if row:
             row.email = user.email
             row.player_name = user.player_name
-            row.avatar_url = user.avatar_url
             row.role = user.role.value
             row.is_active = user.is_active
             row.password_hash = user.password_hash
@@ -99,7 +98,6 @@ class SqlAlchemyUserRepository:
                 id=user.id,
                 email=user.email,
                 player_name=user.player_name,
-                avatar_url=user.avatar_url,
                 role=user.role.value,
                 is_active=user.is_active,
                 password_hash=user.password_hash,
@@ -131,7 +129,6 @@ class SqlAlchemyUserRepository:
             id=row.id,
             email=row.email,
             player_name=row.player_name,
-            avatar_url=row.avatar_url,
             role=Role(row.role),
             is_active=row.is_active if row.is_active is not None else True,
             password_hash=row.password_hash,

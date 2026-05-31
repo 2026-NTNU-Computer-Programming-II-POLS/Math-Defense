@@ -292,7 +292,7 @@ sequenceDiagram
 
 | Router | Mount | Highlights |
 |---|---|---|
-| `auth.py` | `/api/auth` | register, login, logout, me, refresh; profile sub-routes (`PUT /profile/name`, `/profile/avatar`, `/profile/endpoint-marker`); CSRF + lockout-aware |
+| `auth.py` | `/api/auth` | register, login, logout, me, refresh; profile sub-routes (`PUT /profile/name`, `/profile/endpoint-marker`); CSRF + lockout-aware |
 | `game_session.py` | `/api/sessions` | create, active, patch, end, abandon |
 | `leaderboard.py` | `/api/leaderboard` | DENSE_RANK per star, manual submit, personal timeline |
 | `achievement.py` | `/api/achievements` | list, summary |
@@ -473,7 +473,7 @@ flowchart TB
 | `assessmentService`, `recommendationService` | `/api/assessment/*`, `/api/recommendation/*` |
 | `challengeService` | `/api/challenges/*` |
 | `studyService` | `/api/study/*` |
-| `imageCache` | client-side decode/cache of avatar & endpoint-marker data URLs (no HTTP) |
+| `imageCache` | client-side decode/cache of endpoint-marker data URLs (no HTTP) |
 
 ---
 

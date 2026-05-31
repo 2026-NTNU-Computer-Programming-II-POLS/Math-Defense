@@ -382,20 +382,6 @@ class AuthApplicationService:
             self._uow.commit()
         return user
 
-    def update_avatar(self, user_id: str, avatar_url: str | None) -> User:
-        # B-BUG-19: route through the aggregate (see update_player_name).
-        with self._uow:
-            user = self._user_repo.find_by_id(user_id)
-            if user is None:
-                raise UserNotFoundError("User not found")
-            try:
-                user.update_avatar(avatar_url)
-            except ValueError as e:
-                raise DomainValueError(str(e)) from e
-            self._user_repo.save(user)
-            self._uow.commit()
-        return user
-
     def update_endpoint_marker(
         self,
         user_id: str,
