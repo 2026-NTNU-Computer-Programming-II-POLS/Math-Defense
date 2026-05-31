@@ -120,11 +120,23 @@ const manualOpen = ref(false)
           <div class="account-row">
             <div
               class="avatar-sm"
-              :style="profileInitials ? { background: profileInitials.color } : null"
+              :class="{ 'avatar-sm--initials': profileInitials }"
+              :style="profileInitials ? { borderColor: profileInitials.color } : null"
             >
-              {{ profileInitials
-                ? profileInitials.letters
-                : (auth.user?.player_name || '?').slice(0, 2).toUpperCase() }}
+              <template v-if="profileInitials">
+                <span
+                  class="avatar-sm-fill"
+                  :style="{ background: profileInitials.color }"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  class="avatar-sm-letter"
+                  :style="{ color: profileInitials.color }"
+                >{{ profileInitials.letters }}</span>
+              </template>
+              <template v-else>
+                {{ (auth.user?.player_name || '?').slice(0, 2).toUpperCase() }}
+              </template>
             </div>
             <div class="account-meta">
               <div class="account-name">{{ auth.user?.player_name }}</div>
@@ -285,6 +297,29 @@ const manualOpen = ref(false)
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+/* Custom-initials variant — same SVG-style treatment as the profile preview
+   (ring + smaller translucent inner disc + coloured letter). border-color,
+   fill background, and letter colour are bound inline from data. */
+.avatar-sm--initials {
+  position: relative;
+  background: transparent;
+  border-style: solid;
+  border-width: 2px;
+  overflow: hidden;
+}
+
+.avatar-sm-fill {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  opacity: 0.2;
+}
+
+.avatar-sm-letter {
+  position: relative;
+  z-index: 1;
 }
 
 .account-meta {
