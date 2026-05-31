@@ -107,6 +107,88 @@ def _seed_one(repo: SqlAlchemyUserRepository, db: Session, account: _DevAccount)
         logger.debug("Dev account %s seed skipped (%s)", account.email, exc)
 
 
+def ensure_admin_account(db: Session) -> None:
+    """Seed the bootstrap admin account if SEED_ADMIN_EMAIL and
+    SEED_ADMIN_PASSWORD are both set.
+
+    Idempotent: if the email already exists the function returns without
+    modifying the existing row — the DB record is the source of truth after
+    first boot, so an operator can change the password in the DB and the
+    next restart will not revert it.
+
+    No environment restriction — intended for production first-run as well as
+    local setup (unlike ensure_dev_accounts which is localhost-only). When
+    running outside a recognised dev host a WARNING is emitted so the startup
+    log always records that a privileged seed ran.
+
+    Unexpected DB or domain errors call db.rollback() before re-raising so
+    the caller receives a clean session and can continue with other seed steps.
+    """
+    email = (settings.seed_admin_email or "").strip()
+    # SecretStr: access the raw value only here; never log or assign to a
+    # plain variable that outlives this scope.
+    _secret = settings.seed_admin_password
+    password = _secret.get_secret_value() if _secret is not None else ""
+    if not email or not password:
+        logger.debug("SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD not set — skipping admin seed")
+        return
+
+    if not _is_dev_environment():
+        logger.warning(
+            "Seeding bootstrap admin account in non-local environment (FRONTEND_URL=%s). "
+            "Ensure these credentials are intentional and unique to this environment.",
+            settings.frontend_url,
+        )
+
+    # Warn when the admin email shadows a well-known dev account — the dev
+    # credential would then authenticate as admin, an unintended privilege escalation.
+    if any(a.email == email for a in _DEV_ACCOUNTS):
+        logger.warning(
+            "SEED_ADMIN_EMAIL=%s matches a dev account email. "
+            "The known dev password will authenticate as admin if SEED_DEMO_USER is also enabled. "
+            "Use a distinct email for the bootstrap admin.",
+            email,
+        )
+
+    try:
+        _validate_password_shape(password)
+    except ValueError:
+        # Do NOT log exc — a future change to _validate_password_shape could
+        # include the raw value in the message, leaking SEED_ADMIN_PASSWORD.
+        logger.error("SEED_ADMIN_PASSWORD does not meet complexity requirements — skipping admin seed")
+        return
+
+    repo = SqlAlchemyUserRepository(db)
+    if repo.find_by_email(email) is not None:
+        logger.debug("Admin account %s already exists — skipping seed", email)
+        return
+
+    try:
+        user = User.create(
+            email=email,
+            player_name=settings.seed_admin_name,
+            role=Role.ADMIN,
+            password_hash=hash_password(password),
+        )
+        # Mark email as verified: the admin key was set by the operator who
+        # controls the environment, so they vouch for the identity — the same
+        # rationale used in AdminApplicationService.create_teacher.
+        user.is_email_verified = True
+        repo.save(user)
+        db.commit()
+        logger.info("Seeded bootstrap admin account: %s", email)
+    except (ConstraintViolationError, DomainValueError) as exc:
+        # Expected races (two workers starting simultaneously) or aggregate
+        # invariant violations. Roll back and treat as already seeded.
+        db.rollback()
+        logger.debug("Admin account %s seed skipped (%s)", email, exc)
+    except Exception:
+        # Unexpected error (network drop, tablespace full, etc.). Roll back so
+        # the session is clean for the caller, then re-raise.
+        db.rollback()
+        raise
+
+
 def ensure_dev_accounts(db: Session) -> None:
     """Create the dev teacher + student accounts if SEED_DEMO_USER is enabled.
 

@@ -26,7 +26,7 @@ from app.infrastructure.token_denylist import purge_expired as purge_expired_den
 from app.middleware.csrf import CsrfMiddleware
 from app.routers import achievement, admin, assessment, auth, challenge, class_, leaderboard, game_session, recommendation, replay, study, talent, territory
 from app.limiter import limiter
-from app.seed import ensure_dev_accounts
+from app.seed import ensure_admin_account, ensure_dev_accounts
 from app.utils.encryption import verify_key_configured
 
 logging.basicConfig(
@@ -100,10 +100,15 @@ async def lifespan(_app: FastAPI):
         finally:
             conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": _MIGRATION_LOCK_ID})
             conn.commit()
-    # Seed dev accounts (teacher + student) after schema is up-to-date.
-    # No-op unless SEED_DEMO_USER=true AND FRONTEND_URL looks like a local-dev host.
+    # Seed accounts after schema is up-to-date.
+    # Each seed step runs independently: a failure in ensure_admin_account
+    # rolls back and logs but does not prevent ensure_dev_accounts from running.
     db = SessionLocal()
     try:
+        try:
+            ensure_admin_account(db)
+        except Exception:
+            logger.exception("Bootstrap admin seed failed — dev account seed will still run")
         ensure_dev_accounts(db)
     finally:
         db.close()

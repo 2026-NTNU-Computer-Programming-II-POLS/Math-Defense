@@ -4,7 +4,7 @@ import re
 import sys
 from pathlib import Path
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _MIN_SECRET_KEY_LENGTH = 32
@@ -63,6 +63,22 @@ class Settings(BaseSettings):
     # GET-mutation edge cases, so production must fail closed. Disabling
     # outside the test harness is explicitly rejected by the validator below.
     csrf_enabled: bool = Field(default_factory=_csrf_enabled_default)
+
+    # Bootstrap admin — set both to seed the first admin account on startup.
+    # Idempotent: existing email is skipped; the row is never modified afterward.
+    # No environment restriction (unlike SEED_DEMO_USER) — intended for
+    # production first-run as well as local setup.
+    # seed_admin_password uses SecretStr so the value is masked in repr(),
+    # model_dump(), and any log line that formats the Settings object.
+    seed_admin_email: str | None = None
+    seed_admin_password: SecretStr | None = None
+    seed_admin_name: str = "Admin"
+
+    @field_validator("seed_admin_name")
+    @classmethod
+    def normalise_seed_admin_name(cls, v: str) -> str:
+        stripped = v.strip()
+        return stripped if stripped else "Admin"
 
     # SMTP — all optional; if smtp_host is empty, outbound email is skipped gracefully.
     smtp_host: str = ""
