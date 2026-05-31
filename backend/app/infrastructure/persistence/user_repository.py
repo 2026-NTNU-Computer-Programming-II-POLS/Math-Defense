@@ -33,14 +33,28 @@ class SqlAlchemyUserRepository:
         rows = self._db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()
         return [self._to_domain(r) for r in rows]
 
-    def count_active_by_role(self, role: Role) -> int:
-        """Number of active users with the given role, via a single COUNT
-        query — avoids loading every row just to count them."""
-        return (
-            self._db.query(UserModel)
+    def lock_active_ids_by_role(self, role: Role) -> list[str]:
+        """Row-lock every active user of `role` and return their ids.
+
+        Takes FOR UPDATE on each matched row so concurrent "disable the last
+        admin" transactions serialise on the same row set instead of both
+        reading a stale count and both committing (a TOCTOU that could empty
+        the active-admin set). ORDER BY id biases toward a consistent lock
+        order to minimise deadlocks; the second transaction blocks, then
+        re-evaluates the predicate against the freshly committed state and sees
+        the just-disabled admin drop out. Even if the planner locks in scan
+        order and a deadlock occurs, the invariant still holds: Postgres aborts
+        one transaction, so at most one disable commits. No-op lock on SQLite,
+        where FOR UPDATE is ignored.
+        """
+        rows = (
+            self._db.query(UserModel.id)
             .filter(UserModel.role == role.value, UserModel.is_active.is_(True))
-            .count()
+            .order_by(UserModel.id.asc())
+            .with_for_update()
+            .all()
         )
+        return [r[0] for r in rows]
 
     def find_by_role_paginated(self, role: Role, offset: int, limit: int) -> tuple[list[User], int]:
         q = self._db.query(UserModel).filter(UserModel.role == role.value)

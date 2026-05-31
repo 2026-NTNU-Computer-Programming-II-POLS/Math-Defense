@@ -109,6 +109,7 @@ def build_admin_service(db: "DbSession") -> AdminApplicationService:
         user_repo=SqlAlchemyUserRepository(db),
         class_repo=SqlAlchemyClassRepository(db),
         uow=_get_uow(db),
+        refresh_token_repo=SqlAlchemyRefreshTokenRepository(db),
     )
 
 

@@ -16,6 +16,7 @@ from app.utils.security import hash_password
 
 if TYPE_CHECKING:
     from app.application.ports import UnitOfWork
+    from app.domain.auth.repository import RefreshTokenRepository
     from app.domain.class_.repository import ClassRepository
     from app.domain.user.repository import UserRepository
 
@@ -27,10 +28,12 @@ class AdminApplicationService:
         user_repo: UserRepository,
         class_repo: ClassRepository,
         uow: UnitOfWork | None = None,
+        refresh_token_repo: RefreshTokenRepository | None = None,
     ) -> None:
         self._user_repo = user_repo
         self._class_repo = class_repo
         self._uow = uow
+        self._refresh_token_repo = refresh_token_repo
 
     def list_teachers_paginated(self, offset: int, limit: int) -> tuple[list[tuple[User, int]], int]:
         users, total = self._user_repo.find_by_role_paginated(Role.TEACHER, offset, limit)
@@ -96,12 +99,28 @@ class AdminApplicationService:
                 if user.id == requester_id:
                     raise DomainValueError("Admins cannot disable their own account")
                 if user.role == Role.ADMIN:
-                    # COUNT query instead of loading every admin row. The user
-                    # we're about to disable is still active and counted here;
-                    # refuse if disabling them would empty the active set.
-                    if self._user_repo.count_active_by_role(Role.ADMIN) <= 1:
+                    # Row-lock every active admin (FOR UPDATE) instead of a bare
+                    # COUNT: two admins disabling each other concurrently would
+                    # otherwise both read count==2 under READ COMMITTED and both
+                    # commit, emptying the active-admin set. The lock serialises
+                    # them — the second transaction blocks, then re-evaluates
+                    # against the committed state and sees only itself left. The
+                    # target admin is still active here, so it is in the locked
+                    # set and counted; refuse if disabling it empties the set.
+                    if len(self._user_repo.lock_active_ids_by_role(Role.ADMIN)) <= 1:
                         raise DomainValueError("Cannot disable the last active admin")
             user.is_active = is_active
             self._user_repo.save(user)
+            # Disabling is a hard logout: access tokens already fail the
+            # is_active check on the next request, but refresh tokens carry no
+            # such claim, so without explicit revocation they survive and would
+            # mint fresh access tokens again the moment the account is
+            # re-enabled (a previously-stolen cookie regaining validity). Mirror
+            # change_password / disable_mfa and kill the whole refresh family.
+            # NB: an already-open WebSocket is not severed mid-stream, but the
+            # only WS is read-only replay spectating (authenticated at
+            # handshake), so no privileged action survives a disable.
+            if not is_active and self._refresh_token_repo is not None:
+                self._refresh_token_repo.revoke_all_for_user(user.id)
             self._uow.commit()
         return user
