@@ -15,7 +15,6 @@ from app.middleware.auth import get_current_user, bearer_scheme, AUTH_COOKIE_NAM
 from app.middleware.csrf import mint_csrf_cookie
 from app.schemas.auth import (
     AuthMeResponse,
-    AvatarUpdateRequest,
     ChangePasswordRequest,
     DisableMFARequest,
     EndpointMarkerUpdateRequest,
@@ -66,7 +65,6 @@ def _build_auth_me_response(
         player_name=user.player_name,
         role=user.role.value,
         created_at=user.created_at,
-        avatar_url=user.avatar_url,
         is_email_verified=user.is_email_verified,
         mfa_enabled=user.mfa_enabled,
         ia_unlock_earned=ia_unlock_earned,
@@ -214,7 +212,6 @@ def login(request: Request, response: Response, req: LoginRequest, db: Session =
             email=user.email,
             player_name=user.player_name,
             role=user.role.value,
-            avatar_url=user.avatar_url,
             is_email_verified=user.is_email_verified,
         )
     except Exception as e:
@@ -282,7 +279,6 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
         email=user.email,
         player_name=user.player_name,
         role=user.role.value,
-        avatar_url=user.avatar_url,
         is_email_verified=user.is_email_verified,
     )
 
@@ -326,18 +322,6 @@ def update_player_name(
     current_user: User = Depends(get_current_user),
 ):
     user = build_auth_service(db).update_player_name(current_user.id, req.player_name)
-    return _build_auth_me_response(user)
-
-
-@router.put("/profile/avatar", response_model=AuthMeResponse)
-@limiter.limit("10/minute")
-def update_avatar(
-    request: Request,
-    req: AvatarUpdateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    user = build_auth_service(db).update_avatar(current_user.id, req.avatar_url)
     return _build_auth_me_response(user)
 
 
@@ -448,7 +432,6 @@ def mfa_challenge(
             email=user.email,
             player_name=user.player_name,
             role=user.role.value,
-            avatar_url=user.avatar_url,
             is_email_verified=user.is_email_verified,
         )
     except Exception as e:

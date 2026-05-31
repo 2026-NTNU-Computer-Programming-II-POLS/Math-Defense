@@ -3,7 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain.user.constraints import (
-    ALLOWED_AVATAR_URLS,
     ALLOWED_ENDPOINT_HIT_FX_STYLES,
     ALLOWED_ENDPOINT_MARKER_STYLES,
     ENDPOINT_MARKER_DATAURL_MAX_LENGTH,
@@ -100,7 +99,6 @@ class TokenResponse(BaseModel):
     email: str | None = None
     player_name: str | None = None
     role: str | None = None
-    avatar_url: str | None = None
     is_email_verified: bool = False
     mfa_required: bool = False
     mfa_token: str | None = None
@@ -145,7 +143,6 @@ class AuthMeResponse(BaseModel):
     player_name: str
     role: str
     created_at: datetime
-    avatar_url: str | None = None
     is_email_verified: bool = False
     mfa_enabled: bool = False
     # Star-5 personal unlock derived from completed-IA history; the level-select
@@ -174,21 +171,6 @@ class UpdatePlayerNameRequest(BaseModel):
         v = v.strip()
         if len(v) < PLAYER_NAME_MIN_LENGTH or len(v) > PLAYER_NAME_MAX_LENGTH:
             raise ValueError(f"Player name must be {PLAYER_NAME_MIN_LENGTH}-{PLAYER_NAME_MAX_LENGTH} characters")
-        return v
-
-
-class AvatarUpdateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    avatar_url: str | None
-
-    @field_validator("avatar_url")
-    @classmethod
-    def avatar_url_valid(cls, v: str | None) -> str | None:
-        # Early 422 for HTTP callers; the domain aggregate re-enforces the same
-        # allowlist (single source of truth in domain.user.constraints).
-        if v is not None and v not in ALLOWED_AVATAR_URLS:
-            raise ValueError("Invalid avatar URL")
         return v
 
 

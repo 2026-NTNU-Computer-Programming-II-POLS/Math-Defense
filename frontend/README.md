@@ -135,7 +135,7 @@ frontend/
 │   │
 │   ├── services/                   Backend API clients
 │   │   ├── api.ts                          fetch wrapper; auto-attaches Bearer token; ApiError
-│   │   ├── authService.ts                  register(email, password, playerName, role) / login / me / logout / updatePlayerName / updateAvatar / updateEndpointMarker
+│   │   ├── authService.ts                  register(email, password, playerName, role) / login / me / logout / updatePlayerName / updateEndpointMarker
 │   │   ├── sessionService.ts               create / update / end / abandon / getActive (V2 fields, rng_seed, practice_mode)
 │   │   ├── sessionLifecycleService.ts      High-level orchestration around session creation + end / score submit
 │   │   ├── gameCommandService.ts           Server-authoritative game commands (when backend governs a run)
@@ -320,7 +320,6 @@ frontend/
 │
 ├── public/
 │   ├── audio/                      WAV assets — procedurally synthesised by `scripts/synth-audio.py`
-│   ├── avatars/                    SVG avatars (alchemist / archer / knight / mage / scholar / wizard)
 │   ├── manual/                     In-game manual markdown (`game-mechanics.md`, `towers-and-enemies.md`)
 │   ├── logo.png                    Math Defense brand mark — used as favicon + MenuView/AuthView hero
 │   ├── logo-V1.png                 Legacy V1 brand mark (kept for migration references)
@@ -539,7 +538,7 @@ User actions emit events through the store — `BuildPanel.vue` calls `TowerInfo
 | State | Description |
 |---|---|
 | `token` | JWT access token (persisted to `localStorage`) |
-| `user` | `{ id, email, player_name, role, avatar_url, ia_unlock_earned, ia_recent_accuracy }` (snake_case, mapped from `/auth/me`) or `null` |
+| `user` | `{ id, email, player_name, role, ia_unlock_earned, ia_recent_accuracy }` (snake_case, mapped from `/auth/me`) or `null` |
 | `initializing` | `true` while `me()` is in-flight on boot |
 
 Computed: `isLoggedIn`, `isAdmin`, `isTeacher`, `isStudent`.
@@ -591,7 +590,7 @@ Also owns the **endpoint-marker** preferences (persisted to `localStorage` and s
 | Service | Methods |
 |---|---|
 | `api.ts` | `request<T>(path, opts)` — fetch wrapper with auto Bearer token + `ApiError` class |
-| `authService.ts` | `register(email, password, playerName, role='student')`, `login(email, password)`, `me()`, `logout()`, `updatePlayerName`, `updateAvatar`, `updateEndpointMarker(payload)` |
+| `authService.ts` | `register(email, password, playerName, role='student')`, `login(email, password)`, `me()`, `logout()`, `updatePlayerName`, `updateEndpointMarker(payload)` |
 | `sessionService.ts` | `create(...)`, `getActive()`, `update(id, patch)`, `end(id, result)`, `abandon(id)`, `submitReflection(id, text)`, `appendReplayEvents(...)`, `getReplay(id)` |
 | `sessionLifecycleService.ts` | High-level orchestration: open a session, attach engine, submit the final score in one flow |
 | `gameCommandService.ts` | Issues server-authoritative game commands (used when the backend governs a run) |
