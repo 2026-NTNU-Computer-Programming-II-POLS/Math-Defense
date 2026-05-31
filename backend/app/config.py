@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     # Scheme is `postgresql+psycopg` (psycopg v3) rather than the bare `postgresql`
     # alias, which SQLAlchemy still resolves to the unmaintained psycopg2.
     database_url: str
+    # Optional least-privilege runtime URL (M-13). When set, the runtime engine
+    # (app/db/database.py) connects with the DML-only `mathdefense_app` role that
+    # scripts/pg_init_roles.sh provisions, while Alembic migrations keep using
+    # database_url (the admin role with DDL rights) via alembic/env.py. Left
+    # unset, runtime falls back to database_url, so single-role deployments are
+    # byte-for-byte unchanged.
+    database_url_app: str | None = None
     secret_key: str  # Required — must be set via SECRET_KEY env var or .env file
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
@@ -152,6 +159,21 @@ class Settings(BaseSettings):
             raise ValueError(
                 "DATABASE_URL contains the default password 'changeme'. "
                 "Set a strong password via the DATABASE_URL env var or .env file."
+            )
+        return v
+
+    @field_validator("database_url_app")
+    @classmethod
+    def reject_weak_database_url_app(cls, v: str | None) -> str | None:
+        # Optional override — an empty value (the `${DATABASE_URL_APP:-}` default
+        # from docker-compose) is treated as unset and falls back to database_url
+        # in app/db/database.py. Only guard the poison password when one is set.
+        if v is None or not v.strip():
+            return v
+        if not _is_test_env() and ":changeme@" in v:
+            raise ValueError(
+                "DATABASE_URL_APP contains the default password 'changeme'. "
+                "Set a strong password (matching POSTGRES_APP_PASSWORD) instead."
             )
         return v
 

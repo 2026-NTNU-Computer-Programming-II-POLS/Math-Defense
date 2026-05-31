@@ -2,9 +2,11 @@
 # M-13: Least-privilege PostgreSQL roles.
 # Mounted as /docker-entrypoint-initdb.d/init-roles.sh in the postgres
 # container so it runs once on first database creation. The default
-# "mathdefense" superuser created by POSTGRES_USER is used only for
-# Alembic migrations (DDL). Runtime queries go through "mathdefense_app"
-# which has DML-only privileges.
+# "mathdefense" superuser created by POSTGRES_USER runs Alembic migrations
+# (DDL) and, by default, runtime queries too. To scope runtime to the
+# DML-only "mathdefense_app" role created here, set DATABASE_URL_APP in the
+# backend environment (see docker-compose.prod.yml / .env.example) — the
+# runtime engine then uses it while Alembic keeps using the admin DATABASE_URL.
 #
 # Only runs on first DB init (empty data directory). For existing
 # deployments, run the SQL below manually via psql as the superuser.

@@ -47,6 +47,11 @@ services:
     environment:
       SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: ${DATABASE_URL}
+      # M-13: optional least-privilege runtime URL. When set, runtime queries use
+      # the DML-only `mathdefense_app` role created by pg_init_roles.sh while
+      # Alembic still migrates as the admin DATABASE_URL. Empty (the default) =
+      # run runtime through DATABASE_URL too.
+      DATABASE_URL_APP: ${DATABASE_URL_APP:-}
       CORS_ORIGINS: ${CORS_ORIGINS}
       FRONTEND_URL: ${FRONTEND_URL}
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}

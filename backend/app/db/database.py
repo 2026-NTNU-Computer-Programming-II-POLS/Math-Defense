@@ -2,8 +2,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.config import settings
 
+# M-13: runtime queries use the least-privilege app role when DATABASE_URL_APP
+# is set; otherwise fall back to the admin DATABASE_URL. Alembic migrations
+# always run as the admin role (alembic/env.py reads settings.database_url) —
+# only this runtime engine honours the override, so DDL keeps its DDL rights
+# while day-to-day reads/writes can be scoped to DML-only.
+_runtime_database_url = settings.database_url_app or settings.database_url
+
 engine = create_engine(
-    settings.database_url,
+    _runtime_database_url,
     isolation_level="READ COMMITTED",
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
