@@ -219,8 +219,8 @@ onMounted(async () => {
 }
 
 .ach-card.unlocked {
-  border-color: var(--terracotta);
-  background: linear-gradient(135deg, rgba(168, 188, 203, 0.24), #fff);
+  border-color: var(--gold);
+  background: linear-gradient(135deg, var(--gold-tint-select), #fff);
 }
 
 .ach-card.locked { opacity: 0.5; }
@@ -235,7 +235,7 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.ach-card.unlocked .ach-icon { color: var(--terracotta-deep); }
+.ach-card.unlocked .ach-icon { color: var(--gold-deep); }
 .ach-card.locked .ach-icon { color: var(--charcoal-soft); }
 
 .ach-info { flex: 1; min-width: 0; }
