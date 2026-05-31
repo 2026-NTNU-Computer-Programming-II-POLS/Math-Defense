@@ -36,13 +36,12 @@ const gameStore = useGameStore()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 
-// Active-buff tokens in the left rail. `remainingTime` is a snapshot from the
-// last ACTIVE_BUFFS_CHANGED, so interpolate against timeTotal for a smooth
-// countdown. Initials use the buff's word-initials (e.g. "Sharpen Blades" → SB).
+// Active-buff tokens in the left rail. `remainingTime` is the engine's live
+// value (BuffSystem ticks it during WAVE; gameStore mirrors the array every Nth
+// frame), so just round it for display. Initials use the buff's word-initials
+// (e.g. "Sharpen Blades" → SB).
 function liveBuffSeconds(buff: { remainingTime: number }): number {
-  return Math.ceil(
-    Math.max(0, buff.remainingTime - (gameStore.timeTotal - gameStore.activeBuffsSnapshotTime)),
-  )
+  return Math.ceil(buff.remainingTime)
 }
 function buffInitials(name: string): string {
   const words = name.trim().split(/\s+/)

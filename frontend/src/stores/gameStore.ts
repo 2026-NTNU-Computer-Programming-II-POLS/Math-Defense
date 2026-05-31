@@ -73,13 +73,13 @@ export const useGameStore = defineStore('game', () => {
   const montyHallProgress = ref(0)
   const montyHallState = ref<MontyHallState | null>(null)
 
-  // V2 Active buffs
+  // V2 Active buffs. The array is replaced on ACTIVE_BUFFS_CHANGED (add/expire/
+  // LEVEL_START) AND refreshed every Nth frame by pushTimingTick, so each
+  // entry's `remainingTime` mirrors the engine's live value — BuffSystem owns
+  // the countdown (ticking only during WAVE), the UI just reads it. This
+  // mirrors how spellCooldowns are surfaced and avoids any UI-side clock
+  // interpolation (which previously desynced across BUILD phases).
   const activeBuffs = shallowRef<ReadonlyArray<ActiveBuffEntry>>([])
-  // game.state.timeTotal at the moment activeBuffs was last emitted. Lets
-  // consumers interpolate liveRemaining = max(0, b.remainingTime - (timeTotal
-  // - activeBuffsSnapshotTime)) without an extra periodic event from the
-  // engine, since BuffSystem only emits on add / expire / LEVEL_START.
-  const activeBuffsSnapshotTime = ref(0)
 
   // V2 Calculus tower states (reactive mirror of tower.calculusState per towerId)
   const calculusStates = shallowRef<Record<string, CalculusState | null>>({})
@@ -234,7 +234,6 @@ export const useGameStore = defineStore('game', () => {
         montyHallState.value = null
         enemiesAlive.value = 0
         activeBuffs.value = []
-        activeBuffsSnapshotTime.value = 0
         spellCooldowns.value = {}
         calculusStates.value = {}
       }),
@@ -243,7 +242,6 @@ export const useGameStore = defineStore('game', () => {
       }),
       game.eventBus.on(Events.ACTIVE_BUFFS_CHANGED, (buffs) => {
         activeBuffs.value = buffs
-        activeBuffsSnapshotTime.value = game.state.timeTotal
       }),
       game.eventBus.on(Events.TOWER_UPGRADED, () => { towerUpgradeTick.value++ }),
       // Magic-tower configuration (curve + zone mode) mutates plain engine
@@ -305,18 +303,28 @@ export const useGameStore = defineStore('game', () => {
     initialAnswer.value = s.initialAnswer
     pathsVisible.value = s.pathsVisible
     activeBuffs.value = [...s.activeBuffs]
-    activeBuffsSnapshotTime.value = s.timeTotal
   }
 
   /**
-   * Used by useGameLoop's RAF mirror to push timeTotal + spellCooldowns into
-   * reactive state every Nth frame. Keeping the writes here (rather than
-   * letting useGameLoop reach into the refs) preserves the rule that this
-   * file is the only place gameStore state mutates.
+   * Used by useGameLoop's RAF mirror to push timeTotal + spellCooldowns +
+   * activeBuffs into reactive state every Nth frame. Keeping the writes here
+   * (rather than letting useGameLoop reach into the refs) preserves the rule
+   * that this file is the only place gameStore state mutates.
+   *
+   * activeBuffs is refreshed here (not only on ACTIVE_BUFFS_CHANGED) so each
+   * entry's live `remainingTime` — which BuffSystem decrements during WAVE —
+   * surfaces to the buff-countdown UIs without any clock interpolation. The
+   * array is shallow-copied so the shallowRef re-triggers; the entry objects
+   * are the engine's own, so their mutated remainingTime reads through.
    */
-  function pushTimingTick(timeTotalNow: number, spellCooldownsNow: Record<string, number>): void {
+  function pushTimingTick(
+    timeTotalNow: number,
+    spellCooldownsNow: Record<string, number>,
+    activeBuffsNow: ReadonlyArray<ActiveBuffEntry>,
+  ): void {
     timeTotal.value = timeTotalNow
     spellCooldowns.value = { ...spellCooldownsNow }
+    activeBuffs.value = [...activeBuffsNow]
   }
 
   function getEngine(): Game | null {
@@ -355,7 +363,6 @@ export const useGameStore = defineStore('game', () => {
     montyHallProgress.value = 0
     montyHallState.value = null
     activeBuffs.value = []
-    activeBuffsSnapshotTime.value = 0
     spellCooldowns.value = {}
     calculusStates.value = {}
     pathLabelOpacity.value = 0
@@ -369,7 +376,7 @@ export const useGameStore = defineStore('game', () => {
     gold, hp, maxHp, score, kills, cumulativeKillValue, enemiesAlive, buffCards,
     costTotal, healthOrigin, timeTotal, timeExcludePrepare, perceivedSpeedMultiplier,
     initialAnswer, pathsVisible, montyHallProgress, montyHallState,
-    activeBuffs, activeBuffsSnapshotTime, spellCooldowns, calculusStates, towerUpgradeTick,
+    activeBuffs, spellCooldowns, calculusStates, towerUpgradeTick,
     pathLabelOpacity,
     pathPanel,
     lastCheckpoint, isCheckpointRun,

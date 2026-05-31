@@ -105,7 +105,7 @@ export function useGameLoop(canvasRef: Ref<HTMLCanvasElement | null>, options: G
       frameCount++
       const g = game.value
       if (g && frameCount % 30 === 0) {
-        gameStore.pushTimingTick(g.state.timeTotal, g.state.spellCooldowns)
+        gameStore.pushTimingTick(g.state.timeTotal, g.state.spellCooldowns, g.state.activeBuffs)
       }
       _timingMirrorRaf = requestAnimationFrame(tick)
     }
