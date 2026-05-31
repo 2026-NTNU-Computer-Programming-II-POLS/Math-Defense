@@ -181,13 +181,23 @@ onMounted(async () => {
 .ach-count { color: var(--gold-deep); font-weight: 700; }
 .ach-points { color: var(--charcoal-soft); }
 
-.ach-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+/* Distribute chips evenly across the row's full width: nowrap keeps everything
+   on one line, space-between turns leftover slack into uniform inter-chip
+   gaps so the first chip sits flush-left and the last sits flush-right with
+   .ach-grid below. `gap` is the minimum spacing if the row ever runs tight. */
+.ach-filters { display: flex; gap: 4px; flex-wrap: nowrap; justify-content: space-between; }
 .filter-btn.active { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%); color: #fff; border-color: var(--gold-deep); }
-/* Push the last category chip to the row's right edge so it lines up with
-   the right edge of the .ach-grid (and season-banner) below — the row
-   spans the same container width, so margin-left:auto on the trailing
-   item makes that single chip flush-right. */
-.ach-filters .filter-btn:last-child { margin-left: auto; }
+/* Mockup chip style: pill (from shared primitive) + soft inset shadow gives
+   inactive chips a recessed feel; active chips get the shared gold gradient
+   plus a slight outer raise. Padding is sized so all eight categories (+ All,
+   + Seasonal) still fit on the single row inside .ach-grid's container. */
+.ach-filters .filter-btn {
+  padding: 6px 14px;
+  min-height: 32px;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 2px var(--line);
+}
+.ach-filters .filter-btn.active { box-shadow: var(--shadow-sm); }
 
 .ach-loading, .ach-error { text-align: center; color: var(--charcoal-soft); padding: 32px; }
 .ach-error { color: var(--clay-deep); }
