@@ -26,7 +26,12 @@ const activeTab = computed<Tab>(() => {
 
 const seasonForm = ref({ season_id: '', name: '', starts_at: '', ends_at: '' })
 const seasonFormError = ref('')
+const seasonFormSuccess = ref('')
 const seasonFormSubmitting = ref(false)
+
+// User id whose active-state toggle is in flight, so the row's button can show
+// pending state and block double-submits without freezing the whole list.
+const togglingUserId = ref<string | null>(null)
 
 const teacherForm = ref({ email: '', password: '', player_name: '' })
 const teacherFormError = ref('')
@@ -50,23 +55,38 @@ const filteredStudents = computed(() =>
   students.value.filter(s => matchesSearch(s.player_name) || matchesSearch(s.email))
 )
 
+const filteredSeasons = computed(() =>
+  seasons.value.filter(s => matchesSearch(s.name) || matchesSearch(s.season_id))
+)
+
+// Abort the in-flight load when a newer tab switch supersedes it, so a slow
+// earlier response can't overwrite the current tab's data or flip `loading`
+// off underneath the request that actually owns the view.
+let loadController: AbortController | null = null
+
 async function loadData(): Promise<void> {
+  loadController?.abort()
+  const controller = new AbortController()
+  loadController = controller
   loading.value = true
   error.value = ''
   try {
     if (activeTab.value === 'teachers') {
-      teachers.value = await adminService.getTeachers()
+      teachers.value = await adminService.getTeachers(controller.signal)
     } else if (activeTab.value === 'classes') {
-      classes.value = await adminService.getClasses()
+      classes.value = await adminService.getClasses(controller.signal)
     } else if (activeTab.value === 'seasons') {
-      seasons.value = await seasonService.listAdmin()
+      seasons.value = await seasonService.listAdmin(controller.signal)
     } else {
-      students.value = await adminService.getStudents()
+      students.value = await adminService.getStudents(controller.signal)
     }
   } catch (e) {
+    // A superseded load was aborted by a newer switch — expected; let the
+    // newer request own `loading` and the error surface.
+    if (controller.signal.aborted) return
     error.value = e instanceof Error ? e.message : 'Failed to load data'
   } finally {
-    loading.value = false
+    if (loadController === controller) loading.value = false
   }
 }
 
@@ -103,6 +123,7 @@ async function submitTeacher(): Promise<void> {
 
 async function submitSeason(): Promise<void> {
   seasonFormError.value = ''
+  seasonFormSuccess.value = ''
   if (!seasonForm.value.season_id || !seasonForm.value.name
       || !seasonForm.value.starts_at || !seasonForm.value.ends_at) {
     seasonFormError.value = 'All fields required'
@@ -114,18 +135,32 @@ async function submitSeason(): Promise<void> {
   }
   seasonFormSubmitting.value = true
   try {
-    await seasonService.create({
+    const saved = await seasonService.create({
       season_id: seasonForm.value.season_id,
       name: seasonForm.value.name,
       starts_at: new Date(seasonForm.value.starts_at).toISOString(),
       ends_at: new Date(seasonForm.value.ends_at).toISOString(),
     })
     seasonForm.value = { season_id: '', name: '', starts_at: '', ends_at: '' }
+    seasonFormSuccess.value = `Saved season ${saved.name} (${saved.season_id})`
     await loadData()
   } catch (e) {
     seasonFormError.value = e instanceof Error ? e.message : 'Failed to create season'
   } finally {
     seasonFormSubmitting.value = false
+  }
+}
+
+async function toggleActive(user: UserSummary): Promise<void> {
+  togglingUserId.value = user.id
+  error.value = ''
+  try {
+    const updated = await adminService.setUserActive(user.id, !user.is_active)
+    user.is_active = updated.is_active
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to update account status'
+  } finally {
+    togglingUserId.value = null
   }
 }
 
@@ -202,9 +237,22 @@ watch(activeTab, loadData, { immediate: true })
         </form>
 
         <ul class="item-list">
-          <li v-for="t in filteredTeachers" :key="t.id" class="item-row">
+          <li
+            v-for="t in filteredTeachers"
+            :key="t.id"
+            class="item-row user-row"
+            :class="{ inactive: !t.is_active }"
+          >
             <span class="item-name">{{ t.player_name }}</span>
             <span class="item-detail">{{ t.email }}</span>
+            <span v-if="!t.is_active" class="status-pill disabled">DISABLED</span>
+            <button
+              class="toggle-btn"
+              :disabled="togglingUserId === t.id"
+              @click="toggleActive(t)"
+            >
+              {{ togglingUserId === t.id ? '…' : (t.is_active ? 'Disable' : 'Enable') }}
+            </button>
           </li>
           <li v-if="filteredTeachers.length === 0" class="empty">
             {{ searchQuery ? 'No results' : 'No teachers' }}
@@ -225,9 +273,22 @@ watch(activeTab, loadData, { immediate: true })
 
       <!-- Students -->
       <ul v-if="activeTab === 'students' && !loading" class="item-list">
-        <li v-for="s in filteredStudents" :key="s.id" class="item-row">
+        <li
+          v-for="s in filteredStudents"
+          :key="s.id"
+          class="item-row user-row"
+          :class="{ inactive: !s.is_active }"
+        >
           <span class="item-name">{{ s.player_name }}</span>
           <span class="item-detail">{{ s.email }}</span>
+          <span v-if="!s.is_active" class="status-pill disabled">DISABLED</span>
+          <button
+            class="toggle-btn"
+            :disabled="togglingUserId === s.id"
+            @click="toggleActive(s)"
+          >
+            {{ togglingUserId === s.id ? '…' : (s.is_active ? 'Disable' : 'Enable') }}
+          </button>
         </li>
         <li v-if="filteredStudents.length === 0" class="empty">
           {{ searchQuery ? 'No results' : 'No students' }}
@@ -243,13 +304,14 @@ watch(activeTab, loadData, { immediate: true })
           <label class="season-label">Start <input v-model="seasonForm.starts_at" class="rune-input" type="datetime-local" /></label>
           <label class="season-label">End <input v-model="seasonForm.ends_at" class="rune-input" type="datetime-local" /></label>
           <div v-if="seasonFormError" class="error-msg">{{ seasonFormError }}</div>
+          <div v-if="seasonFormSuccess" class="success-msg">{{ seasonFormSuccess }}</div>
           <button class="btn" type="submit" :disabled="seasonFormSubmitting">
             {{ seasonFormSubmitting ? 'Saving…' : 'Save Season' }}
           </button>
         </form>
 
         <ul class="item-list">
-          <li v-for="s in seasons" :key="s.season_id" class="item-row season-row">
+          <li v-for="s in filteredSeasons" :key="s.season_id" class="item-row season-row">
             <div>
               <span class="item-name">{{ s.name }}</span>
               <span class="season-id-hint"> · {{ s.season_id }}</span>
@@ -264,7 +326,9 @@ watch(activeTab, loadData, { immediate: true })
               <span v-if="s.achievement_ids.length"> · {{ s.achievement_ids.length }} achievements</span>
             </div>
           </li>
-          <li v-if="seasons.length === 0" class="empty">No seasons</li>
+          <li v-if="filteredSeasons.length === 0" class="empty">
+            {{ searchQuery ? 'No results' : 'No seasons' }}
+          </li>
         </ul>
       </section>
 
@@ -339,6 +403,38 @@ watch(activeTab, loadData, { immediate: true })
 
 .item-name { color: var(--charcoal); font-weight: 600; }
 .item-detail { color: var(--charcoal-soft); opacity: 0.85; font-size: var(--text-xs); }
+
+/* User rows carry an active-state toggle on the right; let the email column
+   absorb the slack so the button stays flush-right and the row stays centered. */
+.user-row { align-items: center; gap: 10px; }
+.user-row .item-detail { flex: 1; }
+.item-row.inactive { opacity: 0.55; }
+
+.status-pill {
+  padding: 2px 8px;
+  font-size: var(--text-2xs);
+  letter-spacing: 1px;
+  border-radius: 999px;
+  border: 1px solid rgba(180, 96, 96, 0.32);
+  background: rgba(180, 96, 96, 0.15);
+  color: var(--clay-deep);
+}
+
+.toggle-btn {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+  padding: 6px 12px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(245, 250, 254, 0.6);
+  color: var(--charcoal-soft);
+  cursor: pointer;
+}
+
+.toggle-btn:hover:not(:disabled) { color: var(--charcoal); background: rgba(245, 250, 254, 0.9); }
+.toggle-btn:disabled { opacity: 0.5; cursor: default; }
 
 .search-input { font-size: var(--text-xs); }
 .error-msg { font-size: var(--text-xs); color: var(--clay-deep); }
