@@ -7,6 +7,7 @@ import { authService } from '@/services/authService'
 import { achievementService, type AchievementSummary } from '@/services/achievementService'
 import { talentService, type TalentTreeOut } from '@/services/talentService'
 import { useUiAudio } from '@/composables/useUiAudio'
+import { useProfileInitials, PROFILE_COLOR_CHOICES } from '@/composables/useProfileInitials'
 
 const uiAudio = useUiAudio()
 
@@ -34,6 +35,16 @@ const PRESET_AVATARS = [
   '/avatars/scholar.svg',
   '/avatars/alchemist.svg',
 ]
+
+const { initials: profileInitials, setInitials, clearInitials } = useProfileInitials()
+const initialsDraftLetters = ref(profileInitials.value?.letters ?? '')
+const initialsDraftColor = ref(profileInitials.value?.color ?? PROFILE_COLOR_CHOICES[0].color)
+
+function applyInitials(): void {
+  const trimmed = initialsDraftLetters.value.trim()
+  if (trimmed.length === 0) return
+  setInitials(trimmed, initialsDraftColor.value)
+}
 
 const pwVisible = ref(false)
 const pwCurrent = ref('')
@@ -164,6 +175,7 @@ const safeAvatarUrl = computed(() => {
 
 async function selectAvatar(url: string): Promise<void> {
   if (!auth.user || auth.user.avatar_url === url) return
+  clearInitials()
   avatarSaving.value = true
   avatarError.value = ''
   try {
@@ -319,7 +331,16 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
       <h2 class="profile-title">Profile</h2>
 
       <div v-if="auth.user" class="avatar-section">
+        <div
+          v-if="profileInitials"
+          class="avatar-current avatar-current--initials"
+          :style="{ background: profileInitials.color }"
+          :aria-label="`Avatar: ${profileInitials.letters}`"
+        >
+          {{ profileInitials.letters }}
+        </div>
         <img
+          v-else
           class="avatar-current"
           :src="safeAvatarUrl"
           alt="Avatar"
@@ -329,13 +350,58 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
             v-for="url in PRESET_AVATARS"
             :key="url"
             class="avatar-btn"
-            :class="{ selected: auth.user.avatar_url === url }"
+            :class="{ selected: !profileInitials && auth.user.avatar_url === url }"
             :disabled="avatarSaving"
             @click="selectAvatar(url)"
           >
             <img :src="url" :alt="url" />
           </button>
         </div>
+
+        <div class="initials-picker">
+          <div class="initials-picker-title">Or use custom initials</div>
+          <div class="initials-picker-row">
+            <input
+              v-model="initialsDraftLetters"
+              class="rune-input initials-input"
+              type="text"
+              :maxlength="2"
+              placeholder="AB"
+              aria-label="Initials (up to 2 letters)"
+              @keyup.enter="applyInitials"
+            />
+            <div class="initials-color-grid" role="radiogroup" aria-label="Avatar color">
+              <button
+                v-for="choice in PROFILE_COLOR_CHOICES"
+                :key="choice.color"
+                type="button"
+                class="initials-color-swatch"
+                :class="{ selected: initialsDraftColor === choice.color }"
+                :style="{ background: choice.color }"
+                :aria-label="choice.name"
+                :aria-pressed="initialsDraftColor === choice.color"
+                @click="initialsDraftColor = choice.color"
+              />
+            </div>
+            <button
+              type="button"
+              class="btn initials-apply-btn"
+              :disabled="initialsDraftLetters.trim().length === 0"
+              @click="applyInitials"
+            >
+              Use
+            </button>
+            <button
+              v-if="profileInitials"
+              type="button"
+              class="btn initials-clear-btn"
+              @click="clearInitials"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
         <div v-if="avatarError" class="avatar-error">{{ avatarError }}</div>
       </div>
 
@@ -668,6 +734,104 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
 .avatar-btn:disabled { opacity: 0.5; cursor: default; }
 
 .avatar-error { font-size: var(--text-xs); color: var(--clay-deep); }
+
+/* ── Custom-initials picker ──
+   `background` on the bubble and on each color swatch is bound inline
+   from data (tower-defs colors). Keeping the value in the data layer
+   instead of inventing CSS tokens preserves a single source of truth. */
+.avatar-current--initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-base);
+  letter-spacing: 1px;
+  /* Padding is for the image variant only; the initials variant fills. */
+  padding: 0;
+}
+
+.initials-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.initials-picker-title {
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.initials-picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.initials-input {
+  width: 64px;
+  text-align: center;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  letter-spacing: 2px;
+  font-size: var(--text-sm);
+  padding: 4px 6px;
+  height: 30px;
+}
+
+.initials-color-grid {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.initials-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.initials-color-swatch:hover { transform: scale(1.08); }
+
+.initials-color-swatch.selected {
+  border-color: var(--charcoal);
+  box-shadow: 0 0 0 2px var(--gold-tint-soft);
+}
+
+.initials-apply-btn,
+.initials-clear-btn {
+  font-size: var(--text-xs);
+  padding: 2px 10px;
+  height: 30px;
+  min-height: 30px;
+  letter-spacing: 0.5px;
+}
+
+.initials-apply-btn {
+  border-color: var(--gold-deep);
+  color: #fff;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+}
+.initials-apply-btn:hover:not(:disabled) { filter: brightness(1.06); }
+
+.initials-clear-btn {
+  border-color: var(--line);
+  color: var(--charcoal-soft);
+}
+.initials-clear-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .profile-info {
   display: flex;

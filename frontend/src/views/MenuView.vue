@@ -2,10 +2,12 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useProfileInitials } from '@/composables/useProfileInitials'
 import ManualModal from '@/components/common/ManualModal.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+const { initials: profileInitials } = useProfileInitials()
 
 const manualOpen = ref(false)
 </script>
@@ -116,8 +118,13 @@ const manualOpen = ref(false)
         <div class="section-label">Account</div>
         <template v-if="auth.isLoggedIn">
           <div class="account-row">
-            <div class="avatar-sm">
-              {{ (auth.user?.player_name || '?').slice(0, 2).toUpperCase() }}
+            <div
+              class="avatar-sm"
+              :style="profileInitials ? { background: profileInitials.color } : null"
+            >
+              {{ profileInitials
+                ? profileInitials.letters
+                : (auth.user?.player_name || '?').slice(0, 2).toUpperCase() }}
             </div>
             <div class="account-meta">
               <div class="account-name">{{ auth.user?.player_name }}</div>
