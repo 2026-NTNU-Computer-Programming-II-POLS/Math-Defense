@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.domain.errors import DomainValueError
+from app.domain.errors import DomainValueError, PersistenceError
 from app.domain.user.aggregate import User
 from app.domain.user.value_objects import Role
 from app.factories import build_admin_service, build_season_service
@@ -110,6 +110,16 @@ def set_user_active(
     db: Session = Depends(get_db),
 ):
     u = build_admin_service(db).set_user_active(user_id, req.is_active, requester.id)
+    logger.info(
+        "Admin set user active=%s: admin=%s target_anon=%s",
+        req.is_active, requester.id, _anon(user_id),
+    )
+    record_audit_event(
+        request,
+        "ADMIN_USER_SET_ACTIVE",
+        requester.id,
+        {"target_user_id": user_id, "is_active": req.is_active},
+    )
     return _to_user_out(u)
 
 
@@ -118,15 +128,16 @@ def set_user_active(
 def create_season(
     request: Request,
     req: SeasonCreateRequest,
-    _user: User = Depends(require_role(Role.ADMIN)),
+    requester: User = Depends(require_role(Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Promote a set of achievements (those tagged with `season_id`) as a
     time-bounded season. Reward is doubled while the window is active. Spec:
     docs/Pedagogical_Backlog_Spec.md §22.
     """
+    season_svc = build_season_service(db)
     try:
-        build_season_service(db).upsert_season(
+        season_svc.upsert_season(
             season_id=req.season_id,
             name=req.name,
             starts_at=req.starts_at,
@@ -134,9 +145,22 @@ def create_season(
         )
     except ValueError as exc:
         raise DomainValueError(str(exc))
-    seasons = build_season_service(db).list_seasons()
+    record_audit_event(
+        request,
+        "ADMIN_SEASON_UPSERT",
+        requester.id,
+        {"season_id": req.season_id},
+    )
+    seasons = season_svc.list_seasons()
     match = next((s for s in seasons if s["season_id"] == req.season_id), None)
-    return SeasonOut(**(match or {"season_id": req.season_id, "name": req.name}))
+    if match is None:
+        # We just upserted this season in the same DB session, so it must read
+        # back. Its absence means the write did not persist — surface a real
+        # error rather than fabricating a SeasonOut with placeholder fields
+        # (which would report the season as inactive with null dates).
+        logger.error("Season %s not found after upsert", req.season_id)
+        raise PersistenceError("Season was not persisted")
+    return SeasonOut(**match)
 
 
 @router.get("/seasons", response_model=list[SeasonOut])

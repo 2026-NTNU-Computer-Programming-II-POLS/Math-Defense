@@ -24,6 +24,12 @@ class SeasonApplicationService:
         starts_at: datetime,
         ends_at: datetime,
     ) -> Season:
+        # Intentionally permissive on season_id: a season is a forward-looking
+        # window that achievements get tagged into over time, so an admin may
+        # legitimately create the window before any achievement references it
+        # (no seasonal defs ship today). A season that currently matches zero
+        # achievements is inert rather than wrong — the UI flags that case so
+        # the admin has feedback without the backend blocking the setup flow.
         season = Season.create(
             season_id=season_id, name=name, starts_at=starts_at, ends_at=ends_at,
         )
