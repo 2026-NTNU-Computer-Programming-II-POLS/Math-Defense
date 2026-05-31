@@ -1,0 +1,144 @@
+# Dedicated stress/load environment — NOT for production.
+#
+# Differences from the dev docker-compose.yml that make load testing viable:
+#   * CI=true       — the ONE escape hatch the backend's own config validators
+#                     honour (config.py::_is_test_env). It unlocks CSRF_ENABLED
+#                     =false and COOKIE_SECURE=false so plain-HTTP k6 traffic
+#                     isn't blocked by the CSRF double-submit or rejected for a
+#                     missing Secure cookie. Deployed prod refuses both.
+#   * PROXY_MODE    — the per-IP rate limiter trusts X-Forwarded-For from the
+#     + TRUSTED_     compose subnet, so each k6 VU gets its OWN rate-limit
+#       PROXY_IPS    bucket (it sends a unique XFF). Without this, every VU
+#                    shares one bucket and slowapi throttles the whole run.
+#   * a fatter DB pool to actually exercise connection-pool contention.
+#
+# Topology: a one-shot `migrate` step runs `alembic upgrade head`, then the
+# `backend` serves via gunicorn with STRESS_WORKERS UvicornWorker processes so
+# the CPU-bound bcrypt login path scales across cores. (Migrating up front
+# avoids N workers racing on the migration advisory lock at boot.)
+#
+# Usage:
+#   cd stress
+#   cp .env.stress.example .env.stress      # then fill the generated secrets
+#   docker compose -f docker-compose.stress.yml --env-file .env.stress up -d --build
+#   docker compose -f docker-compose.stress.yml --env-file .env.stress run --rm k6 run /scripts/seed-users.js
+#   docker compose -f docker-compose.stress.yml --env-file .env.stress run --rm k6 run /scripts/01-read-heavy.js
+#
+# Tear down (and wipe the throwaway DB volume):
+#   docker compose -f docker-compose.stress.yml --env-file .env.stress down -v
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mathdefense
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: math_defense
+    # Raise the connection ceiling so a fat pool across multiple workers fits.
+    command: ["postgres", "-c", "max_connections=300", "-c", "shared_buffers=256MB"]
+    ports:
+      - "127.0.0.1:5433:5432"   # 5433 so it can coexist with the dev stack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mathdefense -d math_defense"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Run migrations ONCE, up front, via the real alembic path. The chain is now
+  # replayable from zero (58cbdc857a81 guards its CREATEs), so this exercises
+  # the genuine `alembic upgrade head` rather than the create_all+stamp
+  # work-around. Running it as a discrete step (instead of letting N gunicorn
+  # workers each migrate under the advisory lock) is the canonical migrate-then-
+  # serve pattern and keeps worker boot fast.
+  migrate:
+    image: stress-backend
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    environment:
+      CI: "true"
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      FRONTEND_URL: ${FRONTEND_URL}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
+    volumes:
+      - ../shared:/shared:ro
+      - ../frontend/src/math/wasm/math_engine.wasm:/app/data/math_engine.wasm:ro
+    command: alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    image: stress-backend
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    ports:
+      - "127.0.0.1:8001:8000"   # 8001 so it can coexist with the dev stack
+    environment:
+      CI: "true"                # unlocks the relaxed validators (see header)
+      PYTHONUNBUFFERED: "1"     # don't swallow tracebacks behind stdout buffering
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      FRONTEND_URL: ${FRONTEND_URL}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
+      CSRF_ENABLED: "false"
+      COOKIE_SECURE: "false"
+      # Lift slowapi rate limits entirely so the run probes raw capacity rather
+      # than the throttle. Only honoured because CI=true (see limiter.py). Set
+      # to "true" to instead exercise the limits via the per-VU XFF buckets.
+      RATELIMIT_ENABLED: ${RATELIMIT_ENABLED:-false}
+      PROXY_MODE: "true"
+      # Trust XFF from the whole compose subnet (default Docker RFC-1918 range).
+      # Safe ONLY because this is a throwaway stress env reachable from loopback.
+      TRUSTED_PROXY_IPS: "172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
+    # Run as root ONLY so the throwaway stress image can `pip install gunicorn`
+    # at startup (it isn't in the prod image — prod runs single-process uvicorn
+    # per backend/Dockerfile, and we don't want to grow its dependency surface).
+    user: root
+    volumes:
+      - ../shared:/shared:ro
+      - ../frontend/src/math/wasm/math_engine.wasm:/app/data/math_engine.wasm:ro
+    # Multi-process via gunicorn + UvicornWorker — N independent event loops, so
+    # the CPU-bound bcrypt login path scales across cores (this is the knee the
+    # auth-flow scenario probes). Migrations already ran in the `migrate` step,
+    # so each worker's lifespan upgrade(head) is a no-op; the advisory lock makes
+    # the redundant check safe regardless. STRESS_WORKERS tunes the worker count.
+    # NOTE: keep this on ONE line. A YAML folded (>) block preserves newlines
+    # on the more-indented continuation lines, which inside `sh -c "..."` splits
+    # the gunicorn invocation and silently drops -w/-b (1 worker on 127.0.0.1).
+    command: sh -c "pip install --no-cache-dir --quiet 'gunicorn==23.0.0' && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${STRESS_WORKERS:-4} -b 0.0.0.0:8000 --timeout 60 --graceful-timeout 30"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=2).status == 200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # In-network k6 runner. `profiles` keeps it out of `up`; invoke explicitly
+  # with `docker compose ... run --rm k6 run /scripts/<script>.js`.
+  k6:
+    image: grafana/k6:latest
+    profiles: ["tools"]
+    environment:
+      BASE_URL: http://backend:8000
+      USER_COUNT: ${USER_COUNT:-200}
+      SEED_PASS: ${SEED_PASS:-StressTest2026!}
+    volumes:
+      - ./k6:/scripts:ro
+    depends_on:
+      backend:
+        condition: service_healthy

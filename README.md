@@ -314,6 +314,10 @@ cd frontend && npm test            # ~87 test files (systems, engine, domain pol
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
 
+### Load & stress testing
+
+Load and throughput tests (k6 HTTP scenarios plus Vitest compute benches) live under `stress/`, separate from the correctness suites above. See **[stress/README.md](stress/README.md)** for what each scenario represents, how to run the whole suite with one command (`stress\run-stress.cmd`), and the known limitations. The most recent measured numbers are kept in **[stress/RESULTS.md](stress/RESULTS.md)**.
+
 ---
 
 ## Production Deployment
