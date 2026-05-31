@@ -182,7 +182,11 @@ onMounted(async () => {
 .ach-points { color: var(--charcoal-soft); }
 
 .ach-filters { display: flex; gap: 4px; flex-wrap: wrap; }
-/* `.filter-btn` (active state included) is a shared primitive in global.css. */
+/* Push the last category chip to the row's right edge so it lines up with
+   the right edge of the .ach-grid (and season-banner) below — the row
+   spans the same container width, so margin-left:auto on the trailing
+   item makes that single chip flush-right. */
+.ach-filters .filter-btn:last-child { margin-left: auto; }
 
 .ach-loading, .ach-error { text-align: center; color: var(--charcoal-soft); padding: 32px; }
 .ach-error { color: var(--clay-deep); }
