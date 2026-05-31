@@ -77,6 +77,23 @@ jobs:
         # the bit-exact score-verification contract unverified while CI stays
         # green. Fail loudly here instead of letting those tests skip.
         run: python -c "from app.infrastructure.wasm_runtime import is_wasm_loaded; assert is_wasm_loaded(), 'WASM runtime failed to load; see wasm_runtime logs'"
+      - name: Migrations replay from a fresh DB
+        # Guards the "tests pass but a fresh deploy can't boot" class of bug.
+        # conftest.py builds schema via Base.metadata.create_all, so pytest
+        # never runs the alembic chain — a non-replayable migration (e.g. an
+        # unconditional CREATE of a table an earlier revision already made)
+        # stays green in CI yet fails every brand-new `alembic upgrade head`.
+        # Run the real chain from zero against the empty `math_defense` DB
+        # (pytest uses the separate `math_defense_test`, so they don't collide)
+        # and fail loudly here instead. `alembic current` prints the landed head.
+        env:
+          SECRET_KEY: ci-placeholder-secret-key-not-used-in-prod
+          DATABASE_URL: postgresql+psycopg://mathdefense:changeme@localhost:5432/math_defense
+          CORS_ORIGINS: http://localhost:5173
+          FRONTEND_URL: http://localhost:5173
+        run: |
+          alembic upgrade head
+          alembic current
       - name: pytest
         env:
           SECRET_KEY: ci-placeholder-secret-key-not-used-in-prod
