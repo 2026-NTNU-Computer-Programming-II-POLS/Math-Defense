@@ -261,7 +261,24 @@ onBeforeUnmount(() => {
 .lb-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .filter-label { font-size: var(--text-xs); color: var(--charcoal-soft); }
 
-/* `.filter-btn` (level filter pills) is a shared primitive in global.css. */
+/* Level filter pills (mockup .pill) */
+.filter-btn {
+  border-radius: 999px;
+  padding: 4px 12px;
+  min-height: 30px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 1px;
+  background: rgba(79, 74, 72, 0.07);
+  color: var(--charcoal-soft);
+  border: 1px solid rgba(79, 74, 72, 0.16);
+}
+.filter-btn.active {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  border-color: var(--gold-deep);
+  font-weight: 700;
+}
 
 /* Table (mockup .tbl) */
 .lb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }

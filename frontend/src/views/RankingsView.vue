@@ -361,7 +361,7 @@ onBeforeUnmount(cancelInflight)
       <button
         v-for="lv in [undefined, 1, 2, 3, 4]"
         :key="lv ?? 'all'"
-        :class="['btn', 'filter-btn', { active: personalLevel === lv }]"
+        :class="['btn', 'tab-btn', { active: personalLevel === lv }]"
         @click="personalLevel = lv"
       >
         {{ lv === undefined ? 'All' : `Lv.${lv}` }}

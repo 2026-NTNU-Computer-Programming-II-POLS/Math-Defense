@@ -182,6 +182,7 @@ onMounted(async () => {
 .ach-points { color: var(--charcoal-soft); }
 
 .ach-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+.filter-btn.active { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%); color: #fff; border-color: var(--gold-deep); }
 /* Push the last category chip to the row's right edge so it lines up with
    the right edge of the .ach-grid (and season-banner) below — the row
    spans the same container width, so margin-left:auto on the trailing
