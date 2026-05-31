@@ -245,6 +245,10 @@ watch(activeTab, loadData, { immediate: true })
           >
             <span class="item-name">{{ t.player_name }}</span>
             <span class="item-detail">{{ t.email }}</span>
+            <span
+              class="class-count"
+              :title="`Teaches ${t.classes_joined_count} class(es) — disabling locks this teacher out of them`"
+            >{{ t.classes_joined_count }} taught</span>
             <span v-if="!t.is_active" class="status-pill disabled">DISABLED</span>
             <button
               class="toggle-btn"
@@ -281,6 +285,10 @@ watch(activeTab, loadData, { immediate: true })
         >
           <span class="item-name">{{ s.player_name }}</span>
           <span class="item-detail">{{ s.email }}</span>
+          <span
+            class="class-count"
+            :title="`Enrolled in ${s.classes_joined_count} class(es)`"
+          >{{ s.classes_joined_count }} joined</span>
           <span v-if="!s.is_active" class="status-pill disabled">DISABLED</span>
           <button
             class="toggle-btn"
@@ -324,6 +332,11 @@ watch(activeTab, loadData, { immediate: true })
               →
               {{ s.ends_at ? new Date(s.ends_at).toLocaleDateString() : '—' }}
               <span v-if="s.achievement_ids.length"> · {{ s.achievement_ids.length }} achievements</span>
+              <span
+                v-else
+                class="season-inert"
+                title="No achievements reference this season_id yet, so the 2x reward window currently grants nothing."
+              > · no achievements (inert)</span>
             </div>
           </li>
           <li v-if="filteredSeasons.length === 0" class="empty">
@@ -420,6 +433,18 @@ watch(activeTab, loadData, { immediate: true })
   color: var(--clay-deep);
 }
 
+/* Class-count hint on user rows — gives the admin visibility into how many
+   classes a teacher/student is tied to before disabling the account. */
+.class-count {
+  flex-shrink: 0;
+  font-size: var(--text-2xs);
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+  color: var(--charcoal-soft);
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
 .toggle-btn {
   font-size: var(--text-xs);
   font-family: var(--font-mono);
@@ -469,6 +494,10 @@ watch(activeTab, loadData, { immediate: true })
 .season-row { flex-direction: column; gap: 4px; align-items: flex-start; }
 
 .season-id-hint { font-size: var(--text-xs); color: var(--charcoal-soft); opacity: 0.7; }
+
+/* Inert-season warning: a season whose season_id matches no achievement grants
+   nothing. Flag it so the admin notices, rather than hiding the (zero) count. */
+.season-inert { color: var(--clay-deep); font-weight: 600; }
 
 .season-pill {
   margin-left: 6px;
