@@ -9,7 +9,6 @@ import base64
 import binascii
 
 from app.domain.user.constraints import (
-    ALLOWED_AVATAR_URLS,
     ALLOWED_ENDPOINT_HIT_FX_STYLES,
     ALLOWED_ENDPOINT_MARKER_STYLES,
     ENDPOINT_MARKER_DATAURL_MAX_LENGTH,
@@ -42,7 +41,6 @@ class User:
         player_name: str,
         role: Role,
         password_hash: str,
-        avatar_url: str | None = None,
         created_at: datetime | None = None,
         password_version: int = 0,
         is_active: bool = True,
@@ -66,7 +64,6 @@ class User:
         self.player_name = self._validate_player_name(player_name)
         self.role = role
         self.password_hash = password_hash
-        self.avatar_url = avatar_url
         self.created_at = created_at or datetime.now(UTC)
         self.password_version = password_version
         self.is_active = is_active
@@ -108,8 +105,6 @@ class User:
             password_hash=password_hash,
         )
 
-    AVATAR_URL_MAX_LENGTH = 2048
-
     @staticmethod
     def _validate_email(email: str) -> str:
         if not isinstance(email, str):
@@ -133,32 +128,6 @@ class User:
 
     def rename(self, player_name: str) -> None:
         self.player_name = self._validate_player_name(player_name)
-
-    def update_avatar(self, avatar_url: str | None) -> None:
-        """Validate and assign a new avatar URL (B-BUG-19).
-
-        ``None`` (or an empty/whitespace string) clears the avatar. Otherwise
-        the URL must be one of the application's shipped avatars. The allowlist
-        is enforced here so every caller — the HTTP schema, internal services,
-        and any future non-HTTP callers — gets the same guarantee rather than
-        relying on the Pydantic layer alone.
-        """
-        if avatar_url is None:
-            self.avatar_url = None
-            return
-        if not isinstance(avatar_url, str):
-            raise ValueError("avatar_url must be a string or None")
-        cleaned = avatar_url.strip()
-        if not cleaned:
-            self.avatar_url = None
-            return
-        if len(cleaned) > self.AVATAR_URL_MAX_LENGTH:
-            raise ValueError(
-                f"avatar_url exceeds {self.AVATAR_URL_MAX_LENGTH} characters"
-            )
-        if cleaned not in ALLOWED_AVATAR_URLS:
-            raise ValueError("Invalid avatar URL")
-        self.avatar_url = cleaned
 
     def update_endpoint_marker(
         self,

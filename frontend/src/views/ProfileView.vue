@@ -7,6 +7,7 @@ import { authService } from '@/services/authService'
 import { achievementService, type AchievementSummary } from '@/services/achievementService'
 import { talentService, type TalentTreeOut } from '@/services/talentService'
 import { useUiAudio } from '@/composables/useUiAudio'
+import { useProfileInitials, PROFILE_COLOR_CHOICES } from '@/composables/useProfileInitials'
 
 const uiAudio = useUiAudio()
 
@@ -26,14 +27,22 @@ const roleLabels: Record<string, string> = {
   student: 'Student',
 }
 
-const PRESET_AVATARS = [
-  '/avatars/wizard.svg',
-  '/avatars/knight.svg',
-  '/avatars/archer.svg',
-  '/avatars/mage.svg',
-  '/avatars/scholar.svg',
-  '/avatars/alchemist.svg',
-]
+const { initials: profileInitials, setInitials, clearInitials } = useProfileInitials()
+const initialsDraftLetters = ref(profileInitials.value?.letters ?? '')
+const initialsDraftColor = ref(profileInitials.value?.color ?? PROFILE_COLOR_CHOICES[0].color)
+
+
+const displayInitials = computed(() => {
+  const letters = initialsDraftLetters.value.trim().slice(0, 2).toUpperCase()
+  if (letters.length > 0) return { letters, color: initialsDraftColor.value }
+  return profileInitials.value
+})
+
+function applyInitials(): void {
+  const trimmed = initialsDraftLetters.value.trim()
+  if (trimmed.length === 0) return
+  setInitials(trimmed, initialsDraftColor.value)
+}
 
 const pwVisible = ref(false)
 const pwCurrent = ref('')
@@ -87,8 +96,6 @@ const achievementSummary = ref<AchievementSummary | null>(null)
 const talentSummary = ref<TalentTreeOut | null>(null)
 const loading = ref(true)
 const loadError = ref('')
-const avatarSaving = ref(false)
-const avatarError = ref('')
 const nameDraft = ref('')
 const nameEditing = ref(false)
 const nameSaving = ref(false)
@@ -152,28 +159,6 @@ onBeforeUnmount(() => {
     endpointMarkerSyncInFlight = null
   }
 })
-
-// M12: mirror the backend allowlist client-side. Any avatar_url that doesn't
-// start with '/avatars/' is silently replaced with the default so a future
-// backend regression can't load an arbitrary URL.
-const safeAvatarUrl = computed(() => {
-  const url = auth.user?.avatar_url ?? null
-  if (url && url.startsWith('/avatars/')) return url
-  return PRESET_AVATARS[0]
-})
-
-async function selectAvatar(url: string): Promise<void> {
-  if (!auth.user || auth.user.avatar_url === url) return
-  avatarSaving.value = true
-  avatarError.value = ''
-  try {
-    await auth.updateAvatar(url)
-  } catch {
-    avatarError.value = 'Failed to save avatar'
-  } finally {
-    avatarSaving.value = false
-  }
-}
 
 // Endpoint marker — custom image upload. The uploaded file is resized to a
 // 256×256 letterboxed dataURL so localStorage keeps headroom for other
@@ -319,24 +304,65 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
       <h2 class="profile-title">Profile</h2>
 
       <div v-if="auth.user" class="avatar-section">
-        <img
+        <div
+          v-if="displayInitials"
           class="avatar-current"
-          :src="safeAvatarUrl"
-          alt="Avatar"
-        />
-        <div class="avatar-grid">
-          <button
-            v-for="url in PRESET_AVATARS"
-            :key="url"
-            class="avatar-btn"
-            :class="{ selected: auth.user.avatar_url === url }"
-            :disabled="avatarSaving"
-            @click="selectAvatar(url)"
-          >
-            <img :src="url" :alt="url" />
-          </button>
+          :style="{ borderColor: displayInitials.color }"
+          :aria-label="`Avatar: ${displayInitials.letters}`"
+        >
+          <span
+            class="avatar-initials-fill"
+            :style="{ background: displayInitials.color }"
+            aria-hidden="true"
+          ></span>
+          <span
+            class="avatar-initials-letter"
+            :style="{ color: displayInitials.color }"
+          >{{ displayInitials.letters }}</span>
         </div>
-        <div v-if="avatarError" class="avatar-error">{{ avatarError }}</div>
+        <div class="initials-picker">
+          <div class="initials-picker-row">
+            <input
+              v-model="initialsDraftLetters"
+              class="rune-input initials-input"
+              type="text"
+              :maxlength="2"
+              placeholder="AB"
+              aria-label="Initials (up to 2 letters)"
+              @keyup.enter="applyInitials"
+            />
+            <div class="initials-color-grid" role="radiogroup" aria-label="Avatar color">
+              <button
+                v-for="choice in PROFILE_COLOR_CHOICES"
+                :key="choice.color"
+                type="button"
+                class="initials-color-swatch"
+                :class="{ selected: initialsDraftColor === choice.color }"
+                :style="{ background: choice.color }"
+                :aria-label="choice.name"
+                :aria-pressed="initialsDraftColor === choice.color"
+                @click="initialsDraftColor = choice.color"
+              />
+            </div>
+            <button
+              type="button"
+              class="btn initials-apply-btn"
+              :disabled="initialsDraftLetters.trim().length === 0"
+              @click="applyInitials"
+            >
+              Use
+            </button>
+            <button
+              v-if="profileInitials"
+              type="button"
+              class="btn initials-clear-btn"
+              @click="clearInitials"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
       </div>
 
       <div v-if="auth.user" class="profile-info">
@@ -629,45 +655,112 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
   gap: 10px;
 }
 
+/* ── Custom-initials avatar ──
+   Coloured outer ring + smaller translucent inner disc + coloured letter.
+   borderColor, the fill `background`, and the letter `color` are bound
+   inline from data so the seven tower-defs colors stay the single source
+   of truth. */
 .avatar-current {
+  position: relative;
   width: 64px;
   height: 64px;
-  border: 2px solid var(--terracotta);
   border-radius: 50%;
-  object-fit: contain;
-  background: rgba(245, 250, 254, 0.85);
-  padding: 4px;
-}
-
-.avatar-grid {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-}
-
-.avatar-btn {
-  width: 44px;
-  height: 44px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
   background: transparent;
-  cursor: pointer;
-  transition: border-color 0.15s;
+  border-style: solid;
+  border-width: 2px;
+  overflow: hidden;
 }
 
-.avatar-btn img {
+.avatar-initials-fill {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  opacity: 0.2;
+}
+
+.avatar-initials-letter {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-md);
+  letter-spacing: 1px;
+}
+
+.initials-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  margin-top: 4px;
 }
 
-.avatar-btn:hover { border-color: var(--terracotta); }
-.avatar-btn.selected { border-color: var(--terracotta-deep); border-width: 2px; }
-.avatar-btn:disabled { opacity: 0.5; cursor: default; }
+.initials-picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
 
-.avatar-error { font-size: var(--text-xs); color: var(--clay-deep); }
+.initials-input {
+  width: 64px;
+  text-align: center;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  letter-spacing: 2px;
+  font-size: var(--text-sm);
+  padding: 4px 6px;
+  height: 30px;
+}
+
+.initials-color-grid {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.initials-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.initials-color-swatch:hover { transform: scale(1.08); }
+
+.initials-color-swatch.selected {
+  border-color: var(--charcoal);
+  box-shadow: 0 0 0 2px var(--gold-tint-soft);
+}
+
+.initials-apply-btn,
+.initials-clear-btn {
+  font-size: var(--text-xs);
+  padding: 2px 10px;
+  height: 30px;
+  min-height: 30px;
+  letter-spacing: 0.5px;
+}
+
+.initials-apply-btn {
+  border-color: var(--gold-deep);
+  color: #fff;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+}
+.initials-apply-btn:hover:not(:disabled) { filter: brightness(1.06); }
+
+.initials-clear-btn {
+  border-color: var(--line);
+  color: var(--charcoal-soft);
+}
+.initials-clear-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
 
 .profile-info {
   display: flex;

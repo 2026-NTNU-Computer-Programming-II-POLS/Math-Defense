@@ -31,7 +31,6 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     player_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     role: Mapped[str] = mapped_column(
         Enum("admin", "teacher", "student", name="user_role", create_type=False),
         nullable=False,

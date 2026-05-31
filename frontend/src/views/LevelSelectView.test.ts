@@ -40,7 +40,6 @@ function makeUser(iaUnlockEarned: boolean) {
     email: 'u1@test.local',
     player_name: 'u1',
     role: 'student' as const,
-    avatar_url: null,
     ia_unlock_earned: iaUnlockEarned,
     ia_recent_accuracy: 0,
   }
@@ -64,7 +63,6 @@ describe('LevelSelectView.vue — Star-5 unlock gate', () => {
       email: 'u1@test.local',
       player_name: 'u1',
       role: 'student',
-      avatar_url: null,
       ia_unlock_earned: false,
     })
   })
@@ -109,7 +107,6 @@ describe('LevelSelectView.vue — Star-5 unlock gate', () => {
       email: 'u1@test.local',
       player_name: 'u1',
       role: 'student',
-      avatar_url: null,
       ia_unlock_earned: true,
     })
     const auth = useAuthStore()

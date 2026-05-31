@@ -17,7 +17,6 @@ erDiagram
         string  username            "UNIQUE, nullable"
         string  email           UK  "NOT NULL"
         string  player_name         "NOT NULL"
-        string  avatar_url          "nullable"
         string  role                "enum: admin|teacher|student, DEFAULT student"
         boolean is_active           "DEFAULT true"
         string  password_hash       "NOT NULL"
@@ -365,7 +364,6 @@ Central identity table. Stores authentication credentials, MFA state, and profil
 | `username` | `String(50)` | YES | UNIQUE |
 | `email` | `String(255)` | NO | UNIQUE |
 | `player_name` | `String(50)` | NO | — |
-| `avatar_url` | `String(500)` | YES | — |
 | `role` | `Enum` | NO | `admin \| teacher \| student`; DEFAULT `student` |
 | `is_active` | `Boolean` | NO | DEFAULT `true` |
 | `password_hash` | `String(255)` | NO | — |

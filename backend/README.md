@@ -109,7 +109,7 @@ backend/
 │   │       └── email_verification_repository.py  One-use email verification token store
 │   │
 │   ├── models/                    SQLAlchemy ORM models
-│   │   ├── user.py                User (email, player_name, avatar_url, role, is_active, totp_*, ia_recent_accuracy, password_version, endpoint_marker_style/custom_dataurl/hit_fx)
+│   │   ├── user.py                User (email, player_name, role, is_active, totp_*, ia_recent_accuracy, password_version, endpoint_marker_style/custom_dataurl/hit_fx)
 │   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields, reflection_text, practice_mode, is_preview, rng_seed, replay_version, challenge_id)
 │   │   ├── leaderboard.py         LeaderboardEntry (unique session_id; user_id nullable via SET NULL; challenge_id nullable)
 │   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline + lockout_count for backoff)
@@ -138,7 +138,7 @@ backend/
 │   │   ├── replay.py · season.py · study.py · territory.py
 │   │
 │   ├── routers/                   HTTP adapters — thin controllers; error translation lives in main.py
-│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile/{name,avatar,endpoint-marker} / verify-email / mfa/*)
+│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile/{name,endpoint-marker} / verify-email / mfa/*)
 │   │   ├── game_session.py        /api/sessions (CRUD + /reflection)
 │   │   ├── leaderboard.py         /api/leaderboard (+ /me for personal timeline)
 │   │   ├── achievement.py         /api/achievements + GET /api/seasons (sibling seasons_router)
@@ -192,7 +192,6 @@ backend/
 │   ├── test_class.py                      — class CRUD, join, rename, student management
 │   ├── test_class_extensions.py           — co-teachers, groups, pending invites
 │   ├── test_territory.py                  — activity lifecycle, seize/counter-seize, cap, settlement
-│   ├── test_avatar_parity.py              — backend ↔ frontend avatar whitelist parity
 │   ├── test_endpoint_marker.py            — endpoint-marker prefs: schema + aggregate (magic-byte / PNG-dimension checks) + route round-trip + FE/BE parity
 │   ├── test_q_matrix.py                   — Q-matrix lookup + competency mapping
 │   ├── test_competency_estimator.py       — Beta posterior update (Bayesian stealth assessment)
@@ -228,7 +227,7 @@ Pure Python — no SQLAlchemy, no FastAPI, no Pydantic.
 
 Use-case orchestration. One method per user intent. Services depend on the `UnitOfWork` protocol declared in `application/ports.py`, never directly on SQLAlchemy.
 
-- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / verify_email / resend_verification_email / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_avatar / update_endpoint_marker`.
+- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / verify_email / resend_verification_email / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_endpoint_marker`.
 - **`SessionApplicationService`** — `create_session` (abandons stale sessions >2h and any existing active one, with one IntegrityError retry against the partial-unique index), `get_active_for_user`, `update_session`, `abandon_session`, `end_session` (transitions to COMPLETED and dispatches `SessionCompleted` through the event bus), `attach_reflection`, `has_correct_ia_session`.
 - **`SessionEventBus`** (in `session_event_handlers.py`) — dispatches `SessionCompleted` to three independent handlers, each in its own UoW so a downstream failure cannot roll back the durable session row:
   1. `LeaderboardInsertHandler` — idempotent insert (skipped when `practice_mode` or `is_preview` is true); `ConstraintViolationError` on the unique session-id constraint is the expected duplicate-delivery outcome.
@@ -295,7 +294,6 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 | POST | `/api/auth/change-password` | 5/min | Verify current password, set new one, bump `password_version`, clear cookies |
 | GET | `/api/auth/me` | 30/min | Current user + IA unlock state + rolling IA accuracy |
 | PUT | `/api/auth/profile/name` | 10/min | Update `player_name` |
-| PUT | `/api/auth/profile/avatar` | 10/min | Update `avatar_url` (whitelist-checked) |
 | PUT | `/api/auth/profile/endpoint-marker` | 10/min | Update endpoint-marker prefs (`style` ∈ star/gorilla/custom, optional `custom_dataurl` PNG/JPEG, `hit_fx` ∈ random/fragments/crying/angry); aggregate re-validates magic bytes + PNG dimensions |
 | GET | `/api/auth/verify-email?token=` | 10/min | One-use email verification |
 | POST | `/api/auth/resend-verification` | 3/min | Re-issue verification email |
@@ -477,7 +475,6 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `username` | String(50) | Nullable, unique (legacy; primary identity is `email`) |
 | `email` | String(255) | Unique, not null — primary login identifier |
 | `player_name` | String(50) | Display name shown on leaderboard |
-| `avatar_url` | String(500) | Nullable; path to one of the preset SVG avatars |
 | `role` | Enum | `admin` / `teacher` / `student`; default `student` |
 | `is_active` | Boolean | Soft-ban flag; admin-controllable via `PATCH /api/admin/users/{id}/active` |
 | `password_hash` | String(255) | bcrypt hash |
@@ -648,7 +645,7 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter), keyed by client IP.
 | `POST /auth/refresh` | 30/min |
 | `POST /auth/change-password` | 5/min |
 | `GET /auth/me` | 30/min |
-| `PUT /auth/profile/name`, `PUT /auth/profile/avatar`, `PUT /auth/profile/endpoint-marker` | 10/min |
+| `PUT /auth/profile/name`, `PUT /auth/profile/endpoint-marker` | 10/min |
 | `GET /auth/verify-email` | 10/min |
 | `POST /auth/resend-verification` | 3/min |
 | `POST /auth/mfa/setup`, `/mfa/confirm`, `/mfa/disable` | 5/min |

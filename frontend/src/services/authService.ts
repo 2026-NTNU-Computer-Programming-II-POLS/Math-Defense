@@ -8,7 +8,6 @@ export interface TokenResponse {
   email?: string
   player_name?: string
   role?: string
-  avatar_url?: string | null
   mfa_required?: boolean
   mfa_token?: string | null
 }
@@ -22,7 +21,6 @@ export interface MeResponse {
   email: string
   player_name: string
   role: string
-  avatar_url: string | null
   is_email_verified?: boolean
   mfa_enabled?: boolean
   ia_unlock_earned?: boolean
@@ -64,9 +62,6 @@ export const authService = {
   },
   updatePlayerName(playerName: string) {
     return api.put<MeResponse>('/api/auth/profile/name', { player_name: playerName })
-  },
-  updateAvatar(avatarUrl: string | null) {
-    return api.put<MeResponse>('/api/auth/profile/avatar', { avatar_url: avatarUrl })
   },
   updateEndpointMarker(payload: EndpointMarkerUpdate, opts: ApiOptions = {}) {
     // signal is threaded through so ProfileView's rapid-change abort cancels

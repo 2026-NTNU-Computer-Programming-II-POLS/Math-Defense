@@ -20,7 +20,6 @@ export interface User {
   email: string
   player_name: string
   role: UserRole
-  avatar_url: string | null
   ia_unlock_earned: boolean
   // Rolling fraction (0.0–1.0) of the last 10 completed sessions whose IA
   // was answered correctly. Read at level start by the path renderer to
@@ -34,7 +33,6 @@ function mapMeResponseToUser(res: MeResponse): User {
     email: res.email,
     player_name: res.player_name,
     role: res.role as UserRole,
-    avatar_url: res.avatar_url ?? null,
     ia_unlock_earned: res.ia_unlock_earned ?? false,
     ia_recent_accuracy: res.ia_recent_accuracy ?? 0,
   }
@@ -184,11 +182,6 @@ export const useAuthStore = defineStore('auth', () => {
     if (user.value) user.value = { ...user.value, player_name: playerName }
   }
 
-  async function updateAvatar(avatarUrl: string | null): Promise<void> {
-    await authService.updateAvatar(avatarUrl)
-    if (user.value) user.value = { ...user.value, avatar_url: avatarUrl }
-  }
-
   async function logout(): Promise<void> {
     // F-BUG-7: capture the user-id BEFORE clearAuth so we can scrub the
     // per-user recommendation-dismiss key. Without this a shared lab
@@ -245,7 +238,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     init,
     refreshProfile,
-    updateAvatar,
     updatePlayerName,
     stopProbe: probe.stop,
   }

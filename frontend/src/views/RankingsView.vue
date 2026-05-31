@@ -361,7 +361,7 @@ onBeforeUnmount(cancelInflight)
       <button
         v-for="lv in [undefined, 1, 2, 3, 4]"
         :key="lv ?? 'all'"
-        :class="['btn', 'tab-btn', { active: personalLevel === lv }]"
+        :class="['btn', 'filter-btn', { active: personalLevel === lv }]"
         @click="personalLevel = lv"
       >
         {{ lv === undefined ? 'All' : `Lv.${lv}` }}
@@ -562,6 +562,27 @@ onBeforeUnmount(cancelInflight)
 .tab-btn:hover { background: transparent; color: var(--terracotta-deep); border-color: transparent; }
 .tab-btn.active { color: var(--terracotta-deep); border-bottom-color: var(--terracotta); font-weight: 600; }
 .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Star-rating filter pills — kept scoped (not promoted to global.css) so
+   the change has no spillover onto other filter rows. Mirrors the leaderboard's
+   level-filter style; the duplication is contained to these two views. */
+.filter-btn {
+  border-radius: 999px;
+  padding: 4px 12px;
+  min-height: 30px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 1px;
+  background: rgba(79, 74, 72, 0.07);
+  color: var(--charcoal-soft);
+  border: 1px solid rgba(79, 74, 72, 0.16);
+}
+.filter-btn.active {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%);
+  color: #fff;
+  border-color: var(--gold-deep);
+  font-weight: 700;
+}
 
 .rk-selector { max-width: 300px; }
 

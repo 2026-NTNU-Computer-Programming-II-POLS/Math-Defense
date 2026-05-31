@@ -181,8 +181,23 @@ onMounted(async () => {
 .ach-count { color: var(--gold-deep); font-weight: 700; }
 .ach-points { color: var(--charcoal-soft); }
 
-.ach-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+/* Distribute chips evenly across the row's full width: nowrap keeps everything
+   on one line, space-between turns leftover slack into uniform inter-chip
+   gaps so the first chip sits flush-left and the last sits flush-right with
+   .ach-grid below. `gap` is the minimum spacing if the row ever runs tight. */
+.ach-filters { display: flex; gap: 4px; flex-wrap: nowrap; justify-content: space-between; }
 .filter-btn.active { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%); color: #fff; border-color: var(--gold-deep); }
+/* Mockup chip style: pill (from shared primitive) + soft inset shadow gives
+   inactive chips a recessed feel; active chips get the shared gold gradient
+   plus a slight outer raise. Padding is sized so all eight categories (+ All,
+   + Seasonal) still fit on the single row inside .ach-grid's container. */
+.ach-filters .filter-btn {
+  padding: 6px 14px;
+  min-height: 32px;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 2px var(--line);
+}
+.ach-filters .filter-btn.active { box-shadow: var(--shadow-sm); }
 
 .ach-loading, .ach-error { text-align: center; color: var(--charcoal-soft); padding: 32px; }
 .ach-error { color: var(--clay-deep); }
@@ -204,8 +219,8 @@ onMounted(async () => {
 }
 
 .ach-card.unlocked {
-  border-color: var(--terracotta);
-  background: linear-gradient(135deg, rgba(168, 188, 203, 0.24), #fff);
+  border-color: var(--gold);
+  background: linear-gradient(135deg, var(--gold-tint-select), #fff);
 }
 
 .ach-card.locked { opacity: 0.5; }
@@ -220,7 +235,7 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.ach-card.unlocked .ach-icon { color: var(--terracotta-deep); }
+.ach-card.unlocked .ach-icon { color: var(--gold-deep); }
 .ach-card.locked .ach-icon { color: var(--charcoal-soft); }
 
 .ach-info { flex: 1; min-width: 0; }
