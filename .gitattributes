@@ -1,0 +1,7 @@
+# Shell scripts must keep LF line endings regardless of the cloning platform's
+# core.autocrlf setting. scripts/pg_init_roles.sh and scripts/pg_backup.sh are
+# bind-mounted straight into Linux containers (postgres / db-backup) by
+# docker-compose.prod.yml; a CRLF here turns the `#!/bin/sh` shebang into
+# `#!/bin/sh\r` and the container fails with a "bad interpreter" error, so the
+# least-privilege role and nightly backup would silently never run.
+*.sh text eol=lf
