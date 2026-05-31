@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 16" width="440" height="16" role="img" aria-label="">
+  <defs>
+    <style>
+      .sheen { animation: slide 3.8s ease-in-out infinite; }
+      @keyframes slide {
+        0%   { transform: translateX(-140px); }
+        100% { transform: translateX(440px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .sheen { animation: none; opacity: 0; }
+      }
+    </style>
+    <!-- project primary: Morandi light blue (terracotta token family) -->
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"   stop-color="#6F8AA1"/>
+      <stop offset=".5"  stop-color="#A8BCCB"/>
+      <stop offset="1"   stop-color="#6F8AA1"/>
+    </linearGradient>
+    <linearGradient id="sheenGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"  stop-color="#E8EFF5" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#E8EFF5" stop-opacity=".85"/>
+      <stop offset="1"  stop-color="#E8EFF5" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-10%" y="-200%" width="120%" height="500%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="round"><rect x="0" y="5" width="440" height="6" rx="3"/></clipPath>
+  </defs>
+
+  <rect x="0" y="5" width="440" height="6" rx="3" fill="url(#bar)" filter="url(#glow)"/>
+  <g clip-path="url(#round)">
+    <rect class="sheen" x="0" y="5" width="120" height="6" fill="url(#sheenGrad)"/>
+  </g>
+</svg>
