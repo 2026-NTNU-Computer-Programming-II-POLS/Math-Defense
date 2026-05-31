@@ -1,4 +1,4 @@
-"""Seed dev accounts (teacher + student) for local development.
+"""Seed dev accounts (teacher + student + admin) for local development.
 
 Gated on SEED_DEMO_USER=true so production deployments don't silently ship
 well-known public credentials. When the flag is off (default), this is a
@@ -196,7 +196,7 @@ def ensure_admin_account(db: Session) -> None:
 
 
 def ensure_dev_accounts(db: Session) -> None:
-    """Create the dev teacher + student accounts if SEED_DEMO_USER is enabled.
+    """Create the dev teacher + student + admin accounts if SEED_DEMO_USER is enabled.
 
     Routes through ``User.create`` + ``SqlAlchemyUserRepository.save`` rather
     than a raw INSERT so the aggregate's invariants (id assignment, defaulted

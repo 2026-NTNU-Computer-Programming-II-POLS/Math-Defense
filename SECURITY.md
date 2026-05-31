@@ -185,7 +185,8 @@ The following values must be set via environment variables or an `.env` file and
 | `CORS_ORIGINS` | One or more valid HTTP/HTTPS origins |
 | `FRONTEND_URL` | Absolute `http://` or `https://` URL used in outbound email links |
 | `POSTGRES_PASSWORD` | Used by Docker Compose for the admin role; must be a strong random value |
-| `POSTGRES_APP_PASSWORD` | Used by `pg_init_roles.sh` to create the least-privilege `mathdefense_app` role on first DB init; required even when not yet wired into a runtime `DATABASE_URL_APP` |
+| `POSTGRES_APP_PASSWORD` | Used by `pg_init_roles.sh` to create the least-privilege `mathdefense_app` role on first DB init; consumed at runtime only when `DATABASE_URL_APP` is also set |
+| `DATABASE_URL_APP` | Optional. When set, the runtime engine connects with the DML-only `mathdefense_app` role while Alembic keeps migrating as the admin `DATABASE_URL`. Same `postgresql+psycopg` scheme + `changeme` rejection as `DATABASE_URL`. Unset/blank → runtime also uses `DATABASE_URL` |
 | `TOTP_ENCRYPTION_KEY` | Fernet key (32 url-safe base64-encoded bytes) encrypting TOTP secrets at rest. Validated by `verify_key_configured()` at startup; boot fails fast if missing or malformed |
 | `PROXY_MODE` / `TRUSTED_PROXY_IPS` | When the backend runs behind nginx, set `PROXY_MODE=true` and list the proxy's IPs/CIDR blocks (e.g. `172.16.0.0/12`) so the rate limiter keys on the real client IP via `X-Forwarded-For` |
 
@@ -268,6 +269,7 @@ Before deploying to a publicly accessible environment:
 - [ ] Generate a strong, random `SECRET_KEY` (at least 32 characters of random bytes).
 - [ ] Set a strong, random `POSTGRES_PASSWORD` and confirm it is reflected in `DATABASE_URL`.
 - [ ] Set a strong, random `POSTGRES_APP_PASSWORD` for the least-privilege application role created by `pg_init_roles.sh`.
+- [ ] (Optional, recommended) Set `DATABASE_URL_APP` to the `mathdefense_app` role so runtime queries run with DML-only privileges; leave it unset to run runtime through the admin `DATABASE_URL`.
 - [ ] Generate `TOTP_ENCRYPTION_KEY` with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`; back it up — losing it makes every enrolled TOTP secret unrecoverable.
 - [ ] If deploying behind nginx (the default production topology), set `PROXY_MODE=true` and populate `TRUSTED_PROXY_IPS` with the proxy's IP or CIDR so per-IP rate limits key on the real client address.
 - [ ] Set `CORS_ORIGINS` to only the origins your frontend is served from, and keep `CORS_ORIGIN_1` / `CORS_ORIGIN_2` (consumed by nginx via `envsubst`) in sync.

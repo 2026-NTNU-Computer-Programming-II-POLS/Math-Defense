@@ -211,7 +211,12 @@ Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirror
 ### Option A — Docker (recommended)
 
 ```bash
-cp .env.example .env          # fill in SECRET_KEY (≥32 chars)
+cp .env.example .env          # then edit .env before booting:
+                              #   - SECRET_KEY  (≥32 chars)
+                              #   - replace the 'changeme' password in both
+                              #     DATABASE_URL and POSTGRES_PASSWORD
+                              #   - TOTP_ENCRYPTION_KEY (Fernet key; required)
+                              # The backend refuses to start until all are set.
 docker-compose up
 ```
 
@@ -261,11 +266,15 @@ Create `.env` at the project root (see `.env.example`):
 | `POSTGRES_PASSWORD` | Yes | Password for the `postgres` service (matches the password embedded in `DATABASE_URL`) |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
 | `FRONTEND_URL` | Yes | Base URL used in outbound emails (verification links), e.g. `http://localhost:5173` |
-| `POSTGRES_APP_PASSWORD` | No | M-13 least-privilege app role password; consumed by `pg_init_roles.sh` on first DB init. Required only if you set a second `DATABASE_URL_APP` for runtime queries. |
+| `POSTGRES_APP_PASSWORD` | No | M-13 least-privilege app role password; consumed by `pg_init_roles.sh` on first DB init to create the DML-only `mathdefense_app` role. Required only if you set `DATABASE_URL_APP` for runtime queries. |
+| `DATABASE_URL_APP` | No | M-13 optional least-privilege runtime URL. When set, the runtime engine connects with the `mathdefense_app` role (password = `POSTGRES_APP_PASSWORD`) while Alembic keeps migrating as the admin `DATABASE_URL`. Unset/blank → runtime also uses `DATABASE_URL`. |
 | `PROXY_MODE` | No | Default `false`. Set `true` when running behind nginx/another proxy so rate limits key on `X-Forwarded-For` instead of the proxy IP. |
 | `TRUSTED_PROXY_IPS` | No | Comma-separated IPs / CIDRs whose `X-Forwarded-For` the backend trusts when `PROXY_MODE=true`. |
 | `TOTP_ENCRYPTION_KEY` | Yes | AES-256 Fernet key used to encrypt TOTP secrets at rest. Required at startup unconditionally (`lifespan` calls `verify_key_configured()` before the first request), so a missing key aborts boot regardless of whether MFA is in use. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
-| `SEED_DEMO_USER` | No | Default `false`. Set `true` to seed the dev teacher + student accounts (see `backend/app/seed.py`); the same credentials appear in the AuthView UI when the frontend is built in dev mode. A localhost-only guard refuses to seed unless `FRONTEND_URL` points at a recognised local-dev host. |
+| `SEED_DEMO_USER` | No | Default `false`. Set `true` to seed the dev teacher + student + admin accounts (see `backend/app/seed.py`); the same credentials appear in the AuthView UI when the frontend is built in dev mode. A localhost-only guard refuses to seed unless `FRONTEND_URL` points at a recognised local-dev host. |
+| `SEED_ADMIN_EMAIL` | No | Bootstrap admin e-mail. Set together with `SEED_ADMIN_PASSWORD` to seed the first admin on initial boot (the supported way to provision the production admin). Omitting either is a no-op. Create-once: an existing e-mail is never modified. |
+| `SEED_ADMIN_PASSWORD` | No | Bootstrap admin password (stored bcrypt-hashed). May be blanked after first boot — an in-app password change is preserved. Generate with `python -c "import secrets; print(secrets.token_urlsafe(24))"`. |
+| `SEED_ADMIN_NAME` | No | Display name for the bootstrapped admin. Default `Admin`. |
 | `COOKIE_SECURE` | No | Default `true`; only `false` is honoured under CI/pytest (see `reject_insecure_cookie_outside_tests` in `backend/app/config.py`) |
 
 > The backend refuses to start when `DATABASE_URL` embeds the literal password `changeme` — replace it in `.env` before first boot.
