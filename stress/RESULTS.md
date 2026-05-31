@@ -7,6 +7,21 @@ scenario stresses and the important "run the load generator on a separate
 machine" caveat.
 <!-- STRESS-RESULTS:START -->
 
+## 2026-05-31 18:20:33
+
+- Mode: **full** | host k6 -> dockerized backend (co-located: latency is a floor, not the app ceiling)
+- Full logs: `stress/results/2026-05-31_180157/`
+
+| Test | req/s | p95 (overall) | Errors | Checks | Result |
+|---|---|---|---|---|---|
+| 01 read-heavy | 159.199008 | 247.06ms | 0.00% | 100.00% | PASS |
+| 02 auth-flow | 35.592958 | 447.85ms | 0.00% | 100.00% | PASS |
+| 03 session-lifecycle | 70.664349 | 119ms | 0.00% | 100.00% | PASS |
+| 05 login-spike | 39.632222 | 4.88s | 0.00% | 100.00% | PASS |
+| 04 peak-100 | 204.226398 | 653.41ms | 0.00% | 100.00% | PASS |
+
+**Compute bench:** curve_evaluate 7.29M ops/s | compute_total_score 4.29M ops/s | hotpath 32t-x-300e p95=1.24ms  p99=1.45ms  max=1.76ms  over-budget=0/600
+
 ## 2026-05-31 17:38:04
 
 - Mode: **quick (smoke)** | host k6 -> dockerized backend (co-located: latency is a floor, not the app ceiling)
@@ -21,21 +36,6 @@ machine" caveat.
 | 04 peak-100 | 75.679706 | 45.36ms | 0.00% | 100.00% | PASS |
 
 **Compute bench:** curve_evaluate 5.25M ops/s | compute_total_score 2.88M ops/s | hotpath 32t-x-300e p95=2.09ms  p99=2.77ms  max=3.96ms  over-budget=0/600
-
-## 2026-05-31 17:36:21
-
-- Mode: **quick (smoke)** | host k6 -> dockerized backend (co-located: latency is a floor, not the app ceiling)
-- Full logs: `stress/results/2026-05-31_173447/`
-
-| Test | req/s | p95 (overall) | Errors | Checks | Result |
-|---|---|---|---|---|---|
-| 01 read-heavy | 67.687095 | 38.58ms | 0.00% | 100.00% | PASS |
-| 02 auth-flow | 35.670864 | 353.79ms | 0.00% | 100.00% | PASS |
-| 03 session-lifecycle | 43.353173 | 63.18ms | 0.00% | 100.00% | PASS |
-| 05 login-spike | 44.102814 | 519.5ms | 0.00% | 100.00% | PASS |
-| 04 peak-100 | 75.483834 | 51.02ms | 0.00% | 100.00% | PASS |
-
-**Compute bench:** curve_evaluate 6.53M ops/s | compute_total_score 3.37M ops/s | hotpath 32t-x-300e p95=2.10ms  p99=2.81ms  max=3.43ms  over-budget=0/600
 
 <!-- STRESS-RESULTS:END -->
 
