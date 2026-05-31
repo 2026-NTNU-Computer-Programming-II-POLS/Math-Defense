@@ -58,6 +58,12 @@ _DEV_ACCOUNTS: tuple[_DevAccount, ...] = (
         role=Role.STUDENT,
         password="StudentDev2026!",
     ),
+    _DevAccount(
+        email="admin@mathdefense.local",
+        player_name="Admin",
+        role=Role.ADMIN,
+        password="AdminDev2026!",
+    ),
 )
 
 

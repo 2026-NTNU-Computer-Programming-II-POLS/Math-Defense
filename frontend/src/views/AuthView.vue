@@ -21,6 +21,7 @@ const DEV_ACCOUNTS: readonly DevAccount[] = import.meta.env.DEV
   ? [
       { label: 'Teacher', email: 'teacher@mathdefense.local', password: 'TeacherDev2026!' },
       { label: 'Student', email: 'student@mathdefense.local', password: 'StudentDev2026!' },
+      { label: 'Admin', email: 'admin@mathdefense.local', password: 'AdminDev2026!' },
     ]
   : []
 
