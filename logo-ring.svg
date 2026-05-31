@@ -18,11 +18,18 @@
       <stop offset=".5" stop-color="#ADA284"/>
       <stop offset="1"  stop-color="#7A7156"/>
     </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C6D2DC"/>
+      <stop offset="1" stop-color="#A8BCCB"/>
+    </linearGradient>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="3" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
+
+  <!-- project-primary light-blue background -->
+  <rect x="0" y="0" width="420" height="420" rx="36" fill="url(#bg)"/>
 
   <!-- outer rotating gold tick ring -->
   <g class="spin" filter="url(#glow)">
