@@ -182,7 +182,7 @@ onMounted(async () => {
 .ach-points { color: var(--charcoal-soft); }
 
 .ach-filters { display: flex; gap: 4px; flex-wrap: wrap; }
-.filter-btn.active { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-soft) 100%); color: #fff; border-color: var(--gold-deep); }
+/* `.filter-btn` (active state included) is a shared primitive in global.css. */
 
 .ach-loading, .ach-error { text-align: center; color: var(--charcoal-soft); padding: 32px; }
 .ach-error { color: var(--clay-deep); }
