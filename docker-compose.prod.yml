@@ -56,6 +56,14 @@ services:
       # you customise docker-compose networking.
       PROXY_MODE: "true"
       TRUSTED_PROXY_IPS: "172.16.0.0/12"
+      # Bootstrap admin (create-once). Set SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD
+      # in the deploy environment (host env or `docker compose --env-file`) to
+      # seed the first admin on initial boot. Idempotent: an existing email is
+      # never modified, so a UI-side password change is preserved and you may
+      # blank SEED_ADMIN_PASSWORD after first boot. Empty (the default) = no-op.
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
     expose:
       - "8000"
     depends_on:
