@@ -542,7 +542,9 @@ python -m venv .venv
 # Windows PowerShell: .\.venv\Scripts\Activate.ps1
 # macOS/Linux:        source .venv/bin/activate
 pip install -r requirements-dev.txt    # includes pytest; use requirements.txt for prod
-cp ../.env.example ../.env             # then fill in SECRET_KEY, DATABASE_URL, POSTGRES_PASSWORD, TOTP_ENCRYPTION_KEY
+cp ../.env.example .env                # creates backend/.env — uvicorn resolves env_file=".env" from backend/ cwd
+# Edit .env: change DATABASE_URL host from 'postgres' to 'localhost' for non-Docker PG
+# then fill in SECRET_KEY, POSTGRES_PASSWORD, TOTP_ENCRYPTION_KEY
 # Alembic upgrade head runs automatically from FastAPI lifespan on first boot.
 # To run migrations manually (e.g. before launching workers):
 #   alembic upgrade head
@@ -591,6 +593,9 @@ docker-compose up backend        # from project root
 | `TRUSTED_PROXY_IPS` | No | Comma-separated IP/CIDR list whose `X-Forwarded-For` the backend trusts (consulted when `PROXY_MODE=true`). |
 | `TOTP_ENCRYPTION_KEY` | Yes | AES-256 Fernet key encrypting TOTP secrets at rest. Required at startup unconditionally — `lifespan` calls `verify_key_configured()` before the first request — so a missing/malformed key fails loudly instead of surfacing as a 500 on the first MFA-related request. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
 | `SEED_DEMO_USER` | No | Default `false`. Set `true` to seed the dev teacher + student + admin accounts on startup (see `backend/app/seed.py`); the credentials are mirrored in `frontend/src/views/AuthView.vue`'s dev hint. A localhost-only guard refuses to seed unless `FRONTEND_URL` resolves to a recognised local-dev host. |
+| `SEED_ADMIN_EMAIL` | No | Bootstrap admin e-mail. Set together with `SEED_ADMIN_PASSWORD` to seed the first admin account on startup. Omitting either is a no-op. |
+| `SEED_ADMIN_PASSWORD` | No | Bootstrap admin password (stored as a bcrypt hash). Create-once semantics: if the e-mail already exists the row is never modified, so an in-app password change is preserved. You may blank this after first boot. Generate with `python -c "import secrets; print(secrets.token_urlsafe(24))"`. |
+| `SEED_ADMIN_NAME` | No | Display name for the bootstrapped admin account. Default `Admin`. |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` | No | SQLAlchemy pool tuning. Defaults: `10` / `20` / `3600` s. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | No | Optional; when `SMTP_HOST` is empty `email_service` becomes a no-op. |
 | `SESSION_STALE_CUTOFF_HOURS` | No | Default `2.0`; active sessions older than this are auto-abandoned |
