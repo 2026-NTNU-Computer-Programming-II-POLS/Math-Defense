@@ -1,6 +1,7 @@
 import ipaddress
 import logging
 import os
+import sys
 import time
 from collections import deque
 from threading import Lock
@@ -92,6 +93,31 @@ def _get_real_client_ip(request: Request) -> str:
 
 
 limiter = Limiter(key_func=_get_real_client_ip)
+
+
+def _is_test_env() -> bool:
+    # Mirror app.config._is_test_env without importing config (keeps the
+    # limiter import-light and test-isolated).
+    return bool(os.environ.get("CI")) or "pytest" in sys.modules
+
+
+# Stress/load-testing escape hatch. slowapi honours `limiter.enabled`; flipping
+# it off lifts every @limiter.limit ceiling process-wide so a load test can
+# probe raw capacity instead of measuring the throttle. Gated behind BOTH an
+# explicit env var AND the test/CI harness so a production misconfiguration
+# can never silently disable rate limiting — same fail-closed philosophy as
+# CSRF_ENABLED / COOKIE_SECURE in app.config. See stress/README.md.
+if os.getenv("RATELIMIT_ENABLED", "true").strip().lower() in ("false", "0", "no"):
+    if _is_test_env():
+        limiter.enabled = False
+        _logger.warning(
+            "Rate limiting DISABLED via RATELIMIT_ENABLED=false (test/CI env only)."
+        )
+    else:
+        _logger.error(
+            "RATELIMIT_ENABLED=false ignored: only honoured under the test/CI "
+            "harness (set CI=true). Rate limiting stays ON."
+        )
 
 
 # Per-email login throttle (B-SEC-12). The per-IP @limiter.limit on /login
