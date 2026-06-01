@@ -130,7 +130,7 @@ flowchart LR
         AuthAgg["auth/<br/>repository (cross-cutting auth protocols)"]
         Scoring["scoring/<br/>score_calculator (S1 / S2 / K / TotalScore)"]
         VO["Top-level: value_objects.py<br/>SessionStatus · Level · Score · GameResult"]
-        Errors["Top-level: errors.py<br/>(status_code attribute)"]
+        Errors["Top-level: errors.py<br/>(HTTP-free; mapped by http_status_map.py)"]
         Constraints["Top-level: constraints.py<br/>numeric bounds"]
     end
 
@@ -174,7 +174,7 @@ flowchart LR
 - **Domain** has zero imports from FastAPI, Pydantic, or SQLAlchemy. Each aggregate lives in its own folder under `backend/app/domain/<aggregate>/` containing `aggregate.py` (root + entities), `policy.py`/`definitions.py`/`tree.py` (pure rules), and `repository.py` (the repository protocol). Cross-aggregate primitives live at the root: `value_objects.py`, `constraints.py`, `errors.py`. Repository interfaces are `typing.Protocol`s.
 - **Application** orchestrates use cases and accepts repository protocols via constructor (DI). Mappers convert aggregates to Pydantic DTOs at the boundary.
 - **Infrastructure** is the only place SQLAlchemy lives. Repositories implement the domain protocols. `SqlAlchemyUnitOfWork` is a context manager with explicit `.commit()` and auto-rollback.
-- **Routers** are thin: validate input, call one application method, return DTO. Domain errors carry `status_code`; a global exception handler maps them to HTTP responses (so routers never translate exceptions).
+- **Routers** are thin: validate input, call one application method, return DTO. The domain layer is HTTP-free — domain errors carry **no** `status_code`; a single mapping table (`app/http_status_map.py`) translates each `DomainError` class to a status code, and a global exception handler (`app/main.py::_domain_error_handler`) applies it (so routers never translate exceptions).
 
 ### 3.2 Bounded Contexts and Aggregates
 
@@ -243,7 +243,7 @@ flowchart TB
 
 **Domain events (lite event sourcing)**
 
-`GameSession` emits `SessionCreated`, `SessionUpdated`, `SessionCompleted`, `SessionAbandoned`. Within a single Unit of Work, `SessionApplicationService` consumes `SessionCompleted` to:
+`GameSession` emits `SessionCreated`, `SessionUpdated`, `SessionCompleted`, `SessionAbandoned`. After the session row itself is committed, `SessionApplicationService` dispatches `SessionCompleted` through `SessionEventBus` to a chain of **independent, post-commit handlers** (`application/session_event_handlers.py`) that:
 
 1. Create a `LeaderboardEntry` (idempotent via `UNIQUE(session_id)`).
 2. Run `AchievementApplicationService.evaluate_unlocks(...)` and award talent points.
@@ -251,7 +251,7 @@ flowchart TB
 4. Update `User.ia_recent_accuracy` (rolling 10-session fraction).
 5. Accumulate study dosage if user is enrolled.
 
-If any consumer fails, the UoW rolls back — leaderboard, achievements, and competency state stay consistent with session state.
+Each handler runs in **its own Unit of Work** and is isolated by a per-handler `try/except` in `SessionEventBus.dispatch` — a failure in one (or a bug) is logged and does **not** roll back the already-durable session row or suppress the other handlers. Atomicity is guaranteed only *within* `AchievementCheckHandler`: achievement-unlock rows and their Beta-Bernoulli evidence (steps 2–3) commit together in one UoW (the "H3" fix). The trade-off is a known durability gap — if the leaderboard insert fails it is logged with **no automatic retry** (a future outbox table would close this); the `UNIQUE(session_id)` constraint keeps any later retry idempotent.
 
 ### 3.3 Request Lifecycle (example: end-of-session POST)
 
@@ -851,7 +851,7 @@ flowchart LR
 - **Auth-store janitor** — 10-minute (600 s) purge of expired denylist rows and stale login-attempt rows (defined inline in `backend/app/main.py::_auth_store_janitor`).
 - **Spectate hub** — in-process pub/sub for `/api/sessions/{id}/spectate` WebSocket fan-out (bounded queue per subscriber).
 
-All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::lifespan`).
+The two poll jobs (territory settlement, auth-store janitor) are started as `asyncio` tasks inside the FastAPI lifespan (`backend/app/main.py::lifespan`). The spectate hub is **not** a lifespan task — it is an in-process pub/sub object instantiated on demand by the replay router.
 
 ---
 
@@ -880,9 +880,9 @@ All started inside the FastAPI lifespan as asyncio tasks (`backend/app/main.py::
 
 | Decision | Rationale |
 |---|---|
-| Domain errors carry HTTP `status_code` | Routers stay thin; one global exception handler maps to responses. |
+| Domain errors are HTTP-free; `app/http_status_map.py` maps each error class → status | Routers stay thin; one global exception handler applies the mapping. |
 | Repository **protocols** (not inheritance) | Domain free of ORM; in-memory test doubles are trivial. |
-| Lite event sourcing for sessions | `SessionCompleted` consumers (leaderboard, achievements, competency, study) participate in the same UoW so consistency is atomic. |
+| Lite event sourcing for sessions | `SessionCompleted` is dispatched **post-commit** to independent handlers, each in its own UoW and isolated by a per-handler `try/except`; only achievement-unlock + Beta-evidence commit atomically together (H3). Chosen for resilience over cross-handler atomicity — a failed leaderboard insert is logged, not retried (an outbox is future work), and `UNIQUE(session_id)` keeps retries idempotent. |
 | Append-only `session_events` | Replay and live spectate need a deterministic, immutable record. |
 | Partial unique index on active session | "At most one active session per user" without blocking completed rows. |
 | Rotating refresh tokens, hashed | Compromise window bounded; reuse of a `used` token is detectable. |
