@@ -83,8 +83,8 @@ describe('EndpointFXSystem', () => {
     game.eventBus.emit(Events.ENEMY_REACHED_ORIGIN, createMockEnemy())
     expect(effectsOf(system).length).toBe(1)
 
-    // 0.55s maxAge — one tick past it should drop the entry.
-    system.update(0.6, game)
+    // 1.1s maxAge — one tick past it should drop the entry.
+    system.update(1.2, game)
 
     expect(effectsOf(system).length).toBe(0)
   })

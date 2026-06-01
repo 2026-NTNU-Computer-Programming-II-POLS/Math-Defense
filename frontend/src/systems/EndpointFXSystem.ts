@@ -27,7 +27,10 @@ interface EndpointHitFx extends Effect {
   y: number
 }
 
-const HIT_FX_MAX_AGE = 0.55
+// Lifetime of the endpoint burst FX. The three draw routines are driven by
+// normalised progress (age / maxAge), so raising this slows/lingers the whole
+// animation rather than extending its spatial reach. Tune here only.
+const HIT_FX_MAX_AGE = 1.1
 const HIT_FX_KINDS: ReadonlyArray<HitFxKind> = ['fragments', 'crying', 'angry']
 
 export class EndpointFXSystem extends EffectLayer<EndpointHitFx> {

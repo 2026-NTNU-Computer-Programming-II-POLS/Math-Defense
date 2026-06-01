@@ -9,6 +9,10 @@ const PROJECTILE_MAX_AGE = 5
 // 60-fps tick rate so a full `ANIM.PROJECTILE_TRAIL`-second tail is preserved
 // without dropping samples (frame-rate aware trimming via age also runs).
 const PROJECTILE_HISTORY_MAX = Math.ceil(ANIM.PROJECTILE_TRAIL * 60) + 2
+// Screen-shake duration for an origin breach. Kept equal to the endpoint
+// burst FX lifetime (EndpointFXSystem.HIT_FX_MAX_AGE) so the shake and the
+// star-fragment burst settle together. Tune alongside that constant.
+const ENDPOINT_BREACH_SHAKE_DURATION = 1.1
 
 export class CombatSystem {
   private _unsubs: (() => void)[] = []
@@ -21,9 +25,12 @@ export class CombatSystem {
       }),
       // Visual Redesign Phase 1: trigger a one-shot screen shake when an
       // enemy reaches the goal. Origin breaches are the canonical "the
-      // player is losing" cue, so the shake is large and slow.
+      // player is losing" cue, so the shake is large and slow. Duration is
+      // inlined (not ANIM.SHAKE_BREACH) so it stays in sync with the endpoint
+      // burst lifetime (EndpointFXSystem HIT_FX_MAX_AGE) without lengthening
+      // the shared boss-death shake that also reads ANIM.SHAKE_BREACH.
       game.eventBus.on(Events.ENEMY_REACHED_ORIGIN, () => {
-        game.shake.shake(6, ANIM.SHAKE_BREACH)
+        game.shake.shake(6, ENDPOINT_BREACH_SHAKE_DURATION)
       }),
     )
   }

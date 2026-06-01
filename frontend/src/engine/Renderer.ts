@@ -555,7 +555,7 @@ export class Renderer {
     const eased = 1 - (1 - p) ** 4
     const fade = 1 - p
     const FRAGMENTS = 8
-    const reach = UNIT_PX * 1.6 * eased
+    const reach = UNIT_PX * 2.4 * eased
     const size = UNIT_PX * 0.22 * (1 - 0.4 * p)
     ctx.save()
     ctx.fillStyle = '#F6C944'
@@ -591,7 +591,7 @@ export class Renderer {
     const eased = 1 - (1 - p) ** 3
     const fade = 1 - p * p
     const COUNT = 3
-    const reach = UNIT_PX * 1.2 * eased
+    const reach = UNIT_PX * 1.8 * eased
     const drop = UNIT_PX * 0.9 * p * p
     const size = Math.round(UNIT_PX * 0.9)
     ctx.save()
@@ -617,7 +617,7 @@ export class Renderer {
     const eased = 1 - (1 - p) ** 4
     const fade = 1 - p
     const COUNT = 4
-    const reach = UNIT_PX * 1.3 * eased
+    const reach = UNIT_PX * 2.0 * eased
     const pulse = 1 + 0.3 * Math.sin(p * Math.PI * 4)
     const size = Math.round(UNIT_PX * 0.85 * pulse)
     ctx.save()
