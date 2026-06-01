@@ -351,7 +351,7 @@ A pure-TypeScript fallback in `frontend/src/engine/WasmBridge.ts` mirrors every 
 | **Domain** | Pure Python; no FastAPI / Pydantic / SQLAlchemy imports. Aggregates (`User`, `GameSession`, `LeaderboardEntry`, `Achievement`, `Talent`, `Class`, `Territory`, `Challenge`, `Season`), value objects (`SessionStatus`, `Level`, `Score`, `GameResult`), policies, repository protocols. |
 | **Application** | 13+ services orchestrating use cases (auth, session, leaderboard, achievement, talent, class, admin, territory, assessment, recommender, challenge, replay, study). Receives repositories through DI. `SessionEventBus` dispatches post-commit consumers (leaderboard, achievements, competency, study) in separate Units of Work. |
 | **Infrastructure** | SQLAlchemy repositories, `UnitOfWork` with explicit commit, login guard, token denylist, audit logger, email service, territory-settlement scheduler (5-minute job), in-process spectate hub, `wasm_runtime` singleton for FU-A score recompute. |
-| **HTTP** | Thin routers; domain errors carry `status_code`; a single global exception handler maps them to HTTP responses. |
+| **HTTP** | Thin routers; the domain layer is HTTP-free (errors carry no `status_code`) — a single mapping table (`app/http_status_map.py`) plus a global exception handler translate each domain error class to an HTTP response. |
 
 ---
 

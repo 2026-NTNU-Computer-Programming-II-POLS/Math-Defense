@@ -28,6 +28,20 @@ onBeforeUnmount(() => {
   _unsubClick = null
 })
 
+// A spell whose effect lingers (currently only Acceleration/haste) registers
+// an active buff under the SAME name via BuffSystem.applyExternalBuff. Match by
+// name so the spell cell can surface the live EFFECT time, distinct from the
+// recharge COOLDOWN — the two are independent timers (e.g. Acceleration's 8 s
+// effect vs its 25 s cooldown). `remainingTime` is the engine's live value
+// (BuffSystem ticks it during WAVE; gameStore mirrors the array every Nth
+// frame), so read it directly. Returns null when the spell has no active buff
+// (instant spells never register one).
+function liveSpellBuffRemaining(name: string): number | null {
+  const buff = g.activeBuffs.find((b) => b.name === name)
+  if (!buff) return null
+  return buff.remainingTime
+}
+
 const spells = computed(() =>
   SPELL_DEFS.map((s) => {
     const cd = g.spellCooldowns[s.id] ?? 0
@@ -35,6 +49,8 @@ const spells = computed(() =>
     // in-canvas VFX colour on `SpellDef.color` — the two concerns are tuned
     // against different backgrounds.
     const iconColor = getSpellIconDef(s.id).color
+    const buffRemaining = liveSpellBuffRemaining(s.name)
+    const buffActive = buffRemaining !== null && buffRemaining > 0
     return {
       ...s,
       iconColor,
@@ -42,6 +58,8 @@ const spells = computed(() =>
       cooldownPct: cd > 0 ? (cd / s.cooldown) * 100 : 0,
       cooldownLabel: cd > 0 ? Math.ceil(cd) + 's' : '',
       affordable: g.gold >= s.cost,
+      buffActive,
+      buffLabel: buffActive ? Math.ceil(buffRemaining!) + 's' : '',
     }
   }),
 )
@@ -87,18 +105,23 @@ defineExpose({ castingSpell, castAtPosition })
       class="spell-btn"
       :class="{
         'on-cooldown': spell.onCooldown,
+        'buff-active': spell.buffActive,
         unaffordable: !spell.affordable && !spell.onCooldown,
         casting: castingSpell === spell.id,
       }"
       :style="{ '--spell-color': spell.iconColor }"
       :disabled="spell.onCooldown || !spell.affordable"
       :title="`${spell.name} (${spell.cost}g) — ${spell.description}`"
-      :aria-label="`${spell.name}, costs ${spell.cost} gold${spell.onCooldown ? `, on cooldown ${spell.cooldownLabel}` : ''}`"
+      :aria-label="`${spell.name}, costs ${spell.cost} gold${spell.buffActive ? `, effect active ${spell.buffLabel}` : ''}${spell.onCooldown ? `, on cooldown ${spell.cooldownLabel}` : ''}`"
       @click="selectSpell(spell.id)"
     >
       <SpellIcon :spell-id="spell.id" />
       <span v-if="spell.onCooldown" class="cd-overlay" :style="{ height: `${spell.cooldownPct}%` }" />
       <span v-if="spell.onCooldown" class="cd-label">{{ spell.cooldownLabel }}</span>
+      <!-- Active-effect indicator: top accent bar + label in the spell colour,
+           shown alongside (and distinct from) the bottom cooldown readout. -->
+      <span v-if="spell.buffActive" class="buff-bar" aria-hidden="true" />
+      <span v-if="spell.buffActive" class="buff-label">{{ spell.buffLabel }}</span>
       <span class="spell-cost">{{ spell.cost }}</span>
     </button>
   </div>
@@ -170,6 +193,38 @@ defineExpose({ castingSpell, castAtPosition })
   text-align: center;
   font-size: var(--text-2xs);
   color: var(--charcoal-soft);
+  font-weight: 700;
+  z-index: 2;
+}
+
+/* Active-effect indicator (distinct from cooldown): a glowing top accent bar
+   plus a seconds label at the top-left, both in the spell's colour. Cooldown
+   lives at the bottom (rising overlay + bottom label), so a spell that is both
+   mid-effect and recharging — e.g. Acceleration in its first 8 s — shows both
+   timers without overlap. */
+.buff-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--spell-color, var(--sage));
+  box-shadow: 0 0 6px var(--spell-color, var(--sage));
+  z-index: 2;
+}
+
+.spell-btn.buff-active {
+  border-color: var(--spell-color, var(--sage-deep));
+}
+
+.buff-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: var(--text-2xs);
+  line-height: 1;
+  letter-spacing: -0.2px;
+  color: var(--spell-color, var(--sage-deep));
   font-weight: 700;
   z-index: 2;
 }

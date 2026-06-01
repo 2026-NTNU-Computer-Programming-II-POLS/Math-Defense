@@ -48,13 +48,6 @@ const activeByEffectId = computed(() => {
   return m
 })
 
-// Live remaining seconds. BuffSystem only emits ACTIVE_BUFFS_CHANGED on
-// add/expire, so `remainingTime` is a snapshot — interpolate from
-// activeBuffsSnapshotTime to give the player a smoothly-draining countdown.
-function liveRemaining(remainingAtSnap: number): number {
-  return Math.max(0, remainingAtSnap - (g.timeTotal - g.activeBuffsSnapshotTime))
-}
-
 function categoryCount(c: Category): number {
   if (c === 'all') return PURCHASABLE_BUFFS.length
   return PURCHASABLE_BUFFS.filter((b) => b.category === c).length
@@ -65,7 +58,9 @@ const items = computed(() =>
     .filter((b) => activeCategory.value === 'all' || b.category === activeCategory.value)
     .map((b) => {
       const entry = activeByEffectId.value.get(b.effectId)
-      const remaining = entry ? liveRemaining(entry.remainingTime) : null
+      // `remainingTime` is the engine's live value (BuffSystem ticks it during
+      // WAVE; gameStore mirrors the array every Nth frame), so read it directly.
+      const remaining = entry ? entry.remainingTime : null
       const wastedHeal = HEAL_EFFECT_IDS.has(b.effectId) && g.hp >= g.maxHp
       return {
         ...b,
@@ -96,7 +91,7 @@ const hasNotice = computed(() => {
     return true
   }
   for (const ab of g.activeBuffs) {
-    if (liveRemaining(ab.remainingTime) <= expiringSoonSeconds) return true
+    if (ab.remainingTime <= expiringSoonSeconds) return true
   }
   return false
 })
