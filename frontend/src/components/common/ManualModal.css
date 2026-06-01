@@ -86,6 +86,34 @@
   outline-offset: 2px;
 }
 
+/* Slim edge handle shown when the sidebar is collapsed — a discoverable way to
+   bring the section list back without reaching for the header toggle. */
+.manual-sidebar-rail {
+  flex: 0 0 18px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--charcoal-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.manual-sidebar-rail:hover {
+  background: var(--gold-tint-hover);
+  color: var(--charcoal);
+}
+
+.manual-sidebar-rail:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: -2px;
+}
+
 .manual-close {
   width: 32px;
   height: 32px;
@@ -452,4 +480,7 @@
     font-size: var(--text-base);
   }
   .manual-section-title { font-size: var(--text-lg); }
+  /* The edge handle is a desktop affordance; on mobile the header toggle
+     suffices and a thin top bar would look out of place. */
+  .manual-sidebar-rail { display: none; }
 }

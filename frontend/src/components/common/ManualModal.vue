@@ -72,6 +72,16 @@ function onKeydown(e: KeyboardEvent): void {
     e.preventDefault()
     e.stopPropagation()
     close()
+    return
+  }
+  // `[` toggles the section sidebar — ignored while typing in a field and when
+  // combined with a modifier so it never shadows a real shortcut.
+  if (e.key === '[' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const target = e.target as HTMLElement | null
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+    e.preventDefault()
+    e.stopPropagation()
+    toggleSidebar()
   }
 }
 
@@ -117,7 +127,7 @@ onBeforeUnmount(() => {
             :aria-expanded="sidebarOpen"
             aria-controls="manual-sections"
             :aria-label="sidebarOpen ? 'Hide section list' : 'Show section list'"
-            :title="sidebarOpen ? 'Hide section list' : 'Show section list'"
+            :title="(sidebarOpen ? 'Hide section list' : 'Show section list') + ' ([)'"
             @click="toggleSidebar"
           >{{ sidebarOpen ? '«' : '»' }}</button>
           <h2 id="manual-title" class="manual-title">{{ title }}</h2>
@@ -149,6 +159,16 @@ onBeforeUnmount(() => {
           Could not load manual ({{ error }}).
         </p>
         <template v-else-if="activeBook">
+          <button
+            v-show="!sidebarOpen"
+            type="button"
+            class="manual-sidebar-rail"
+            aria-controls="manual-sections"
+            :aria-expanded="sidebarOpen"
+            aria-label="Show section list"
+            title="Show section list ([)"
+            @click="toggleSidebar"
+          >»</button>
           <aside v-show="sidebarOpen" id="manual-sections" class="manual-sidebar" aria-label="Sections">
             <button
               v-for="s in activeBook.sections"
@@ -172,7 +192,7 @@ onBeforeUnmount(() => {
       </div>
 
       <footer class="manual-footer">
-        <span>Press <kbd>Esc</kbd> to close</span>
+        <span><kbd>[</kbd> toggle sections · <kbd>Esc</kbd> close</span>
       </footer>
     </div>
   </div>
