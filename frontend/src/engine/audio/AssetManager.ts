@@ -68,6 +68,14 @@ export class AssetManager {
   private gestureHandler: (() => void) | null = null
   /** Music slugs requested before unlock — played on first gesture. */
   private pendingMusic = new Set<SfxSlug>()
+  /** Global menu playlist pool. Empty when no playlist is active. */
+  private playlist: SfxSlug[] = []
+  /** Whether the playlist should keep advancing on `ended`. */
+  private playlistActive = false
+  /** The track currently owning the playlist (null when suspended). */
+  private currentPlaylistSlug: SfxSlug | null = null
+  /** The `ended` listener wired to the current track, so we can detach it. */
+  private playlistEnded: { src: HTMLAudioElement; fn: () => void } | null = null
 
   /**
    * Preload every SFX. Resolves once all `<audio>` elements have at least
@@ -189,8 +197,11 @@ export class AssetManager {
     }
   }
 
-  /** Stop every music bed (called on engine teardown). */
+  /** Stop every music bed AND the menu playlist (full music teardown). */
   stopAllMusic(): void {
+    this.detachPlaylistEnded()
+    this.playlistActive = false
+    this.currentPlaylistSlug = null
     for (const slug of [...this.musicBeds.keys()]) this.stopMusic(slug)
     this.pendingMusic.clear()
   }
@@ -215,9 +226,86 @@ export class AssetManager {
   /** Test/debug accessor — not part of the §15.3 spec but cheap to expose. */
   get isUnlocked(): boolean { return this.unlocked }
 
+  /** The slug currently playing from the menu playlist (null = suspended). */
+  get currentTrack(): SfxSlug | null { return this.currentPlaylistSlug }
+
+  // ─── Global menu playlist ─────────────────────────────────────────────
+
+  /**
+   * Start (or refresh) the global menu playlist. Plays a random track from
+   * `slugs` and, when it ends, advances to another random track — never the
+   * same one twice in a row. Consecutive tracks do not overlap (the WAVs
+   * carry their own edge fades); the bed crossfade only kicks in when the
+   * playlist hands the bus to/from the engine phase beds. Idempotent: if a
+   * playlist is already running this only refreshes the pool and lets the
+   * current track finish.
+   *
+   * Like a music bed, a track requested before the autoplay unlock is queued
+   * and kicked off on the first user gesture.
+   */
+  startPlaylist(slugs: ReadonlyArray<SfxSlug>): void {
+    const pool = slugs.filter((s) => SFX_DEFS[s])
+    if (pool.length === 0) return
+    this.playlist = [...pool]
+    if (this.playlistActive) return
+    this.playlistActive = true
+    this.advancePlaylist()
+  }
+
+  /** Suspend the playlist: stop the current track and halt auto-advance.
+   *  Used when entering a game session so the BUILD/WAVE beds own the bus. */
+  stopPlaylist(): void {
+    this.playlistActive = false
+    this.detachPlaylistEnded()
+    if (this.currentPlaylistSlug !== null) {
+      this.stopMusic(this.currentPlaylistSlug)
+      this.currentPlaylistSlug = null
+    }
+  }
+
+  private advancePlaylist(): void {
+    if (!this.playlistActive || this.playlist.length === 0) return
+    this.playPlaylistTrack(this.pickNextPlaylistSlug())
+  }
+
+  private pickNextPlaylistSlug(): SfxSlug {
+    const pool = this.playlist
+    if (pool.length === 1) return pool[0]
+    let next: SfxSlug
+    do {
+      next = pool[Math.floor(Math.random() * pool.length)]
+    } while (next === this.currentPlaylistSlug)
+    return next
+  }
+
+  private playPlaylistTrack(slug: SfxSlug): void {
+    const src = this.sources.get(slug)
+    if (!src || !SFX_DEFS[slug]) return
+    this.currentPlaylistSlug = slug
+    // loop=false so the element fires `ended`, which advances the playlist.
+    // playMusic handles the crossfade-out of any other bed + the unlock queue.
+    this.playMusic(slug, {}, false)
+    this.detachPlaylistEnded()
+    const fn = (): void => {
+      this.detachPlaylistEnded()
+      if (!this.playlistActive) return
+      this.stopMusic(slug)
+      this.advancePlaylist()
+    }
+    this.playlistEnded = { src, fn }
+    src.addEventListener('ended', fn)
+  }
+
+  private detachPlaylistEnded(): void {
+    if (this.playlistEnded) {
+      this.playlistEnded.src.removeEventListener('ended', this.playlistEnded.fn)
+      this.playlistEnded = null
+    }
+  }
+
   // ─── Music bed implementation ─────────────────────────────────────────
 
-  private playMusic(slug: SfxSlug, opts: PlayOptions): void {
+  private playMusic(slug: SfxSlug, opts: PlayOptions, loop = true): void {
     const def = SFX_DEFS[slug]
     const src = this.sources.get(slug)
     if (!src || !def) return
@@ -245,7 +333,7 @@ export class AssetManager {
       this.fadeMusic(other, 0, () => this.stopMusic(other.slug))
     }
 
-    src.loop = true
+    src.loop = loop
     const target = opts.volume ?? def.volume
     const bed: MusicBed = {
       slug, el: src,

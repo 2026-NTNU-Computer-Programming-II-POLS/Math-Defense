@@ -53,6 +53,10 @@ export type SfxSlug =
   | 'game-over'
   // Music bed for WAVE phase (mirror of ambient-build for BUILD)
   | 'ambient-wave'
+  // Global menu playlist — randomly rotated across non-game screens
+  | 'menu-theme-a'
+  | 'menu-theme-b'
+  | 'menu-theme-c'
 
 export type SfxBus = 'music' | 'sfx' | 'ui'
 
@@ -76,8 +80,15 @@ export interface SfxDef {
 
 export const SFX_DEFS: Record<SfxSlug, SfxDef> = {
   // ─── Music beds ────────────────────────────────────────────────────────
-  'ambient-build': { url: '/audio/ambient-build.wav', volume: 0.3, bus: 'music', loop: true },
-  'ambient-wave':  { url: '/audio/ambient-wave.wav',  volume: 0.32, bus: 'music', loop: true },
+  'ambient-build': { url: '/audio/ambient-build.wav', volume: 0.55, bus: 'music', loop: true },
+  'ambient-wave':  { url: '/audio/ambient-wave.wav',  volume: 0.55, bus: 'music', loop: true },
+  // Global menu playlist tracks — deliberately NOT `loop`; the AssetManager
+  // playlist controller advances to the next random track on `ended`. They are
+  // never passed to play() directly (only startPlaylist), so the absence of
+  // `loop` does not route them through the one-shot clone path.
+  'menu-theme-a':  { url: '/audio/menu-theme-a.wav',  volume: 0.70, bus: 'music' },
+  'menu-theme-b':  { url: '/audio/menu-theme-b.wav',  volume: 0.70, bus: 'music' },
+  'menu-theme-c':  { url: '/audio/menu-theme-c.wav',  volume: 0.70, bus: 'music' },
 
   // ─── UI ────────────────────────────────────────────────────────────────
   'ui-click':   { url: '/audio/ui-click.wav',   volume: 0.4,  bus: 'ui', polyphonyCap: 3, minIntervalMs: 40, pitchJitter: 0.03 },
@@ -127,3 +138,14 @@ export const SFX_DEFS: Record<SfxSlug, SfxDef> = {
 /** Slugs that loop forever (music beds). Used by AssetManager for crossfade. */
 export const MUSIC_SLUGS: ReadonlyArray<SfxSlug> =
   (Object.keys(SFX_DEFS) as SfxSlug[]).filter((s) => SFX_DEFS[s].loop === true)
+
+/**
+ * Global menu-music playlist. The AssetManager rotates through these randomly
+ * (no immediate repeat) on every non-game screen; entering a game session
+ * suspends the playlist so the BUILD/WAVE beds own the music bus.
+ */
+export const PLAYLIST_SLUGS: ReadonlyArray<SfxSlug> = [
+  'menu-theme-a',
+  'menu-theme-b',
+  'menu-theme-c',
+]

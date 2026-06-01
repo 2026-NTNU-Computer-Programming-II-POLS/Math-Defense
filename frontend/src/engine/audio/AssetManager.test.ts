@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AssetManager } from './AssetManager'
-import { SFX_DEFS } from './sfx-defs'
+import { SFX_DEFS, PLAYLIST_SLUGS } from './sfx-defs'
 
 interface FakeAudio {
   src: string
@@ -83,6 +83,15 @@ function fireLoaded(): void {
   for (const a of allInstances) {
     a.__listeners['loadedmetadata']?.forEach((fn) => fn())
   }
+}
+
+function fireEnded(inst: FakeAudio): void {
+  // Snapshot before dispatching: per the DOM spec, listeners added during an
+  // event's dispatch are NOT invoked for that same event. A live Set.forEach
+  // would re-visit them, which for a single-track playlist (whose `ended`
+  // handler re-adds a listener to the same element) recurses forever.
+  const listeners = inst.__listeners['ended'] ? [...inst.__listeners['ended']] : []
+  for (const fn of listeners) fn()
 }
 
 function unlock(): void {
@@ -340,5 +349,83 @@ describe('AssetManager', () => {
     fireLoaded()
     await p
     expect(() => am.stopAllMusic()).not.toThrow()
+  })
+
+  // ─── Global menu playlist ───────────────────────────────────────────────
+
+  it('startPlaylist plays a non-looping track and advances on ended', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    am.startPlaylist(PLAYLIST_SLUGS)
+    const first = am.currentTrack
+    expect(first).not.toBeNull()
+    const firstSrc = allInstances.find((a) => a.src === SFX_DEFS[first!].url)!
+    expect(firstSrc.play).toHaveBeenCalled()
+    expect(firstSrc.loop).toBe(false)  // must end so the playlist can advance
+    // Track finishing advances to a different track (no immediate repeat).
+    fireEnded(firstSrc)
+    const second = am.currentTrack
+    expect(second).not.toBeNull()
+    expect(second).not.toBe(first)
+    expect(firstSrc.pause).toHaveBeenCalled()  // outgoing track stopped
+  })
+
+  it('startPlaylist queued before unlock kicks off on first gesture', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    am.startPlaylist(PLAYLIST_SLUGS)
+    const slug = am.currentTrack!
+    const src = allInstances.find((a) => a.src === SFX_DEFS[slug].url)!
+    expect(src.play).not.toHaveBeenCalled()
+    unlock()
+    expect(src.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('stopPlaylist pauses the current track and halts auto-advance', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    am.startPlaylist(PLAYLIST_SLUGS)
+    const slug = am.currentTrack!
+    const src = allInstances.find((a) => a.src === SFX_DEFS[slug].url)!
+    am.stopPlaylist()
+    expect(src.pause).toHaveBeenCalled()
+    expect(am.currentTrack).toBeNull()
+    // The ended listener was detached — a late ended event must not restart.
+    fireEnded(src)
+    expect(am.currentTrack).toBeNull()
+  })
+
+  it('a single-track playlist replays the same track on ended', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    am.startPlaylist(['menu-theme-a'])
+    expect(am.currentTrack).toBe('menu-theme-a')
+    const src = allInstances.find((a) => a.src === SFX_DEFS['menu-theme-a'].url)!
+    fireEnded(src)
+    expect(am.currentTrack).toBe('menu-theme-a')
+    expect(src.play).toHaveBeenCalledTimes(2)  // initial + replay
+  })
+
+  it('startPlaylist is idempotent — re-calling keeps the current track', async () => {
+    const am = new AssetManager()
+    const p = am.load()
+    fireLoaded()
+    await p
+    unlock()
+    am.startPlaylist(PLAYLIST_SLUGS)
+    const first = am.currentTrack
+    am.startPlaylist(PLAYLIST_SLUGS)  // re-entry (e.g. route change between menus)
+    expect(am.currentTrack).toBe(first)
   })
 })
