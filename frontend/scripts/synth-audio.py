@@ -133,7 +133,7 @@ def synth_ambient_build() -> list[float]:
             fade = t / edge
         elif t > duration - edge:
             fade = (duration - t) / edge
-        samples.append(0.18 * fade * lfo * (a + b * 0.7 + c * 0.5))
+        samples.append(0.30 * fade * lfo * (a + b * 0.7 + c * 0.5))
     return samples
 
 
@@ -158,8 +158,88 @@ def synth_ambient_wave() -> list[float]:
             fade = t / edge
         elif t > duration - edge:
             fade = (duration - t) / edge
-        samples.append(0.2 * fade * pulse * (a * 0.6 + b * 0.5 + c * 0.4))
+        samples.append(0.42 * fade * pulse * (a * 0.6 + b * 0.5 + c * 0.4))
     return samples
+
+
+# ─── Global menu playlist ────────────────────────────────────────────
+# Long-form ambient pads rotated randomly across all non-game screens by the
+# AssetManager playlist controller. Unlike the 8s BUILD/WAVE beds these do not
+# loop — the controller cross-fades to the next random track when one ends —
+# but each still fades its first/last 250ms so the cut between tracks is clean.
+
+
+def _ambient_pad(
+    duration: float,
+    partials: list[float],
+    lfo_hz: float,
+    lfo_depth: float,
+    shimmer_freqs: list[float],
+    shimmer_step: float,
+    gain: float,
+) -> list[float]:
+    """Generic warm-pad generator: detuned low partials under a slow tremolo,
+    with a quiet high "shimmer" sine that steps through `shimmer_freqs` (one
+    note every `shimmer_step` seconds, each with a rise-fall envelope)."""
+    n = int(SAMPLE_RATE * duration)
+    edge = 0.25
+    samples = []
+    for i in range(n):
+        t = i / SAMPLE_RATE
+        # Pad body: detuned partials with linearly decreasing weight.
+        pad = 0.0
+        for k, f in enumerate(partials):
+            pad += math.sin(2 * math.pi * f * t) * (1.0 - 0.18 * k)
+        pad /= len(partials)
+        # Slow tremolo in [1 - depth, 1].
+        lfo = (1.0 - lfo_depth) + lfo_depth * (0.5 + 0.5 * math.sin(2 * math.pi * lfo_hz * t))
+        # Melodic shimmer: a soft high sine stepping through the note list.
+        shimmer = 0.0
+        if shimmer_freqs:
+            idx = int(t / shimmer_step) % len(shimmer_freqs)
+            local = (t % shimmer_step) / shimmer_step
+            senv = math.sin(math.pi * local)  # rise-fall within each step
+            shimmer = 0.12 * senv * math.sin(2 * math.pi * shimmer_freqs[idx] * t)
+        fade = 1.0
+        if t < edge:
+            fade = t / edge
+        elif t > duration - edge:
+            fade = (duration - t) / edge
+        samples.append(gain * fade * (lfo * pad + shimmer))
+    return samples
+
+
+def synth_menu_theme_a() -> list[float]:
+    """Warm C-major pad with a gentle pentatonic shimmer (~20s)."""
+    return _ambient_pad(
+        duration=20.0,
+        partials=[130.81, 164.81, 196.00],               # C3 E3 G3
+        lfo_hz=0.15, lfo_depth=0.40,
+        shimmer_freqs=[523.25, 587.33, 659.25, 783.99],  # C5 D5 E5 G5
+        shimmer_step=2.5, gain=0.55,
+    )
+
+
+def synth_menu_theme_b() -> list[float]:
+    """Airy A-major pad, slower shimmer, brighter top notes (~22s)."""
+    return _ambient_pad(
+        duration=22.0,
+        partials=[110.00, 164.81, 220.00],               # A2 E3 A3
+        lfo_hz=0.11, lfo_depth=0.50,
+        shimmer_freqs=[659.25, 880.00, 987.77, 659.25],  # E5 A5 B5 E5
+        shimmer_step=3.0, gain=0.52,
+    )
+
+
+def synth_menu_theme_c() -> list[float]:
+    """Contemplative D-minor pad with a slow pulse (~24s)."""
+    return _ambient_pad(
+        duration=24.0,
+        partials=[146.83, 174.61, 220.00],               # D3 F3 A3 (D minor)
+        lfo_hz=0.20, lfo_depth=0.45,
+        shimmer_freqs=[587.33, 698.46, 880.00, 698.46],  # D5 F5 A5 F5
+        shimmer_step=2.0, gain=0.53,
+    )
 
 
 # ─── UI ──────────────────────────────────────────────────────────────
@@ -439,6 +519,9 @@ GENERATORS = {
     "achievement.wav":         synth_achievement,
     "ambient-build.wav":       synth_ambient_build,
     "ambient-wave.wav":        synth_ambient_wave,
+    "menu-theme-a.wav":        synth_menu_theme_a,
+    "menu-theme-b.wav":        synth_menu_theme_b,
+    "menu-theme-c.wav":        synth_menu_theme_c,
     "ui-click.wav":            synth_ui_click,
     "ui-hover.wav":            synth_ui_hover,
     "ui-confirm.wav":          synth_ui_confirm,
