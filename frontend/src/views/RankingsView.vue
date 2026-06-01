@@ -88,7 +88,9 @@ const sortNullDeltaHint = computed(() => {
 })
 
 const personalEntries = ref<PersonalHistoryEntry[]>([])
-const personalLevel = ref<number | undefined>(undefined)
+// Shared star-rating (difficulty level) filter for the personal, global and
+// class tabs. The backend leaderboard endpoint accepts `level` for all three.
+const levelFilter = ref<number | undefined>(undefined)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 
@@ -111,6 +113,10 @@ const filteredActivities = computed(() => {
 
 let inflight: AbortController | null = null
 let fetchId = 0
+// Swallows the one levelFilter watcher tick caused by switchTab() resetting the
+// filter to "All": switchTab already issues the load for the new tab, so letting
+// the watcher fire too would double the request on every tab change.
+let suppressLevelWatch = false
 
 function cancelInflight(): void {
   inflight?.abort()
@@ -129,7 +135,7 @@ async function loadGlobal(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const res = await rankingService.getGlobal(page.value, perPage, controller.signal)
+    const res = await rankingService.getGlobal(levelFilter.value, page.value, perPage, controller.signal)
     if (thisId !== fetchId) return
     entries.value = res.entries
     total.value = res.total
@@ -151,7 +157,7 @@ async function loadClass(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const res = await rankingService.getByClass(selectedClassId.value, page.value, perPage, controller.signal)
+    const res = await rankingService.getByClass(selectedClassId.value, levelFilter.value, page.value, perPage, controller.signal)
     if (thisId !== fetchId) return
     entries.value = res.entries
     total.value = res.total
@@ -213,7 +219,7 @@ async function loadPersonal(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const res = await leaderboardService.getMyHistory(personalLevel.value, controller.signal)
+    const res = await leaderboardService.getMyHistory(levelFilter.value, controller.signal)
     if (thisId !== fetchId) return
     personalEntries.value = res.entries
   } catch (e) {
@@ -267,6 +273,13 @@ watch(internalSort, () => {
 
 function switchTab(tab: TabId): void {
   activeTab.value = tab
+  // Reset the star-rating filter to "All" on every tab change. Guard the
+  // watcher so this reset does not trigger a second fetch on top of the load
+  // issued at the end of this function.
+  if (levelFilter.value !== undefined) {
+    suppressLevelWatch = true
+    levelFilter.value = undefined
+  }
   resetData()
   // B-M-12: clear a class-scoped selection when entering the External tab (inter-class only).
   if (tab === 'external' && selectedActivityId.value) {
@@ -286,8 +299,18 @@ function switchTab(tab: TabId): void {
   else if (tab === 'external' && selectedActivityId.value) loadExternal()
 }
 
-watch(personalLevel, () => {
+watch(levelFilter, () => {
+  // A switchTab()-driven reset already loads the new tab; skip the redundant fetch.
+  if (suppressLevelWatch) {
+    suppressLevelWatch = false
+    return
+  }
+  // Star filtering applies to the personal, global and class leaderboards.
+  // Reset to the first page so the filtered result set starts from the top.
+  page.value = 1
   if (activeTab.value === 'personal') loadPersonal()
+  else if (activeTab.value === 'global') loadGlobal()
+  else if (activeTab.value === 'class' && selectedClassId.value) loadClass()
 })
 
 function goToPage(p: number): void {
@@ -364,14 +387,17 @@ onBeforeUnmount(cancelInflight)
       </select>
     </div>
 
-    <!-- Personal-tab star-rating filter -->
-    <div v-if="activeTab === 'personal'" class="rk-filters">
+    <!-- Star-rating filter — shared by the personal, global and class tabs -->
+    <div
+      v-if="activeTab === 'personal' || activeTab === 'global' || activeTab === 'class'"
+      class="rk-filters"
+    >
       <span class="filter-label">Star rating:</span>
       <button
         v-for="lv in [undefined, 1, 2, 3, 4]"
         :key="lv ?? 'all'"
-        :class="['btn', 'filter-btn', { active: personalLevel === lv }]"
-        @click="personalLevel = lv"
+        :class="['btn', 'filter-btn', { active: levelFilter === lv }]"
+        @click="levelFilter = lv"
       >
         {{ lv === undefined ? 'All' : `Lv.${lv}` }}
       </button>

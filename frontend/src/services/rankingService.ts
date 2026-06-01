@@ -10,17 +10,19 @@ export interface ExternalRankingEntry {
 }
 
 export const rankingService = {
-  getGlobal(page = 1, perPage = 20, signal?: AbortSignal) {
+  getGlobal(level?: number, page = 1, perPage = 20, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+    if (level != null) params.set('level', String(level))
     return api.get<LeaderboardResponse>(`/api/leaderboard?${params}`, { signal })
   },
 
-  getByClass(classId: string, page = 1, perPage = 20, signal?: AbortSignal) {
+  getByClass(classId: string, level?: number, page = 1, perPage = 20, signal?: AbortSignal) {
     const params = new URLSearchParams({
       class_id: classId,
       page: String(page),
       per_page: String(perPage),
     })
+    if (level != null) params.set('level', String(level))
     return api.get<LeaderboardResponse>(`/api/leaderboard?${params}`, { signal })
   },
 

@@ -601,7 +601,7 @@ Also owns the **endpoint-marker** preferences (persisted to `localStorage` and s
 | `talentService.ts` | `getTree()`, `getModifiers()`, `allocate(nodeId)`, `reset()` |
 | `classService.ts` | Full class CRUD + roster + organisation: `createClass`, `listClasses`, `getClass`, `renameClass`, `updateClass`, `deleteClass`, `archiveClass` / `unarchiveClass`, `transferOwnership`, `addStudent` / `bulkAddStudents` / `removeStudent` / `moveStudent`, `listStudents`, `joinByCode`, `claimInvites`, `regenerateCode`, `joinQr`, co-teacher + invite + group + reflection + leaderboard/report helpers |
 | `adminService.ts` | `getTeachers()`, `getClasses()`, `getStudents()`, `createTeacher(payload)` |
-| `rankingService.ts` | `getGlobal(page, perPage)`, `getByClass(classId, …)`, `getInternal(activityId)`, `getExternal(activityId)` |
+| `rankingService.ts` | `getGlobal(level?, page, perPage)`, `getByClass(classId, level?, …)`, `getInternal(activityId)`, `getExternal(activityId)` |
 | `territoryService.ts` | `createActivity(payload)`, `listActivities(classId?)`, `getActivity(id)`, `playTerritory(activityId, slotId, sessionId)`, `getRankings(activityId)`, `settleActivity(activityId)` |
 | `territory/challengeMode.ts` | Per-slot challenge-mode constraint helpers |
 | `territory/rankingSort.ts` | Ranking sort + tiebreak helpers |
