@@ -457,8 +457,12 @@ async function unassignFromGroup(studentId: string): Promise<void> {
   }
 }
 
-async function loadLeaderboard(): Promise<void> {
+async function toggleLeaderboard(): Promise<void> {
   if (!selectedClassId.value) return
+  if (showLeaderboard.value) {
+    showLeaderboard.value = false
+    return
+  }
   try {
     leaderboard.value = await classService.leaderboard(selectedClassId.value)
     showLeaderboard.value = true
@@ -716,7 +720,9 @@ onMounted(async () => {
         <div class="subsection">
           <h4 class="subsection-title">Class Reports</h4>
           <div class="row-between">
-            <button class="btn-sm" @click="loadLeaderboard">Show Leaderboard</button>
+            <button class="btn-sm" @click="toggleLeaderboard">
+              {{ showLeaderboard ? 'Hide Leaderboard' : 'Show Leaderboard' }}
+            </button>
             <button class="btn-sm" @click="downloadReport">Download CSV</button>
           </div>
           <ol v-if="showLeaderboard && leaderboard.length" class="leaderboard-list">
@@ -726,6 +732,7 @@ onMounted(async () => {
               <span class="lb-score">{{ r.total_score }} pts · ★{{ r.average_stars.toFixed(1) }} · {{ r.sessions_played }} runs</span>
             </li>
           </ol>
+          <div v-else-if="showLeaderboard" class="empty">No leaderboard data yet</div>
         </div>
       </div>
 
