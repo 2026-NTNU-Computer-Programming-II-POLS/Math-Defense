@@ -42,6 +42,13 @@
   flex: 0 0 auto;
 }
 
+.manual-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .manual-title {
   margin: 0;
   font-family: var(--font-mono);
@@ -49,6 +56,34 @@
   letter-spacing: 4px;
   text-transform: uppercase;
   color: var(--charcoal);
+}
+
+/* Collapse / expand the section sidebar to hand the freed width to the body. */
+.manual-sidebar-toggle {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--charcoal);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.manual-sidebar-toggle:hover {
+  background: var(--gold-tint-select);
+  border-color: var(--terracotta-deep);
+}
+
+.manual-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--terracotta-deep);
+  outline-offset: 2px;
 }
 
 .manual-close {
@@ -315,6 +350,48 @@
 
 .manual-content :deep(a):hover {
   color: var(--terracotta);
+}
+
+/* Sprite art embedded in the field reference. Sources are the transparent PNGs
+   exported to public/{towers,monsters}. */
+.manual-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+
+/* Hero sprite on its own line under a tower / boss heading — framed on a soft
+   plate so the transparent art reads against the cream page. */
+.manual-content :deep(p img) {
+  height: 84px;
+  width: auto;
+  padding: 6px 16px;
+  margin: 4px 0;
+  background: var(--gold-tint-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+/* Inline icon next to a name inside a table cell. */
+.manual-content :deep(td) img {
+  height: 34px;
+  width: auto;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* Full-width "all units at a glance" banner. The attribute selector outranks
+   the `p img` hero rule, so the contact-sheet PNG is shown at banner width
+   instead of being shrunk to the 84px hero height. */
+.manual-content :deep(img[src$="_overview.png"]) {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 10px 0 18px;
+  padding: 10px;
+  background: var(--gold-tint-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .manual-footer {

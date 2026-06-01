@@ -28,6 +28,22 @@ const boxRef = ref<HTMLElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
 let previousFocus: HTMLElement | null = null
 
+// Collapsible section sidebar — lets the reader hand the full width back to the
+// article body. The choice is remembered across sessions; storage failures
+// (private mode / disabled) fall back to "open" without throwing.
+const SIDEBAR_PREF_KEY = 'mathDefense.manualSidebarOpen'
+const sidebarOpen = ref(true)
+try {
+  sidebarOpen.value = localStorage.getItem(SIDEBAR_PREF_KEY) !== '0'
+} catch { /* storage unavailable — keep the default open state */ }
+
+function toggleSidebar(): void {
+  sidebarOpen.value = !sidebarOpen.value
+  try {
+    localStorage.setItem(SIDEBAR_PREF_KEY, sidebarOpen.value ? '1' : '0')
+  } catch { /* ignore persistence failures */ }
+}
+
 const title = computed(() => (props.mode === 'full' ? 'Math Defense — Manual' : 'Field Reference'))
 
 watch(activeSectionId, () => {
@@ -93,7 +109,19 @@ onBeforeUnmount(() => {
       <span class="card-corner card-corner--inset card-corner-bl" aria-hidden="true"></span>
       <span class="card-corner card-corner--inset card-corner-br" aria-hidden="true"></span>
       <header class="manual-header">
-        <h2 id="manual-title" class="manual-title">{{ title }}</h2>
+        <div class="manual-header-left">
+          <button
+            v-if="activeBook"
+            type="button"
+            class="manual-sidebar-toggle"
+            :aria-expanded="sidebarOpen"
+            aria-controls="manual-sections"
+            :aria-label="sidebarOpen ? 'Hide section list' : 'Show section list'"
+            :title="sidebarOpen ? 'Hide section list' : 'Show section list'"
+            @click="toggleSidebar"
+          >{{ sidebarOpen ? '«' : '»' }}</button>
+          <h2 id="manual-title" class="manual-title">{{ title }}</h2>
+        </div>
         <button
           type="button"
           class="manual-close"
@@ -121,7 +149,7 @@ onBeforeUnmount(() => {
           Could not load manual ({{ error }}).
         </p>
         <template v-else-if="activeBook">
-          <aside class="manual-sidebar" aria-label="Sections">
+          <aside v-show="sidebarOpen" id="manual-sections" class="manual-sidebar" aria-label="Sections">
             <button
               v-for="s in activeBook.sections"
               :key="s.id"
