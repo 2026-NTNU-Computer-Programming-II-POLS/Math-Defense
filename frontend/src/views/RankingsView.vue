@@ -268,10 +268,16 @@ watch(internalSort, () => {
 function switchTab(tab: TabId): void {
   activeTab.value = tab
   resetData()
-  // B-M-12: clear selection if the currently selected activity is not valid for this tab
+  // B-M-12: clear a class-scoped selection when entering the External tab (inter-class only).
   if (tab === 'external' && selectedActivityId.value) {
     const selectedActivity = activities.value.find(activity => activity.id === selectedActivityId.value)
     if (selectedActivity && selectedActivity.class_id !== null) selectedActivityId.value = null
+  }
+  // C-10: clear an inter-class selection when entering the Internal tab (class-scoped only).
+  // Symmetrical to B-M-12. Navigation deep-links bypass switchTab to preserve their selection.
+  if (tab === 'internal' && selectedActivityId.value) {
+    const selectedActivity = activities.value.find(activity => activity.id === selectedActivityId.value)
+    if (selectedActivity && selectedActivity.class_id === null) selectedActivityId.value = null
   }
   if (tab === 'personal') loadPersonal()
   else if (tab === 'global') loadGlobal()
@@ -305,10 +311,13 @@ onMounted(async () => {
   try { activities.value = await territoryService.listActivities() } catch { /* dropdown only */ }
 
   // When navigated from a territory detail page, pre-select that activity's internal rankings.
+  // Bypass switchTab so the C-10 inter-class clearing does not drop the deep-linked selection.
   const paramId = route.params.id as string | undefined
   if (paramId) {
     selectedActivityId.value = paramId
-    switchTab('internal')
+    activeTab.value = 'internal'
+    resetData()
+    loadInternal()
   } else if (activeTab.value === 'personal') {
     loadPersonal()
   } else {
