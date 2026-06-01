@@ -8,7 +8,11 @@ Quick-lookup tables for towers, enemies, spells, buffs, and Monty Hall rewards. 
 
 Seven tower types, each tied to a real math concept. Stats below are the **base** tier. Tier 2 adds +25% damage and +10% range at 60% of base cost; Tier 3 adds +50% damage, +20% range, **and a universal +15% attack speed** at 100% of base cost. The +15% speed reduces base cooldown by 15% and so has no effect on Calculus (whose base cooldown is 0). Any other per-tower bonuses (sweep speed, target count, crit, ramp, AoE width, pet stats) are listed in each row.
 
+![All towers at a glance](towers/_overview.png)
+
 ### Magic Tower — ✦
+
+![Magic Tower](towers/magic.png)
 
 - **Cost / Damage / Range / Cooldown:** 60 / 8 / 10 / 1.0 s
 - **Math:** function curves (polynomial, trigonometric, log)
@@ -19,6 +23,8 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 ### Radar A — Sweep — ◐
 
+![Radar A — Sweep](towers/radarA.png)
+
 - **Cost / Damage / Range / Cooldown:** 50 / 5 / 6 / 0.5 s
 - **Math:** radian arcs, sector area
 - **Unlocked from:** Star 1
@@ -28,6 +34,8 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 ### Radar B — Rapid — ◑
 
+![Radar B — Rapid](towers/radarB.png)
+
 - **Cost / Damage / Range / Cooldown:** 65 / 8 / 7 / 0.3 s
 - **Math:** radian arcs
 - **Unlocked from:** Star 2
@@ -36,6 +44,8 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Pick when:** lots of small, fast enemies in a corridor.
 
 ### Radar C — Sniper — ◒
+
+![Radar C — Sniper](towers/radarC.png)
 
 - **Cost / Damage / Range / Cooldown:** 90 / 40 / 12 / 2.5 s
 - **Math:** radian arcs
@@ -48,6 +58,8 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 ### Matrix Tower — ⊞
 
+![Matrix Tower](towers/matrix.png)
+
 - **Cost / Damage / Range / Cooldown:** 80 / 1 base / 8 / 0.5 s
 - **Math:** vectors, dot product
 - **Unlocked from:** Star 2
@@ -58,6 +70,8 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 ### Limit Tower — ∞
 
+![Limit Tower](towers/limit.png)
+
 - **Cost / Damage / Range / Cooldown:** 70 / 25 / 8 / 3.0 s
 - **Math:** limits, L'Hôpital's rule
 - **Unlocked from:** Star 3
@@ -66,13 +80,15 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 | Answer | Effect |
 |---|---|
 | `+∞` | **instakill** every enemy in range (bypasses defensive caps) |
-| `+C` (finite positive) | `effectiveDamage × |C| × 1.5` per enemy |
+| `+C` (finite positive) | `effectiveDamage × \|C\| × 1.5` per enemy |
 | `0` / non-limit constant / `−C` / `−∞` | chip damage `effectiveDamage × 0.35 × 1.5` |
 
 - **Pick when:** you can reliably solve the shown `lim[x→a] f(x)/(x − a)` quickly, especially against long-lived high-HP enemies where a correct `+∞` result has time to swing the wave. Wrong / degenerate answers no longer remove the tower or heal enemies — they just chip — but the lost burst on a 3 s cadence is still expensive.
 - **Exam tie-in:** AP Calculus AB one-sided / infinite limits; AST calculus subject test.
 
 ### Calculus Tower — ∫
+
+![Calculus Tower](towers/calculus.png)
 
 - **Cost / Damage / Range / Cooldown:** 100 / 0 base / 10 / — (does not fire directly)
 - **Math:** derivatives, integrals, power rule
@@ -86,13 +102,13 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 | Tower | Cost | DMG | Range | CD | Role |
 |---|---|---|---|---|---|
-| Magic | 60 | 8 | 10 | 1.0 | Curve zone (debuff DoT + 2 s slow, or buff allies) |
-| Radar A — Sweep | 50 | 5 | 6 | 0.5 | AoE sweep |
-| Radar B — Rapid | 65 | 8 | 7 | 0.3 | Fast single target |
-| Radar C — Sniper | 90 | 40 | 12 | 2.5 | Slow heavy single target |
-| Matrix | 80 | 1* | 8 | 0.5 | Paired laser, 1 + dot-product damage |
-| Limit | 70 | 25 | 8 | 3.0 | Charge-up AoE burst (1.5× damage) from `lim` answer |
-| Calculus | 100 | 0* | 10 | — | Spawns C·x^n pets |
+| ![Magic](towers/magic.png) Magic | 60 | 8 | 10 | 1.0 | Curve zone (debuff DoT + 2 s slow, or buff allies) |
+| ![Radar A](towers/radarA.png) Radar A — Sweep | 50 | 5 | 6 | 0.5 | AoE sweep |
+| ![Radar B](towers/radarB.png) Radar B — Rapid | 65 | 8 | 7 | 0.3 | Fast single target |
+| ![Radar C](towers/radarC.png) Radar C — Sniper | 90 | 40 | 12 | 2.5 | Slow heavy single target |
+| ![Matrix](towers/matrix.png) Matrix | 80 | 1* | 8 | 0.5 | Paired laser, 1 + dot-product damage |
+| ![Limit](towers/limit.png) Limit | 70 | 25 | 8 | 3.0 | Charge-up AoE burst (1.5× damage) from `lim` answer |
+| ![Calculus](towers/calculus.png) Calculus | 100 | 0* | 10 | — | Spawns C·x^n pets |
 
 \* Effective damage comes from the tower's mechanic, not the base stat.
 
@@ -102,27 +118,35 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 
 Ten enemy types. `killValue` is what they contribute to the Monty Hall and score formulas; `reward` is the raw gold drop.
 
+![All enemies at a glance](monsters/_overview.png)
+
 | Enemy | HP | Speed | Reward | Damage | Kill value | Special |
 |---|---|---|---|---|---|---|
-| **General** | 30 | 2.0 | 15 | 1 | 10 | Baseline mob |
-| **Fast** | 15 | 4.0 | 8 | 1 | 5 | 2× speed, thin HP — sneaks past slow towers |
-| **Strong** | 120 | 1.0 | 38 | 2 | 25 | Tanky bruiser |
-| **Split** | 40 | 2.0 | 8 | 1 | 5 | On death, splits into 2 smaller General enemies (40% scale) |
-| **Helper** | 35 | 2.0 | 23 | 1 | 15 | Aura: heals nearby allies +5 HP/s and grants +20% speed within r=3 |
-| **Boss Type-A** | 500 | 0.8 | 150 | 99 | 100 | Shield 200 HP; spawns a General minion every 8 s |
-| **Boss Type-B** | 600 | 0.7 | 225 | 99 | 150 | Shield 250 HP; spawns a Fast every 8 s; triggers a **Chain Rule** challenge at ~50% HP |
-| **Regenerator** | 80 | 1.5 | 30 | 2 | 20 | Regenerates 18 HP/s constantly — burst-kill or it never dies |
-| **Bulwark** | 220 | 0.9 | 45 | 3 | 30 | Tower damage is reduced to **40%** — pets and player effects bypass it |
-| **Swarmling** | 12 | 3.2 | 6 | 1 | 4 | Takes **only 35% of tower damage**; pets bypass this. Spawns in tight bursts |
+| ![General](monsters/general.png) **General** | 30 | 2.0 | 15 | 1 | 10 | Baseline mob |
+| ![Fast](monsters/fast.png) **Fast** | 15 | 4.0 | 8 | 1 | 5 | 2× speed, thin HP — sneaks past slow towers |
+| ![Strong](monsters/strong.png) **Strong** | 120 | 1.0 | 38 | 2 | 25 | Tanky bruiser |
+| ![Split](monsters/split.png) **Split** | 40 | 2.0 | 8 | 1 | 5 | On death, splits into 2 smaller General enemies (40% scale) |
+| ![Helper](monsters/helper.png) **Helper** | 35 | 2.0 | 23 | 1 | 15 | Aura: heals nearby allies +5 HP/s and grants +20% speed within r=3 |
+| ![Boss Type-A](monsters/bossA.png) **Boss Type-A** | 500 | 0.8 | 150 | 99 | 100 | Shield 200 HP; spawns a General minion every 8 s |
+| ![Boss Type-B](monsters/bossB.png) **Boss Type-B** | 600 | 0.7 | 225 | 99 | 150 | Shield 250 HP; spawns a Fast every 8 s; triggers a **Chain Rule** challenge at ~50% HP |
+| ![Regenerator](monsters/regenerator.png) **Regenerator** | 80 | 1.5 | 30 | 2 | 20 | Regenerates 18 HP/s constantly — burst-kill or it never dies |
+| ![Bulwark](monsters/bulwark.png) **Bulwark** | 220 | 0.9 | 45 | 3 | 30 | Tower damage is reduced to **40%** — pets and player effects bypass it |
+| ![Swarmling](monsters/swarmling.png) **Swarmling** | 12 | 3.2 | 6 | 1 | 4 | Takes **only 35% of tower damage**; pets bypass this. Spawns in tight bursts |
 
 ### Boss Mechanics (extra detail)
 
 **Boss Type-A (`bossA`)**
+
+![Boss Type-A](monsters/bossA.png)
+
 - Shield HP is absorbed first (the blue overhead bar). While the shield is up, all tower damage hits the shield, not the underlying HP.
 - Minion spawn every 8 s. Killing the minion gives normal General rewards.
 - HP-99 contact: one Boss reaching P\* will essentially end the run. Stop them well before then.
 
 **Boss Type-B (`bossB`)**
+
+![Boss Type-B](monsters/bossB.png)
+
 - Shield + Fast-minion spawn behave as above.
 - When current HP enters the range `[0.45, 0.55] × maxHp` (sampled per spawn so it isn't memorizable), the wave enters `CHAIN_RULE` phase.
 - A KaTeX-rendered chain rule question is presented (e.g. compute `(f∘g)'(x)`).
