@@ -153,7 +153,7 @@ Browser
                           │           achievements/seasons/talents/classes/admin/
                           │           territory/assessment/recommendation/challenge/
                           │           replay/study)
-                          ├─ Global exception handlers → HTTP status from DomainError.status_code
+                          ├─ Global exception handlers → HTTP status via http_status_map (domain errors are HTTP-free)
                           ├─ Application Services (Auth / Session / Leaderboard /
                           │   Achievement / Season / Talent / Class / Admin /
                           │   Territory / Assessment / Recommender / Challenge /
@@ -313,6 +313,8 @@ cd frontend && npm test            # ~87 test files (systems, engine, domain pol
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).
+
+Frontend test coverage (Vitest v8 provider): **Lines 56.8% · Statements 52.2% · Branches 42.9% · Functions 44.6%**.
 
 ### Load & stress testing
 
