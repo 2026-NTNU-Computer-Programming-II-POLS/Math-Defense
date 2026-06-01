@@ -73,7 +73,7 @@ describe('MagicTowerSystem — Q7 debuff zone applies AoE damage + slow', () => 
     expect(SLOW_BASE_DURATION).toBeGreaterThan(DOT_BASE_DURATION)
   })
 
-  it('does not affect enemies outside the tower range on x', () => {
+  it('does not affect enemies outside the tower range', () => {
     makeMagicTower(game, { effectiveRange: 3 })
     const enemy = createMockEnemy({ x: 10, y: 0 })
     game.enemies.push(enemy)
@@ -82,6 +82,26 @@ describe('MagicTowerSystem — Q7 debuff zone applies AoE damage + slow', () => 
 
     expect(enemy.slowFactor).toBe(0)
     expect(enemy.dotDamage).toBe(0)
+  })
+
+  it('gates reach by radial distance to the curve, not x-projection', () => {
+    // Regression: the debuff gate used to test only `|enemy.x − tower.x| ≤
+    // range`, so a steep curve reached far past `range` along its arc. The gate
+    // is now the Euclidean distance from the tower to the curve point — same
+    // radial semantics as every other tower (RadarTargeting) and the drawn
+    // band. Curve `y = x`, range 5, tower at the origin:
+    makeMagicTower(game, { effectiveRange: 5, magicExpression: 'x' })
+    // x = 4: x-distance 4 (≤ 5) but radial distance √32 ≈ 5.66 (> 5) → no hit.
+    const far = createMockEnemy({ x: 4, y: 4 })
+    // x = 3: radial distance √18 ≈ 4.24 (≤ 5), and on the curve → hit.
+    const near = createMockEnemy({ x: 3, y: 3 })
+    game.enemies.push(far, near)
+
+    system.update(0.016, game)
+
+    expect(far.slowFactor).toBe(0)
+    expect(far.dotDamage).toBe(0)
+    expect(near.slowFactor).toBe(SLOW_FACTOR)
   })
 
   it('does not affect enemies above/below the curve outside zone width', () => {
@@ -239,6 +259,28 @@ describe('MagicTowerSystem — Q7 buff zone (preserved)', () => {
 
     expect(ZONE_WIDTH * 1.5).toBeLessThan(ZONE_WIDTH * BUFF_ZONE_MULTIPLIER)
     expect(ally.magicBuff).toBeGreaterThan(1)
+  })
+
+  it('gates the buff zone by radial distance to the curve, not x-projection', () => {
+    // Buff shares the debuff radial gate: a tower under a steep curve but beyond
+    // the tower's circular range is not buffed even though its x is within range.
+    makeMagicTower(game, { magicMode: 'buff', x: 0, effectiveRange: 5, magicExpression: 'x' })
+    // Curve y = x. Ally on the curve at x = 4: radial distance √32 ≈ 5.66 (> 5).
+    const ally = createMockTower({
+      type: TowerType.RADAR_A,
+      x: 4,
+      y: 4,
+      baseDamage: 10,
+      damageBonus: 1,
+      magicBuff: 1,
+      interferenceFactor: 1,
+      effectiveDamage: 10,
+    })
+    game.towers.push(ally)
+
+    system.update(0.016, game)
+
+    expect(ally.magicBuff).toBe(1)
   })
 
   it('resets magicBuff to 1 on the next tick when the source is disabled', () => {

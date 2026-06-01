@@ -1,5 +1,6 @@
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { parseExpression, type CurveFunction } from '@/math/expressionParser'
+import { distance } from '@/math/MathUtils'
 import { recomputeEffectiveDamage, effectiveCooldown } from '@/entities/tower-stats'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
@@ -117,13 +118,20 @@ export class MagicTowerSystem {
     const slowFactor = Math.min(SLOW_FACTOR_CEIL, SLOW_FACTOR + slowDepthMod)
     const range = tower.effectiveRange
     // Curve is evaluated in world coordinates so students must compute the
-    // translation `y = f(x − h) + k` themselves — but the influence is gated
-    // by the tower's range on x, otherwise a curve passing far away would
-    // still tag distant enemies.
+    // translation `y = f(x − h) + k` themselves. Influence is a CIRCULAR range
+    // centered on the tower (radius = effectiveRange), measured to the curve
+    // point `(x, f(x))` — same radial semantics as RadarTargeting and the drawn
+    // band. Gating on `|enemy.x − tower.x|` alone (the old slab) let a steep
+    // curve reach far past `range` along its arc; the radial gate caps the
+    // actual reach at `range` regardless of slope.
     for (const enemy of game.enemies) {
       if (!enemy.alive) continue
+      // Cheap x-axis pre-filter — the curve point can only sit within `range`
+      // of the tower if its x is, so this skips the fn() eval for far enemies.
+      // The authoritative gate is the radial distance below.
       if (Math.abs(enemy.x - tower.x) > range) continue
       const curveY = fn(enemy.x)
+      if (distance(tower.x, tower.y, enemy.x, curveY) > range) continue
       if (Math.abs(enemy.y - curveY) < zoneWidth) {
         enemy.slowFactor = Math.max(enemy.slowFactor, slowFactor)
         enemy.slowTimer = slowDuration
@@ -139,10 +147,14 @@ export class MagicTowerSystem {
     const strengthMult = 1 + (mods['zone_strength'] ?? 0)
     const buffAmount = 1.25 * strengthMult
     const range = tower.effectiveRange
+    // Circular range centered on the tower (see _applyDebuff) — the buff zone
+    // shares the same radial gate; only the band's vertical half-width is
+    // widened by BUFF_ZONE_MULTIPLIER, not its reach.
     for (const other of game.towers) {
       if (other.id === tower.id || other.disabled) continue
       if (Math.abs(other.x - tower.x) > range) continue
       const curveY = fn(other.x)
+      if (distance(tower.x, tower.y, other.x, curveY) > range) continue
       if (Math.abs(other.y - curveY) < zoneWidth * BUFF_ZONE_MULTIPLIER) {
         other.magicBuff = Math.max(other.magicBuff, buffAmount)
         recomputeEffectiveDamage(other, game.state)
