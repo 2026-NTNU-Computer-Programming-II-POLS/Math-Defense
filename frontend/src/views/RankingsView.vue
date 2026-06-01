@@ -484,7 +484,11 @@ onBeforeUnmount(cancelInflight)
             <td class="player-name">{{ r.class_name ?? className(r.class_id) }}</td>
             <td class="score">{{ r.avg_territory_value.toFixed(2) }}</td>
           </tr>
-          <tr v-if="externalRankings.length === 0"><td colspan="3" class="empty">No records</td></tr>
+          <tr v-if="externalRankings.length === 0">
+            <td colspan="3" class="empty">
+              {{ selectedActivityId ? 'No records' : 'Select an activity to view rankings.' }}
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>

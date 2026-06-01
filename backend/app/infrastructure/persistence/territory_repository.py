@@ -320,15 +320,22 @@ class SqlAlchemyTerritoryRepository:
             .order_by(avg_col.desc())
             .all()
         )
-        return [
-            {
-                "rank": i + 1,
+        # Competition-style ranking (1, 1, 3) — mirrors get_internal_rankings (B-M-4).
+        result: list[dict] = []
+        rank = 0
+        prev_value: float | None = None
+        for i, row in enumerate(rows):
+            av = float(row.avg_territory_value)
+            if av != prev_value:
+                rank = i + 1
+                prev_value = av
+            result.append({
+                "rank": rank,
                 "class_id": row.class_id,
                 "class_name": row.class_name,
-                "avg_territory_value": float(row.avg_territory_value),
-            }
-            for i, row in enumerate(rows)
-        ]
+                "avg_territory_value": av,
+            })
+        return result
 
     def get_internal_rankings(self, activity_id: str) -> list[dict]:
         # B-H-11: include player_name so callers don't expose raw UUIDs
