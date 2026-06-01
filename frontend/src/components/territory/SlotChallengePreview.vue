@@ -59,11 +59,11 @@ const stars = computed(() =>
         </template>
         <template v-else>
           <dt>Status</dt>
-          <dd>Unoccupied — first to seize takes it.</dd>
+          <dd class="gold-value">Unoccupied — first to seize takes it.</dd>
         </template>
         <template v-if="userAvgAtLevel != null">
           <dt>Your avg at this level</dt>
-          <dd>{{ userAvgAtLevel.toFixed(0) }}</dd>
+          <dd class="gold-value">{{ userAvgAtLevel.toFixed(0) }}</dd>
         </template>
         <template v-if="scoreGap !== null">
           <dt>Gap</dt>
@@ -103,6 +103,7 @@ const stars = computed(() =>
 .preview-stats dt { color: var(--axis); text-shadow: var(--gold-shadow); }
 .preview-stats dd { margin: 0; color: #e8dcc8; }
 .preview-stats dd.score { color: var(--gold-bright); font-weight: bold; }
+.preview-stats dd.gold-value { color: var(--gold); text-shadow: var(--gold-shadow); }
 .preview-stats dd.negative { color: #d05050; }
 
 .skip-pref { font-size: var(--text-xs); color: var(--axis); text-shadow: var(--gold-shadow); display: flex; gap: 6px; align-items: center; }
