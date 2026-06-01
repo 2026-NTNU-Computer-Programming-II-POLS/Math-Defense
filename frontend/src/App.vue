@@ -6,10 +6,14 @@ import { useUiStore } from '@/stores/uiStore'
 import Modal from '@/components/common/Modal.vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import GlobalBackground from '@/components/layout/GlobalBackground.vue'
+import { useGlobalMusic } from '@/composables/useGlobalMusic'
 
 const router = useRouter()
 const uiStore = useUiStore()
 const navigating = ref(false)
+
+// App-wide background music: menu playlist everywhere, engine phase beds in /game.
+useGlobalMusic()
 
 router.beforeEach(() => { navigating.value = true })
 router.afterEach(() => { navigating.value = false })
