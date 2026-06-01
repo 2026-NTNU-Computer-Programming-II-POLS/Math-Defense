@@ -55,6 +55,15 @@ export function bindEngineAudio(g: Game, audio: AchievementAudioRef): (() => voi
   // triggers /audio/* fetches; subsequent retries reuse the cached pool.
   void assetManager.load()
 
+  // Stop ONLY the engine's own phase beds — never the global menu playlist
+  // (useGlobalMusic). Using stopAllMusic() here would kill the playlist track
+  // that useGlobalMusic restarts the instant the route leaves /game, before
+  // GameView's onUnmounted teardown fires.
+  const stopEngineMusic = (): void => {
+    assetManager.stop('ambient-build')
+    assetManager.stop('ambient-wave')
+  }
+
   // ─── Spell / kill / wave-end ───────────────────────────────────────────
   offs.push(g.eventBus.on(Events.SPELL_CAST, () => assetManager.play('cast-spell')))
   offs.push(g.eventBus.on(Events.ENEMY_KILLED, () => assetManager.play('kill')))
@@ -65,12 +74,12 @@ export function bindEngineAudio(g: Game, audio: AchievementAudioRef): (() => voi
   offs.push(g.eventBus.on(Events.PHASE_CHANGED, ({ to }) => {
     if (to === GamePhase.BUILD) assetManager.play('ambient-build')
     else if (to === GamePhase.WAVE) assetManager.play('ambient-wave')
-    else assetManager.stopAllMusic()
+    else stopEngineMusic()
   }))
   // Singleton music survives engine teardown — without this cleanup the bed
   // keeps playing after the player leaves GameView, and also persists across
   // retry() between teardown and the next phase transition.
-  offs.push(() => assetManager.stopAllMusic())
+  offs.push(stopEngineMusic)
 
   // ─── Build / economy feedback ─────────────────────────────────────────
   offs.push(g.eventBus.on(Events.TOWER_PLACED, () => assetManager.play('tower-place')))
