@@ -28,7 +28,7 @@ The application is a Vue 3 single-page application backed by a FastAPI REST API 
 
 Authentication uses short-lived JWT access tokens (15-minute expiry by default, configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). Tokens are delivered as `HttpOnly`, `SameSite=Lax` cookies. The `Secure` flag is enforced at startup: attempting to disable it outside of the CI/test harness causes the application to refuse to start.
 
-Tokens carry the following claims, all of which are validated at decode time:
+Tokens carry the following claims. The structural claims (`sub`, `iss`, `aud`, `jti`, `exp`, `iat`) are marked as required and validated when the token is decoded; `pv` is not part of the decode-time `require` set but is compared against the live user record in the auth dependency before any route handler runs:
 
 | Claim | Purpose |
 |---|---|
@@ -36,9 +36,9 @@ Tokens carry the following claims, all of which are validated at decode time:
 | `iss` / `aud` | Issuer and audience binding (prevents cross-service token reuse) |
 | `jti` | Unique token ID used for revocation |
 | `exp` / `iat` | Expiry and issued-at timestamps |
-| `pv` | Password version; incremented on password change to invalidate old tokens |
+| `pv` | Password version; incremented on password change to invalidate old tokens (checked in the auth dependency, not at decode) |
 
-The signing algorithm is pinned to `HS256` in the decode call; the library's default of accepting any algorithm advertised in the token header is explicitly overridden.
+The signing algorithm is pinned to `HS256` in the decode call; the library's default of accepting any algorithm advertised in the token header is explicitly overridden. As an additional guard, the token's advertised header `alg` is read and asserted to match the configured algorithm before the verifying decode is attempted.
 
 ### Refresh Tokens
 
@@ -58,7 +58,7 @@ After five consecutive failed login attempts within a five-minute window, the ac
 
 ### Password Hashing
 
-Passwords are hashed with bcrypt at a cost factor of 12. Input is truncated to 72 bytes before hashing to avoid a bcrypt-specific issue where bytes beyond the 72-byte limit are silently ignored.
+Passwords are hashed with bcrypt at a cost factor of 12. Input longer than 72 bytes is rejected before hashing (rather than silently truncated), which closes the bcrypt-specific issue where bytes beyond the 72-byte limit would otherwise be ignored. The 72-byte ceiling is also enforced at the schema layer.
 
 ### Multi-Factor Authentication (TOTP)
 
@@ -106,7 +106,8 @@ Because the application is a competitive game with a public leaderboard, score a
 - **Append-only session event log**: every meaningful in-game action is persisted to `session_events` as a JSONB row with an explicit `seq` field assigned client-side. A `UNIQUE(session_id, seq)` constraint makes retried flushes idempotent. The event log feeds replay/spectate playback and ad-hoc post-game verification rather than primary scoring.
 - **Server-side score validation**: the score formula is implemented in WebAssembly (`math_engine.wasm`) and shipped to both sides. The backend loads it through `wasmtime-py` and recomputes the authoritative `total_score` from scalar fields persisted on the `game_sessions` row (kill value, time totals, costs, starting/ending health, the initial answer, etc.). On v2 (strict) sessions a mismatch between client-declared and server-recomputed score raises `ReplayMismatchError`; on v1 sessions the mismatch is logged. In both cases the server overwrites the persisted score with its own recomputation before the value reaches the leaderboard.
 - **Deterministic RNG seed**: `game_sessions.rng_seed` is fixed when the session is created. The score formula itself does not consume the seed; the seed exists so that the recorded event log can be replayed deterministically for spectator/audit purposes.
-- **Leaderboard submissions use only server-side values**: `/leaderboard/submit` reads the score, kills, and waves_survived from the locked session row, never from the request body, so a tampered client cannot raise its own score even if it passes earlier checks.
+- **Leaderboard submissions use only server-side values**: `POST /api/leaderboard` reads the score, kills, and waves_survived from the locked session row, never from the request body, so a tampered client cannot raise its own score even if it passes earlier checks.
+- **Fail-closed score verification**: when the WebAssembly engine cannot be loaded, v2 (strict) sessions are rejected with HTTP 503 (`ReplayUnavailableError`) rather than silently downgrading to the v1 tolerance. The server never accepts a v2 score it could not independently recompute.
 - **Duplicate-submission guards**: the session row is locked with `SELECT ... FOR UPDATE` before the duplicate check, and a database-level `UNIQUE` constraint on `leaderboard.session_id` is the final safety net. Concurrent submissions from the same session are serialised and only one row reaches the leaderboard.
 - **Achievements, talents, and progression**: these are computed server-side from the same session state and the user's persisted progression; the client cannot grant itself an achievement or skill point by sending a crafted request.
 
@@ -114,7 +115,7 @@ Because the application is a competitive game with a public leaderboard, score a
 
 ## CSRF Protection
 
-The application implements the double-submit cookie pattern for CSRF protection. A random token is set in a `csrf_token` cookie and must also appear in the `X-CSRF-Token` request header on all state-mutating requests. The token is refreshed on every response.
+The application implements the double-submit cookie pattern for CSRF protection. A random token is set in a non-`HttpOnly` `csrf_token` cookie (readable by the SPA so it can echo the value) and must also appear in the `X-CSRF-Token` request header, where the two are compared with a constant-time `secrets.compare_digest`. The token is minted once when the cookie is absent and then reused for the cookie's lifetime; it is **not** rotated on every response. This is by design — double-submit security relies on a cross-site attacker being unable to *read* the cookie, not on per-request rotation. The check is enforced only on state-mutating requests that already carry a session or refresh cookie, and the unauthenticated entry points (`/api/auth/login`, `/api/auth/register`, `/api/auth/mfa/challenge`) are exempt because there is no session to protect yet.
 
 CSRF protection is enabled by default. Attempting to disable it outside of the CI/test harness causes the application to refuse to start. `SameSite=Lax` cookies provide a second layer of defence for modern browsers, but the explicit CSRF check is retained because `SameSite` alone does not cover all older browsers or all cross-origin navigation patterns.
 
