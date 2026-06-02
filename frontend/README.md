@@ -108,6 +108,7 @@ frontend/
 │   │   ├── useGameLoop.ts                Mount/unmount engine, inject systems, wire UI bridges, talent modifiers
 │   │   ├── useEngineUiBridges.ts         Registers Vue ↔ engine event bridges used by `useGameLoop`
 │   │   ├── useEngineAudio.ts             Routes engine events to SFX/music via `AssetManager`
+│   │   ├── useGlobalMusic.ts             App-root menu playlist driver — rotates `PLAYLIST_SLUGS` on non-game routes, yields the music bus to the engine on `/game`
 │   │   ├── useUiAudio.ts                 Routes UI-store events (clicks, hovers) to the UI audio bus
 │   │   ├── useSessionSync.ts             Bridge engine lifecycle ↔ backend session API (V2 payload, rng_seed)
 │   │   ├── useStartRun.ts                Single entry point used by LevelSelect / Territory to start a run
@@ -119,6 +120,7 @@ frontend/
 │   │   ├── usePolling.ts                 Polling helper with backoff + cleanup
 │   │   ├── useTokenProbe.ts              Probes auth-token freshness on resume / focus
 │   │   ├── useCanvasPlot.ts              Canvas plotting helper for KaTeX-adjacent function previews
+│   │   ├── useProfileInitials.ts        Singleton reactive custom-initials avatar (letters + tower-palette colour), persisted to `localStorage`
 │   │   ├── useAuth.ts                    Reactive auth helpers (email-based; role checks)
 │   │   ├── useLeaderboard.ts             Leaderboard fetch helpers
 │   │   ├── useManual.ts                  Fetch + reactive state for the in-app Manual viewer
@@ -127,14 +129,15 @@ frontend/
 │   │   └── useKeyboardPlacement.ts       Arrow-key + Enter tower placement (WCAG 2.2 SC 2.1.1 — pointer-free)
 │   │
 │   ├── stores/                     Pinia stores (Vue reactivity layer)
-│   │   ├── authStore.ts            token, user (email/player_name/role), initialising flag
+│   │   ├── authStore.ts            user (email/player_name/role), cookie-based session, initializing flag
 │   │   ├── gameStore.ts            Mirror of engine state → drives HUD reactivity (V2 fields)
 │   │   ├── talentStore.ts          Caches talent modifiers; exposes getTowerModifiers()
 │   │   ├── territoryStore.ts       Territory activity state
 │   │   └── uiStore.ts              Panel visibility, selected tower type, hint step, audio prefs
 │   │
 │   ├── services/                   Backend API clients
-│   │   ├── api.ts                          fetch wrapper; auto-attaches Bearer token; ApiError
+│   │   ├── api.ts                          fetch wrapper; cookie-based session + refresh-and-retry on 401; ApiError
+│   │   ├── imageCache.ts                   dataURL → HTMLImageElement loader/cache for the custom endpoint-marker image
 │   │   ├── authService.ts                  register(email, password, playerName, role) / login / me / logout / updatePlayerName / updateEndpointMarker
 │   │   ├── sessionService.ts               create / update / end / abandon / getActive (V2 fields, rng_seed, practice_mode)
 │   │   ├── sessionLifecycleService.ts      High-level orchestration around session creation + end / score submit
@@ -195,8 +198,8 @@ frontend/
 │   │   │   ├── tile-style.ts           Tile-appearance lookup shared by grid + placement preview
 │   │   │   └── clip-to-board.ts        Canvas-clip helper that masks effects to the play-grid rect
 │   │   ├── audio/                  HTMLAudioElement-based SFX layer
-│   │   │   ├── AssetManager.ts     Lazy-loaded clips, bus mix (music / sfx / ui), polyphony cap, jitter, crossfade
-│   │   │   └── sfx-defs.ts         SFX slug → URL + bus + mix params (see frontend/public/audio/)
+│   │   │   ├── AssetManager.ts     Lazy-loaded clips, bus mix (music / sfx / ui), polyphony cap, jitter, crossfade, menu playlist controller
+│   │   │   └── sfx-defs.ts         SFX slug → URL + bus + mix params; `MUSIC_SLUGS` + `PLAYLIST_SLUGS` (menu-theme-a/b/c) (see frontend/public/audio/)
 │   │   └── replay/                 Deterministic recording + playback + spectate
 │   │       ├── EventRecorder.ts    Captures curated player-decision events (excludes simulation output) with batched flush
 │   │       ├── EventPlayer.ts      Re-feeds the recorded stream against a fresh engine seeded from `rng_seed`
@@ -405,7 +408,7 @@ interface GameState {
   timeExcludePrepare: number[]
   prepPhaseStart: number
   pausePhaseStart: number           // MONTY_HALL / CHAIN_RULE pause start (excluded from score time)
-  perceivedSpeedMultiplier: number  // wall-clock pacing only; score time advances at 1×
+  perceivedSpeedMultiplier: number  // wall-clock pacing only; score time advances with simulation time
 
   // V2 Initial Answer
   initialAnswer: 0 | 1
@@ -535,15 +538,18 @@ User actions emit events through the store — `BuildPanel.vue` calls `TowerInfo
 
 ### `authStore`
 
+Authentication is cookie-based (HTTP-only); the store holds **no** token. Login state is derived from whether `/auth/me` returns a user.
+
 | State | Description |
 |---|---|
-| `token` | JWT access token (persisted to `localStorage`) |
 | `user` | `{ id, email, player_name, role, ia_unlock_earned, ia_recent_accuracy }` (snake_case, mapped from `/auth/me`) or `null` |
 | `initializing` | `true` while `me()` is in-flight on boot |
+| `initPromise` | Resolves when the boot `init()` completes (awaited by router guards) |
+| `sessionExpired` | Set by the api.ts 401 interceptor once the session is unrecoverable |
 
-Computed: `isLoggedIn`, `isAdmin`, `isTeacher`, `isStudent`.
+Computed: `isLoggedIn`, `userRole`, `isAdmin`, `isTeacher`, `isStudent`.
 
-Actions: `init()`, `setToken()`, `setUser()`, `clearAuth()`, `logout()`.
+Actions: `init()`, `setUser()`, `clearAuth()`, `handleSessionExpiry()`, `logout()`, `refreshProfile()`, `updatePlayerName()`, `stopProbe()`.
 
 ### `gameStore`
 
@@ -589,7 +595,8 @@ Also owns the **endpoint-marker** preferences (persisted to `localStorage` and s
 
 | Service | Methods |
 |---|---|
-| `api.ts` | `request<T>(path, opts)` — fetch wrapper with auto Bearer token + `ApiError` class |
+| `api.ts` | `get` / `post` / `put` / `del` helpers — fetch wrapper with cookie-based session (`credentials: 'include'`), refresh-and-retry on 401, `ApiError` class (no `Authorization` header / no localStorage token) |
+| `imageCache.ts` | `loadImage(dataUrl)` / `getCached` / `evict` / `clearCache` — caches the player's custom endpoint-marker image as an `HTMLImageElement` |
 | `authService.ts` | `register(email, password, playerName, role='student')`, `login(email, password)`, `me()`, `logout()`, `updatePlayerName`, `updateEndpointMarker(payload)` |
 | `sessionService.ts` | `create(...)`, `getActive()`, `update(id, patch)`, `end(id, result)`, `abandon(id)`, `submitReflection(id, text)`, `appendReplayEvents(...)`, `getReplay(id)` |
 | `sessionLifecycleService.ts` | High-level orchestration: open a session, attach engine, submit the final score in one flow |
@@ -783,12 +790,13 @@ Grid bounds: X ∈ [-14, 14], Y ∈ [-14, 14]. Tower placement snaps to grid int
 
 ## Audio Assets
 
-`frontend/public/audio/` contains WAV clips loaded on-demand by `engine/audio/AssetManager`. Every file is procedurally synthesised by `scripts/synth-audio.py`, so the repo carries no third-party audio licence. `AssetManager` enforces three mix buses (`music` / `sfx` / `ui`) backed by the four sliders in `uiStore` (master + per-bus), defers initial `play()` until after the first user gesture (autoplay policy), supports per-slug polyphony caps, pitch / volume jitter, and crossfades between the BUILD and WAVE music beds.
+`frontend/public/audio/` contains WAV clips loaded on-demand by `engine/audio/AssetManager`. Every file is procedurally synthesised by `scripts/synth-audio.py`, so the repo carries no third-party audio licence. `AssetManager` enforces three mix buses (`music` / `sfx` / `ui`) backed by the four sliders in `uiStore` (master + per-bus), defers initial `play()` until after the first user gesture (autoplay policy), supports per-slug polyphony caps, pitch / volume jitter, crossfades between the BUILD and WAVE music beds, and a menu-music playlist controller (the `menu-theme-*` tracks below, driven by `useGlobalMusic`).
 
 | File | Bus | Trigger |
 |---|---|---|
 | `ambient-build.wav` | music | Looped bed during BUILD phase |
 | `ambient-wave.wav` | music | Looped bed during WAVE phase (crossfades with `ambient-build`) |
+| `menu-theme-a.wav` / `menu-theme-b.wav` / `menu-theme-c.wav` | music | Menu playlist — randomly rotated across non-game screens by `useGlobalMusic` (not looped; advance on `ended`) |
 | `ui-click.wav` / `ui-hover.wav` / `ui-confirm.wav` / `ui-cancel.wav` | ui | UI affordances (buttons, hovers, modals) |
 | `tower-place.wav` / `tower-upgrade.wav` / `tower-refund.wav` / `tower-select.wav` | sfx | Build-economy actions |
 | `cast-spell.wav` | sfx | Spell cast |
