@@ -42,7 +42,7 @@ The signing algorithm is pinned to `HS256` in the decode call; the library's def
 
 ### Refresh Tokens
 
-A separate long-lived refresh token (30-day expiry by default, configurable via `REFRESH_TOKEN_EXPIRE_DAYS`) is issued on login, registration, and MFA challenge completion. The raw token is delivered as a second `HttpOnly`, `Secure`, `SameSite=Lax` cookie; only a SHA-256 hash of the token is stored server-side in the `refresh_tokens` table. Refresh tokens are rotated on every successful `/api/auth/refresh` call: the previous hash is invalidated and a new raw token replaces the cookie. On logout, both the access-token `jti` and the active refresh token hash are revoked.
+A separate long-lived refresh token (30-day expiry by default, configurable via `REFRESH_TOKEN_EXPIRE_DAYS`) is issued on a successful password login (without MFA) and on MFA challenge completion. Registration does not issue any token or cookie — it is a submit-then-verify flow whose response is identical regardless of whether the email already existed, so a new user signs in via `/api/auth/login` after verifying. The raw token is delivered as a second `HttpOnly`, `Secure`, `SameSite=Lax` cookie; only a SHA-256 hash of the token is stored server-side in the `refresh_tokens` table. Refresh tokens are rotated on every successful `/api/auth/refresh` call: the previous hash is invalidated and a new raw token replaces the cookie. On logout, both the access-token `jti` and the active refresh token hash are revoked.
 
 If the same refresh token is presented twice (typically because an attacker has captured the cookie and the legitimate client has already used it, or vice versa), the second use is detected as a reuse event. When this happens, **every** refresh token for that user is revoked inside the same transaction before the error is returned to the client, forcing the legitimate user to re-authenticate but preventing the attacker from minting any further access tokens. Password changes likewise revoke the user's entire refresh-token family in addition to incrementing `password_version`.
 
@@ -238,7 +238,7 @@ CI (`.github/workflows/ci.yml`) runs `pip-audit -r requirements.txt` against bac
 - Development Docker Compose binds services to `127.0.0.1` only, not `0.0.0.0`.
 - All production services drop every Linux capability (`cap_drop: [ALL]`) and set `security_opt: [no-new-privileges:true]`, so a compromised process cannot regain elevated privileges via setuid binaries.
 - Backend and frontend containers run with a read-only root filesystem in production; only explicitly declared `tmpfs` and named-volume mounts are writable.
-- The production compose declares a `healthcheck` for every long-running service (`postgres`, `backend`, `frontend`); the periodic `db-backup` service has no healthcheck because it is a one-shot job. The development compose adds healthchecks for `postgres` and `backend` only — the Vite dev server is left without one because reload-driven restarts make the signal noisy.
+- The production compose declares a `healthcheck` for `postgres`, `backend`, and `frontend`; the `db-backup` service (a `crond` loop that runs `pg_backup.sh` daily at 02:00 UTC) has no healthcheck. The development compose adds healthchecks for `postgres` and `backend` only — the Vite dev server is left without one because reload-driven restarts make the signal noisy.
 
 ---
 
