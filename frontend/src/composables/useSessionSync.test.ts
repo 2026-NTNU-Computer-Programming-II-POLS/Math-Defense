@@ -65,7 +65,7 @@ describe('useSessionSync — retry on transient end-session failure (bug 3.2)', 
     vi.clearAllMocks()
     // Pretend the user is logged in so the sync path actually runs
     const auth = useAuthStore()
-    auth.setUser({ id: 'u1', email: 'tester@test.local', player_name: 'tester', role: 'student', ia_unlock_earned: false, ia_recent_accuracy: 0 })
+    auth.setUser({ id: 'u1', email: 'tester@test.local', player_name: 'tester', role: 'student', ia_unlock_earned: false, ia_recent_accuracy: 0, profile_initials_letters: null, profile_initials_color: null })
 
     // No orphan session at mount
     vi.mocked(sessionService.getActive).mockResolvedValue(null)

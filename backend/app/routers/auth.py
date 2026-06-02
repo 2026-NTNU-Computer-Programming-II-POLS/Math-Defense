@@ -23,6 +23,7 @@ from app.schemas.auth import (
     MFAConfirmRequest,
     MFASetupRequest,
     MFASetupResponse,
+    ProfileInitialsUpdateRequest,
     RegisterAcceptedResponse,
     RegisterRequest,
     TokenResponse,
@@ -72,6 +73,8 @@ def _build_auth_me_response(
         endpoint_marker_style=user.endpoint_marker_style,
         endpoint_marker_custom_dataurl=user.endpoint_marker_custom_dataurl,
         endpoint_hit_fx=user.endpoint_hit_fx,
+        profile_initials_letters=user.profile_initials_letters,
+        profile_initials_color=user.profile_initials_color,
     )
 
 
@@ -344,6 +347,28 @@ def update_endpoint_marker(
         req.style,
         req.custom_dataurl,
         req.hit_fx,
+    )
+    return _build_auth_me_response(user)
+
+
+@router.put("/profile/initials", response_model=AuthMeResponse)
+@limiter.limit("10/minute")
+def update_profile_initials(
+    request: Request,
+    req: ProfileInitialsUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set or clear the profile-initials avatar (letters + colour).
+
+    Pydantic enforces length + hex shape at the edge; the User aggregate
+    re-validates the pairing invariant (both set or both null) which is also
+    enforced by a DB CheckConstraint as defense in depth.
+    """
+    user = build_auth_service(db).update_profile_initials(
+        current_user.id,
+        req.letters,
+        req.color,
     )
     return _build_auth_me_response(user)
 

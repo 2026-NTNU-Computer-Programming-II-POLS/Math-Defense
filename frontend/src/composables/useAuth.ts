@@ -30,6 +30,8 @@ export function useAuth() {
           role: me.role as UserRole,
           ia_unlock_earned: me.ia_unlock_earned ?? false,
           ia_recent_accuracy: me.ia_recent_accuracy ?? 0,
+          profile_initials_letters: me.profile_initials_letters ?? null,
+          profile_initials_color: me.profile_initials_color ?? null,
         })
       } catch {
         authStore.setUser({
@@ -39,6 +41,8 @@ export function useAuth() {
           role: (res.role as UserRole) ?? 'student',
           ia_unlock_earned: false,
           ia_recent_accuracy: 0,
+          profile_initials_letters: null,
+          profile_initials_color: null,
         })
       }
       return true
@@ -64,6 +68,8 @@ export function useAuth() {
           role: me.role as UserRole,
           ia_unlock_earned: me.ia_unlock_earned ?? false,
           ia_recent_accuracy: me.ia_recent_accuracy ?? 0,
+          profile_initials_letters: me.profile_initials_letters ?? null,
+          profile_initials_color: me.profile_initials_color ?? null,
         })
       } catch {
         authStore.setUser({
@@ -73,6 +79,8 @@ export function useAuth() {
           role: (res.role as UserRole) ?? 'student',
           ia_unlock_earned: false,
           ia_recent_accuracy: 0,
+          profile_initials_letters: null,
+          profile_initials_color: null,
         })
       }
       mfaRequired.value = false

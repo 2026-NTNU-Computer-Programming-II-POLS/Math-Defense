@@ -42,6 +42,8 @@ function makeUser(iaUnlockEarned: boolean) {
     role: 'student' as const,
     ia_unlock_earned: iaUnlockEarned,
     ia_recent_accuracy: 0,
+    profile_initials_letters: null,
+    profile_initials_color: null,
   }
 }
 

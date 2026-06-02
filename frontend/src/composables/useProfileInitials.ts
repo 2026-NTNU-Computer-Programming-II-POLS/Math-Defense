@@ -1,5 +1,7 @@
-import { ref, readonly, watch, type Ref, type DeepReadonly } from 'vue'
+import { computed, type ComputedRef } from 'vue'
 import { TOWER_DEFS } from '@/data/tower-defs'
+import { useAuthStore } from '@/stores/authStore'
+import { authService } from '@/services/authService'
 
 // The selectable color palette for the custom-initials avatar is the seven
 // tower identity colors — sourced from TOWER_DEFS so a future palette change
@@ -12,7 +14,6 @@ export interface ProfileColorChoice {
 export const PROFILE_COLOR_CHOICES: ReadonlyArray<ProfileColorChoice> =
   Object.values(TOWER_DEFS).map((d) => ({ name: d.name, color: d.color }))
 
-const STORAGE_KEY = 'mdf.profileInitials'
 const MAX_LETTERS = 2
 
 export interface ProfileInitials {
@@ -20,60 +21,57 @@ export interface ProfileInitials {
   color: string
 }
 
-function readFromStorage(): ProfileInitials | null {
+// One-time scrub: the previous build persisted the avatar to a single global
+// localStorage key, leaking the choice between accounts on the same browser.
+// The server is now the source of truth; remove the legacy key so stale data
+// can never resurface for the wrong account.
+let legacyScrubbed = false
+function scrubLegacyKey(): void {
+  if (legacyScrubbed) return
+  legacyScrubbed = true
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<ProfileInitials>
-    if (
-      typeof parsed.letters === 'string' &&
-      parsed.letters.length > 0 &&
-      typeof parsed.color === 'string'
-    ) {
-      return {
-        letters: parsed.letters.slice(0, MAX_LETTERS).toUpperCase(),
-        color: parsed.color,
-      }
-    }
-  } catch {
-    // localStorage unavailable (private mode) or malformed JSON — fall through.
-  }
-  return null
+    window.localStorage.removeItem('mdf.profileInitials')
+  } catch { /* best-effort */ }
 }
 
-// Singleton reactive state. Sharing one ref across consumers means a change
-// inside ProfileView reflects immediately in MenuView's avatar bubble without
-// a page reload.
-const profileInitials: Ref<ProfileInitials | null> = ref(readFromStorage())
-
-watch(profileInitials, (next) => {
-  try {
-    if (next === null) {
-      window.localStorage.removeItem(STORAGE_KEY)
-    } else {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    }
-  } catch {
-    // Persistence is best-effort; an unavailable localStorage shouldn't break
-    // the in-memory selection.
-  }
-}, { deep: true })
-
 export function useProfileInitials(): {
-  initials: DeepReadonly<Ref<ProfileInitials | null>>
-  setInitials: (letters: string, color: string) => void
-  clearInitials: () => void
+  initials: ComputedRef<ProfileInitials | null>
+  setInitials: (letters: string, color: string) => Promise<void>
+  clearInitials: () => Promise<void>
   isValidColor: (color: string) => boolean
 } {
-  function setInitials(letters: string, color: string): void {
+  scrubLegacyKey()
+  const auth = useAuthStore()
+
+  // Derived directly from the authenticated user, so two accounts on the
+  // same browser can never see each other's avatar — each /me hydrates only
+  // the signed-in user's persisted pair.
+  const initials = computed<ProfileInitials | null>(() => {
+    const u = auth.user
+    if (!u || !u.profile_initials_letters || !u.profile_initials_color) return null
+    return { letters: u.profile_initials_letters, color: u.profile_initials_color }
+  })
+
+  function applyServerResult(letters: string | null | undefined, color: string | null | undefined): void {
+    // patchUser is a no-op when logged out and merges in place without
+    // restarting the token probe (unlike setUser).
+    auth.patchUser({
+      profile_initials_letters: letters ?? null,
+      profile_initials_color: color ?? null,
+    })
+  }
+
+  async function setInitials(letters: string, color: string): Promise<void> {
     const trimmed = letters.trim().slice(0, MAX_LETTERS).toUpperCase()
     if (trimmed.length === 0) return
     if (!isValidColor(color)) return
-    profileInitials.value = { letters: trimmed, color }
+    const updated = await authService.updateProfileInitials({ letters: trimmed, color })
+    applyServerResult(updated.profile_initials_letters, updated.profile_initials_color)
   }
 
-  function clearInitials(): void {
-    profileInitials.value = null
+  async function clearInitials(): Promise<void> {
+    const updated = await authService.updateProfileInitials({ letters: null, color: null })
+    applyServerResult(updated.profile_initials_letters, updated.profile_initials_color)
   }
 
   function isValidColor(color: string): boolean {
@@ -81,7 +79,7 @@ export function useProfileInitials(): {
   }
 
   return {
-    initials: readonly(profileInitials),
+    initials,
     setInitials,
     clearInitials,
     isValidColor,

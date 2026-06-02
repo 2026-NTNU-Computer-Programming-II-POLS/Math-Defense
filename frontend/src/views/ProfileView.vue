@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore, type EndpointHitFxStyle } from '@/stores/uiStore'
@@ -31,6 +31,16 @@ const { initials: profileInitials, setInitials, clearInitials } = useProfileInit
 const initialsDraftLetters = ref(profileInitials.value?.letters ?? '')
 const initialsDraftColor = ref(profileInitials.value?.color ?? PROFILE_COLOR_CHOICES[0].color)
 
+// Seed the draft from the persisted avatar once it becomes available. On a hard
+// refresh landing directly on /profile the auth user (and thus profileInitials)
+// can hydrate after this component mounts; seed only while the field is still
+// untouched so we never clobber what the player is typing.
+watch(profileInitials, (val) => {
+  if (val && initialsDraftLetters.value.trim().length === 0) {
+    initialsDraftLetters.value = val.letters
+    initialsDraftColor.value = val.color
+  }
+}, { immediate: true })
 
 const displayInitials = computed(() => {
   const letters = initialsDraftLetters.value.trim().slice(0, 2).toUpperCase()
@@ -38,10 +48,36 @@ const displayInitials = computed(() => {
   return profileInitials.value
 })
 
-function applyInitials(): void {
+const initialsError = ref('')
+// Guards the avatar PUTs so a double-click (or Enter + click) can't fire two
+// concurrent requests; also drives the disabled state on the buttons.
+const savingInitials = ref(false)
+
+async function applyInitials(): Promise<void> {
   const trimmed = initialsDraftLetters.value.trim()
-  if (trimmed.length === 0) return
-  setInitials(trimmed, initialsDraftColor.value)
+  if (trimmed.length === 0 || savingInitials.value) return
+  initialsError.value = ''
+  savingInitials.value = true
+  try {
+    await setInitials(trimmed, initialsDraftColor.value)
+  } catch (e) {
+    initialsError.value = e instanceof Error ? e.message : 'Failed to update avatar'
+  } finally {
+    savingInitials.value = false
+  }
+}
+
+async function clearAvatar(): Promise<void> {
+  if (savingInitials.value) return
+  initialsError.value = ''
+  savingInitials.value = true
+  try {
+    await clearInitials()
+  } catch (e) {
+    initialsError.value = e instanceof Error ? e.message : 'Failed to clear avatar'
+  } finally {
+    savingInitials.value = false
+  }
 }
 
 const pwVisible = ref(false)
@@ -347,7 +383,7 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
             <button
               type="button"
               class="btn initials-apply-btn"
-              :disabled="initialsDraftLetters.trim().length === 0"
+              :disabled="initialsDraftLetters.trim().length === 0 || savingInitials"
               @click="applyInitials"
             >
               Use
@@ -356,11 +392,13 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
               v-if="profileInitials"
               type="button"
               class="btn initials-clear-btn"
-              @click="clearInitials"
+              :disabled="savingInitials"
+              @click="clearAvatar"
             >
               Clear
             </button>
           </div>
+          <p v-if="initialsError" class="initials-error">{{ initialsError }}</p>
         </div>
 
       </div>
@@ -761,6 +799,8 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
   color: var(--charcoal-soft);
 }
 .initials-clear-btn:hover { background: rgba(245, 250, 254, 0.6); color: var(--charcoal); }
+
+.initials-error { font-size: var(--text-xs); color: var(--clay-deep); text-align: center; margin: 0; }
 
 .profile-info {
   display: flex;
