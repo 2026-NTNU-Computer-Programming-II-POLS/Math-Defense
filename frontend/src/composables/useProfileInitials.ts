@@ -53,9 +53,9 @@ export function useProfileInitials(): {
   })
 
   function applyServerResult(letters: string | null | undefined, color: string | null | undefined): void {
-    if (!auth.user) return
-    auth.setUser({
-      ...auth.user,
+    // patchUser is a no-op when logged out and merges in place without
+    // restarting the token probe (unlike setUser).
+    auth.patchUser({
       profile_initials_letters: letters ?? null,
       profile_initials_color: color ?? null,
     })

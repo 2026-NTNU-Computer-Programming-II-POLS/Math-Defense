@@ -119,6 +119,16 @@ export const useAuthStore = defineStore('auth', () => {
     probe.start()
   }
 
+  /**
+   * Merge a partial update into the current user. Unlike setUser this does not
+   * restart the token probe or reset sessionExpired — it's for in-place field
+   * edits (e.g. the profile-initials avatar) where those session side effects
+   * would be inappropriate. No-op when logged out.
+   */
+  function patchUser(partial: Partial<User>): void {
+    if (user.value) user.value = { ...user.value, ...partial }
+  }
+
   function clearAuth(): void {
     user.value = null
     probe.stop()
@@ -240,6 +250,7 @@ export const useAuthStore = defineStore('auth', () => {
     initPromise,
     sessionExpired,
     setUser,
+    patchUser,
     clearAuth,
     handleSessionExpiry,
     logout,
