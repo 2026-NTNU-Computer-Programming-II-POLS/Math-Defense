@@ -19,10 +19,10 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 | Path | Role |
 |---|---|
 | `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~87 Vitest files. |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (46 migrations), ~31 pytest files. |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (47 migrations), ~32 pytest files. |
 | `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). Sources: `math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`, `Makefile`. |
 | `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
-| `shared/` | `game-constants.json` (canvas/grid/economy single source of truth) + `score_parity_fixtures.json` (cross-language score-formula fixtures). |
+| `shared/` | `game-constants.json` (canvas/grid/economy single source of truth) + `enemy-defs.json` (enemy stats/abilities, cross-language) + `score_parity_fixtures.json` (cross-language score-formula fixtures). |
 | `assets/` | Sprites, audio, fonts (referenced as `frontend/public/`). |
 | `docs/` | Project documentation (analysis, audit, educational theory). |
 | `docker-compose.yml` | Dev orchestration: Postgres + backend (hot reload) + Vite dev server. |
@@ -63,7 +63,7 @@ flowchart TB
         Infra --> Domain
     end
 
-    DB[("PostgreSQL 16<br/>Alembic: 46 migrations<br/>29 tables")]
+    DB[("PostgreSQL 16<br/>Alembic: 47 migrations<br/>29 tables")]
     Shared[/"shared/game-constants.json<br/>(parity-tested)"/]
 
     Client -- HTTPS --> Nginx
@@ -125,7 +125,7 @@ flowchart LR
         TerrAgg["territory/<br/>aggregate · errors · recommendation · repository"]
         ChalAgg["challenge/<br/>aggregate · constraint_dsl · tower_types · repository"]
         SeasonAgg["season/<br/>aggregate · repository"]
-        Assess["assessment/<br/>competencies · q_matrix · competency_state ·<br/>competency_estimator · suggestions"]
+        Assess["assessment/<br/>competencies · q_matrix · q_matrix_defs ·<br/>competency_state · competency_estimator · suggestions"]
         StudyAgg["study/<br/>group_assignment · probe_keys"]
         AuthAgg["auth/<br/>repository (cross-cutting auth protocols)"]
         Scoring["scoring/<br/>score_calculator (S1 / S2 / K / TotalScore)"]
@@ -189,7 +189,7 @@ flowchart TB
     end
 
     subgraph Game["Game Context"]
-        GS["GameSession Aggregate<br/>FSM: active → completed/abandoned<br/>monotonic score · 50k delta cap"]
+        GS["GameSession Aggregate<br/>FSM: active → completed/abandoned<br/>monotonic score · per-level delta cap"]
         SE[SessionEvent<br/>append-only]
     end
 
@@ -204,9 +204,13 @@ flowchart TB
     end
 
     subgraph Class["Classroom Context"]
-        C[Class<br/>teacher_id · join_code]
+        C[Class<br/>teacher_id · join_code<br/>archived_at soft-archive]
         CM[ClassMembership]
-        RCM[RemovedClassMembership<br/>soft delete]
+        RCM[RemovedClassMembership<br/>re-join blocklist]
+        CCT[ClassCoTeacher<br/>secondary teachers]
+        CPI[ClassPendingInvite<br/>pre-registration invites]
+        CG[ClassGroup<br/>within-class grouping]
+        CGM[ClassGroupMember<br/>≤1 group per class]
     end
 
     subgraph Terr["Territory Context"]
@@ -238,20 +242,22 @@ flowchart TB
     GS -. occupies .-> TO
     TO --> TS --> GTA
     C --> CM
+    C --> RCM
+    C --> CCT
+    C --> CPI
+    C --> CG --> CGM
     GS -. challenge_id .-> CH
 ```
 
 **Domain events (lite event sourcing)**
 
-`GameSession` emits `SessionCreated`, `SessionUpdated`, `SessionCompleted`, `SessionAbandoned`. After the session row itself is committed, `SessionApplicationService` dispatches `SessionCompleted` through `SessionEventBus` to a chain of **independent, post-commit handlers** (`application/session_event_handlers.py`) that:
+`GameSession` emits `SessionCreated`, `SessionUpdated`, `SessionCompleted`, `SessionAbandoned`. After the session row itself is committed, `SessionApplicationService` dispatches `SessionCompleted` through `SessionEventBus` to a chain of **three independent, post-commit handlers** (`application/session_event_handlers.py`):
 
-1. Create a `LeaderboardEntry` (idempotent via `UNIQUE(session_id)`).
-2. Run `AchievementApplicationService.evaluate_unlocks(...)` and award talent points.
-3. Update `UserCompetencyState` (Beta-Bernoulli posteriors per Q-matrix evidence).
-4. Update `User.ia_recent_accuracy` (rolling 10-session fraction).
-5. Accumulate study dosage if user is enrolled.
+1. `LeaderboardInsertHandler` — create a `LeaderboardEntry` (idempotent via `UNIQUE(session_id)`; skipped for practice-mode and teacher/admin preview runs).
+2. `AchievementCheckHandler` — run `AchievementApplicationService.check_and_unlock(...)` (awarding talent points) **and**, when an `AssessmentApplicationService` is wired, write the unlocked achievements' Beta-Bernoulli evidence (`apply_evidence_in_open_uow`) inside the **same** UoW commit (the "H3" fix).
+3. `IaAccuracyRefreshHandler` — recompute and persist `User.ia_recent_accuracy` (rolling recent-session fraction).
 
-Each handler runs in **its own Unit of Work** and is isolated by a per-handler `try/except` in `SessionEventBus.dispatch` — a failure in one (or a bug) is logged and does **not** roll back the already-durable session row or suppress the other handlers. Atomicity is guaranteed only *within* `AchievementCheckHandler`: achievement-unlock rows and their Beta-Bernoulli evidence (steps 2–3) commit together in one UoW (the "H3" fix). The trade-off is a known durability gap — if the leaderboard insert fails it is logged with **no automatic retry** (a future outbox table would close this); the `UNIQUE(session_id)` constraint keeps any later retry idempotent.
+Each handler runs in **its own Unit of Work** and is isolated by a per-handler `try/except Exception` in `SessionEventBus.dispatch` — a failure in one (or a bug) is logged and does **not** roll back the already-durable session row or suppress the other handlers. Atomicity is guaranteed only *within* `AchievementCheckHandler`: achievement-unlock rows and their Beta-Bernoulli evidence commit together in one UoW. The trade-off is a known durability gap — if the leaderboard insert fails it is logged with **no automatic retry** (a future outbox table would close this); the `UNIQUE(session_id)` constraint keeps any later retry idempotent. (Study `dosage_seconds` is **not** updated by this chain.)
 
 ### 3.3 Request Lifecycle (example: end-of-session POST)
 
@@ -278,13 +284,16 @@ sequenceDiagram
     Repo-->>App: GameSession aggregate
     App->>Dom: complete(result)
     Dom-->>App: SessionCompleted event
-    App->>Lb: on_session_completed(...)
-    Lb->>DB: INSERT leaderboard_entries (idempotent)
-    App->>Ach: evaluate_unlocks(...)
-    Ach->>DB: INSERT user_achievements / UPDATE talent_allocations
+    App->>App: _verify_score (wasmtime-py recompute)
     App->>Repo: save(session)
     Repo->>DB: UPDATE game_sessions
-    App-->>R: GameSessionDTO
+    App->>DB: commit (session row now durable)
+    Note over App,DB: post-commit dispatch via SessionEventBus<br/>each handler in its own UoW, isolated by try/except
+    App->>Lb: LeaderboardInsertHandler(SessionCompleted)
+    Lb->>DB: INSERT leaderboard_entries (idempotent)
+    App->>Ach: AchievementCheckHandler(SessionCompleted)
+    Ach->>DB: INSERT user_achievements / UPDATE talent_allocations + Beta-evidence (H3)
+    App-->>R: EndSessionResult (DTO + newly_unlocked)
     R-->>FE: 200 OK + DTO
 ```
 
@@ -350,9 +359,9 @@ flowchart TB
         LbCmp[leaderboard/PersonalTimeline]
     end
 
-    subgraph Composables["Composables (20 use*.ts)"]
-        Lifecycle["useGameLoop · useSessionSync · useStartRun · useEngineUiBridges · useEngineAudio · useUiAudio"]
-        Auth["useAuth · useTokenProbe"]
+    subgraph Composables["Composables (22 use*.ts)"]
+        Lifecycle["useGameLoop · useSessionSync · useStartRun · useEngineUiBridges · useEngineAudio · useUiAudio · useGlobalMusic"]
+        Auth["useAuth · useTokenProbe · useProfileInitials"]
         UI["useCanvasPlot · useKeyboardPlacement · useCountdown · useFirstEncounterCards · usePrincipleOverlay · useChallengePreviewPreference · useManual · useReducedMotion · useValuePop"]
         Data["useLeaderboard · usePolling · useTerritoryRecommendation"]
     end
@@ -406,7 +415,7 @@ flowchart TB
 
     subgraph DomainPolicies["domain/* (pure rules)"]
         SP[SplitPolicy]
-        LG[level-generator · distractor · decoy]
+        LG[level-generator · decoy-generator · checkpoint]
         LLS[level-layout-service]
         PP[placement-policy · legal-positions]
         MoveS[movement-strategy]
@@ -589,30 +598,59 @@ landed" note).
 
 ## 6. Database Schema (Logical View)
 
-> Authoritative reference: `DATABASE_SCHEMA.md`. The diagram below shows the principal entities and FK relationships.
+> Authoritative reference: `DATABASE_SCHEMA.md` (full column / constraint / index detail). The diagram below is **exhaustive** — it depicts all 29 tables and every foreign-key relationship, with concise key-column blocks. Four tables carry no foreign keys: `seasons` (its talent-point multiplier is applied *logically* by timestamp window — shown dashed below, there is no FK to `user_achievements`), `login_attempts`, `denied_tokens`, and `audit_logs` (whose `user_id` deliberately omits its FK so audit history survives user deletion).
 
 ```mermaid
 erDiagram
-    USERS ||--o{ GAME_SESSIONS : has
-    USERS ||--o{ USER_ACHIEVEMENTS : earns
-    USERS ||--o{ TALENT_ALLOCATIONS : allocates
-    USERS ||--o{ REFRESH_TOKENS : owns
-    USERS ||--o{ EMAIL_VERIFICATION_TOKENS : owns
-    USERS ||--o{ USER_COMPETENCY_STATE : tracked_by
-    USERS ||--o{ STUDY_ENROLLMENTS : enrolls
-    USERS ||--o{ CLASS_MEMBERSHIPS : member_of
-    USERS ||--o{ CLASSES : teaches
-    GAME_SESSIONS ||--|| LEADERBOARD_ENTRIES : produces
-    GAME_SESSIONS ||--o{ SESSION_EVENTS : logs
-    GAME_SESSIONS }o--o| CHALLENGES : "ran under (nullable)"
-    CLASSES ||--o{ CLASS_MEMBERSHIPS : contains
-    CLASSES ||--o{ REMOVED_CLASS_MEMBERSHIPS : soft_deletes
-    CLASSES ||--o{ GRABBING_TERRITORY_ACTIVITIES : hosts
-    GRABBING_TERRITORY_ACTIVITIES ||--o{ TERRITORY_SLOTS : has
-    TERRITORY_SLOTS ||--o| TERRITORY_OCCUPATIONS : "currently occupied by"
-    TERRITORY_OCCUPATIONS }o--o| GAME_SESSIONS : "via session_id"
-    GRABBING_TERRITORY_ACTIVITIES ||--o{ TERRITORY_SESSION_USES : guards_replay
-    SEASONS ||--o{ USER_ACHIEVEMENTS : applies_multiplier_to
+    %% -- Core user associations --
+    USERS ||--o{ CLASSES : "teaches (teacher_id RESTRICT)"
+    USERS ||--o{ CLASS_MEMBERSHIPS : "member_of (student_id)"
+    USERS ||--o{ REMOVED_CLASS_MEMBERSHIPS : "removed (student_id)"
+    USERS ||--o{ CLASS_CO_TEACHERS : "co-teaches (teacher_id)"
+    USERS ||--o{ CLASS_GROUP_MEMBERS : "grouped (student_id)"
+    USERS ||--o{ GAME_SESSIONS : "plays (user_id)"
+    USERS |o--o{ LEADERBOARD_ENTRIES : "scored (user_id SET NULL)"
+    USERS ||--o{ USER_ACHIEVEMENTS : "earns"
+    USERS ||--o{ TALENT_ALLOCATIONS : "allocates"
+    USERS ||--o{ USER_COMPETENCY_STATE : "tracked_by"
+    USERS ||--o{ REFRESH_TOKENS : "rotates"
+    USERS ||--o{ EMAIL_VERIFICATION_TOKENS : "verifies_via"
+    USERS ||--o{ CHALLENGES : "authors (teacher_id)"
+    USERS ||--o{ STUDY_ENROLLMENTS : "enrolls"
+    USERS ||--o{ STUDY_PROBE_ATTEMPTS : "submits"
+    USERS ||--o{ STUDY_AFFECT_RESPONSES : "rates"
+    USERS ||--o{ TERRITORY_OCCUPATIONS : "occupies (student_id)"
+    USERS ||--o{ TERRITORY_RANKINGS_SNAPSHOT : "ranked (student_id)"
+    USERS ||--o{ GRABBING_TERRITORY_ACTIVITIES : "creates (teacher_id)"
+    USERS |o--o{ GRABBING_TERRITORY_ACTIVITIES : "settles (settled_by SET NULL)"
+
+    %% -- Class associations --
+    CLASSES ||--o{ CLASS_MEMBERSHIPS : "enrolls (class_id)"
+    CLASSES ||--o{ REMOVED_CLASS_MEMBERSHIPS : "removal_log (class_id)"
+    CLASSES ||--o{ CLASS_CO_TEACHERS : "co-taught (class_id)"
+    CLASSES ||--o{ CLASS_PENDING_INVITES : "pre-invites (class_id)"
+    CLASSES ||--o{ CLASS_GROUPS : "groups (class_id)"
+    CLASSES ||--o{ CLASS_GROUP_MEMBERS : "group_link (class_id denorm.)"
+    CLASSES |o--o{ GRABBING_TERRITORY_ACTIVITIES : "hosts (class_id nullable)"
+    CLASS_GROUPS ||--o{ CLASS_GROUP_MEMBERS : "members (group_id)"
+
+    %% -- Challenge mode --
+    CHALLENGES |o--o{ GAME_SESSIONS : "scoped (challenge_id SET NULL)"
+    CHALLENGES |o--o{ LEADERBOARD_ENTRIES : "ranks (challenge_id CASCADE)"
+
+    %% -- Session -> projections / territory (session_id is UNIQUE on both projections) --
+    GAME_SESSIONS ||--o{ SESSION_EVENTS : "recorded (session_id)"
+    GAME_SESSIONS |o--o| LEADERBOARD_ENTRIES : "logged_as (session_id UNIQUE)"
+    GAME_SESSIONS |o--o| TERRITORY_OCCUPATIONS : "used_for (session_id UNIQUE)"
+    GAME_SESSIONS ||--o| TERRITORY_SESSION_USES : "replay_guard (session_id PK)"
+
+    %% -- Territory hierarchy --
+    GRABBING_TERRITORY_ACTIVITIES ||--o{ TERRITORY_SLOTS : "has (activity_id)"
+    TERRITORY_SLOTS ||--o| TERRITORY_OCCUPATIONS : "occupied_by (slot_id UNIQUE)"
+    GRABBING_TERRITORY_ACTIVITIES ||--o{ TERRITORY_RANKINGS_SNAPSHOT : "snapshots (activity_id)"
+
+    %% -- Seasons: logical (no FK) --
+    SEASONS ||..o{ USER_ACHIEVEMENTS : "multiplier by time-window (no FK)"
 
     USERS {
         uuid id PK
@@ -626,62 +664,186 @@ erDiagram
         text endpoint_marker_custom_dataurl "nullable"
         string endpoint_hit_fx "nullable, CHECK allowlist"
     }
+    CLASSES {
+        uuid id PK
+        uuid teacher_id FK "-> users RESTRICT"
+        string join_code UK "8-char UPPER"
+        datetime archived_at "nullable soft-archive"
+    }
+    CLASS_MEMBERSHIPS {
+        uuid id PK
+        uuid class_id FK "-> classes CASCADE"
+        uuid student_id FK "-> users CASCADE"
+    }
+    REMOVED_CLASS_MEMBERSHIPS {
+        uuid id PK
+        uuid class_id FK "-> classes CASCADE"
+        uuid student_id FK "-> users CASCADE"
+    }
+    CLASS_CO_TEACHERS {
+        uuid id PK
+        uuid class_id FK "-> classes CASCADE"
+        uuid teacher_id FK "-> users CASCADE"
+    }
+    CLASS_PENDING_INVITES {
+        uuid id PK
+        uuid class_id FK "-> classes CASCADE"
+        string email "UNIQUE per class"
+    }
+    CLASS_GROUPS {
+        uuid id PK
+        uuid class_id FK "-> classes CASCADE"
+        string name "UNIQUE per class"
+    }
+    CLASS_GROUP_MEMBERS {
+        uuid group_id PK,FK "-> class_groups CASCADE"
+        uuid student_id PK,FK "-> users CASCADE"
+        uuid class_id FK "-> classes (denormalised)"
+    }
     GAME_SESSIONS {
         uuid id PK
-        uuid user_id FK
+        uuid user_id FK "-> users CASCADE"
+        uuid challenge_id FK "-> challenges SET NULL, nullable"
         int star_rating
         string status
-        int current_wave
+        bool practice_mode
+        bool is_preview
         int gold
         int hp
         int score
-        int kills
-        int waves_survived
         float total_score
         bigint rng_seed
-        uuid challenge_id FK "nullable"
+        smallint replay_version "1=JS, 2=WASM bit-exact"
         timestamptz started_at
         timestamptz ended_at
     }
     LEADERBOARD_ENTRIES {
         uuid id PK
-        uuid user_id FK "nullable"
-        uuid session_id FK "UNIQUE, nullable"
+        uuid user_id FK "-> users SET NULL, nullable"
+        uuid session_id FK "-> game_sessions SET NULL, UNIQUE"
+        uuid challenge_id FK "-> challenges CASCADE, nullable"
         int level
         int score
+        float total_score "nullable"
     }
     SESSION_EVENTS {
         bigserial id PK
-        uuid session_id FK
-        int seq
-        float ts
+        uuid session_id FK "-> game_sessions CASCADE"
+        int seq "UNIQUE(session_id, seq)"
+        float ts "game-time seconds"
         string event_type
         jsonb payload
     }
     USER_ACHIEVEMENTS {
         uuid id PK
-        uuid user_id FK
+        uuid user_id FK "-> users CASCADE"
         string achievement_id
         int talent_points
         timestamptz unlocked_at
     }
     TALENT_ALLOCATIONS {
         uuid id PK
-        uuid user_id FK
+        uuid user_id FK "-> users CASCADE"
         string talent_node_id
-        int current_level
+        int current_level "CHECK >= 1"
     }
     CHALLENGES {
         uuid id PK
-        uuid teacher_id FK
+        uuid teacher_id FK "-> users CASCADE"
         jsonb constraints
         timestamptz deleted_at "soft delete"
     }
     USER_COMPETENCY_STATE {
-        uuid user_id PK
+        uuid user_id PK,FK "-> users CASCADE"
         string competency PK
-        float alpha
-        float beta
+        float alpha "CHECK > 0"
+        float beta "CHECK > 0"
+    }
+    GRABBING_TERRITORY_ACTIVITIES {
+        uuid id PK
+        uuid class_id FK "-> classes CASCADE, nullable"
+        uuid teacher_id FK "-> users CASCADE"
+        uuid settled_by FK "-> users SET NULL, nullable"
+        datetime deadline
+        bool settled
+        int student_slot_cap "CHECK 1..50"
+    }
+    TERRITORY_SLOTS {
+        uuid id PK
+        uuid activity_id FK "-> activities CASCADE"
+        int star_rating "CHECK 1..5"
+        int slot_index "CHECK 0..49"
+    }
+    TERRITORY_OCCUPATIONS {
+        uuid id PK
+        uuid slot_id FK "-> slots CASCADE, UNIQUE"
+        uuid student_id FK "-> users CASCADE"
+        uuid session_id FK "-> game_sessions SET NULL, UNIQUE"
+        float score
+    }
+    TERRITORY_SESSION_USES {
+        uuid session_id PK,FK "-> game_sessions CASCADE"
+    }
+    TERRITORY_RANKINGS_SNAPSHOT {
+        uuid id PK
+        uuid activity_id FK "-> activities CASCADE"
+        uuid student_id FK "-> users CASCADE"
+        float territory_value
+        int rank
+    }
+    REFRESH_TOKENS {
+        uuid id PK
+        uuid user_id FK "-> users CASCADE"
+        string token_hash UK "SHA-256 hex"
+        bool used
+        bool revoked
+    }
+    EMAIL_VERIFICATION_TOKENS {
+        uuid id PK
+        uuid user_id FK "-> users CASCADE"
+        string token UK
+        bool used
+    }
+    STUDY_ENROLLMENTS {
+        uuid user_id PK,FK "-> users CASCADE"
+        string study_id PK
+        string group "A|B"
+        int dosage_seconds
+    }
+    STUDY_PROBE_ATTEMPTS {
+        serial id PK
+        uuid user_id FK "-> users CASCADE"
+        string form "pre|post|delay"
+        int score "0..10"
+    }
+    STUDY_AFFECT_RESPONSES {
+        serial id PK
+        uuid user_id FK "-> users CASCADE"
+        string phase "pre|post"
+        float anxiety_mean
+        float motivation_mean
+    }
+    SEASONS {
+        string season_id PK "slug"
+        string name
+        datetime starts_at
+        datetime ends_at "CHECK > starts_at"
+    }
+    LOGIN_ATTEMPTS {
+        string username PK
+        int failures
+        datetime locked_until "nullable"
+        int lockout_count
+    }
+    DENIED_TOKENS {
+        string jti PK
+        datetime expires_at
+    }
+    AUDIT_LOGS {
+        uuid id PK
+        string user_id "nullable, NO FK"
+        string event_type
+        datetime created_at
     }
 ```
 
@@ -731,7 +893,7 @@ stateDiagram-v2
 
 ### 7.3 Enemies
 
-Normal · Fast · Tank · Split · Invisible · Boss-A (airborne, spawns minions) · Boss-B (chain-rule trigger; splits on death).
+General · Fast · Strong (high-HP) · Split (spawns children on death) · Helper (heals/speed-buffs nearby enemies) · Boss-A (periodically spawns minions) · Boss-B (triggers a chain-rule question at a per-spawn HP fraction; splits on death) · Regenerator (constant HP regen, uninterrupted by damage) · Bulwark · Swarmling. (`EnemyType` enum in `frontend/src/data/constants.ts`; visuals/abilities in `data/enemy-defs.ts` + `systems/EnemyAbilitySystem.ts`.)
 
 ### 7.4 Progression Systems
 
@@ -857,12 +1019,12 @@ The two poll jobs (territory settlement, auth-store janitor) are started as `asy
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~31 test files)
+### Backend (pytest, ~32 test files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
-- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, > 50k delta), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
+- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, over the per-level score-delta cap), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
 
 ### Frontend (Vitest + happy-dom, ~87 test files)
 
@@ -914,7 +1076,7 @@ backend/
     seed.py                      # demo-user seeding
     db/                          # engine, SessionLocal
     middleware/                  # auth.py, csrf.py
-    utils/                       # security.py (JWT, bcrypt), totp.py, integrity.py
+    utils/                       # security.py (JWT, bcrypt), totp.py, integrity.py, encryption.py
     domain/                      # per-aggregate folders (aggregate root + policy + repository protocol)
       session/   user/   leaderboard/   achievement/   talent/   class_/
       territory/   challenge/   season/   assessment/   study/   scoring/   auth/
@@ -932,8 +1094,8 @@ backend/
                                  # auth, challenge, class_, game_session, leaderboard, recommendation,
                                  # replay, study, talent, territory)
     schemas/                     # Pydantic DTOs
-  alembic/                       # 46 migrations
-  tests/                         # ~31 pytest files
+  alembic/                       # 47 migrations
+  tests/                         # ~32 pytest files
 
 frontend/
   src/
@@ -942,7 +1104,7 @@ frontend/
     stores/                      # Pinia: auth, game, talent, territory, ui
     views/                       # 26 page-level .vue files
     components/                  # common, layout, game (28 .vue), teacher, territory, leaderboard
-    composables/                 # 20 use*.ts (lifecycle, auth, UI, data)
+    composables/                 # 22 use*.ts (lifecycle, auth, UI, data)
     services/                    # api.ts + 19 per-domain clients (incl. imageCache)
     engine/                      # Game.ts, GameState, PhaseStateMachine, EventBus,
                                  # Renderer, InputManager, register-systems,
@@ -960,7 +1122,7 @@ frontend/
 
 wasm/                            # C99 sources (math_engine.c, prng.c/h, curve.c/h, level_gen.c/h) + Makefile (Emscripten)
 emsdk/                           # vendored toolchain
-shared/                          # game-constants.json + score_parity_fixtures.json
+shared/                          # game-constants.json + enemy-defs.json + score_parity_fixtures.json
 docs/                            # analysis / audit / educational-theory docs
 docker-compose.yml               # dev
 docker-compose.prod.yml          # prod
