@@ -46,3 +46,21 @@ ENDPOINT_MARKER_MAGIC_BYTES = {
 # worst-case decoded RGBA buffer is ~4 MB, which any modern browser handles
 # without crashing.
 ENDPOINT_MARKER_MAX_DIMENSION = 1024
+
+# ── Profile initials avatar ──
+#
+# Client-side "initials + colour" badge moved from localStorage-only to server-
+# side persistence so the avatar follows the player across devices and never
+# leaks between two accounts signed in on the same browser. Both fields are
+# nullable; NULL means the player has not chosen an avatar and the FE falls
+# back to the no-avatar rendering. They must be set or cleared together — the
+# aggregate rejects a half-filled state.
+#
+# Letters are normalised by the FE to 1-2 characters (any script). The backend
+# enforces only the length here; membership-of-palette is enforced FE-side
+# against PROFILE_COLOR_CHOICES (derived from TOWER_DEFS), so importing the
+# tower palette into the domain layer would couple it to game data.
+
+PROFILE_INITIALS_MAX_LETTERS = 2
+PROFILE_INITIALS_COLOR_PATTERN = r'^#[0-9a-fA-F]{6}$'
+

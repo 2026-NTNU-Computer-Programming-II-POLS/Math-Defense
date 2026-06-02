@@ -9,6 +9,8 @@ from app.domain.user.constraints import (
     ENDPOINT_MARKER_DATAURL_PREFIXES,
     PLAYER_NAME_MIN_LENGTH,
     PLAYER_NAME_MAX_LENGTH,
+    PROFILE_INITIALS_COLOR_PATTERN,
+    PROFILE_INITIALS_MAX_LETTERS,
 )
 from app.domain.user.value_objects import Email
 from app.utils.security import BCRYPT_MAX_BYTES
@@ -158,6 +160,10 @@ class AuthMeResponse(BaseModel):
     endpoint_marker_style: str | None = None
     endpoint_marker_custom_dataurl: str | None = None
     endpoint_hit_fx: str | None = None
+    # Profile-initials avatar (letters + colour). Both nullable, but always
+    # set or cleared together — the aggregate rejects half-filled state.
+    profile_initials_letters: str | None = None
+    profile_initials_color: str | None = None
 
 
 class UpdatePlayerNameRequest(BaseModel):
@@ -226,6 +232,40 @@ class EndpointMarkerUpdateRequest(BaseModel):
                 "custom_dataurl must start with one of: "
                 + ", ".join(ENDPOINT_MARKER_DATAURL_PREFIXES)
             )
+        return v
+
+
+class ProfileInitialsUpdateRequest(BaseModel):
+    """PUT /api/auth/profile/initials body.
+
+    Both fields move together: pass both to set the avatar, both as None to
+    clear. Fast-path validation here returns 422 before the aggregate runs;
+    the aggregate then re-checks as the canonical source of truth.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    letters: str | None
+    color: str | None
+
+    @field_validator("letters")
+    @classmethod
+    def letters_length(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        cleaned = v.strip()
+        if len(cleaned) < 1 or len(cleaned) > PROFILE_INITIALS_MAX_LETTERS:
+            raise ValueError(
+                f"letters must be 1-{PROFILE_INITIALS_MAX_LETTERS} characters"
+            )
+        return cleaned
+
+    @field_validator("color")
+    @classmethod
+    def color_shape(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not re.match(PROFILE_INITIALS_COLOR_PATTERN, v):
+            raise ValueError("color must be a 7-character hex string (e.g. '#a1b2c3')")
         return v
 
 

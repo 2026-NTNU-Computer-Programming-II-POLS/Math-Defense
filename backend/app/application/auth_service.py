@@ -406,6 +406,26 @@ class AuthApplicationService:
             self._uow.commit()
         return user
 
+    def update_profile_initials(
+        self,
+        user_id: str,
+        letters: str | None,
+        color: str | None,
+    ) -> User:
+        """Set or clear the profile-initials avatar atomically. Both fields
+        move together — the aggregate rejects half-filled state."""
+        with self._uow:
+            user = self._user_repo.find_by_id(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found")
+            try:
+                user.update_profile_initials(letters, color)
+            except ValueError as e:
+                raise DomainValueError(str(e)) from e
+            self._user_repo.save(user)
+            self._uow.commit()
+        return user
+
     # ── Email verification ──────────────────────────────────────────────────
 
     def verify_email(self, token: str) -> None:

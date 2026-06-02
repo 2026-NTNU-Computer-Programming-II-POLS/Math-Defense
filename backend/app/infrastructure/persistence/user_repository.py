@@ -93,6 +93,8 @@ class SqlAlchemyUserRepository:
             row.endpoint_marker_style = user.endpoint_marker_style
             row.endpoint_marker_custom_dataurl = user.endpoint_marker_custom_dataurl
             row.endpoint_hit_fx = user.endpoint_hit_fx
+            row.profile_initials_letters = user.profile_initials_letters
+            row.profile_initials_color = user.profile_initials_color
         else:
             row = UserModel(
                 id=user.id,
@@ -111,6 +113,8 @@ class SqlAlchemyUserRepository:
                 endpoint_marker_style=user.endpoint_marker_style,
                 endpoint_marker_custom_dataurl=user.endpoint_marker_custom_dataurl,
                 endpoint_hit_fx=user.endpoint_hit_fx,
+                profile_initials_letters=user.profile_initials_letters,
+                profile_initials_color=user.profile_initials_color,
             )
             self._db.add(row)
         self._flush()
@@ -142,6 +146,8 @@ class SqlAlchemyUserRepository:
             endpoint_marker_style=row.endpoint_marker_style,
             endpoint_marker_custom_dataurl=row.endpoint_marker_custom_dataurl,
             endpoint_hit_fx=row.endpoint_hit_fx,
+            profile_initials_letters=row.profile_initials_letters,
+            profile_initials_color=row.profile_initials_color,
         )
 
 

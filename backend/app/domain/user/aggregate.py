@@ -8,6 +8,8 @@ from datetime import datetime, UTC
 import base64
 import binascii
 
+import re
+
 from app.domain.user.constraints import (
     ALLOWED_ENDPOINT_HIT_FX_STYLES,
     ALLOWED_ENDPOINT_MARKER_STYLES,
@@ -17,6 +19,8 @@ from app.domain.user.constraints import (
     ENDPOINT_MARKER_MAX_DIMENSION,
     PLAYER_NAME_MAX_LENGTH,
     PLAYER_NAME_MIN_LENGTH,
+    PROFILE_INITIALS_COLOR_PATTERN,
+    PROFILE_INITIALS_MAX_LETTERS,
 )
 from app.domain.user.value_objects import Email, Role
 
@@ -52,6 +56,8 @@ class User:
         endpoint_marker_style: str | None = None,
         endpoint_marker_custom_dataurl: str | None = None,
         endpoint_hit_fx: str | None = None,
+        profile_initials_letters: str | None = None,
+        profile_initials_color: str | None = None,
     ) -> None:
         if not isinstance(role, Role):
             raise ValueError("role must be a Role instance")
@@ -87,6 +93,11 @@ class User:
         self.endpoint_marker_style: str | None = endpoint_marker_style
         self.endpoint_marker_custom_dataurl: str | None = endpoint_marker_custom_dataurl
         self.endpoint_hit_fx: str | None = endpoint_hit_fx
+        # Profile-initials avatar — see update_profile_initials for invariants.
+        # Letters and colour must move together; the constructor accepts either
+        # both-set or both-None and the aggregate rejects half-filled state.
+        self.profile_initials_letters: str | None = profile_initials_letters
+        self.profile_initials_color: str | None = profile_initials_color
 
     @classmethod
     def create(
@@ -256,6 +267,41 @@ class User:
                     f"are out of range (max {ENDPOINT_MARKER_MAX_DIMENSION})"
                 )
         return dataurl
+
+    def update_profile_initials(
+        self,
+        letters: str | None,
+        color: str | None,
+    ) -> None:
+        """Set or clear the profile-initials avatar in one atomic update.
+
+        Both fields move together: pass both to set, both as None to clear.
+        A half-filled payload (one None, one set) is rejected — letters
+        without a colour (or vice versa) has no meaningful UI rendering,
+        so the aggregate refuses to persist the inconsistency.
+        """
+        if letters is None and color is None:
+            self.profile_initials_letters = None
+            self.profile_initials_color = None
+            return
+        if letters is None or color is None:
+            raise ValueError(
+                "profile_initials_letters and profile_initials_color must be "
+                "set or cleared together"
+            )
+        if not isinstance(letters, str) or not isinstance(color, str):
+            raise ValueError("profile initials letters and color must be strings")
+        cleaned_letters = letters.strip()
+        if len(cleaned_letters) < 1 or len(cleaned_letters) > PROFILE_INITIALS_MAX_LETTERS:
+            raise ValueError(
+                f"profile_initials_letters must be 1-{PROFILE_INITIALS_MAX_LETTERS} characters"
+            )
+        if not re.match(PROFILE_INITIALS_COLOR_PATTERN, color):
+            raise ValueError(
+                "profile_initials_color must be a 7-character hex string (e.g. '#a1b2c3')"
+            )
+        self.profile_initials_letters = cleaned_letters
+        self.profile_initials_color = color
 
     def update_ia_accuracy(self, value: float) -> None:
         """Set the rolling Initial-Answer accuracy (0.0–1.0). Clamps out-of-

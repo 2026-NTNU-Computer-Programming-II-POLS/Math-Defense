@@ -38,10 +38,26 @@ const displayInitials = computed(() => {
   return profileInitials.value
 })
 
-function applyInitials(): void {
+const initialsError = ref('')
+
+async function applyInitials(): Promise<void> {
   const trimmed = initialsDraftLetters.value.trim()
   if (trimmed.length === 0) return
-  setInitials(trimmed, initialsDraftColor.value)
+  initialsError.value = ''
+  try {
+    await setInitials(trimmed, initialsDraftColor.value)
+  } catch (e) {
+    initialsError.value = e instanceof Error ? e.message : 'Failed to update avatar'
+  }
+}
+
+async function clearAvatar(): Promise<void> {
+  initialsError.value = ''
+  try {
+    await clearInitials()
+  } catch (e) {
+    initialsError.value = e instanceof Error ? e.message : 'Failed to clear avatar'
+  }
 }
 
 const pwVisible = ref(false)
@@ -356,7 +372,7 @@ async function resizeImageToDataUrl(file: File, size: number): Promise<string> {
               v-if="profileInitials"
               type="button"
               class="btn initials-clear-btn"
-              @click="clearInitials"
+              @click="clearAvatar"
             >
               Clear
             </button>

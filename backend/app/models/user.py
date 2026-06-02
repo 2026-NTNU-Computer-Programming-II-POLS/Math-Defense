@@ -25,6 +25,16 @@ class User(Base):
             "('random', 'fragments', 'crying', 'angry')",
             name="ck_user_endpoint_hit_fx",
         ),
+        # Profile initials: letters (1-2 chars) and a 7-char hex colour. Both
+        # nullable, but they must be set or cleared together — the aggregate
+        # enforces the pairing invariant, this constraint is the DB backstop.
+        CheckConstraint(
+            "(profile_initials_letters IS NULL AND profile_initials_color IS NULL) OR "
+            "(profile_initials_letters IS NOT NULL AND profile_initials_color IS NOT NULL "
+            " AND length(profile_initials_letters) BETWEEN 1 AND 2 "
+            " AND profile_initials_color LIKE '#______')",
+            name="ck_user_profile_initials_paired",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -56,6 +66,11 @@ class User(Base):
     endpoint_marker_style: Mapped[str | None] = mapped_column(String(16), nullable=True)
     endpoint_marker_custom_dataurl: Mapped[str | None] = mapped_column(Text, nullable=True)
     endpoint_hit_fx: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Profile-initials avatar (letters + colour). Server-side persisted so the
+    # choice follows the player across devices instead of leaking between
+    # accounts via shared localStorage.
+    profile_initials_letters: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    profile_initials_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC),
     )

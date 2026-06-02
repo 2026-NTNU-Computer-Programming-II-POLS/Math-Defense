@@ -31,12 +31,22 @@ export interface MeResponse {
   endpoint_marker_style?: 'star' | 'gorilla' | 'custom' | null
   endpoint_marker_custom_dataurl?: string | null
   endpoint_hit_fx?: 'random' | 'fragments' | 'crying' | 'angry' | null
+  // Profile-initials avatar persisted server-side. `null` means the player has
+  // not chosen an avatar yet (or has cleared it). Letters and colour move
+  // together — the backend rejects half-filled state.
+  profile_initials_letters?: string | null
+  profile_initials_color?: string | null
 }
 
 export interface EndpointMarkerUpdate {
   style: 'star' | 'gorilla' | 'custom' | null
   custom_dataurl: string | null
   hit_fx: 'random' | 'fragments' | 'crying' | 'angry' | null
+}
+
+export interface ProfileInitialsUpdate {
+  letters: string | null
+  color: string | null
 }
 
 export const authService = {
@@ -68,6 +78,9 @@ export const authService = {
     // the in-flight PUT — without this the abort only flipped the local
     // controller flag and two PUTs could land at the server out of order.
     return api.put<MeResponse>('/api/auth/profile/endpoint-marker', payload, opts)
+  },
+  updateProfileInitials(payload: ProfileInitialsUpdate) {
+    return api.put<MeResponse>('/api/auth/profile/initials', payload)
   },
   changePassword(currentPassword: string, newPassword: string) {
     return api.post<void>('/api/auth/change-password', {

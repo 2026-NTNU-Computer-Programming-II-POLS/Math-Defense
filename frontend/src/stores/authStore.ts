@@ -25,6 +25,11 @@ export interface User {
   // was answered correctly. Read at level start by the path renderer to
   // drive concrete-fading on y-axis labels (spec §17).
   ia_recent_accuracy: number
+  // Profile-initials avatar (letters + colour). Server-side persisted so two
+  // accounts sharing a browser can't see each other's choice. `null` means
+  // the player has no avatar set; the FE renders the no-avatar fallback.
+  profile_initials_letters: string | null
+  profile_initials_color: string | null
 }
 
 function mapMeResponseToUser(res: MeResponse): User {
@@ -35,6 +40,8 @@ function mapMeResponseToUser(res: MeResponse): User {
     role: res.role as UserRole,
     ia_unlock_earned: res.ia_unlock_earned ?? false,
     ia_recent_accuracy: res.ia_recent_accuracy ?? 0,
+    profile_initials_letters: res.profile_initials_letters ?? null,
+    profile_initials_color: res.profile_initials_color ?? null,
   }
 }
 
