@@ -246,7 +246,7 @@ PCG XSL-RR 64/32 (O'Neill, public domain). Pure integer arithmetic — same
 cross-engine determinism guarantee as `mulberry32`, but with 128-bit state
 and a stream-id channel (`inc`) for splitting `level_rng` from
 `gameplay_rng`. `prng_next_f64` builds a `[0, 1)` double from two `u32`
-draws as `(top26 * 2^26 + bot27) / 2^53`; rounding never enters because each
+draws as `(top26 * 2^27 + bot27) / 2^53`; rounding never enters because each
 intermediate is exactly representable. Used by `Game.setSeed` when WASM is
 loaded.
 
@@ -345,7 +345,7 @@ int32_t compute_spawn_points(
 
 For each curve, march left and right from the disclosure endpoint; bisect
 the boundary crossing. Each curve contributes up to 2 spawns. Output is
-ordered (curve_index ascending, then side: -1 then +1).
+ordered (curve_index ascending, then side: +1 then -1).
 
 ---
 
