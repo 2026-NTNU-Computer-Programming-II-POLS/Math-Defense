@@ -15,7 +15,7 @@ REST API server for Math Defense: authentication (incl. refresh-token rotation, 
 | Rate Limiting | slowapi (per-IP) + per-account login throttle |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
 | WASM host | wasmtime-py 45.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
-| Testing | pytest 9 + pytest-asyncio (31 test files) |
+| Testing | pytest 9 + pytest-asyncio (32 test files) |
 
 ---
 
@@ -165,10 +165,10 @@ backend/
 ├── data/
 │   └── math_engine.wasm           Shipped WASM blob (mirrors frontend/public/wasm) — backs wasm_runtime singleton
 │
-├── alembic/                       Alembic migration environment (versions/ + env.py) — 46 revisions through ff6a7b8c9d0e_add_endpoint_marker_to_users (current head)
+├── alembic/                       Alembic migration environment (versions/ + env.py) — 47 revisions through d1a2b3c4e5f6_drop_avatar_url_from_users (current head)
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
-├── tests/                         31 files
+├── tests/                         32 files
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py                       — register / login / me / logout
 │   ├── test_auth_lockout.py               — per-account lockout window + exponential backoff
@@ -176,6 +176,8 @@ backend/
 │   ├── test_refresh_token.py              — refresh-token rotation + reuse detection
 │   ├── test_csrf_cookie.py                — CSRF double-submit cookie enforcement on unsafe methods
 │   ├── test_admin_create_teacher.py       — Admin teacher-provisioning endpoint + RBAC
+│   ├── test_admin_season.py               — Admin season upsert (POST /api/admin/seasons)
+│   ├── test_admin_user_active.py          — Admin enable/disable account invariants + hard-logout semantics
 │   ├── test_game_session.py
 │   ├── test_session_repository.py         — repo-level invariants and cumulative stats
 │   ├── test_leaderboard.py
@@ -511,7 +513,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `challenge_id` | String (FK) | Non-NULL when launched from a challenge deep-link; FK to `challenges` (SET NULL on soft delete) |
 | `started_at`, `ended_at` | DateTime | `ended_at` nullable |
 
-Indexes: `ix_game_session_user_id`; partial unique `uq_one_active_per_user WHERE status='active'` — enforces at most one active session per user.
+Indexes: `ix_game_session_user_id`, `ix_game_sessions_challenge_id`; partial unique `uq_one_active_per_user WHERE status='active'` — enforces at most one active session per user.
 
 ### LeaderboardEntry
 
@@ -522,7 +524,8 @@ Indexes: `ix_game_session_user_id`; partial unique `uq_one_active_per_user WHERE
 | `session_id` | String | FK → GameSession (ON DELETE SET NULL), unique |
 | `level` | Integer | CHECK 1–5 (stores star_rating of the completed session) |
 | `score`, `kills`, `waves_survived` | Integer | |
-| `challenge_id` | String (FK) | Nullable; SET NULL when the challenge is soft-deleted |
+| `total_score` | Float | Nullable; V2 floating-point score. Rankings prefer it when present, falling back to raw `score` for older entries |
+| `challenge_id` | String (FK) | Nullable; ON DELETE CASCADE — deleting a challenge removes its leaderboard entries (B-BUG-4) so wave-restricted/uncapped challenge scores never leak into global rankings |
 | `created_at` | DateTime | |
 
 Unique on `session_id` — guarantees one leaderboard entry per completed session, which is what makes the event-driven auto-create idempotent.
@@ -555,7 +558,7 @@ The lifespan also seeds the demo user and starts two background asyncio tasks:
 | Task | Purpose |
 |---|---|
 | `_auth_store_janitor` (10-min interval) | Purges expired JWT deny-list rows + stale `login_attempts` rows so the auth path never has to clean up inline (removes a TOCTOU window and a DoS amplifier under logout spam) |
-| `territory_settlement_task` (5-s interval) | Settles `grabbing_territory_activities` whose `deadline` has passed |
+| `territory_settlement_task` (5-min interval) | Settles `grabbing_territory_activities` whose `deadline` has passed |
 
 The HTTP layer also installs:
 
@@ -608,7 +611,7 @@ docker-compose up backend        # from project root
 ## Testing
 
 ```bash
-pytest                                       # 31 test files
+pytest                                       # 32 test files
 pytest tests/test_session_aggregate.py -v    # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v        # audit-driven edge cases
 pytest tests/test_territory.py -v            # territory integration tests
@@ -627,7 +630,7 @@ The test suite targets a dedicated PostgreSQL database (the dev DB name with a `
 - Stale-session auto-abandon side-effect ordering (must commit *before* raising)
 - Per-level / per-class / per-challenge `dense_rank` partitioning
 - Real rate-limiter enablement (session create → 429 at 30/min)
-- Abuse cases: negative hp, `score` going backwards, score delta > 50 000, refresh-token reuse
+- Abuse cases: negative hp, `score` going backwards, per-update score delta above the per-level cap (`max_score_delta_for`, e.g. 3334 at L1), refresh-token reuse
 - FK cascade behaviour (PG enforces `ON DELETE CASCADE` / `SET NULL` natively — no fixture gymnastics)
 - WASM v2 strict tolerance + fail-closed when `wasm_runtime` cannot load
 

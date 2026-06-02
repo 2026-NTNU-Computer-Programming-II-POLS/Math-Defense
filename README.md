@@ -150,7 +150,7 @@ Browser
        │    └─ WasmBridge → math_engine.wasm (C, Emscripten) with JS fallback
        └─ Services → FastAPI Backend
                           ├─ Routers (thin controllers — auth/sessions/leaderboard/
-                          │           achievements/seasons/talents/classes/admin/
+                          │           achievements/talents/classes/admin/
                           │           territory/assessment/recommendation/challenge/
                           │           replay/study)
                           ├─ Global exception handlers → HTTP status via http_status_map (domain errors are HTTP-free)
@@ -176,7 +176,7 @@ Browser
 | Frontend | Vue 3.5 (Composition API, `<script setup>`), TypeScript 6.0 strict, Pinia 3, Vue Router 5, Vite 8, Vitest 4 |
 | Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
 | WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 17 exported math functions (plus `_malloc`/`_free`) |
-| Database | PostgreSQL 16 (46 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
+| Database | PostgreSQL 16 (47 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
 | Container | Docker, Docker Compose |
 | Replay | Versioned (`replay_version` 1=mulberry32+JS Math, 2=PCG+WASM bit-exact); server-side score recompute via `wasmtime-py` |
 
@@ -308,7 +308,7 @@ Create `.env` at the project root (see `.env.example`):
 ## Testing
 
 ```bash
-cd backend  && pytest              # ~31 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, CSRF cookie, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute, admin teacher provisioning)
+cd backend  && pytest              # ~32 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, CSRF cookie, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute, admin teacher provisioning)
 cd frontend && npm test            # ~87 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
 ```
 

@@ -96,7 +96,7 @@ erDiagram
         string  status                   "enum: active|completed|abandoned"
         int     current_wave             "DEFAULT 0"
         int     gold                     "DEFAULT INITIAL_GOLD (200)"
-        int     hp                       "DEFAULT 20"
+        int     hp                       "DEFAULT INITIAL_HP (20)"
         int     score                    "DEFAULT 0"
         int     kills                    "DEFAULT 0"
         int     waves_survived           "DEFAULT 0"
@@ -256,7 +256,7 @@ erDiagram
     }
 
     study_probe_attempts {
-        int     id          PK   "BIGSERIAL"
+        int     id          PK   "SERIAL (Integer autoincrement)"
         string  user_id     FK   "→ users.id CASCADE"
         string  study_id         "≤64 chars"
         string  form             "pre|post|delay; UNIQUE(user_id, study_id, form)"
@@ -266,7 +266,7 @@ erDiagram
     }
 
     study_affect_responses {
-        int     id          PK   "BIGSERIAL"
+        int     id          PK   "SERIAL (Integer autoincrement)"
         string  user_id     FK   "→ users.id CASCADE"
         string  study_id         "≤64 chars"
         string  phase            "pre|post; UNIQUE(user_id, study_id, phase)"
@@ -506,7 +506,7 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `status` | `Enum` | NO | `active \| completed \| abandoned`; DEFAULT `active` |
 | `current_wave` | `Integer` | NO | DEFAULT `0` |
 | `gold` | `Integer` | NO | DEFAULT `INITIAL_GOLD` (200, from `shared/game-constants.json`) |
-| `hp` | `Integer` | NO | DEFAULT `20` |
+| `hp` | `Integer` | NO | DEFAULT `INITIAL_HP` (20, from `shared/game-constants.json`) |
 | `score` | `Integer` | NO | DEFAULT `0` |
 | `kills` | `Integer` | NO | DEFAULT `0` |
 | `waves_survived` | `Integer` | NO | DEFAULT `0` |
@@ -1050,10 +1050,11 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `cc3d4e5f6a8b` | Balance Overhaul Phase 4 (Q10): `DELETE FROM talent_allocations WHERE talent_node_id = 'calculus_pet_hp'`. Node was renamed `calculus_pet_range`; orphaned allocations are removed so spent-TP recovery (`achievement_service.compute_remaining_talent_points`) reflects the rename automatically |
 | `dd4e5f6a7b8c` | Tighten `territory_slots.slot_index` CHECK from `>= 0` to `BETWEEN 0 AND 49`. Combined with the existing `UNIQUE(activity_id, slot_index)` and sequential 0-based assignment, this caps per-activity slot count at 50 at the DB layer (matching `CreateActivityRequest.max_length=50`) so paths that bypass the application service still can't exceed the limit. Renames constraint `ck_territory_slot_index_nonneg` → `ck_territory_slot_index_range` |
 | `ee5f6a7b8c9d` | Add `grabbing_territory_activities.student_slot_cap INTEGER NOT NULL DEFAULT 5` plus `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Surfaces the previously hard-coded `TERRITORY_CAP_PER_STUDENT = 5` as a per-activity, teacher-configurable column; default of 5 preserves existing behaviour for backfilled rows |
-| `ff6a7b8c9d0e` | **Current head.** Add `users.endpoint_marker_style String(16) NULL`, `users.endpoint_marker_custom_dataurl Text NULL`, `users.endpoint_hit_fx String(16) NULL` plus CHECK allowlists `ck_user_endpoint_marker_style` (NULL or `star`/`gorilla`/`custom`) and `ck_user_endpoint_hit_fx` (NULL or `random`/`fragments`/`crying`/`angry`). Moves the endpoint-marker (P\*) display preferences from localStorage-only to server-side persistence so the player's choice follows them across devices. All columns nullable with no server default — legacy rows stay valid and NULL means the FE uses its local default |
+| `ff6a7b8c9d0e` | Add `users.endpoint_marker_style String(16) NULL`, `users.endpoint_marker_custom_dataurl Text NULL`, `users.endpoint_hit_fx String(16) NULL` plus CHECK allowlists `ck_user_endpoint_marker_style` (NULL or `star`/`gorilla`/`custom`) and `ck_user_endpoint_hit_fx` (NULL or `random`/`fragments`/`crying`/`angry`). Moves the endpoint-marker (P\*) display preferences from localStorage-only to server-side persistence so the player's choice follows them across devices. All columns nullable with no server default — legacy rows stay valid and NULL means the FE uses its local default |
+| `d1a2b3c4e5f6` | **Current head.** Drop `users.avatar_url` (the preset-SVG avatar feature was removed; the avatar is now a client-side "initials + colour" badge persisted in localStorage only, so the server no longer stores or serves an avatar). `avatar_url` was originally added as `String(500) NULL` in `f7a3b8c2d1e6`; downgrade re-adds it with that definition. Linear chain on top of `ff6a7b8c9d0e` |
 
 > **Branched history**: Two parallel merges exist in the chain.
 > 1. After `q1f2a3b4c5d6` (gameplay — practice mode) and `a3b4c5d6e7f8` (auth — lockout backoff), `r2a3b4c5d6e7` merges them and also creates the `seasons` table.
-> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `ff6a7b8c9d0e` is the current single head (linear chain `bb2c3d4e5f7a` → `cc3d4e5f6a8b` → `dd4e5f6a7b8c` → `ee5f6a7b8c9d` → `ff6a7b8c9d0e`).
+> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `d1a2b3c4e5f6` is the current single head (linear chain `bb2c3d4e5f7a` → `cc3d4e5f6a8b` → `dd4e5f6a7b8c` → `ee5f6a7b8c9d` → `ff6a7b8c9d0e` → `d1a2b3c4e5f6`).
 
 > **Earlier history**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create.
