@@ -18,6 +18,7 @@
 //                       `=---='
 //
 //        Buddha bless this app — may it boot bug-free.
+//        Kuai-Kuai sits on the server so it runs nice — full banner in kuai-kuai.txt
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
