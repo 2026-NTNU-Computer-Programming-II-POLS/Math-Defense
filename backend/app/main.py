@@ -1,3 +1,18 @@
+#                              __        _
+#                            _/  \    _(\(o
+#                           /     \  /  _  ^^^o
+#                          /   !   \/  ! '!!!v'
+#                         !  !  \ _' ( \____
+#                         ! . \ _!\   \===^\)
+#                          \ \_!  / __!
+#                           \!   /    \
+#                     (\_      _/   _\ )
+#                      \ ^^--^^ __-^ /(__
+#                       ^^----^^    "^--v'
+#
+#       ~~~  DRAGON KING OF THE EAST SEA  ~~~
+#       ~~~  ruler of tides — may your requests flow like water  ~~~
+
 import asyncio
 import logging
 from contextlib import asynccontextmanager
