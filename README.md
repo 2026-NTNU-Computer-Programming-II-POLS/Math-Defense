@@ -360,11 +360,31 @@ Load and throughput tests (k6 HTTP scenarios plus Vitest compute benches) live u
 
 ## Production Deployment
 
+**Prerequisites** (in addition to the dev `.env` values):
+
+- **TLS certificates** — the prod frontend mounts `./certs` and `nginx-tls.conf`
+  hard-requires `./certs/fullchain.pem` + `./certs/privkey.pem`. nginx will not
+  start without them (there is no presence-check fallback). Supply real certs in
+  production; for a local prod smoke-test, generate a self-signed pair:
+  ```bash
+  mkdir -p certs
+  openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+    -keyout certs/privkey.pem -out certs/fullchain.pem -subj "/CN=localhost"
+  chmod 644 certs/privkey.pem    # see note below
+  ```
+  The cert **and key must be readable by the nginx container's user (UID 101)**.
+  `openssl` writes the key `0600`-owned-by-you, which the unprivileged nginx
+  cannot read — it then fails to start with `cannot load certificate key … BIO_new_file() … Permission denied`.
+- **`POSTGRES_APP_PASSWORD`** — must be set in `.env` (it is in `.env.example`).
+  On first DB init, `scripts/pg_init_roles.sh` aborts if it is blank.
+- Set `CORS_ORIGIN_1` / `CORS_ORIGIN_2` (nginx preflight allow-list) and
+  `COOKIE_SECURE=true` for your real domain.
+
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-`docker-compose.prod.yml` builds self-contained images (no bind-mounted source) and fronts them with nginx. `nginx.conf` serves the Vite `dist/` build as an SPA and reverse-proxies `/api/` to the backend container; CORS preflight is short-circuited at the nginx layer and response headers are forwarded from the backend. Postgres is only reachable from the docker network — no host port is published.
+`docker-compose.prod.yml` builds self-contained images (no bind-mounted source) and fronts them with nginx. `nginx-tls.conf` serves the Vite `dist/` build as an SPA over TLS (port 80 → 301 redirect → 443) and reverse-proxies `/api/` to the backend container; CORS preflight is short-circuited at the nginx layer and response headers are forwarded from the backend. The backend container runs `alembic upgrade head` before uvicorn. Postgres is only reachable from the docker network — no host port is published.
 
 ---
 
