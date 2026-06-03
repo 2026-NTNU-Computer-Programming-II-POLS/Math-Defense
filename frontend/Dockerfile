@@ -25,6 +25,12 @@ FROM node:26-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules /app/node_modules
 COPY frontend/ .
+# The `@shared/*` alias (tsconfig.app.json + vite.config.ts) resolves to
+# `/app/../shared` = `/shared`. In dev, docker-compose bind-mounts ./shared
+# there; the production build has no bind mount, so the shared JSON must be
+# copied into the image or vue-tsc fails with TS2307 (cannot find
+# '@shared/game-constants.json'). Mirrors the backend Dockerfile's `COPY shared`.
+COPY shared /shared
 # Skip the `prebuild` lifecycle hook (= `cd ../wasm && make`) — emsdk is not
 # installed in this image and the compiled WASM artifacts under src/math/wasm/
 # are committed to the repo. Invoke vue-tsc + vite directly to bypass it.
