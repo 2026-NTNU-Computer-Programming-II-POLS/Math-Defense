@@ -12,6 +12,7 @@
 #
 #       ~~~  DRAGON KING OF THE EAST SEA  ~~~
 #       ~~~  ruler of tides — may your requests flow like water  ~~~
+#       ~~~  Kuai-Kuai sits on the server so it runs nice — full banner in kuai-kuai.txt  ~~~
 
 import asyncio
 import logging
