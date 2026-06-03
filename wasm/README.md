@@ -68,6 +68,13 @@ source emsdk/emsdk_env.sh     # Linux/macOS
 emsdk\emsdk_env.bat           # Windows
 ```
 
+> **The vendored `emsdk/` is a Windows build.** The `emsdk_env.sh` line above
+> only yields a working `emcc` if `emsdk/` was provisioned for your platform. On
+> macOS/Linux, install a native SDK instead (`git clone emscripten-core/emsdk`,
+> `./emsdk install 5.0.7 && ./emsdk activate 5.0.7`), or skip host setup entirely
+> and let Docker build the binary (`docker compose build backend`). See
+> [../UBUNTU_SETUP.md](../UBUNTU_SETUP.md#about-the-wasm-engine).
+
 ### Compile
 
 ```bash

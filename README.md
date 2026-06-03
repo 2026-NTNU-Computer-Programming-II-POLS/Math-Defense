@@ -210,6 +210,11 @@ Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirror
 - Docker & Docker Compose (optional)
 - Emscripten SDK (only if rebuilding WASM; `emsdk/` is vendored)
 
+> **On Ubuntu 24.04?** See **[UBUNTU_SETUP.md](UBUNTU_SETUP.md)** for a detailed,
+> platform-specific walkthrough — it covers the Node 26 / Python 3.13 upgrades
+> the distro's `apt` defaults don't provide, PostgreSQL 16 setup, and the
+> Linux-vs-Windows `emsdk/` caveat.
+
 ### Option A — Docker (recommended)
 
 ```bash
@@ -219,22 +224,43 @@ cp .env.example .env          # then edit .env before booting:
                               #     DATABASE_URL and POSTGRES_PASSWORD
                               #   - TOTP_ENCRYPTION_KEY (Fernet key; required)
                               # The backend refuses to start until all are set.
-docker-compose up
+docker compose up
 ```
+
+> Compose **v2** (current Docker installs) uses `docker compose` (a space).
+> Older standalone installs use the hyphenated `docker-compose` — either works
+> as long as the binary is present.
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
-- OpenAPI docs: http://localhost:8000/docs
+- Health probe: http://localhost:8000/health
+- OpenAPI docs: http://localhost:8000/docs — **only mounted when `DEBUG=true`**
+  (off by default). Add `DEBUG=true` to `.env` if you want the Swagger UI in dev.
 
 ### Option B — Manual
+
+Requires a running **PostgreSQL 16** instance and the `math_defense` database/role
+already created (see [backend/README.md](backend/README.md#setup--running) for the
+exact `CREATE ROLE` / `CREATE DATABASE` commands, and
+[UBUNTU_SETUP.md](UBUNTU_SETUP.md) for a distro-specific walkthrough).
 
 **Backend**
 
 ```bash
 cd backend
-pip install -r requirements.txt
+python -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS / Linux:      source .venv/bin/activate
+pip install -r requirements.txt        # use requirements-dev.txt to also run the tests
+
+cp ../.env.example .env                 # creates backend/.env — uvicorn reads it from this cwd
+# Edit backend/.env before first boot:
+#   - change DATABASE_URL host from 'postgres' to 'localhost' (you are not on the compose network)
+#   - set SECRET_KEY, the DB password, and TOTP_ENCRYPTION_KEY (the backend refuses to boot otherwise)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Migrations apply automatically on first boot via the FastAPI lifespan.
 
 **Frontend**
 
@@ -253,7 +279,15 @@ cd wasm
 make               # writes math_engine.js / .wasm into frontend/src/math/wasm/
 ```
 
-`npm run build` in the frontend automatically triggers `make` via the `prebuild` script.
+`npm run build` in the frontend automatically triggers `make` via the `prebuild`
+script. You only need this when you change `wasm/*.c` — the compiled artifacts are
+committed, and the game runs (with a JS fallback) without rebuilding.
+
+> **Platform note:** `make` requires `emcc` (Emscripten) on `PATH`. The vendored
+> `emsdk/` is a **Windows** build — on macOS/Linux it will not produce a working
+> `emcc`. Install a native Emscripten SDK (or let Docker build it via
+> `docker compose build backend`). See
+> [UBUNTU_SETUP.md](UBUNTU_SETUP.md#about-the-wasm-engine) for the Linux steps.
 
 ---
 
@@ -341,6 +375,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — System topology, DDD layering, ECS engine, WASM bridge, deployment, and testing in one place
 - **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** — ERD for 29 tables, constraints, indexes, and Alembic migration history
 - **[SECURITY.md](SECURITY.md)** — Threat model, auth flow (JWT/bcrypt/MFA), lockout, CSRF, CSP, audit logging
+- **[UBUNTU_SETUP.md](UBUNTU_SETUP.md)** — Step-by-step Ubuntu 24.04 setup (Docker and native paths, runtime version upgrades, WASM/emsdk caveats)
 - **[Math_Defense_Spec.md](Math_Defense_Spec.md)** — Original game-design specification
 - **[docs/Educational_Theory_Analysis.md](docs/Educational_Theory_Analysis.md)** — Theory-driven design audit mapping each game mechanic to authoritative learning theories (APA 7 citations)
 - [docs/](docs/) — Additional design analysis, audit notes, and educational-theory background

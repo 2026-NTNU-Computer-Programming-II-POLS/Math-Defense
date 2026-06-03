@@ -967,7 +967,7 @@ sequenceDiagram
 ### 9.1 Development
 
 ```bash
-docker-compose up
+docker compose up   # older standalone installs: docker-compose up
 # Frontend (Vite dev server with HMR): http://localhost:5173
 # Backend (uvicorn --reload):           http://localhost:8000
 # Postgres:                             127.0.0.1:5432 (host-mapped, dev only)
@@ -978,7 +978,7 @@ docker-compose up
 ### 9.2 Production
 
 ```bash
-docker-compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
 ```mermaid

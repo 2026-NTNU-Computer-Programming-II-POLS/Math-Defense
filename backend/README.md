@@ -570,7 +570,7 @@ The HTTP layer also installs:
 ### Docker
 
 ```bash
-docker-compose up backend        # from project root
+docker compose up backend        # from project root (older installs: docker-compose)
 ```
 
 ---
