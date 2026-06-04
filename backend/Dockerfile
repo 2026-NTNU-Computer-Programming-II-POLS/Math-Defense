@@ -9,7 +9,7 @@
 #
 # Pin the emsdk tag (avoid `:latest`) so production builds are reproducible.
 # Bump in lock-step with whatever version the GHA setup-emsdk action installs.
-FROM emscripten/emsdk:5.0.7 AS wasm-builder
+FROM emscripten/emsdk:6.0.0 AS wasm-builder
 WORKDIR /build
 COPY wasm/ /build/wasm/
 # Makefile writes outputs to ../frontend/src/math/wasm relative to wasm/, so
