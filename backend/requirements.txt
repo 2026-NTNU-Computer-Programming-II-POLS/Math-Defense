@@ -8,7 +8,7 @@ pydantic[email]==2.13.4
 pydantic-settings==2.14.1
 PyJWT[crypto]==2.13.0
 slowapi==0.1.9
-bcrypt==4.2.0
+bcrypt==5.0.0
 python-multipart==0.0.29
 httpx==0.28.1
 zxcvbn==4.5.0
