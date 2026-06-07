@@ -184,7 +184,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     range: 8,
     cooldown: 3.0,
     unlockLevel: 3,
-    description: 'Answer: lim [f(x)/(x-a)] as x→a. Charges for 3s, then bursts every enemy in range at 1.5× damage. +∞ instakills; +C bursts scaled damage; wrong/degenerate answers chip.',
+    description: 'Answer: lim [f(x)/(x-a)] as x→a⁺. Charges for 3s, then bursts every enemy in range at 1.5× damage. +∞ instakills; +C bursts scaled damage; wrong/degenerate answers chip.',
     mathConcept: 'Limits, L\'Hôpital\'s rule',
     examRelevance: 'One-sided and infinite limits are on AP Calculus AB and the AST Calculus subject test.',
     glyph: '∞',

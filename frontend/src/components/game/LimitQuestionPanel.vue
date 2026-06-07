@@ -89,7 +89,7 @@ function submitTyped(): void {
         Given: {{ question.fExpr }}
       </p>
       <p class="question-text">
-        Evaluate: lim [f(x) / (x - {{ question.a }})] as x → {{ question.a }}
+        Evaluate: lim [f(x) / {{ question.denom }}] as x → {{ question.a }}⁺
       </p>
 
       <template v-if="useTypedEntry">

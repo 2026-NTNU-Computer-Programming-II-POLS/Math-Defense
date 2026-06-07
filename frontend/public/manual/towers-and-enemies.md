@@ -75,15 +75,15 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 70 / 25 / 8 / 3.0 s
 - **Math:** limits, L'Hôpital's rule
 - **Unlocked from:** Star 3
-- **Mechanic:** charges for **3 s**, then releases an AoE burst that hits every enemy in range at **1.5×** the formula damage. The panel presents a multiple-choice `lim` question of the form `lim[x→a] f(x)/(x − a)`; your answer determines the formula:
+- **Mechanic:** charges for **3 s**, then releases an AoE burst that hits every enemy in range at **1.5×** the formula damage. The panel presents a multiple-choice **one-sided** `lim` question of the form `lim[x→a⁺] f(x)/(x − a)`; your answer determines the formula:
 
 | Answer | Effect |
 |---|---|
 | `+∞` | **instakill** every enemy in range (bypasses defensive caps) |
 | `+C` (finite positive) | `effectiveDamage × \|C\| × 1.5` per enemy |
-| `0` / non-limit constant / `−C` / `−∞` | chip damage `effectiveDamage × 0.35 × 1.5` |
+| `0` / DNE (undefined) / `−C` / `−∞` | chip damage `effectiveDamage × 0.35 × 1.5` |
 
-- **Pick when:** you can reliably solve the shown `lim[x→a] f(x)/(x − a)` quickly, especially against long-lived high-HP enemies where a correct `+∞` result has time to swing the wave. Wrong / degenerate answers no longer remove the tower or heal enemies — they just chip — but the lost burst on a 3 s cadence is still expensive.
+- **Pick when:** you can reliably solve the shown `lim[x→a⁺] f(x)/(x − a)` quickly, especially against long-lived high-HP enemies where a correct `+∞` result has time to swing the wave. Wrong / degenerate answers no longer remove the tower or heal enemies — they just chip — but the lost burst on a 3 s cadence is still expensive.
 - **Exam tie-in:** AP Calculus AB one-sided / infinite limits; AST calculus subject test.
 
 ### Calculus Tower — ∫

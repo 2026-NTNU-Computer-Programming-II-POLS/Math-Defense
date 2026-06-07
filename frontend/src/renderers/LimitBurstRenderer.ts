@@ -171,7 +171,10 @@ function formatResultBadge(p: LimitBurstPayload): { text: string; tone: 'kill' |
     // hint for "the bigger your positive constant, the harder it hits".
     case '+c':      return { text: `+C ×${Math.abs(p.answerValue)}`,     tone: 'bonus' }
     case 'zero':    return { text: '0 → chip',                           tone: 'chip' }
-    case 'constant':return { text: 'C → chip',                           tone: 'chip' }
+    // 'constant' is the engine's internal tag for a DNE / undefined limit
+    // (the oscillatory question branch). Label it DNE — not "C" — to match the
+    // panel ("undefined limit") and the manual.
+    case 'constant':return { text: 'DNE → chip',                         tone: 'chip' }
     case '-c':      return { text: '−C → chip',                          tone: 'chip' }
     case '-inf':    return { text: '−∞ → chip',                          tone: 'chip' }
   }

@@ -29,6 +29,7 @@ function makeQuestion(correct: LimitResult, choices?: LimitResult[]) {
   return {
     fExpr: 'f(x) = 3(x - 5)',
     a: 5,
+    denom: '(x - 5)',
     correctAnswer: correct,
     choices: choices ?? [correct],
   }

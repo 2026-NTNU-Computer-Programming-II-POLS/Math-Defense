@@ -4,13 +4,38 @@ import { mulberry32 } from '@/math/RandomUtils'
 export interface LimitQuestion {
   fExpr: string
   a: number
+  /**
+   * Display string for the linear factor (x − a) — already sign-normalised by
+   * `formatLinearFactor`, so callers render it verbatim instead of rebuilding
+   * `(x - ${a})` (which broke for negative / zero a). See `formatLinearFactor`.
+   */
+  denom: string
   correctAnswer: LimitResult
   choices: LimitResult[]
 }
 
+// Render the linear factor (x − a) for display. The playfield grid is centred
+// on the origin (minX = −14), so `a` — the tower's x grid coordinate, reused
+// as the limit point — is routinely negative or zero. The naïve `(x - ${a})`
+// template then produced "x - -2" (double minus) for a < 0 and the redundant
+// "x - 0" for a = 0. Normalise the sign instead:
+//   a > 0 → "(x - a)"     a < 0 → "(x + |a|)"     a === 0 → "x"
+export function formatLinearFactor(a: number): string {
+  if (a === 0) return 'x'
+  return a > 0 ? `(x - ${a})` : `(x + ${-a})`
+}
+
+// All generated questions use the ONE-SIDED limit convention x → a⁺ (the panel
+// renders the ⁺). This is what makes 1/(x−a) → +∞ and −1/(x−a) → −∞ unambiguous
+// correct answers; under a two-sided limit those would be DNE. The only genuine
+// DNE branch (case 6) therefore has to oscillate — see the comment there.
 export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
   const rng = mulberry32(seed)
   const questionType = Math.floor(rng() * 8)
+
+  // Pre-format the (x − a) factor once so every f(x) branch and the panel's
+  // denominator share one sign-correct rendering.
+  const f = formatLinearFactor(a)
 
   let fExpr: string
   let outcome: LimitOutcome
@@ -19,20 +44,20 @@ export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
   switch (questionType) {
     case 0: {
       const k = Math.floor(rng() * 4) + 1
-      fExpr = `${k}(x - ${a})² + ${k}(x - ${a})`
+      fExpr = `${k}${f}² + ${k}${f}`
       outcome = '+c'
       value = k
       break
     }
     case 1: {
       const k = Math.floor(rng() * 3) + 2
-      fExpr = `${k}(x - ${a})`
+      fExpr = `${k}${f}`
       outcome = '+c'
       value = k
       break
     }
     case 2: {
-      fExpr = `(x - ${a})²`
+      fExpr = `${f}²`
       outcome = 'zero'
       value = 0
       break
@@ -51,21 +76,29 @@ export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
     }
     case 5: {
       const k = -(Math.floor(rng() * 3) + 1)
-      fExpr = `${k}(x - ${a})`
+      fExpr = `${k}${f}`
       outcome = '-c'
       value = k
       break
     }
     case 6: {
-      const c = Math.floor(rng() * 4) + 2
-      fExpr = `${c}`
+      // Genuine DNE under the one-sided x→a⁺ convention. Every other branch is
+      // a polynomial over (x−a), whose right-hand limit always exists (finite
+      // or ±∞) — so a constant numerator like the old `${c}` here was really
+      // +∞, not "undefined". An oscillatory numerator is the only elementary
+      // way to make the limit genuinely fail to exist: sin(1/(x−a)) oscillates
+      // ever faster as x→a⁺, so f(x)/(x−a) neither settles nor diverges to a
+      // single ±∞. Outcome 'constant' is the engine's internal tag for DNE
+      // (see `parseLimitAnswer('DNE')`); value is unused for categorical
+      // outcomes, so 0 keeps it canonical.
+      fExpr = `sin(1/${f})`
       outcome = 'constant'
-      value = c
+      value = 0
       break
     }
     default: {
       const k = Math.floor(rng() * 4) + 1
-      fExpr = `${k}(x - ${a})³`
+      fExpr = `${k}${f}³`
       outcome = 'zero'
       value = 0
       break
@@ -75,7 +108,7 @@ export function generateLimitQuestion(a: number, seed: number): LimitQuestion {
   const correct: LimitResult = { outcome, value }
   const choices = generateDistractors(correct, rng)
 
-  return { fExpr: `f(x) = ${fExpr}`, a, correctAnswer: correct, choices }
+  return { fExpr: `f(x) = ${fExpr}`, a, denom: f, correctAnswer: correct, choices }
 }
 
 function generateDistractors(correct: LimitResult, rng: () => number): LimitResult[] {
