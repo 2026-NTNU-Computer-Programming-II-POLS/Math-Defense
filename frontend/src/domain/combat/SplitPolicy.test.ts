@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest'
 import { applyDamage, type CombatGameContext, type DamageSource } from './SplitPolicy'
 import type { Enemy } from '@/entities/types'
 import { EnemyType, Events } from '@/data/constants'
+import { createSegmentedPath, type PathSegmentRuntime } from '@/domain/path/segmented-path'
 
 function makeEnemy(over?: Partial<Enemy>): Enemy {
   return {
@@ -217,5 +218,87 @@ describe('applyDamage — DAMAGE_RESOLVED feedback event', () => {
     const enemy = makeEnemy({ towerDamageMult: 0.35 })
     applyDamage(enemy, 100, context, 'dot')
     expect(resolved(events)).toHaveLength(0)
+  })
+})
+
+// Regression: in multi-curve generated levels game.levelContext.path is only
+// the primary curve (paths[0]). A split must put its children on the PARENT's
+// curve (looked up via getEnemyPath) and register them there, or they teleport
+// onto curve 0 and march down the wrong route.
+describe('split children inherit the parent path (multi-curve fix)', () => {
+  function horizontalPathAt(y: number, id: string) {
+    const seg: PathSegmentRuntime = {
+      id,
+      kind: 'horizontal',
+      xRange: [0, 20],
+      params: { kind: 'horizontal', y },
+      evaluate: () => y,
+      evaluateDerivative: () => 0,
+      expr: id,
+      label: id,
+    }
+    return createSegmentedPath([seg])
+  }
+
+  function splitContext(over: Partial<CombatGameContext>): {
+    context: CombatGameContext
+    spawned: Enemy[]
+    assigned: { id: string; path: unknown }[]
+  } {
+    const spawned: Enemy[] = []
+    const assigned: { id: string; path: unknown }[] = []
+    const context: CombatGameContext = {
+      eventBus: {
+        emit: (event, payload) => {
+          if (event === Events.ENEMY_SPAWNED) spawned.push(payload as Enemy)
+        },
+      },
+      levelContext: { path: horizontalPathAt(0, 'primary') },
+      enemies: [],
+      state: { enemyVulnerability: 1 },
+      assignEnemyPath: (id, path) => assigned.push({ id, path }),
+      ...over,
+    }
+    return { context, spawned, assigned }
+  }
+
+  function splitter(): Enemy {
+    return makeEnemy({
+      id: 'splitter',
+      x: 10,
+      y: 5,
+      hp: 10,
+      maxHp: 40,
+      splitCount: 2,
+      splitChildType: EnemyType.GENERAL,
+      splitChildScale: 0.4,
+    })
+  }
+
+  it('spawns children on the parent curve (y=5), not the primary curve (y=0)', () => {
+    const parentPath = horizontalPathAt(5, 'parent')
+    const { context, spawned, assigned } = splitContext({
+      getEnemyPath: (id) => (id === 'splitter' ? parentPath : null),
+    })
+
+    applyDamage(splitter(), 999, context, 'towerHit') // lethal → killEnemy → split
+
+    expect(spawned).toHaveLength(2)
+    for (const child of spawned) expect(child.y).toBe(5)
+
+    // Each child must be registered on the parent's path so MovementSystem
+    // advances it along the right curve instead of falling back to paths[0].
+    expect(assigned).toHaveLength(2)
+    expect(assigned.map((a) => a.path)).toEqual([parentPath, parentPath])
+    expect(assigned.map((a) => a.id)).toEqual(spawned.map((c) => c.id))
+  })
+
+  it('falls back to the primary curve (y=0) when the parent path is unknown', () => {
+    const { context, spawned } = splitContext({ getEnemyPath: () => null })
+
+    applyDamage(splitter(), 999, context, 'towerHit')
+
+    expect(spawned).toHaveLength(2)
+    for (const child of spawned) expect(child.y).toBe(0)
   })
 })

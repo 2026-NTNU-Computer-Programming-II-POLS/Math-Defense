@@ -110,6 +110,13 @@ export class LimitTowerSystem {
           applyDamage(enemy, applied, game, 'towerHit')
           if (!willBeModified) {
             hits.push({ x: enemy.x, y: enemy.y, damage: applied, killed: !enemy.alive })
+          } else if (!enemy.alive) {
+            // Modified hit that still landed a kill (e.g. a Bulwark/Swarmling
+            // finished off through its towerDamageMult): push a KILL-only
+            // marker with damage 0 so LimitBurstRenderer prints "KILL" rather
+            // than a number. This restores the kill cue without stacking a
+            // stale pre-defense figure over the DAMAGE_RESOLVED popup.
+            hits.push({ x: enemy.x, y: enemy.y, damage: 0, killed: true })
           }
         }
       }

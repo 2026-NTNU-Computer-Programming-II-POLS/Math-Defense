@@ -10,7 +10,7 @@ export interface SpellDef {
   radius?: number         // game units (for area spells)
   damage?: number
   duration?: number       // seconds (for lingering effects)
-  slowFactor?: number     // multiplier (e.g. 0.5 = 50% speed)
+  slowFactor?: number     // fraction of speed REMOVED; MovementSystem applies base × (1 − slowFactor), so 0.6 → 40% effective speed (NOT a remaining-speed multiplier)
   color: string
   vfxDuration?: number    // seconds — overrides the default VFX lifetime (0.65 s)
   showVfxOnMiss?: boolean // emit SPELL_EFFECT even when the AoE refund path is taken
@@ -39,7 +39,10 @@ export const SPELL_DEFS: SpellDef[] = [
     targetMode: 'area',
     radius: 4,
     duration: 5,
-    slowFactor: 0.4,
+    // 40% effective speed = base × (1 − 0.6); matches spec/manual ("slow to 40% speed").
+    // Previously 0.4 here delivered 60% speed because the engine treats slowFactor as
+    // the fraction REMOVED, not a remaining-speed multiplier (same field semantics as Magic).
+    slowFactor: 0.6,
     color: '#60c0ff',
     vfxDuration: 1.45,
   },

@@ -53,6 +53,22 @@ describe('applyCalcOp — power rule', () => {
       collapsed: false,
     })
   })
+
+  it('snaps an ∫→d/dx round-trip back to an exact integer coefficient', () => {
+    // ∫x^2 dx = (1/3)x^3; d/dx of that is exactly x^2 in math but 0.999…9 in
+    // float. The result must snap to 1, not drift (which would render "(2/2)x").
+    const integ = applyCalcOp({ coefficient: 1, exponent: 2 }, 'integral')
+    const back = applyCalcOp(integ, 'derivative')
+    expect(back).toEqual({ coefficient: 1, exponent: 2, collapsed: false })
+  })
+
+  it('does not snap a tiny non-zero coefficient to 0 (no false collapse)', () => {
+    // A deep ∫-chain leaves |C| < 1; it must survive as a damage multiplier,
+    // not be snapped to 0 and wrongly flagged collapsed.
+    const r = applyCalcOp({ coefficient: 1e-9, exponent: 1 }, 'integral')
+    expect(r.collapsed).toBe(false)
+    expect(r.coefficient).toBeGreaterThan(0)
+  })
 })
 
 describe('checkMonomialAnswer', () => {

@@ -449,6 +449,12 @@ export class Game {
     this.getSystem('movement')?.registerEnemyPath(enemyId, path)
   }
 
+  /** The path an enemy is travelling along (registered on spawn). Returns null
+   *  when unknown so split/minion spawns can fall back to the primary curve. */
+  getEnemyPath(enemyId: string): SegmentedPath | null {
+    return this.getSystem('movement')?.getEnemyPath(enemyId) ?? null
+  }
+
   setPhase(to: GamePhase): void {
     const from = this.state.phase
     // Self-heal: forceTransition can move _current without touching state.phase.

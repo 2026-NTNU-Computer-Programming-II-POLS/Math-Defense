@@ -110,7 +110,7 @@ export class PetCombatSystem {
     game.pets = game.pets.filter((p) => p.active)
   }
 
-  // enemy.slowFactor is reset to 0 by CombatSystem each frame when slowTimer <= 0,
+  // enemy.slowFactor is reset to 0 by MovementSystem each frame when slowTimer <= 0,
   // so this must be called every frame to sustain the aura effect.
   private _applySlowAura(pet: Pet, enemies: Enemy[]): void {
     for (const enemy of enemies) {

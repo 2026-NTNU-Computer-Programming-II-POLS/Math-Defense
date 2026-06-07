@@ -8,6 +8,13 @@ export interface CombatGameContext {
   levelContext: { path: SegmentedPath | null } | null | undefined
   enemies: Enemy[]
   state: { enemyVulnerability: number }
+  // Look up the path an enemy travels (registered by WaveSystem on spawn) so
+  // split children inherit the PARENT's curve instead of the primary one.
+  // Optional so lightweight test contexts may omit it.
+  getEnemyPath?(enemyId: string): SegmentedPath | null
+  // Register a freshly-spawned child on a path so MovementSystem advances it
+  // along that curve rather than falling back to the primary path.
+  assignEnemyPath?(enemyId: string, path: SegmentedPath): void
 }
 
 export interface SplitContext {
@@ -86,11 +93,18 @@ export function killEnemy(enemy: Enemy, game: CombatGameContext): void {
   enemy.deathMaxTime = isBoss ? ANIM.BOSS_DEATH : ANIM.ENEMY_DEATH
   game.eventBus.emit(Events.ENEMY_KILLED, enemy)
   game.eventBus.emit(Events.ENEMY_DYING, enemy)
-  if (shouldSplit(enemy) && game.levelContext?.path) {
+  const primaryPath = game.levelContext?.path
+  if (shouldSplit(enemy) && primaryPath) {
+    // Spawn children on the PARENT's actual curve. In multi-curve generated
+    // levels game.levelContext.path is only the primary curve (paths[0]);
+    // using it would teleport children onto curve 0 and march them down the
+    // wrong route, dodging the towers placed to defend the parent's lane.
+    const parentPath = game.getEnemyPath?.(enemy.id) ?? primaryPath
     spawnChildren(enemy, {
-      path: game.levelContext.path,
+      path: parentPath,
       onChildCreated: (child) => {
         game.enemies.push(child)
+        game.assignEnemyPath?.(child.id, parentPath)
         game.eventBus.emit(Events.ENEMY_SPAWNED, child)
       },
     })

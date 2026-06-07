@@ -31,6 +31,21 @@ export interface CalcOpResult {
 // float. Snap to 1e-12 so display and comparison stay stable.
 const COEFF_PRECISION = 1e12
 
+// A round-trip like ∫ then d/dx yields 0.999999999999 instead of 1, which then
+// renders as a degenerate "(2/2)x" and keeps drifting through later ops. Snap a
+// coefficient within this tolerance of an integer back to that integer so the
+// state, its display, and grading all use the clean value.
+const INTEGER_SNAP_EPSILON = 1e-9
+
+// Only snaps toward a NON-ZERO integer: float drift is always toward a nonzero
+// integer (a genuine zero is computed exactly, e.g. C·n·0). Snapping a tiny
+// nonzero coefficient to 0 would wrongly trip the `coefficient === 0` collapse
+// and erase a small-but-valid damage multiplier (a deep ∫-chain leaves |C| < 1).
+function snapNearInteger(c: number): number {
+  const nearest = Math.round(c)
+  return nearest !== 0 && Math.abs(c - nearest) < INTEGER_SNAP_EPSILON ? nearest : c
+}
+
 /** Applies a calculus operation to the monomial C·x^n via the power rule. */
 export function applyCalcOp(m: Monomial, op: CalcOp): CalcOpResult {
   let coefficient: number
@@ -46,6 +61,8 @@ export function applyCalcOp(m: Monomial, op: CalcOp): CalcOpResult {
     coefficient = Math.round((m.coefficient / (m.exponent + 1)) * COEFF_PRECISION) / COEFF_PRECISION
     exponent = m.exponent + 1
   }
+
+  coefficient = snapNearInteger(coefficient)
 
   const collapsed =
     coefficient === 0 || (op === 'derivative' && m.exponent === 0) || exponent === 0

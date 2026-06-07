@@ -191,7 +191,7 @@ Tower mechanics call into the deterministic C/WASM core (see §11):
 | Split | 40 | 2.0 | 15 | 5 | Splits into 2 Generals on death |
 | Helper | 35 | 2.0 | 30 | 15 | Aura (r=3): +5 HP/s and +20% speed to allies |
 | Regenerator | 80 | 1.5 | 35 | 20 | Regenerates 18 HP/s |
-| Bulwark | 220 | 0.9 | 50 | 30 | Takes only 40% of tower damage (pets and player effects bypass) |
+| Bulwark | 220 | 0.9 | 50 | 30 | Takes only 40% of tower damage (only Calculus pets bypass; spells are reduced too) |
 | Swarmling | 12 | 3.2 | 6 | 4 | Takes only 35% of tower damage (Calculus pets bypass) |
 | **Boss Type-A** | 500 | 0.8 | 200 | 100 | 200-HP shield; summons a General every 8 s |
 | **Boss Type-B** | 600 | 0.7 | 300 | 150 | 250-HP shield; summons a Fast every 8 s; triggers **Chain Rule** event at ~50% HP |

@@ -3,6 +3,7 @@ import { distance } from '@/math/MathUtils'
 import { createEnemy } from '@/entities/EnemyFactory'
 import { ENEMY_DEFS } from '@/data/enemy-defs'
 import { generateChainRuleQuestion, type ChainRuleQuestion } from '@/math/chain-rule-generator'
+import { killEnemy } from '@/domain/combat/SplitPolicy'
 import type { Game, GameSystem } from '@/engine/Game'
 import type { Enemy } from '@/entities/types'
 
@@ -100,8 +101,12 @@ export class EnemyAbilitySystem implements GameSystem {
     boss.minionTimer -= boss.minionInterval
 
     if (!game.levelContext?.path) return
-    const minion = createEnemy(boss.minionType!, game.levelContext.path, boss.x, boss._targetX)
+    // Minions appear beside the boss on its own curve, not the primary curve
+    // (levelContext.path is paths[0]); otherwise they teleport to curve 0.
+    const path = game.getEnemyPath(boss.id) ?? game.levelContext.path
+    const minion = createEnemy(boss.minionType!, path, boss.x, boss._targetX)
     game.enemies.push(minion)
+    game.assignEnemyPath(minion.id, path)
     game.eventBus.emit(Events.ENEMY_SPAWNED, minion)
   }
 
@@ -127,12 +132,18 @@ export class EnemyAbilitySystem implements GameSystem {
     boss.chainRuleAnsweredCorrectly = payload.correct
 
     if (payload.correct) {
-      boss.alive = false
-      boss.active = false
-      // Children must be in game.enemies before ENEMY_KILLED fires so that
+      // Children must be in game.enemies before the kill is broadcast so that
       // any observer (including a future wave-end check) sees them already.
       this._splitBoss(boss, question, game)
-      game.eventBus.emit(Events.ENEMY_KILLED, boss)
+      // Route the insta-kill through killEnemy so the boss gets the full death
+      // lifecycle (dying-window fields + ENEMY_DYING) that drives the boss
+      // death cinematic and screen shake — matching a normal combat kill
+      // instead of vanishing instantly. killEnemy also emits ENEMY_KILLED for
+      // scoring; the ENEMY_KILLED listener (_onEnemyKilled) is a no-op here
+      // because chainRuleAnsweredCorrectly was set true above, and killEnemy's
+      // own shouldSplit() is false for Boss-B (no split config), so _splitBoss
+      // above remains the only source of children.
+      killEnemy(boss, game)
     }
 
     game.setPhase(GamePhase.WAVE)
@@ -150,7 +161,10 @@ export class EnemyAbilitySystem implements GameSystem {
   private _splitBoss(boss: Enemy, question: ChainRuleQuestion, game: Game): void {
     if (!game.levelContext?.path) return
 
-    const path = game.levelContext.path
+    // Spawn children on the boss's actual curve. levelContext.path is only the
+    // primary curve (paths[0]) in multi-curve generated levels; using it would
+    // teleport the children onto curve 0 and send them down the wrong route.
+    const path = game.getEnemyPath(boss.id) ?? game.levelContext.path
 
     const child1 = createEnemy(EnemyType.STRONG, path, boss.x, boss._targetX)
     child1.hp = Math.round(boss.maxHp * 0.6)
@@ -177,6 +191,8 @@ export class EnemyAbilitySystem implements GameSystem {
     child2.minionInterval = 0
 
     game.enemies.push(child1, child2)
+    game.assignEnemyPath(child1.id, path)
+    game.assignEnemyPath(child2.id, path)
     game.eventBus.emit(Events.ENEMY_SPAWNED, child1)
     game.eventBus.emit(Events.ENEMY_SPAWNED, child2)
     game.eventBus.emit(Events.BOSS_SPLIT, {

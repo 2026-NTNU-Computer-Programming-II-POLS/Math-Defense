@@ -53,7 +53,7 @@ Ten enemy types with distinct counter-play. `killValue` (not gold reward) drives
 | Split | 40 | 2.0 | 8 | 1 | 5 | On death splits into 2 smaller Generals |
 | Helper | 35 | 2.0 | 23 | 1 | 15 | Aura: +5 HP/s and +20% speed to allies in r=3 — **kill first** |
 | Regenerator | 80 | 1.5 | 30 | 2 | 20 | Regens 18 HP/s — needs burst damage |
-| Bulwark | 220 | 0.9 | 45 | 3 | 30 | Takes only **40%** of tower damage; pets and player effects bypass the cut |
+| Bulwark | 220 | 0.9 | 45 | 3 | 30 | Takes only **40%** of tower damage; only Calculus pets bypass the cut (spells are reduced too) |
 | Swarmling | 12 | 3.2 | 6 | 1 | 4 | Takes only **35%** of tower damage; pets bypass the modifier |
 | Boss Type-A | 500 | 0.8 | 150 | 99 | 100 | 200-HP shield; spawns a General every 8 s |
 | Boss Type-B | 600 | 0.7 | 225 | 99 | 150 | 250-HP shield; spawns a Fast every 8 s; triggers **Chain Rule challenge** at ~50% HP — correct answer instakills the boss + 100 gold; wrong answer = no heal, no penalty, boss returns to combat |

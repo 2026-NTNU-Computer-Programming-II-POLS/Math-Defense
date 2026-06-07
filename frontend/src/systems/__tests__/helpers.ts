@@ -49,6 +49,7 @@ export function createMockGame(overrides?: Partial<GameState>): Game {
       this.eventBus.emit(Events.PHASE_CHANGED, { from, to })
     },
     assignEnemyPath() {},
+    getEnemyPath() { return null },
     getSystem() { return undefined },
     // ShakeController stub — the real Game owns one; systems may call
     // shake() from their listeners (Visual Redesign Phase 1+) and the mock

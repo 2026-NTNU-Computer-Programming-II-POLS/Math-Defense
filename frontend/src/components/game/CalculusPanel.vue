@@ -6,6 +6,7 @@ import { CALCULUS_OP_COST } from '@/systems/CalculusTowerSystem'
 import type { CalculusTowerSystem, MonomialPreset } from '@/systems/CalculusTowerSystem'
 import { applyCalcOp, checkMonomialAnswer } from '@/math/monomial'
 import type { CalcOp } from '@/math/monomial'
+import { petCountForCoefficient } from '@/entities/PetFactory'
 import { TOWER_DEFS } from '@/data/tower-defs'
 import { TowerType } from '@/data/constants'
 
@@ -48,17 +49,22 @@ function traitFromExp(n: number): TraitKey {
   return 'basic'
 }
 
-function petCount(c: number): number {
-  return Number.isInteger(c) && c > 0 ? c : 1
-}
+// Talent + upgrade pet-count bonus, mirrored from how CalculusTowerSystem
+// combines mods before spawning, so the preview count matches the actual spawn.
+const petCountBonus = computed(() => {
+  const t = tower.value
+  if (!t) return 0
+  return Math.floor((t.talentMods?.['pet_count'] ?? 0) + (t.upgradeExtras?.['petCount'] ?? 0))
+})
 
 // Preset display surfaces only the strategic facts — pet trait (from n) and pet
-// count (from C). The derivative result is deliberately NOT pre-computed here:
-// that is the math the student solves at the operation step.
+// count (from C, via the shared log-compression formula). The derivative result
+// is deliberately NOT pre-computed here: that is the math the student solves at
+// the operation step.
 const presetMeta = computed(() =>
   presets.value.map((p) => ({
     trait: traitFromExp(p.exponent),
-    count: petCount(p.coefficient),
+    count: petCountForCoefficient(p.coefficient, petCountBonus.value),
   })),
 )
 
@@ -169,7 +175,7 @@ function submitAnswer() {
 <template>
   <div class="calc-panel">
     <template v-if="!hasState">
-      <p class="section-label">Choose f(x) — coefficient = pet count, exponent = pet type</p>
+      <p class="section-label">Choose f(x) — bigger coefficient = more pets (log scale), exponent = pet type</p>
       <div class="trait-legend">
         <span v-for="key in (['slow','fast','heavy'] as const)" :key="key" class="legend-item">
           <span class="trait-dot" :style="{ background: TRAIT_INFO[key].color }"></span>

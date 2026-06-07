@@ -17,6 +17,19 @@ import type { Enemy } from '@/entities/types'
 
 const ORIGIN = Object.freeze({ x: 0, y: 0 })
 
+// Hard ceiling on slowFactor, enforced at the single point where a slow is
+// turned into a speed multiplier (in update() below). Caps the effect of ANY
+// slow source — Magic debuff, the Asymptote spell, the Calculus slow-pet aura,
+// or a future one — so a stacked or misconfigured slowFactor can never reach
+// >= 1 and freeze (= 1) or reverse (> 1) an enemy's motion. Defence in depth:
+// MagicTowerSystem also clamps at its own write site (its balance-tuned
+// SLOW_FACTOR_CEIL); this floor is the engine-wide backstop for sources that
+// write slowFactor unclamped. The value matches the deepest intended slow, so
+// every current source passes through untouched — it only ever bites a future
+// regression. Applied to a local copy only: enemy.slowFactor is left intact so
+// the frost-overlay projection keeps reading the true value.
+const SLOW_FACTOR_HARD_CEIL = 0.9
+
 export class MovementSystem {
   private _states = new Map<string, MovementState>()
   private _assignedPaths = new Map<string, SegmentedPath>()
@@ -32,6 +45,13 @@ export class MovementSystem {
 
   registerEnemyPath(enemyId: string, path: SegmentedPath): void {
     this._assignedPaths.set(enemyId, path)
+  }
+
+  /** The path an enemy is travelling, or undefined if none was registered.
+   *  Split/minion spawns read this so children inherit the parent's curve
+   *  instead of falling back to the level's primary path. */
+  getEnemyPath(enemyId: string): SegmentedPath | undefined {
+    return this._assignedPaths.get(enemyId)
   }
 
   init(_game: Game): void {}
@@ -81,7 +101,8 @@ export class MovementSystem {
       // Compute speedMultiplier from live fields; consume speedBoost; clear slowFactor
       // once consumed if the timer has run out (preserving the original consume-then-clear order).
       const baseMul = 1 + enemy.speedBoost
-      enemy.speedMultiplier = enemy.slowFactor > 0 ? baseMul * (1 - enemy.slowFactor) : baseMul
+      const effectiveSlow = Math.min(SLOW_FACTOR_HARD_CEIL, enemy.slowFactor)
+      enemy.speedMultiplier = enemy.slowFactor > 0 ? baseMul * (1 - effectiveSlow) : baseMul
       enemy.speedBoost = 0
       if (enemy.slowFactor > 0 && enemy.slowTimer <= 0) {
         enemy.slowFactor = 0

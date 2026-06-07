@@ -39,13 +39,14 @@ export const COUNTER_ENEMY_INFO: Partial<Record<EnemyType, CounterEnemyInfo>> = 
   [EnemyType.BULWARK]: {
     name: 'Bulwark',
     counterTower: 'Matrix tower',
-    warning: 'tower damage is reduced 60% — bypass with Calculus pets or the Matrix laser ramp.',
+    warning: 'tower damage is reduced 60% — only Calculus pets bypass it (spells are cut too); the Matrix laser ramps through.',
     explanation:
       'The Bulwark only takes 40% of any tower damage, so heavy slow-firing '
-      + 'shots feel weak. Pets and player-cast effects bypass the reduction '
-      + 'entirely; the Matrix tower’s ramping laser is the next-best '
-      + 'option because its sustained damage stacks fast enough to grind '
-      + 'through even after the multiplier.',
+      + 'shots feel weak. Only Calculus pets bypass the reduction entirely — '
+      + 'spells (Exponential / Impulse) are cut to 40% just like tower fire. '
+      + 'The Matrix tower’s ramping laser is the next-best option because its '
+      + 'sustained damage stacks fast enough to grind through even after the '
+      + 'multiplier.',
   },
   [EnemyType.SWARMLING]: {
     name: 'Swarmling',

@@ -1,5 +1,31 @@
 import { describe, it, expect } from 'vitest'
-import { spawnPets } from '../PetFactory'
+import { spawnPets, petCountForCoefficient } from '../PetFactory'
+
+describe('petCountForCoefficient — shared panel/engine pet-count formula', () => {
+  // The CalculusPanel preview and spawnPets must agree; this locks the formula
+  // (regression for the old panel bug that showed raw C instead of log2(C+1)).
+  const cases: Array<[number, number]> = [
+    [1, 1],
+    [2, 1],
+    [3, 2],
+    [6, 2],
+    [7, 3],
+    [99, 6],
+  ]
+  for (const [coefficient, expected] of cases) {
+    it(`coefficient ${coefficient} → ${expected} pets`, () => {
+      expect(petCountForCoefficient(coefficient)).toBe(expected)
+    })
+  }
+
+  it('adds the talent/upgrade bonus linearly', () => {
+    expect(petCountForCoefficient(7, 2)).toBe(5)
+  })
+
+  it('matches spawnPets count for the same coefficient', () => {
+    expect(spawnPets('o', 0, 0, 6, 1, {}, 1, 1)).toHaveLength(petCountForCoefficient(6))
+  })
+})
 
 describe('PetFactory.spawnPets', () => {
   describe('Q11: pet attack-speed scales linearly with level (floor 0.1)', () => {

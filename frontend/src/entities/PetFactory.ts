@@ -14,6 +14,17 @@ function traitFromExponent(n: number): PetTrait {
   return 'basic'
 }
 
+/**
+ * Pet count yielded by a Calculus monomial coefficient. Q12 log-compression so
+ * a large coefficient (e.g. 99) spawns a handful of pets, not 99. `max(1, …)`
+ * floors a fractional/zero coefficient at log2(2) = 1; bonusCount from talents
+ * stacks linearly on top. Exported so CalculusPanel previews the SAME count the
+ * engine spawns — there must be no second formula that can drift out of sync.
+ */
+export function petCountForCoefficient(coefficient: number, bonusCount = 0): number {
+  return Math.floor(Math.log2(Math.max(1, coefficient) + 1)) + bonusCount
+}
+
 export function spawnPets(
   ownerId: string,
   x: number,
@@ -29,10 +40,9 @@ export function spawnPets(
   const trait = traitFromExponent(exponent)
   const isInteger = Number.isInteger(coefficient) && coefficient > 0
   const bonusCount = Math.floor(mods['pet_count'] ?? 0)
-  // Q12: log-compress coefficient → pet count so a 99x Calculus result spawns
-  // 6 pets instead of 99. `max(1, …)` floors a fractional/zero coefficient at
-  // log2(2) = 1; bonusCount from talents stacks linearly on top.
-  const count = Math.floor(Math.log2(Math.max(1, coefficient) + 1)) + bonusCount
+  // Q12 log-compression lives in petCountForCoefficient so the panel preview and
+  // the engine spawn from one formula; bonusCount from talents stacks on top.
+  const count = petCountForCoefficient(coefficient, bonusCount)
   const abilityMod = isInteger ? 1 : Math.abs(coefficient)
 
   // Mod multipliers from talents + upgrade extras

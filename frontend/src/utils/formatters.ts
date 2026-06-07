@@ -31,6 +31,11 @@ export function toFraction(n: number): string | null {
  * Returns '' for 1 and '-' for -1 (implicit coefficient convention).
  */
 export function formatCoefficient(c: number): string {
+  // Float drift (e.g. 0.999999999999 from an ∫→d/dx round-trip) would otherwise
+  // render as a degenerate fraction like "(2/2)"; snap near-integers first.
+  // Guarded to non-zero integers so a tiny valid coefficient is not shown as 0.
+  const nearest = Math.round(c)
+  if (nearest !== 0 && Math.abs(c - nearest) < 1e-9) c = nearest
   if (Number.isInteger(c)) {
     if (c === 1) return ''
     if (c === -1) return '-'
