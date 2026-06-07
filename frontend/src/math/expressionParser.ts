@@ -1,7 +1,12 @@
 export type CurveFunction = (x: number) => number
 
-const MAX_EXPR_LEN = 200
-const MAX_EVAL_DEPTH = 64
+export const MAX_EXPR_LEN = 200
+// Must stay >= MAX_EXPR_LEN. A length-bounded expression can still nest up to
+// ~MAX_EXPR_LEN deep (e.g. a long `-----x` unary chain or an `x+x+x+...` fold),
+// so a smaller cap would throw on valid in-length curves and surface them as a
+// generic "Invalid expression". The length cap is the real DoS guard; this is
+// just defense-in-depth against a degenerate AST.
+const MAX_EVAL_DEPTH = 256
 
 type Token =
   | { kind: 'num'; value: number }

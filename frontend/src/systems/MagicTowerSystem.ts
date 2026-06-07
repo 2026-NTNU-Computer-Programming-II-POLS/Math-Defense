@@ -69,10 +69,13 @@ export class MagicTowerSystem {
   // only through `recomputeEffectiveDamage`, which reads interferenceFactor,
   // so the two factors compose with no flicker or double-application.
   update(dt: number, game: Game): void {
-    if (game.state.phase !== GamePhase.WAVE) return
-
-    // Reset all magic buffs before reapplying below — ensures buff clears
-    // on the frame after a buff tower is destroyed or disabled.
+    // Reset every tower's magic buff each frame, BEFORE the phase gate. The
+    // buff is only re-applied during WAVE (below), so clearing it here drops
+    // the buff the instant a wave ends. Doing the reset only inside the WAVE
+    // branch left it stale through BUILD — and CalculusTowerSystem snapshots
+    // `magicBuff` into its pets' damage at respawn, so a respawn between waves
+    // baked a buff that no longer had a source. The `!== 1` guard keeps this
+    // idempotent once cleared.
     for (const t of game.towers) {
       if (t.magicBuff !== 1) {
         t.magicBuff = 1
@@ -80,25 +83,40 @@ export class MagicTowerSystem {
       }
     }
 
-    for (const tower of game.towers) {
-      if (tower.type !== TowerType.MAGIC || tower.disabled || !tower.configured) continue
-      if (!tower.magicExpression) continue
+    if (game.state.phase !== GamePhase.WAVE) return
 
+    // Two ordered passes so the outcome never depends on tower placement
+    // order. Pass 1 folds every buff zone into the affected towers'
+    // effectiveDamage; pass 2 runs the debuffs, whose DoT reads that
+    // already-buffed effectiveDamage. A single interleaved pass let a buff
+    // reach a debuff tower's DoT only when the buff tower happened to sit
+    // earlier in `game.towers`.
+    for (const tower of game.towers) {
+      if (!this._isActiveMagicTower(tower) || tower.magicMode === 'debuff') continue
       const fn = this.getTowerCurve(tower)
       if (!fn) continue
-
-      if (tower.magicMode === 'debuff') {
-        // Debuff: cooldown-gated so DoT doesn't stack every frame.
-        tower.cooldownTimer -= dt
-        if (tower.cooldownTimer > 0) continue
-        tower.cooldownTimer = effectiveCooldown(tower, game.state)
-        this._applyDebuff(tower, fn, game)
-      } else {
-        // Buff: applied every frame as a persistent zone — effect lasts as
-        // long as the source tower is alive (cleared by the reset above).
-        this._applyBuff(tower, fn, game)
-      }
+      this._applyBuff(tower, fn, game)
     }
+
+    for (const tower of game.towers) {
+      if (!this._isActiveMagicTower(tower) || tower.magicMode !== 'debuff') continue
+      const fn = this.getTowerCurve(tower)
+      if (!fn) continue
+      // Debuff is cooldown-gated so the DoT doesn't stack every frame.
+      tower.cooldownTimer -= dt
+      if (tower.cooldownTimer > 0) continue
+      tower.cooldownTimer = effectiveCooldown(tower, game.state)
+      this._applyDebuff(tower, fn, game)
+    }
+  }
+
+  private _isActiveMagicTower(tower: Tower): boolean {
+    return (
+      tower.type === TowerType.MAGIC &&
+      !tower.disabled &&
+      tower.configured &&
+      !!tower.magicExpression
+    )
   }
 
   private _applyDebuff(tower: Tower, fn: CurveFunction, game: Game): void {
@@ -107,8 +125,9 @@ export class MagicTowerSystem {
     const strengthMult = 1 + (mods['zone_strength'] ?? 0)
     const durationMult = 1 + (mods['duration'] ?? 0)
     // Phase 6 Q7: slow outlasts the DoT window. Refresh-on-rehit semantics
-    // — `max()` on the factor and overwrite the timer — mean stacking two
-    // MAGIC towers does not push the slow past SLOW_FACTOR.
+    // — `max()` on both the factor and the timer (see the apply block below) —
+    // mean stacking two MAGIC towers does not push the slow past SLOW_FACTOR,
+    // while a longer slow from another source is never truncated.
     const slowDuration = SLOW_BASE_DURATION * durationMult
     const dotDuration = DOT_BASE_DURATION * durationMult
     // Phase 7 (Q14): `slow_strength` deepens the slow. slowFactor is the
@@ -133,10 +152,16 @@ export class MagicTowerSystem {
       const curveY = fn(enemy.x)
       if (distance(tower.x, tower.y, enemy.x, curveY) > range) continue
       if (Math.abs(enemy.y - curveY) < zoneWidth) {
+        // max() on every field, not assignment, so overlapping debuff zones
+        // (and a longer slow from an Asymptote spell) compose as "strongest +
+        // longest wins" instead of "last writer wins" — which let a weaker or
+        // shorter source clobber a stronger/longer one. Refresh-on-rehit is
+        // preserved: a re-hit from the same tower still tops up to full because
+        // max(remaining, full) === full.
         enemy.slowFactor = Math.max(enemy.slowFactor, slowFactor)
-        enemy.slowTimer = slowDuration
-        enemy.dotDamage = tower.effectiveDamage * strengthMult
-        enemy.dotTimer = dotDuration
+        enemy.slowTimer = Math.max(enemy.slowTimer, slowDuration)
+        enemy.dotDamage = Math.max(enemy.dotDamage, tower.effectiveDamage * strengthMult)
+        enemy.dotTimer = Math.max(enemy.dotTimer, dotDuration)
       }
     }
   }

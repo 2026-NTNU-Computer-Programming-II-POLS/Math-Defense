@@ -198,6 +198,48 @@ describe('MagicTowerSystem — Q7 debuff zone applies AoE damage + slow', () => 
 
     expect(enemy.slowFactor).toBe(0)
   })
+
+  it('does not truncate a longer pre-existing slow timer (max semantics)', () => {
+    // Cross-source regression: an Asymptote spell sets a 5 s slow; a Magic
+    // debuff (2 s) overlapping the same enemy must NOT overwrite the shared
+    // slowTimer down to 2 s. max() keeps the longer window.
+    makeMagicTower(game)
+    const enemy = createMockEnemy({ x: 2, y: 0, slowFactor: SLOW_FACTOR, slowTimer: 5 })
+    game.enemies.push(enemy)
+
+    system.update(0.016, game)
+
+    expect(enemy.slowTimer).toBeCloseTo(5, 5)
+    expect(enemy.slowFactor).toBe(SLOW_FACTOR)
+  })
+
+  it('keeps a stronger existing DoT when a weaker debuff zone overlaps (max semantics)', () => {
+    // A weaker Magic tower iterated later must not clobber a stronger DoT
+    // already on the enemy (the old last-writer-wins assignment could lower it).
+    makeMagicTower(game, { effectiveDamage: 5 })
+    const enemy = createMockEnemy({ x: 2, y: 0, dotDamage: 20, dotTimer: 1 })
+    game.enemies.push(enemy)
+
+    system.update(0.016, game)
+
+    expect(enemy.dotDamage).toBeCloseTo(20, 5)
+  })
+
+  it('boosts the DoT of a debuff tower regardless of tower placement order', () => {
+    // Order-independence regression: the buff tower is placed AFTER the debuff
+    // tower, yet the debuff's DoT must still read the buffed effectiveDamage.
+    // (The old interleaved single pass only buffed debuff towers that sat
+    // earlier in game.towers.) base 8 × 1.25 buff = 10.
+    const debuff = makeMagicTower(game, { x: 0, baseDamage: 8, effectiveDamage: 8, magicMode: 'debuff' })
+    makeMagicTower(game, { x: 1, magicMode: 'buff' })
+    const enemy = createMockEnemy({ x: 2, y: 0 })
+    game.enemies.push(enemy)
+
+    system.update(0.016, game)
+
+    expect(debuff.magicBuff).toBeCloseTo(1.25, 5)
+    expect(enemy.dotDamage).toBeCloseTo(10, 5)
+  })
 })
 
 describe('MagicTowerSystem — Q7 buff zone (preserved)', () => {
@@ -301,6 +343,28 @@ describe('MagicTowerSystem — Q7 buff zone (preserved)', () => {
     expect(ally.magicBuff).toBeGreaterThan(1)
 
     source.disabled = true
+    system.update(0.016, game)
+
+    expect(ally.magicBuff).toBe(1)
+    expect(ally.effectiveDamage).toBeCloseTo(ally.baseDamage, 5)
+  })
+
+  it('clears a stale magic buff once the wave ends (reset runs outside WAVE)', () => {
+    // Regression: the per-frame magicBuff reset used to sit behind the
+    // `phase === WAVE` gate, so a buff applied during a wave lingered through
+    // BUILD/BUFF_SELECT — and a Calculus respawn between waves snapshotted the
+    // stale buff into its pets. The reset now runs before the phase gate.
+    game.state.phase = GamePhase.BUFF_SELECT
+    const ally = createMockTower({
+      type: TowerType.RADAR_A,
+      baseDamage: 10,
+      damageBonus: 1,
+      magicBuff: 1.25,
+      interferenceFactor: 1,
+      effectiveDamage: 12.5,
+    })
+    game.towers.push(ally)
+
     system.update(0.016, game)
 
     expect(ally.magicBuff).toBe(1)

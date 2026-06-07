@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { Events } from '@/data/constants'
-import { parseExpression } from '@/math/expressionParser'
+import { parseExpression, MAX_EXPR_LEN } from '@/math/expressionParser'
 import { achievementService } from '@/services/achievementService'
 import type { MagicMode } from '@/data/tower-defs'
 
@@ -69,9 +69,12 @@ const LOG_RE = /\b(?:log|ln)\b/
 // or more deeply nested than this isn't a real player input — it's either an
 // accidental paste or a stress probe, and the parser/evaluator can spend
 // significant CPU on pathological inputs (catastrophic backtracking, deep
-// recursion). 256 chars + 16-deep parens easily covers the most elaborate
+// recursion). Kept in lock-step with the parser's own MAX_EXPR_LEN so an input
+// that clears this length check can never then be rejected by the parser
+// purely for length (which would misleadingly read as a generic "Invalid
+// expression"). That cap + 16-deep parens easily covers the most elaborate
 // curve students compose in practice.
-const MAX_EXPRESSION_LENGTH = 256
+const MAX_EXPRESSION_LENGTH = MAX_EXPR_LEN
 const MAX_PAREN_DEPTH = 16
 
 function parenDepth(s: string): number {

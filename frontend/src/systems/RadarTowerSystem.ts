@@ -26,6 +26,10 @@ export class RadarTowerSystem {
   // RADAR_A deals one discrete "ping" when an enemy first enters the band
   // (rising edge), not every frame — so sweep speed scales hit rate.
   private _inBand = new Map<string, Set<string>>()
+  // Per-tower countdown (seconds to next pulse) for the degenerate narrow-arc
+  // fallback in _pulseNarrowArc, used when the restricted sector is narrower
+  // than the detection band and the rising-edge model can no longer fire.
+  private _pulseTimers = new Map<string, number>()
   private _unsubs: (() => void)[] = []
 
   init(game: Game): void {
@@ -39,20 +43,39 @@ export class RadarTowerSystem {
         tower.arcRestrict = restrict
         tower.configured = true
         // Re-seed the needle so a freshly restricted sweep starts on the arc's
-        // edge rather than wherever the full-circle pass had left it.
+        // edge rather than wherever the full-circle pass had left it. Clearing
+        // _inBand also resets the rising-edge memory; this is safe only because
+        // the arc panel is BUILD-only (no live enemies), so the next-tick
+        // re-ping it would otherwise cause cannot land during a wave. If the
+        // panel is ever exposed during WAVE, gate the damage path accordingly.
         this._sweepAngles.delete(towerId)
         this._sweepDirs.delete(towerId)
         this._inBand.delete(towerId)
+        this._pulseTimers.delete(towerId)
       }),
       game.eventBus.on(Events.TOWER_TARGETING_CHANGED, ({ towerId, mode }: { towerId: string; mode: TargetingMode }) => {
         const tower = game.towers.find((t) => t.id === towerId)
         if (!tower) return
         tower.targetingMode = mode
       }),
+      // Drop per-tower sweep state when a tower is sold so the maps don't
+      // accumulate stale entries until the next LEVEL_START. A refund is the
+      // only runtime path that removes a tower from game.towers
+      // (TowerUpgradeSystem splices it and emits this); the declared
+      // TOWER_REMOVED event has no emitter, so listening to it would be a
+      // silent no-op.
+      game.eventBus.on(Events.TOWER_REFUND_RESULT, ({ success, towerId }) => {
+        if (!success || !towerId) return
+        this._sweepAngles.delete(towerId)
+        this._sweepDirs.delete(towerId)
+        this._inBand.delete(towerId)
+        this._pulseTimers.delete(towerId)
+      }),
       game.eventBus.on(Events.LEVEL_START, () => {
         this._sweepAngles.clear()
         this._sweepDirs.clear()
         this._inBand.clear()
+        this._pulseTimers.clear()
       }),
     )
   }
@@ -63,6 +86,7 @@ export class RadarTowerSystem {
     this._sweepAngles.clear()
     this._sweepDirs.clear()
     this._inBand.clear()
+    this._pulseTimers.clear()
   }
 
   update(dt: number, game: Game): void {
@@ -99,6 +123,21 @@ export class RadarTowerSystem {
     const aoeWidth = 0.5
       + (tower.upgradeExtras?.['aoeWidth'] ?? 0)
       + (tower.talentMods['aoe_width'] ?? 0)
+
+    // Degenerate-arc guard: when restricted to a sector narrower than the
+    // detection band itself (span < 2*aoeWidth), the band blankets the whole
+    // wedge, so an enemy inside it never crosses the band's edge — the
+    // rising-edge model below would ping it exactly once and then fall silent.
+    // Switch to a periodic pulse whose cadence equals the time the needle
+    // takes to sweep one band-width (2*aoeWidth / sweepSpeed). That rate is
+    // continuous with the wider-arc wiper at the threshold, stays bounded as
+    // the arc shrinks (no per-tick ping explosion), and still scales with
+    // sweep speed so the talent/upgrade keeps paying off. The needle is still
+    // advanced above so the renderer animates the wiper inside the wedge.
+    if (restricted && arcSpan(arcStart, arcEnd) < 2 * aoeWidth) {
+      this._pulseNarrowArc(tower, dt, game, range, sweepSpeed, aoeWidth)
+      return
+    }
 
     // Discrete "ping" per sweep pass. The needle deals one hit when an enemy
     // FIRST enters its band (rising edge), not every frame the band overlaps.
@@ -164,6 +203,42 @@ export class RadarTowerSystem {
     else if (s <= 0) { s = 0; dir = 1 }
     this._sweepDirs.set(tower.id, dir)
     return normalizeTwoPi(arcStart + s)
+  }
+
+  // Periodic-pulse fallback for a restricted sector narrower than the
+  // detection band (see the degenerate-arc guard in _updateSweep). Pings every
+  // in-arc, in-range enemy on a fixed cadence instead of on band rising-edges,
+  // because the band can no longer clear. Deterministic (timer only, no RNG).
+  private _pulseNarrowArc(
+    tower: Tower,
+    dt: number,
+    game: Game,
+    range: number,
+    sweepSpeed: number,
+    aoeWidth: number,
+  ): void {
+    const interval = (2 * aoeWidth) / sweepSpeed
+    let timer = (this._pulseTimers.get(tower.id) ?? 0) - dt
+    if (timer > 0) {
+      this._pulseTimers.set(tower.id, timer)
+      return
+    }
+    // Carry the overshoot so the average cadence stays exact across frames.
+    timer += interval
+    this._pulseTimers.set(tower.id, timer)
+
+    for (const enemy of game.enemies) {
+      if (!enemy.alive) continue
+      if (distance(tower.x, tower.y, enemy.x, enemy.y) > range) continue
+      // allow-non-deterministic-math: visual/geometric arc check, not in RNG draw schedule.
+      const enemyAngle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x)
+      if (!isAngleInArc(enemyAngle, tower.arcStart ?? 0, tower.arcEnd ?? Math.PI / 2)) continue
+      // Restrict mode ⇒ every pinged enemy is in-arc, so the focus-sector
+      // bonus always applies — same basis (_getArcBonus on the enemy angle) as
+      // the wiper path, so the two damage models agree.
+      const arcBonus = this._getArcBonus(tower, enemyAngle)
+      applyDamage(enemy, tower.effectiveDamage * arcBonus, game, 'towerHit')
+    }
   }
 
   private _updateRapid(tower: Tower, dt: number, game: Game): void {

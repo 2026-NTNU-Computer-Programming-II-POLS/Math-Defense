@@ -78,6 +78,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
       aria-modal="true"
       aria-labelledby="score-title"
     >
+      <div class="score-scroll">
       <div class="score-head">
         <div class="stars-row">
           <span v-for="i in g.starRating" :key="i" class="star filled">&#9733;</span>
@@ -170,6 +171,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
           </div>
         </div>
       </div>
+      </div>
 
       <div class="btn-stack">
         <button
@@ -204,11 +206,27 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 .score-panel {
   width: 100%;
   max-width: 640px;
-  max-height: 90vh;
-  overflow-y: auto;
+  /* Cap to the 1280x720 `.game-view` box, NOT 90vh. The overlay lives inside
+     `.game-view { overflow:hidden }`, whose box is only 720px tall (then CSS-
+     scaled). A viewport-relative 90vh let the panel grow past that box, so its
+     bottom — the Continue button — was silently clipped with no scrollbar.
+     100% resolves against the overlay's definite (inset:0) height, so the
+     panel always fits the box and scrolls its body internally instead. */
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   text-align: left;
   background: rgba(220, 229, 237, 0.96);
   box-shadow: var(--shadow-lg);
+}
+
+/* Scrollable body. The Continue footer (.btn-stack) sits outside this and
+   stays pinned at the bottom, so it is always visible regardless of content. */
+.score-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .score-head {
@@ -386,5 +404,6 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey))
 
 .btn-stack {
   margin-top: 22px;
+  flex-shrink: 0;
 }
 </style>

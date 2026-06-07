@@ -207,6 +207,88 @@ describe('RadarTowerSystem — RADAR_A restrict-mode wiper bounds', () => {
   })
 })
 
+// Regression: a restricted sector narrower than the detection band
+// (span < 2*aoeWidth) used to ping a dwelling in-arc enemy exactly once — the
+// band blanketed the whole wedge so the rising-edge never re-fired. The
+// degenerate-arc guard switches to a bounded periodic pulse so a focused
+// narrow arc deals sustained damage, the natural payoff for giving up 360°.
+describe('RadarTowerSystem — RADAR_A narrow restricted-arc pulse', () => {
+  let game: ReturnType<typeof createMockGame>
+  let system: RadarTowerSystem
+
+  beforeEach(() => {
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+  })
+
+  // Arc [0, 0.3] rad (~17°) is far narrower than the 1.0 rad band, with
+  // restrict on. sweepSpeed = 2.0, aoeWidth = 0.5 ⇒ pulse every
+  // 2*0.5/2.0 = 0.5 s. Enemy mid-arc gets effectiveDamage × 1.5 per pulse.
+  function narrowTower() {
+    const t = createMockTower({
+      type: TowerType.RADAR_A, x: 0, y: 0,
+      arcStart: 0, arcEnd: 0.3, arcRestrict: true,
+      effectiveDamage: 5, effectiveRange: 5,
+    })
+    return t
+  }
+
+  it('deals sustained damage to a dwelling enemy, not a single ping', () => {
+    const tower = narrowTower()
+    game.towers.push(tower)
+    const enemy = createMockEnemy({
+      x: 3 * Math.cos(0.15), y: 3 * Math.sin(0.15), hp: 1e6, maxHp: 1e6,
+    })
+    game.enemies.push(enemy)
+
+    // ~6.4 s. At a 0.5 s cadence that is ~13 pulses of 5 × 1.5 = 7.5 each.
+    for (let i = 0; i < 400; i++) system.update(0.016, game)
+
+    // Pre-fix this was exactly one ping (7.5). Require many more.
+    expect(damageTaken(enemy)).toBeGreaterThan(7.5 * 5)
+  })
+
+  it('keeps the pulse cadence bounded — no per-tick ping explosion', () => {
+    // 5° arc (UI minimum). A naive "clear on wiper reversal" fix would ping
+    // ~20×/s here; the cadence-based pulse caps it to ~2 pings/s.
+    const tower = createMockTower({
+      type: TowerType.RADAR_A, x: 0, y: 0,
+      arcStart: 0, arcEnd: 5 * Math.PI / 180, arcRestrict: true,
+      effectiveDamage: 5, effectiveRange: 5,
+    })
+    game.towers.push(tower)
+    const enemy = createMockEnemy({
+      x: 3 * Math.cos(0.04), y: 3 * Math.sin(0.04), hp: 1e6, maxHp: 1e6,
+    })
+    game.enemies.push(enemy)
+
+    // 1.0 s. pulseInterval = 0.5 s ⇒ at most 3 pulses (t=0, 0.5, 1.0).
+    for (let i = 0; i < 63; i++) system.update(0.016, game)
+
+    // 3 pulses × 7.5 = 22.5; nowhere near a per-tick (60×) explosion.
+    expect(damageTaken(enemy)).toBeLessThanOrEqual(7.5 * 3 + 1e-6)
+    expect(damageTaken(enemy)).toBeGreaterThan(0)
+  })
+
+  it('still hard-filters enemies outside the narrow restricted arc', () => {
+    const tower = narrowTower()
+    game.towers.push(tower)
+    const inArc = createMockEnemy({
+      x: 3 * Math.cos(0.15), y: 3 * Math.sin(0.15), hp: 1e6, maxHp: 1e6,
+    })
+    const outArc = createMockEnemy({
+      x: 3 * Math.cos(1.2), y: 3 * Math.sin(1.2), hp: 1e6, maxHp: 1e6,
+    })
+    game.enemies.push(inArc, outArc)
+
+    for (let i = 0; i < 100; i++) system.update(0.016, game)
+
+    expect(damageTaken(inArc)).toBeGreaterThan(0)
+    expect(damageTaken(outArc)).toBe(0)
+  })
+})
+
 // Phase 7 (Q14) — RADAR_A `aoe_width` advanced talent. The sweep band's
 // half-width is the only gating value for whether an off-needle enemy is
 // struck; the talent is additive on top of the upgrade extra so the two

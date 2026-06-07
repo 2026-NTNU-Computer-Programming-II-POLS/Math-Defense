@@ -110,7 +110,11 @@ export class SpellSystem implements GameSystem {
       if (dist(x, y, enemy.x, enemy.y) > radius) continue  // S-6: > means boundary is inclusive
       hits++
       enemy.slowFactor = Math.max(enemy.slowFactor, factor)
-      enemy.slowTimer = duration
+      // max() not assignment: a shorter slow from another source (e.g. a Magic
+      // debuff tower's 2 s window) overlapping this cast must not truncate the
+      // longer spell slow. Same refresh semantics — on a fresh enemy
+      // max(0, duration) is still `duration`.
+      enemy.slowTimer = Math.max(enemy.slowTimer, duration)
     }
     return hits
   }
