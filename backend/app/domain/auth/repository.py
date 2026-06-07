@@ -29,19 +29,6 @@ class TokenDenylistRepository(Protocol):
     def is_denied(self, jti: str) -> bool: ...
 
 
-@runtime_checkable
-class EmailVerificationRepository(Protocol):
-    def create(self, user_id: str, token: str, expires_at: datetime) -> None: ...
-
-    def consume_verification_token(self, token: str) -> str | None:
-        """Mark the token used and return its user_id, or None if invalid/expired."""
-        ...
-
-    def invalidate_for_user(self, user_id: str) -> None:
-        """Mark all pending tokens for a user as used (called before issuing a new one)."""
-        ...
-
-
 class RefreshTokenConsumeStatus(Enum):
     """Outcome of RefreshTokenRepository.consume()."""
 
@@ -88,7 +75,15 @@ class RefreshTokenRepository(Protocol):
 
 @runtime_checkable
 class EmailService(Protocol):
-    def send_verification_email(self, to: str, player_name: str, token: str) -> None: ...
+    def send_welcome_email(self, to: str, player_name: str) -> None:
+        """Sent once to a genuinely new account just after registration.
+
+        Carries NO verification link: verification is soft and the emailed link
+        has no SPA route, so the welcome email only greets the user and points
+        them at the sign-in page. It is kept as a real (single) email send so
+        the new-account branch stays time-symmetric with the account-exists
+        branch under M-05 — both send exactly one email."""
+        ...
 
     def send_account_exists_notice(self, to: str, player_name: str) -> None:
         """Notify the holder of an existing account that someone tried to register

@@ -108,8 +108,10 @@ export function useAuth() {
   ): Promise<boolean> {
     // M-05: the backend returns a fixed 202 acknowledgement and does NOT
     // issue auth cookies — the caller cannot tell whether the email was
-    // newly created or already on file. The user completes onboarding by
-    // verifying their email and then signing in via /login.
+    // newly created or already on file. New users can sign in via /login
+    // right away: verification is "soft" (no login path reads
+    // is_email_verified) and registration sends only a welcome email — no
+    // verification link, nothing to complete in-app.
     loading.value = true
     error.value = ''
     try {

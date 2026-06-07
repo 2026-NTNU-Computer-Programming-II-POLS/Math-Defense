@@ -15,7 +15,6 @@ from app.domain.errors import (
     DomainError,
     DomainValueError,
     DuplicateSubmissionError,
-    EmailNotVerifiedError,
     InsufficientTalentPointsError,
     InvalidCredentialsError,
     InvalidMFACodeError,
@@ -57,7 +56,6 @@ _STATUS_BY_CLASS: dict[type[DomainError], int] = {
     # non-existent user (admin_service.set_user_active). 401 would wrongly
     # signal "not authenticated" and could log a legitimate admin out.
     UserNotFoundError: 404,
-    EmailNotVerifiedError: 403,
     InvalidMFACodeError: 401,
     MFANotSetupError: 400,
     MFAAlreadyEnabledError: 409,

@@ -1,7 +1,7 @@
 import hashlib
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -149,8 +149,12 @@ def _clear_refresh_cookie(response: Response) -> None:
 def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
     # M-05: registration is enumeration-safe. The service performs the same
     # observable work in both branches; this router returns one fixed 202
-    # body with no cookies. New users complete the flow by clicking the
-    # verification link in their inbox and then signing in via /login.
+    # body with no cookies. Verification is "soft": no login path reads
+    # is_email_verified, so new users sign in via /login immediately and an
+    # unverified account has full access. The new-account branch sends a
+    # welcome email (sign-in link only); no verification token is minted and
+    # there is no email-verification endpoint (the subsystem was removed as
+    # dead, dead-link-emitting code — only the passive DB table remains).
     user, is_new_user = build_auth_service(db).register(
         email=req.email,
         password=req.password,
@@ -165,6 +169,14 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
         # the account existed. Best-effort: a failure here must not block
         # the M-05 enumeration-safe 202 response, since invite-attachment
         # is internal-only and the user can retry via POST /claim-invites.
+        #
+        # M-05 timing note (accepted residual): this claim runs only on the
+        # new-user branch, so the new-account path does slightly more work
+        # (extra SELECT) than the existing-account branch. The delta is small
+        # next to the bcrypt hash both branches pay (~rounds=12), and probing
+        # a non-existent email *creates* it — so a second timing sample hits
+        # the fast path, defeating any averaging-based enumeration. Treated as
+        # a non-exploitable residual rather than padded with artificial delay.
         try:
             build_class_service(db).claim_pending_invites(
                 user_id=user.id, email=user.email, role=user.role,
@@ -371,29 +383,6 @@ def update_profile_initials(
         req.color,
     )
     return _build_auth_me_response(user)
-
-
-# ── Email verification ──────────────────────────────────────────────────────
-
-@router.get("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("10/minute")
-def verify_email(
-    request: Request,
-    token: str = Query(..., min_length=1),
-    db: Session = Depends(get_db),
-):
-    build_auth_service(db).verify_email(token)
-    logger.info("Email verified via token")
-
-
-@router.post("/resend-verification", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("3/minute")
-def resend_verification(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    build_auth_service(db).resend_verification_email(current_user.id)
 
 
 # ── MFA (TOTP) ──────────────────────────────────────────────────────────────

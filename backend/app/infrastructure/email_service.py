@@ -43,17 +43,16 @@ class SmtpEmailService:
                     smtp.login(self._settings.smtp_user, self._settings.smtp_password)
                 smtp.sendmail(self._settings.smtp_from, to, msg.as_string())
 
-    def send_verification_email(self, to: str, player_name: str, token: str) -> None:
+    def send_welcome_email(self, to: str, player_name: str) -> None:
         safe_name = html_lib.escape(player_name)
-        safe_link = html_lib.escape(f"{self._settings.frontend_url}/verify-email?token={token}")
+        safe_login = html_lib.escape(f"{self._settings.frontend_url}/auth")
         body = f"""
         <p>Hi {safe_name},</p>
-        <p>Please verify your email address by clicking the link below.
-        The link expires in 24 hours.</p>
-        <p><a href="{safe_link}">Verify my email</a></p>
-        <p>If you did not create an account, you can ignore this message.</p>
+        <p>Welcome to Math Defense! Your account is ready.</p>
+        <p>You can sign in any time here: <a href="{safe_login}">Sign in</a></p>
+        <p>If you did not create this account, you can safely ignore this email.</p>
         """
-        self._send(to, "Verify your Math Defense email", body)
+        self._send(to, "Welcome to Math Defense", body)
 
     def send_account_exists_notice(self, to: str, player_name: str) -> None:
         safe_name = html_lib.escape(player_name)

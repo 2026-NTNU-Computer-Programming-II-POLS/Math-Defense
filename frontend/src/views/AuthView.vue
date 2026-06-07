@@ -41,9 +41,16 @@ const title = computed(() => isLogin.value ? 'Log In' : 'Register')
 
 const PASSWORD_MIN = 8
 // Aligns with backend bcrypt's 72-byte input cap (see BCRYPT_MAX_BYTES in
-// backend/app/utils/security.py). A 73+ char password would otherwise pass
-// frontend validation only to be rejected with a 422 from the backend.
-const PASSWORD_MAX = 72
+// backend/app/utils/security.py). The cap is measured in UTF-8 BYTES, not
+// characters: a password of <=72 multibyte characters (CJK, accented Latin,
+// emoji) can still exceed 72 bytes. Counting characters here would let such a
+// password pass frontend validation only to be rejected with a 422 from the
+// backend, so we measure encoded byte length to match the server exactly.
+const PASSWORD_MAX_BYTES = 72
+
+function passwordByteLength(p: string): number {
+  return new TextEncoder().encode(p).length
+}
 
 const passwordRules = reactive({
   length: false,
@@ -97,8 +104,11 @@ function validate(): string {
   if (!playerName.value.trim()) return 'Please enter your player name'
   if (playerName.value.trim().length > 50) return 'Player name cannot exceed 50 characters'
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) return 'Please enter a valid email address'
-  if (password.value.length < PASSWORD_MIN || password.value.length > PASSWORD_MAX) {
-    return `Password must be ${PASSWORD_MIN}-${PASSWORD_MAX} characters long`
+  if (password.value.length < PASSWORD_MIN) {
+    return `Password must be at least ${PASSWORD_MIN} characters long`
+  }
+  if (passwordByteLength(password.value) > PASSWORD_MAX_BYTES) {
+    return `Password is too long (max ${PASSWORD_MAX_BYTES} bytes; accented or non-Latin characters count as more than one byte each)`
   }
   if (!/[a-zA-Z]/.test(password.value) || !/[0-9]/.test(password.value)) {
     return 'Password must contain both letters and numbers'
@@ -234,8 +244,8 @@ async function submit(): Promise<void> {
         </div>
 
         <div v-if="registrationSubmitted" class="auth-notice">
-          If the email is available, an account was created. Please check your
-          inbox to verify the address, then sign in below.
+          If the email is available, an account was created. You can sign in
+          below now.
         </div>
 
         <form class="auth-form" @submit.prevent="submit">

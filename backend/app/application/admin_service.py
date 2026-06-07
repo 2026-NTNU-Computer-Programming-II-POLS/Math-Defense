@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from app.application.auth_service import _assert_password_strength
 from app.domain.class_.aggregate import Class
 from app.domain.errors import (
+    ConstraintViolationError,
     DomainValueError,
     UserNotFoundError,
     UsernameTakenError,
@@ -76,8 +77,21 @@ class AdminApplicationService:
                 password_hash=hash_password(password),
             )
             user.is_email_verified = True
-            self._user_repo.save(user)
-            self._uow.commit()
+            try:
+                self._user_repo.save(user)
+                # Any pre-registration student invite addressed to this email
+                # can never resolve now that the address belongs to a teacher
+                # (claim_pending_invites is student-only). Drop it here so it
+                # doesn't linger forever in the inviting teacher's pending list.
+                self._class_repo.delete_invites_by_email(email_vo.value)
+                self._uow.commit()
+            except ConstraintViolationError as e:
+                # A concurrent register/create committed the same email between
+                # our find_by_email and this INSERT. Surface the explicit
+                # conflict the pre-check would have raised rather than a generic
+                # persistence error. Both already map to HTTP 409, but the
+                # caller gets the intended "email in use" message either way.
+                raise UsernameTakenError("Email is already in use") from e
         return user
 
     def set_user_active(self, user_id: str, is_active: bool, requester_id: str) -> User:

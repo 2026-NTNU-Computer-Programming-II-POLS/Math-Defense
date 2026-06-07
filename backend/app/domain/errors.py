@@ -66,10 +66,6 @@ class UserNotFoundError(DomainError):
     pass
 
 
-class EmailNotVerifiedError(DomainError):
-    pass
-
-
 class InvalidMFACodeError(DomainError):
     pass
 

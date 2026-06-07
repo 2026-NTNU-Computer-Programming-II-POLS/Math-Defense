@@ -36,7 +36,6 @@ from app.utils.security import (
 if TYPE_CHECKING:
     from app.domain.auth.repository import (
         EmailService,
-        EmailVerificationRepository,
         LoginAttemptRepository,
         RefreshTokenRepository,
         TokenDenylistRepository,
@@ -47,7 +46,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _DUMMY_PASSWORD_HASH = hash_password("__timing_equaliser__")
-_EMAIL_VERIFICATION_TTL_HOURS = 24
 _MFA_CHALLENGE_TTL_MINUTES = 5
 # TOTP valid_window=1 means codes from t-1, t, t+1 periods are accepted
 # (3 × 30 s = 90 s). Reject any code within this window of the last accepted
@@ -78,7 +76,6 @@ class AuthApplicationService:
         user_repo: UserRepository,
         login_attempt_repo: LoginAttemptRepository,
         token_denylist_repo: TokenDenylistRepository,
-        email_verification_repo: EmailVerificationRepository,
         email_svc: EmailService,
         uow: UnitOfWork,
         refresh_token_repo: RefreshTokenRepository | None = None,
@@ -86,7 +83,6 @@ class AuthApplicationService:
         self._user_repo = user_repo
         self._login_attempts = login_attempt_repo
         self._token_denylist = token_denylist_repo
-        self._email_verification_repo = email_verification_repo
         self._email_svc = email_svc
         self._uow = uow
         self._refresh_token_repo = refresh_token_repo
@@ -132,10 +128,11 @@ class AuthApplicationService:
             raise DomainValueError(f"Invalid role: {role}. Must be one of: admin, teacher, student")
 
         # M-05: registration is enumeration-safe. Both branches do the same
-        # observable work (zxcvbn strength check, single email send, identical
-        # HTTP response). The verification token is only minted for genuinely
-        # new accounts — reusing it for existing users would mutate their
-        # verification state and the email is the wrong template anyway.
+        # observable work (zxcvbn strength check, one synchronous email send,
+        # identical HTTP response). New accounts receive a welcome email and
+        # existing ones an account-exists notice — exactly one email either
+        # way, so response timing does not reveal which branch ran. Verification
+        # is "soft": no token is minted here and no login path checks it.
         _assert_password_strength(password)
 
         with self._uow:
@@ -167,7 +164,6 @@ class AuthApplicationService:
             raced_user: User | None = None
             try:
                 self._user_repo.save(user)
-                verification_token = self._create_verification_token(user.id)
                 self._uow.commit()
             except ConstraintViolationError:
                 # A concurrent request committed the same email between our
@@ -194,21 +190,13 @@ class AuthApplicationService:
             return raced_user, False
 
         try:
-            self._email_svc.send_verification_email(user.email, user.player_name, verification_token)
+            self._email_svc.send_welcome_email(user.email, user.player_name)
         except Exception:
-            logger.warning("Failed to send verification email for user %s", user.id)
+            logger.warning("Failed to send welcome email for user %s", user.id)
 
-        # No auto-login: registration is now a submit-then-verify flow so the
-        # HTTP response is indistinguishable from the existing-account branch.
+        # No auto-login: the 202 response carries no cookies and no identity, so
+        # it stays indistinguishable from the existing-account branch (M-05).
         return user, True
-
-    def _create_verification_token(self, user_id: str) -> str:
-        """Generate a fresh token; invalidates any pending tokens for this user first."""
-        self._email_verification_repo.invalidate_for_user(user_id)
-        raw = secrets.token_hex(32)
-        expires_at = datetime.now(UTC) + timedelta(hours=_EMAIL_VERIFICATION_TTL_HOURS)
-        self._email_verification_repo.create(user_id, raw, expires_at)
-        return raw
 
     # ── Login ───────────────────────────────────────────────────────────────
 
@@ -425,36 +413,6 @@ class AuthApplicationService:
             self._user_repo.save(user)
             self._uow.commit()
         return user
-
-    # ── Email verification ──────────────────────────────────────────────────
-
-    def verify_email(self, token: str) -> None:
-        """Mark a user's email as verified given a valid, unused token."""
-        with self._uow:
-            user_id = self._email_verification_repo.consume_verification_token(token)
-            if user_id is None:
-                raise InvalidTokenError("Invalid or expired verification link")
-            user = self._user_repo.find_by_id(user_id)
-            if user is None:
-                raise UserNotFoundError("User not found")
-            user.is_email_verified = True
-            self._user_repo.save(user)
-            self._uow.commit()
-
-    def resend_verification_email(self, user_id: str) -> None:
-        """Generate a fresh verification token and re-send the email."""
-        with self._uow:
-            user = self._user_repo.find_by_id(user_id)
-            if user is None:
-                raise UserNotFoundError("User not found")
-            if user.is_email_verified:
-                return
-            verification_token = self._create_verification_token(user_id)
-            self._uow.commit()
-        try:
-            self._email_svc.send_verification_email(user.email, user.player_name, verification_token)
-        except Exception:
-            logger.warning("Failed to resend verification email for user %s", user_id)
 
     # ── MFA (TOTP) ──────────────────────────────────────────────────────────
 

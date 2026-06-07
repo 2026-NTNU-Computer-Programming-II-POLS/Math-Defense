@@ -114,7 +114,7 @@ class RegisterAcceptedResponse(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    detail: str = "If the email is available, an account was created. Check your inbox to verify the address before signing in."
+    detail: str = "If the email is available, an account was created. You can sign in now."
 
 
 class ChangePasswordRequest(BaseModel):

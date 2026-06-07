@@ -63,7 +63,7 @@ backend/
 │   │
 │   ├── application/               ── APPLICATION LAYER ──
 │   │   ├── ports.py                       UnitOfWork Protocol so services do not import infrastructure
-│   │   ├── auth_service.py                AuthApplicationService — register / login / MFA / email-verify / refresh + rotate + revoke
+│   │   ├── auth_service.py                AuthApplicationService — register / login / MFA / refresh + rotate + revoke
 │   │   ├── session_service.py             Session use cases; emits SessionCompleted to SessionEventBus; attaches reflection text post-end
 │   │   ├── session_event_handlers.py      Post-commit handlers (leaderboard insert / achievement check + assessment evidence / IA rolling accuracy) + SessionEventBus dispatcher — each handler runs in its own UoW
 │   │   ├── leaderboard_service.py         Per-level / class-scoped / challenge-scoped queries + personal-best timeline + manual submission
@@ -86,7 +86,7 @@ backend/
 │   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers exponential-backoff lockout (5m → 15m → 60m cap; tracked via `login_attempts.lockout_count`); `purge_stale()` used by the janitor
 │   │   ├── token_denylist.py      DB-backed JWT deny-list for server-side logout (jti → expiry); `purge_expired()` used by the janitor
 │   │   ├── audit_logger.py        record_audit_event() — writes to its own SQLAlchemy session so audit rows commit independently of the surrounding business txn
-│   │   ├── email_service.py       Thin SMTP wrapper for verification/MFA mail; no-op when SMTP env is unset
+│   │   ├── email_service.py       Thin SMTP wrapper for welcome/account-exists/verification/MFA mail; no-op when SMTP env is unset
 │   │   ├── scheduler.py           Background asyncio task runner (territory settlement loop)
 │   │   ├── spectate_hub.py        In-process pub/sub for live-spectate WebSocket fan-out (bounded queue per subscriber)
 │   │   ├── wasm_runtime.py        FU-A — singleton wasmtime-py runtime hosting the same math_engine.wasm the frontend ships; exposes power_f64 for v2 score recompute. Thread-safe; raises ReplayUnavailableError when WASM cannot load so v2 fails closed.
@@ -105,8 +105,7 @@ backend/
 │   │       ├── study_repository.py            Enrollment + probe + affect persistence + export aggregation
 │   │       ├── login_attempt_repository.py    Per-account failure-count + lockout-deadline (backs login_guard)
 │   │       ├── token_denylist_repository.py   Persist revoked JWT JTIs until natural expiry (backs token_denylist)
-│   │       ├── refresh_token_repository.py    Rotating refresh-token store (SHA-256 hashed; used + revoked flags)
-│   │       └── email_verification_repository.py  One-use email verification token store
+│   │       └── refresh_token_repository.py    Rotating refresh-token store (SHA-256 hashed; used + revoked flags)
 │   │
 │   ├── models/                    SQLAlchemy ORM models
 │   │   ├── user.py                User (email, player_name, role, is_active, totp_*, ia_recent_accuracy, password_version, endpoint_marker_style/custom_dataurl/hit_fx)
@@ -123,7 +122,7 @@ backend/
 │   │   ├── class_group.py         Named student sub-groups within a class
 │   │   ├── class_pending_invite.py  Pending email invites awaiting acceptance
 │   │   ├── removed_class_membership.py  Re-join blocklist
-│   │   ├── email_verification_token.py  One-use email tokens
+│   │   ├── email_verification_token.py  One-use email tokens (retained passive table; verification subsystem removed — soft verification)
 │   │   ├── territory.py           GrabbingTerritoryActivity (incl. teacher-configurable `student_slot_cap` 1–50, default 5) + TerritorySlot (CHECK slot_index 0..49) + TerritoryOccupation
 │   │   ├── season.py              Season (windowed achievement multipliers; CHECK ends_at > starts_at)
 │   │   ├── challenge.py           Challenge (constraints JSONB; soft-delete via deleted_at)
@@ -138,7 +137,7 @@ backend/
 │   │   ├── replay.py · season.py · study.py · territory.py
 │   │
 │   ├── routers/                   HTTP adapters — thin controllers; error translation lives in main.py
-│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile/{name,endpoint-marker} / verify-email / mfa/*)
+│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile/{name,endpoint-marker} / mfa/*)
 │   │   ├── game_session.py        /api/sessions (CRUD + /reflection)
 │   │   ├── leaderboard.py         /api/leaderboard (+ /me for personal timeline)
 │   │   ├── achievement.py         /api/achievements + GET /api/seasons (sibling seasons_router)
@@ -229,7 +228,7 @@ Pure Python — no SQLAlchemy, no FastAPI, no Pydantic.
 
 Use-case orchestration. One method per user intent. Services depend on the `UnitOfWork` protocol declared in `application/ports.py`, never directly on SQLAlchemy.
 
-- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / verify_email / resend_verification_email / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_endpoint_marker`.
+- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_endpoint_marker`.
 - **`SessionApplicationService`** — `create_session` (abandons stale sessions >2h and any existing active one, with one IntegrityError retry against the partial-unique index), `get_active_for_user`, `update_session`, `abandon_session`, `end_session` (transitions to COMPLETED and dispatches `SessionCompleted` through the event bus), `attach_reflection`, `has_correct_ia_session`.
 - **`SessionEventBus`** (in `session_event_handlers.py`) — dispatches `SessionCompleted` to three independent handlers, each in its own UoW so a downstream failure cannot roll back the durable session row:
   1. `LeaderboardInsertHandler` — idempotent insert (skipped when `practice_mode` or `is_preview` is true); `ConstraintViolationError` on the unique session-id constraint is the expected duplicate-delivery outcome.
@@ -289,7 +288,7 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/auth/register` | 5/min | Create account, set auth + refresh + csrf cookies, return user payload |
+| POST | `/api/auth/register` | 5/min | Submit registration. Enumeration-safe (M-05): always returns a fixed 202 with NO cookies and no user payload. New accounts get a welcome email, existing ones an account-exists notice; the user then signs in via `/login`. Verification is soft (no login gate) |
 | POST | `/api/auth/login` | 10/min | Authenticate; on success set cookies; if MFA required, return `mfa_required=true` + `mfa_token` |
 | POST | `/api/auth/logout` | 30/min | Revoke access JTI (deny-list) + revoke refresh token; clear cookies |
 | POST | `/api/auth/refresh` | 30/min | Rotate refresh token, mint new access cookie |
@@ -297,8 +296,6 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 | GET | `/api/auth/me` | 30/min | Current user + IA unlock state + rolling IA accuracy |
 | PUT | `/api/auth/profile/name` | 10/min | Update `player_name` |
 | PUT | `/api/auth/profile/endpoint-marker` | 10/min | Update endpoint-marker prefs (`style` ∈ star/gorilla/custom, optional `custom_dataurl` PNG/JPEG, `hit_fx` ∈ random/fragments/crying/angry); aggregate re-validates magic bytes + PNG dimensions |
-| GET | `/api/auth/verify-email?token=` | 10/min | One-use email verification |
-| POST | `/api/auth/resend-verification` | 3/min | Re-issue verification email |
 | POST | `/api/auth/mfa/setup` | 5/min | Generate TOTP secret + provisioning URI |
 | POST | `/api/auth/mfa/confirm` | 5/min | Verify first TOTP code, flip `mfa_enabled=true` |
 | POST | `/api/auth/mfa/disable` | 5/min | Require current password + TOTP code, then disable |
@@ -340,7 +337,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 |---|---|---|
 | `400` | `SessionValidationError`, `MFANotSetupError`, `NotAStudentError` | Generic validation / pre-condition failure |
 | `401` | `InvalidCredentialsError`, `InvalidTokenError`, `InvalidMFACodeError` | Bad credentials / token / TOTP code |
-| `403` | `PermissionDeniedError`, `Star5LockedError`, `AccountDisabledError`, `EmailNotVerifiedError`, `NotClassOwnerError`, `NotActivityOwnerError`, `StudentRemovedFromClassError` | Not authorised |
+| `403` | `PermissionDeniedError`, `Star5LockedError`, `AccountDisabledError`, `NotClassOwnerError`, `NotActivityOwnerError`, `StudentRemovedFromClassError` | Not authorised |
 | `404` | `SessionNotFoundError`, `ChallengeNotFoundError`, `ClassNotFoundError`, `ActivityNotFoundError`, `SlotNotFoundError`, `InvalidJoinCodeError`, `StudentEmailNotFoundError`, `StudentNotInClassError`, `UserNotFoundError` | Resource missing |
 | `409` | `UsernameTakenError`, `InvalidStatusTransitionError`, `SessionNotActiveError`, `DuplicateSubmissionError`, `MFAAlreadyEnabledError`, `ChallengeImmutableError`, `InsufficientTalentPointsError`, `PrerequisiteNotMetError`, `MaxLevelReachedError`, `TalentNodeNotFoundError`, `ConstraintViolationError`, `ActivityExpiredError`, `ActivityAlreadySettledError`, `TerritoryCapReachedError`, `ScoreNotHighEnoughError`, `StudentAlreadyInClassError`, `ClassNameConflictError` | Conflict / state |
 | `410` | `SessionStaleError` | Session > 2h active — auto-abandoned before raise |
@@ -649,8 +646,6 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter), keyed by client IP.
 | `POST /auth/change-password` | 5/min |
 | `GET /auth/me` | 30/min |
 | `PUT /auth/profile/name`, `PUT /auth/profile/endpoint-marker` | 10/min |
-| `GET /auth/verify-email` | 10/min |
-| `POST /auth/resend-verification` | 3/min |
 | `POST /auth/mfa/setup`, `/mfa/confirm`, `/mfa/disable` | 5/min |
 | `POST /auth/mfa/challenge` | 10/min |
 | `POST /sessions` | 30/min |
