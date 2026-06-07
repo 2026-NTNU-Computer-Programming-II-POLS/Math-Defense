@@ -63,7 +63,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 80 / 1 base / 8 / 0.5 s
 - **Math:** vectors, dot product
 - **Unlocked from:** Star 2
-- **Mechanic:** Matrix towers fire **nothing** alone — pairing is required. Pair two Matrix towers via the panel and the **base damage = 1 + dot product of their grid-coordinate vectors**. A laser locks onto a target and ramps its damage the longer it stays locked.
+- **Mechanic:** Matrix towers fire **nothing** alone — pairing is required. Pair two Matrix towers via the panel and the **base damage = 1 + dot product of their grid-coordinate vectors**. A laser locks onto a target inside both towers' overlapping range and ramps its damage the longer it stays in that zone; if the target leaves the overlap (or dies) the lock releases and the ramp resets.
 - **Tier 2/3:** lock-on ramp rate +20% / +40%; Tier 3 lets the laser sweep one extra target.
 - **Pick when:** you can place two towers whose coordinate vectors give you a useful dot product, and there's a single long-lived target (mini-boss, Bulwark, Boss).
 - **Exam tie-in:** AST 學測 linear algebra unit (2×2 matrices, dot product).

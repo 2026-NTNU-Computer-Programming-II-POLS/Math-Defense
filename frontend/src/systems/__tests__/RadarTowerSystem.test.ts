@@ -422,3 +422,62 @@ describe('RadarTowerSystem — RADAR_C crit_damage talent', () => {
     expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5 * 3.5, 5)  // eff × arc × crit
   })
 })
+
+// RADAR_C ships with an innate base crit chance (def `baseCritChance` = 0.05) so
+// the `crit_damage` talent is never dead weight on a not-yet-upgraded tower —
+// before this, crit chance came only from the Tier-2/3 upgrade, making the
+// talent do nothing until then. Crits roll against game.rng (seeded for replay);
+// the rng is stubbed to a fixed value here to pin the 0.05 boundary exactly.
+describe('RadarTowerSystem — RADAR_C innate base crit chance', () => {
+  let game: ReturnType<typeof createMockGame>
+  let system: RadarTowerSystem
+
+  beforeEach(() => {
+    game = createMockGame({ phase: GamePhase.WAVE })
+    system = new RadarTowerSystem()
+    system.init(game)
+  })
+
+  // No upgradeExtras → crit chance is the innate base alone. baseCritChance
+  // mirrors the RADAR_C tower def value (createMockTower doesn't read defs).
+  function baseSniper(rngValue: number) {
+    game.rng = () => rngValue
+    const tower = createMockTower({
+      type: TowerType.RADAR_C, x: 0, y: 0,
+      effectiveDamage: 10, effectiveRange: 5,
+      cooldown: 1.0, cooldownTimer: 0,
+      baseCritChance: 0.05,
+    })
+    game.towers.push(tower)
+    game.enemies.push(createMockEnemy({ x: 2, y: 0 }))
+  }
+
+  it('crits on a base (un-upgraded) tower when the roll lands under 0.05', () => {
+    baseSniper(0.04)  // < 0.05 → crit at the fixed 2× base multiplier
+    system.update(0.016, game)
+    expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5 * 2, 5)  // eff × arc × crit
+  })
+
+  it('does not crit when the roll lands at/above 0.05', () => {
+    baseSniper(0.05)  // not < 0.05 → no crit
+    system.update(0.016, game)
+    expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5, 5)  // eff × arc, no crit
+  })
+
+  it('innate base stacks additively with the critChance upgrade extra', () => {
+    game.rng = () => 0.10  // would miss on base 0.05 alone, hits at 0.05+0.20
+    const tower = createMockTower({
+      type: TowerType.RADAR_C, x: 0, y: 0,
+      effectiveDamage: 10, effectiveRange: 5,
+      cooldown: 1.0, cooldownTimer: 0,
+      baseCritChance: 0.05,
+      upgradeExtras: { critChance: 0.20 },  // 0.05 + 0.20 = 0.25 > 0.10 → crit
+    })
+    game.towers.push(tower)
+    game.enemies.push(createMockEnemy({ x: 2, y: 0 }))
+
+    system.update(0.016, game)
+
+    expect(game.projectiles[0].damage).toBeCloseTo(10 * 1.5 * 2, 5)  // eff × arc × crit
+  })
+})

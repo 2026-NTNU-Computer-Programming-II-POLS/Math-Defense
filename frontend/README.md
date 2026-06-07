@@ -93,7 +93,6 @@ frontend/
 │   │   │   ├── PrincipleOverlay.vue Post-wave card surfacing the mathematical principle exercised by the player's last move
 │   │   │   ├── BuffCardPanel.vue   (Legacy V1 — buff card draw overlay; superseded by ShopPanel)
 │   │   │   ├── FunctionPanel.vue   (Legacy V1 — quadratic a/b/c input)
-│   │   │   ├── MatrixInputPanel.vue (Legacy V1 — 2×2 matrix input)
 │   │   │   └── IntegralPanel.vue   (Legacy V1 — [a,b] interval input)
 │   │   ├── teacher/
 │   │   │   └── CompetencyBar.vue   Beta-distribution bar for the teacher dashboard (mean ± uncertainty band)

@@ -267,7 +267,12 @@ export class RadarTowerSystem {
     tower.cooldownTimer = effectiveCooldown(tower, game.state)
 
     const count = radarTargetCount(tower)
-    const critChance = Math.min(1, tower.upgradeExtras?.['critChance'] ?? 0)
+    // Innate base crit chance (def-driven, RADAR_C = 0.05) PLUS the Tier-2/3
+    // `critChance` upgrade extra. The base guarantees the `crit_damage` talent
+    // always has crits to amplify even on a not-yet-upgraded tower — previously
+    // crit chance came only from upgrades, so the talent was dead weight until
+    // then. Clamped to 1.
+    const critChance = Math.min(1, (tower.baseCritChance ?? 0) + (tower.upgradeExtras?.['critChance'] ?? 0))
     // Phase 7 (Q14): `crit_damage` talent stacks additively with the upgrade
     // extra. Final crit multiplier = 2.0 + (upgrade) + (talent).
     const critDmgBonus = (tower.upgradeExtras?.['critDamage'] ?? 0)

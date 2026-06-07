@@ -100,4 +100,37 @@ describe('RadarConfigPanel.vue — typed-degree entry', () => {
     await input.setValue(30)
     expect(engine.eventBus.emit).not.toHaveBeenCalled()
   })
+
+  it('blocks a zero-width restricted arc (start === end) from being applied', async () => {
+    const engine = attachFakeEngine([makeRadarTower()])
+    const wrapper = mount(RadarConfigPanel, { props: { towerId: 'r1' } })
+    await flushPromises()
+
+    // Equal start/end + restrict on = a sector that filters out every enemy.
+    await wrapper.find('[data-testid="radar-arc-start"]').setValue(90)
+    await wrapper.find('[data-testid="radar-arc-end"]').setValue(90)
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="radar-arc-warning"]').exists()).toBe(true)
+    const applyBtn = wrapper.find('[data-testid="radar-apply"]')
+    expect(applyBtn.attributes('disabled')).toBeDefined()
+
+    await applyBtn.trigger('click')
+    expect(engine.eventBus.emit).not.toHaveBeenCalled()
+  })
+
+  it('allows a zero-width arc when restrict is OFF (no focus zone, still fires)', async () => {
+    const engine = attachFakeEngine([makeRadarTower()])
+    const wrapper = mount(RadarConfigPanel, { props: { towerId: 'r1' } })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="radar-arc-start"]').setValue(90)
+    await wrapper.find('[data-testid="radar-arc-end"]').setValue(90)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="radar-arc-warning"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="radar-apply"]').trigger('click')
+    expect(engine.eventBus.emit).toHaveBeenCalledTimes(1)
+  })
 })

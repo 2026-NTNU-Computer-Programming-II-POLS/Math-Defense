@@ -271,10 +271,10 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   // Pedagogical Backlog §20 — opt-in slider-fallback / practice mode for
-  // dyscalculic / high-anxiety learners. When true, MagicModePanel and
-  // MatrixInputPanel render slider controls instead of typed expression /
-  // coefficient input, AND every new session is flagged practice_mode so it
-  // is excluded from the global leaderboard. Persisted across sessions.
+  // dyscalculic / high-anxiety learners. When true, MagicModePanel renders
+  // slider controls instead of typed expression / coefficient input, AND every
+  // new session is flagged practice_mode so it is excluded from the global
+  // leaderboard. Persisted across sessions.
   const sliderFallbackEnabled = ref<boolean>(loadSliderFallbackPref())
   if (typeof window !== 'undefined') {
     watch(sliderFallbackEnabled, (v) => {

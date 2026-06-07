@@ -28,6 +28,17 @@ function snapDeg(v: number): number {
   return Math.round(clamped / 5) * 5
 }
 
+// A restricted arc whose start and end snap to the same angle has zero width:
+// isAngleInArc(angle, s, s) is true only for the exact ray `s`, so the tower
+// would filter out every enemy and fire at nothing — a silent self-disable.
+// Compare the SNAPPED values (Apply snaps before emitting) so the warning and
+// the guard agree with what would actually be sent. Restrict-off is exempt: a
+// zero-width arc there only means "no ×1.5 focus zone", the tower still fires
+// everywhere. 0 vs 360 is NOT degenerate (full circle) and stays allowed.
+const arcInvalid = computed(() =>
+  restrict.value && snapDeg(arcStartDeg.value) === snapDeg(arcEndDeg.value),
+)
+
 function apply() {
   const engine = gameStore.getEngine()
   if (!engine) return
@@ -35,6 +46,8 @@ function apply() {
   const endDeg = snapDeg(arcEndDeg.value)
   arcStartDeg.value = startDeg
   arcEndDeg.value = endDeg
+  // Refuse a zero-width restricted arc rather than silently disabling the tower.
+  if (restrict.value && startDeg === endDeg) return
   engine.eventBus.emit(Events.RADAR_ARC_CHANGED, {
     towerId: props.towerId,
     arcStart: startDeg * Math.PI / 180,
@@ -76,7 +89,15 @@ function apply() {
       <input v-model="restrict" type="checkbox" />
       <span class="param-label">Restrict attacks to arc</span>
     </label>
-    <button class="btn cast-btn" data-testid="radar-apply" @click="apply">Apply</button>
+    <p v-if="arcInvalid" class="arc-warning" data-testid="radar-arc-warning">
+      A restricted arc needs a non-zero width — set Arc Start and Arc End to different angles.
+    </p>
+    <button
+      class="btn cast-btn"
+      data-testid="radar-apply"
+      :disabled="arcInvalid"
+      @click="apply"
+    >Apply</button>
   </div>
 </template>
 
@@ -98,4 +119,6 @@ function apply() {
 }
 .num-input:focus { outline: none; border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(168, 188, 203, 0.28); }
 .cast-btn { font-size: var(--text-xs); padding: 6px 12px; align-self: flex-end; }
+.cast-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.arc-warning { margin: 0; font-size: var(--text-xs); line-height: 1.3; color: var(--terracotta-deep); }
 </style>

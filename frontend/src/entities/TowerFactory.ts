@@ -46,6 +46,7 @@ export function createTower(
 
     baseDamage: def.damage,
     baseRange: def.range,
+    baseCritChance: def.baseCritChance,
     effectiveDamage: 0,
     effectiveRange: def.range * rangeBonus * buffRangeMult,
     cooldown: def.cooldown * (1 - speedBonus),

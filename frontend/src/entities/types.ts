@@ -29,6 +29,10 @@ export interface Tower {
 
   baseDamage: number
   baseRange: number
+  // Innate crit chance copied from the tower def (RADAR_C = 0.05; other towers
+  // leave it undefined → 0). RadarTowerSystem adds the critChance upgrade extra
+  // on top when rolling RADAR_C sniper crits.
+  baseCritChance?: number
 
   talentMods: Record<string, number>
   magicBuff: number

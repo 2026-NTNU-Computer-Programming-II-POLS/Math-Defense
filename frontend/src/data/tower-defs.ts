@@ -62,6 +62,12 @@ export interface TowerDef {
   damage: number
   range: number
   cooldown: number
+  // Innate crit chance (RADAR_C only; other towers omit it → treated as 0).
+  // Crit DAMAGE comes from the Tier-2/3 `critDamage` upgrade extra plus the
+  // `crit_damage` talent; this base chance guarantees those amplifiers always
+  // have crits to act on, so the crit_damage talent is never dead weight on a
+  // not-yet-upgraded tower. RADAR_C's crit chance upgrades stack on top.
+  baseCritChance?: number
   unlockLevel: number
   description: string
   mathConcept: string
@@ -143,6 +149,7 @@ export const TOWER_DEFS: Record<TowerType, TowerDef> = {
     damage: 40,
     range: 12,
     cooldown: 2.5,
+    baseCritChance: 0.05,
     unlockLevel: 2,
     description: 'Slow powerful single-target shots with long range.',
     mathConcept: 'Radian intervals, arc sectors',

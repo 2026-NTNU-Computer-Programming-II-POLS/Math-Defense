@@ -215,6 +215,7 @@ export const EVENT_HANDLER_REGISTRY: Readonly<
   ],
   TOWER_REFUND_RESULT: [
     { module: 'systems/MatrixTowerSystem',        handler: 'anonymous', purpose: 'Clean up stale laser state and partner matrixPairId when a Matrix tower is sold' },
+    { module: 'systems/RadarTowerSystem',         handler: 'anonymous', purpose: 'Drop per-tower sweep / detection-band / narrow-arc pulse-timer state when a radar tower is sold so the maps do not keep stale entries' },
     { module: 'systems/TowerInterferenceSystem',  handler: 'anonymous', purpose: 'Recompute interference factors after a tower is refunded so neighbours lift the penalty' },
     { module: 'composables/useEngineAudio',       handler: 'anonymous', purpose: 'Trigger refund-success SFX' },
   ],

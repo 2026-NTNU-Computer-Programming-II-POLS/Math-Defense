@@ -353,7 +353,7 @@ flowchart TB
     subgraph Components["Reusable Components (6 subdirs)"]
         Common[common/<br/>Modal · MathDisplay · markdown helpers]
         Layout[layout/<br/>app chrome]
-        GameCmp["game/ (28 .vue files)<br/>HUD · TowerBar · BuildPanel · BuildHint · ShopPanel ·<br/>SpellBar · SpellIcon · StartWaveButton · GameSpeedPanel ·<br/>MagicModePanel · RadarConfigPanel · MatrixPairPanel ·<br/>MatrixInputPanel · LimitQuestionPanel · CalculusPanel ·<br/>IntegralPanel · FunctionPanel · ChainRulePanel ·<br/>MontyHallPanel · TargetingModePanel · TowerInfoPanel ·<br/>BuffCardPanel · WaveForecast · FirstEncounterCard ·<br/>AchievementToast · PrincipleOverlay ·<br/>PhaseFader · WaveBanner"]
+        GameCmp["game/ (27 .vue files)<br/>HUD · TowerBar · BuildPanel · BuildHint · ShopPanel ·<br/>SpellBar · SpellIcon · StartWaveButton · GameSpeedPanel ·<br/>MagicModePanel · RadarConfigPanel · MatrixPairPanel ·<br/>LimitQuestionPanel · CalculusPanel ·<br/>IntegralPanel · FunctionPanel · ChainRulePanel ·<br/>MontyHallPanel · TargetingModePanel · TowerInfoPanel ·<br/>BuffCardPanel · WaveForecast · FirstEncounterCard ·<br/>AchievementToast · PrincipleOverlay ·<br/>PhaseFader · WaveBanner"]
         Teacher[teacher/CompetencyBar]
         TerritoryCmp[territory/TerritorySlotCard]
         LbCmp[leaderboard/PersonalTimeline]

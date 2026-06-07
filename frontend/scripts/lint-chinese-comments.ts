@@ -33,7 +33,6 @@ const SRC_ROOT = resolve(process.cwd(), 'src')
  */
 const LEGACY_ALLOWLIST: ReadonlySet<string> = new Set([
   'components/game/IntegralPanel.vue',
-  'components/game/MatrixInputPanel.vue',
   'data/tower-defs.ts',
   'math/WasmBridge.ts',
   'math/WasmBridge.test.ts',

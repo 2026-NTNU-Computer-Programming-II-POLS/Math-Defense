@@ -96,10 +96,16 @@ const rampPct = computed(() => {
 
 const damagePerSec = computed(() => {
   const dp = dotProduct.value
-  if (dp == null) return 0
-  const baseDamage = 1 + dp
-  if (baseDamage <= 0) return 0
-  return baseDamage * laserView.value.rampMultiplier
+  const t = tower.value
+  const p = pair.value
+  if (dp == null || !t || !p) return 0
+  const rawBase = 1 + dp
+  if (rawBase <= 0) return 0
+  // Mirror MatrixTowerSystem's damage formula so the readout matches reality:
+  // baseDamage = (1 + dot) × resonanceMod × interferenceMod, then × ramp.
+  const resonanceMod = 1 + (t.talentMods?.['resonance'] ?? 0)
+  const interferenceMod = (t.interferenceFactor + p.interferenceFactor) / 2
+  return rawBase * resonanceMod * interferenceMod * laserView.value.rampMultiplier
 })
 
 function pairWith(pairId: string) {

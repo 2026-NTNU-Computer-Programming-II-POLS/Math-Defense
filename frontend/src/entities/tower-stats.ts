@@ -35,5 +35,11 @@ export function effectiveCooldown(
 ): number {
   const bonus = state?.towerSpeedBonus ?? 0
   const denom = 1 + bonus
-  return denom > 0 ? tower.cooldown / denom : tower.cooldown
+  const cd = denom > 0 ? tower.cooldown / denom : tower.cooldown
+  // Honour the 1ms floor promised above: even a deeply stacked speed buff must
+  // never drive the reload to ~0, which would re-fire the tower every frame and
+  // stall the cooldown timer's monotonic countdown. The floor sits far below
+  // any reachable buff stack, so it never alters real play — it only closes the
+  // gap between this function and its documented contract.
+  return Math.max(0.001, cd)
 }

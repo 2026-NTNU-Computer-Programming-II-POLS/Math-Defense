@@ -401,7 +401,7 @@ body {
    (Admin / Profile / ClassView / ChallengeBuilder / RankingsView /
    TeacherTerritorySetup), the dark stone+gold canvas styling clashes with
    the cream panel. Switch to a panel-matching light palette. In-canvas
-   inputs (MatrixInputPanel, IntegralPanel) are not under .rune-panel, so
+   inputs (IntegralPanel) are not under .rune-panel, so
    they keep the original look. */
 .rune-panel .rune-input {
   background: var(--cream-soft);

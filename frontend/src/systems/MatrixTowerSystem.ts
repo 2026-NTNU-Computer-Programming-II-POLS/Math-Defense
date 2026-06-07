@@ -22,10 +22,16 @@ export class MatrixTowerSystem {
           const staleKey = [...this._lasers.keys()].find(k => { const [a, b] = k.split(':'); return a === id || b === id })
           if (staleKey) this._lasers.delete(staleKey)
         }
+        // Set `configured` on both towers, not just the panel-clicked one:
+        // `configured` is the update-loop firing gate, and a paired tower must
+        // fire regardless of which side initiated the pairing. Without this the
+        // engine relies on the Vue panel's side-effect to mark the clicked
+        // tower, leaving the partner ungated for any non-panel emitter (replay,
+        // tests, future code).
         const tower = game.towers.find((t) => t.id === towerId)
-        if (tower) tower.matrixPairId = pairId
+        if (tower) { tower.matrixPairId = pairId; tower.configured = true }
         const pair = game.towers.find((t) => t.id === pairId)
-        if (pair) pair.matrixPairId = towerId
+        if (pair) { pair.matrixPairId = towerId; pair.configured = true }
       }),
       game.eventBus.on(Events.TOWER_PLACED, (tower) => {
         if (tower.type !== TowerType.MATRIX) return
@@ -91,15 +97,29 @@ export class MatrixTowerSystem {
       // base damage. Applied *after* the rawBase > 0 gate so it never
       // resurrects an opposite-quadrant pair.
       const resonanceMod = 1 + (mods['resonance'] ?? 0)
-      const baseDamage = rawBase * resonanceMod
+      // Same-type interference soft cap (Phase 7 §7.3): MATRIX is listed in
+      // INTERFERING_TOWER_TYPES, so TowerInterferenceSystem computes a
+      // per-tower interferenceFactor each WAVE frame. Every other tower type
+      // respects the cap implicitly through `effectiveDamage`; this system uses
+      // a custom damage formula and so must fold it in explicitly. The laser is
+      // the joint product of both paired towers, so apply the average of the
+      // two factors.
+      const interferenceMod = (tower.interferenceFactor + pair.interferenceFactor) / 2
+      const baseDamage = rawBase * resonanceMod * interferenceMod
       const upgradeRamp = tower.upgradeExtras?.['rampRate'] ?? 0
       const rampRate = 0.5 * (1 + (mods['damage_ramp'] ?? 0) + upgradeRamp)
       const count = 1 + Math.floor(mods['target_count'] ?? 0) + Math.floor(tower.upgradeExtras?.['targetCount'] ?? 0)
 
-      // Remove dead targets from tracking list
-      const aliveIds = laser.targetIds.filter(tid =>
-        game.enemies.some(e => e.id === tid && e.alive)
-      )
+      // Drop targets that died OR left the firing zone. Acquisition requires
+      // the enemy to sit inside BOTH towers' ranges (_findOverlapTargets), so
+      // the lock holds to that same overlap: a target that walks out of either
+      // tower's range is released, freeing the slot for a fresh in-zone enemy.
+      const aliveIds = laser.targetIds.filter(tid => {
+        const e = game.enemies.find(en => en.id === tid && en.alive)
+        if (!e) return false
+        return distance(tower.x, tower.y, e.x, e.y) <= tower.effectiveRange
+          && distance(pair.x, pair.y, e.x, e.y) <= pair.effectiveRange
+      })
 
       // Acquire new targets up to the talent-modified count
       if (aliveIds.length < count) {
@@ -112,7 +132,13 @@ export class MatrixTowerSystem {
       }
       laser.targetIds = aliveIds
 
-      if (aliveIds.length === 0) continue
+      // No targets in the firing zone → reset the ramp so the readout (and the
+      // next lock) start from ×1 instead of resuming a stale charge. The
+      // fresh-acquisition reset above still handles same-frame target swaps.
+      if (aliveIds.length === 0) {
+        laser.rampTime = 0
+        continue
+      }
 
       laser.rampTime += dt
       const rampMultiplier = 1 + laser.rampTime * rampRate
@@ -138,7 +164,7 @@ export class MatrixTowerSystem {
     let nearestDist = Infinity
     for (const other of game.towers) {
       if (other.id === tower.id || other.type !== TowerType.MATRIX) continue
-      if (other.matrixPairId) continue
+      if (other.matrixPairId || other.disabled) continue
       const d = distance(tower.x, tower.y, other.x, other.y)
       if (d < nearestDist) { nearest = other; nearestDist = d }
     }
