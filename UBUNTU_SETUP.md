@@ -153,6 +153,19 @@ startup lifespan.
 
 All three ports are bound to `127.0.0.1` only — not exposed to your LAN.
 
+> **`/docs` is off by default.** `.env.example` does not set `DEBUG`, so the
+> backend boots with `DEBUG=false` and `/docs`, `/redoc` and `/openapi.json` all
+> return 404. Add `DEBUG=true` to `.env` and restart the backend to enable them
+> (dev only — production must never expose the schema).
+
+> **On a remote / headless Ubuntu box?** The ports bind to `127.0.0.1`, and auth
+> cookies are issued `Secure` with CSRF on by default, so opening
+> `http://<server-lan-ip>:5173` from another machine **fails to log in silently**
+> — the browser drops the `Secure` cookie over plain HTTP to a non-localhost
+> host. Forward the port over SSH so the browser still sees `localhost`:
+> `ssh -L 5173:localhost:5173 you@server`, then browse <http://localhost:5173>.
+> Vite proxies `/api` to the backend inside the box, so only 5173 needs forwarding.
+
 Stop with `Ctrl-C` (or `docker compose down` if detached). Add `-v` to also drop
 the Postgres volume and start from an empty database next time.
 
@@ -366,16 +379,39 @@ npm test
 
 ## Production build (native)
 
+The prod compose builds self-contained images and fronts them with nginx over
+**TLS** using `nginx-tls.conf` (HTTP :80 → HTTPS :443), which serves the Vite
+`dist/` bundle and reverse-proxies `/api/`. It also adds a nightly `db-backup`
+service — four services in total versus dev's three.
+
+**1. Provision TLS certificates first.** The frontend container bind-mounts
+`./certs`, and `nginx-tls.conf` **refuses to start if `fullchain.pem` or
+`privkey.pem` is missing** — so create them *before* bringing the stack up
+(the directory is gitignored and absent on a fresh clone). For a real
+deployment use your CA / Let's Encrypt files; for a local prod smoke-test a
+self-signed pair is enough:
+
+```bash
+mkdir -p certs
+openssl req -x509 -newkey rsa:4096 -nodes -days 365 \
+  -keyout certs/privkey.pem -out certs/fullchain.pem \
+  -subj "/CN=localhost"
+```
+
+**2. Set the production `.env` values** — real `SECRET_KEY`, strong DB password,
+`CORS_ORIGINS`/`FRONTEND_URL` pointing at your domain, and `COOKIE_SECURE=true`
+(safe now that the frontend serves HTTPS). Keep `CORS_ORIGIN_1`/`CORS_ORIGIN_2`
+in sync with `CORS_ORIGINS` — nginx and FastAPI read separate variables (see the
+note in `.env.example`).
+
+**3. Bring it up:**
+
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-The prod compose builds self-contained images and fronts them with nginx
-(`nginx.conf`), which serves the Vite `dist/` bundle and reverse-proxies `/api/`.
-Set the production `.env` values (real `SECRET_KEY`, strong DB password,
-`CORS_ORIGINS`/`FRONTEND_URL` pointing at your domain, and
-`COOKIE_SECURE=true`). See the root [README](README.md) and
-[SECURITY.md](SECURITY.md) for the full production checklist.
+See the root [README](README.md) and [SECURITY.md](SECURITY.md) for the full
+production checklist.
 
 ---
 
@@ -391,6 +427,8 @@ Set the production `.env` values (real `SECRET_KEY`, strong DB password,
 | `pytest` errors creating the test DB | `mathdefense` role lacks `CREATEDB` | `ALTER ROLE mathdefense CREATEDB;` (§B.3) |
 | `emcc: command not found` during `npm run build` | No Linux Emscripten; vendored emsdk is Windows | Use Docker build or install Linux emsdk (§ WASM) |
 | `permission denied` on `docker.sock` | User not in `docker` group | `sudo usermod -aG docker $USER` then re-login |
+| Prod frontend container crash-loops, nginx logs `cannot load certificate` | `./certs/{fullchain,privkey}.pem` missing | Provision certs before `up` (§ Production build) |
+| Login silently fails (cookie never set) when reached via a LAN IP | `Secure` auth cookie dropped over plain HTTP to a non-localhost host | Reach the app as `localhost` via an SSH tunnel (§A.4) |
 
 ---
 

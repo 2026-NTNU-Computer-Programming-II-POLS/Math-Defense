@@ -47,6 +47,12 @@ jobs:
         # Rebuilding here keeps source and binary in lock-step regardless of
         # whether the committing developer had emsdk locally.
         uses: mymindstorm/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
+        with:
+          # Pin to the same tag backend/Dockerfile uses (emscripten/emsdk:5.0.7)
+          # so CI, the prod image, and a manual rebuild all emit a byte-identical
+          # math_engine.wasm. Unpinned, this action floats to the latest emsdk and
+          # a toolchain bump could silently drift the score-parity fixtures.
+          version: 5.0.7
       - name: Build WASM
         # Job-level default working-directory is `backend`, so `../wasm`
         # resolves to <workspace>/wasm. Matches the frontend job's
@@ -130,6 +136,10 @@ jobs:
         run: npm audit --audit-level=high
       - name: Setup emsdk
         uses: mymindstorm/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
+        with:
+          # Pin to backend/Dockerfile's emscripten/emsdk:5.0.7 — see the backend
+          # job above for why an unpinned (latest) emsdk risks parity drift.
+          version: 5.0.7
       - name: Build WASM
         run: npm run prebuild
       - name: Verify WASM artifact
