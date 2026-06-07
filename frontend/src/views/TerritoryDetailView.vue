@@ -28,13 +28,18 @@ const detail = computed(() => store.currentDetail)
 const isOwner = computed(() => detail.value?.activity.teacher_id === auth.user?.id)
 const canSettle = computed(() => {
   if (!detail.value || detail.value.activity.settled) return false
-  if (auth.isAdmin) return true
+  // Admins are read-only for territory — the API rejects an admin settle with
+  // 403 (require_role(TEACHER)), so don't offer the action in the UI.
   if (auth.isTeacher) {
     // C-5: any teacher may settle an inter-class activity
     return detail.value.activity.class_id === null || isOwner.value
   }
   return false
 })
+// Only students may capture territory (play requires Role.STUDENT server-side);
+// hide the Play affordances from teachers/admins so they don't play a whole
+// game only to be rejected at submit.
+const canPlay = computed(() => auth.isStudent)
 const settling = ref(false)
 
 const deadlineRef = computed(() => detail.value?.activity.deadline ?? null)
@@ -52,9 +57,17 @@ const slotDisabledReason = computed((): string | undefined => {
   const a = detail.value?.activity
   if (!a) return undefined
   if (a.settled) return 'Activity is settled'
-  if (new Date(a.deadline) <= new Date()) return 'Activity deadline has passed'
+  // Reactive on the ticking countdown so Play disables the instant the deadline
+  // passes while the page is open. A bare `new Date()` here is non-reactive and
+  // would leave Play enabled, wasting a full game on a guaranteed rejection.
+  if (countdown.value.isExpired) return 'Activity deadline has passed'
   return undefined
 })
+
+// Practice-mode (slider-fallback) runs CAN still capture territory, but they
+// stay excluded from the leaderboard — surface a non-blocking notice so the
+// student knows the trade-off before playing. Only shown to players (students).
+const showPracticeNotice = computed(() => canPlay.value && ui.sliderFallbackEnabled)
 
 // Pre-challenge preview state
 const previewSlotId = ref<string | null>(null)
@@ -79,6 +92,7 @@ const previewUserAvg = computed<number | null>(() => {
 })
 
 function onSlotClick(slotId: string): void {
+  if (!canPlay.value) return
   if (slotDisabledReason.value) return
   if (skipChallengePreview.value) {
     void handlePlay(slotId)
@@ -155,8 +169,13 @@ watch(activityId, (id) => {
           :settled="detail.activity.settled"
         />
 
+        <div v-if="showPracticeNotice" class="practice-notice">
+          Practice mode (slider fallback) is on — you can still capture territory,
+          but this run won't count toward the leaderboard.
+        </div>
+
         <div
-          v-if="recommendationData && !slotDisabledReason"
+          v-if="recommendationData && !slotDisabledReason && canPlay"
           class="recommendation-bar"
         >
           <span class="rec-icon" aria-hidden="true">★</span>
@@ -178,6 +197,7 @@ watch(activityId, (id) => {
             :disabled-reason="slotDisabledReason"
             :user-id="auth.user?.id ?? null"
             :highlighted="s.id === recommendedSlotId"
+            :can-play="canPlay"
             @play="onSlotClick"
           />
         </div>
@@ -290,6 +310,15 @@ watch(activityId, (id) => {
 .loading, .error-msg { text-align: center; padding: 20px; font-size: var(--text-sm); }
 .loading { color: var(--charcoal-soft); }
 .error-msg { color: var(--clay-deep); }
+
+.practice-notice {
+  padding: 10px 14px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 10px;
+  background: rgba(212, 175, 55, 0.12);
+  font-size: var(--text-xs);
+  color: var(--charcoal-soft);
+}
 
 .recommendation-bar {
   display: flex; align-items: center; gap: 10px;

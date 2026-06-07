@@ -56,15 +56,15 @@ def _create_activity(client, token, slots=None, title="Test Activity", class_id=
     )
 
 
-def _complete_session(client, token, level=1, score=500, kills=30, waves_survived=3):
+def _complete_session(client, token, level=1, score=500, kills=30, waves_survived=3, practice_mode=False):
     """Complete a game session and return the session ID.
 
-    Passes ``total_score=score`` so that _validate_session's non-None guard
-    is satisfied without requiring the full V2 scoring formula inputs.
+    Passes ``total_score=score`` so that _validate_session's score basis is
+    satisfied without requiring the full V2 scoring formula inputs.
     """
     sid = client.post(
         "/api/sessions",
-        json={"star_rating": level},
+        json={"star_rating": level, "practice_mode": practice_mode},
         headers=_auth(token),
     ).json()["id"]
     client.post(
@@ -275,6 +275,31 @@ def test_session_difficulty_must_match_slot_star_rating(client, db_session):
     session_id = _complete_session(client, student_token, level=1, score=500)
     res = _play(client, student_token, activity_id, slot_id, session_id)
     assert res.status_code == 422
+
+
+# ── Practice / preview handling ──────────────────────────────────────────────
+
+def test_practice_mode_session_can_capture_territory(client, db_session):
+    """Product decision: practice-mode (slider-fallback) student runs remain
+    eligible to capture territory (accessibility/inclusion), even though they
+    are excluded from the leaderboard. Only teacher/admin preview runs are
+    rejected (is_preview), and those cannot reach this student-only endpoint.
+    """
+    teacher_token = _register_teacher(db_session, "t_practice_ok")
+    student_token = _register_student(client, "s_practice_ok")
+
+    activity_id = _create_activity(client, teacher_token).json()["id"]
+    slot_id = _slots_for(client, teacher_token, activity_id)[0]["id"]
+
+    session_id = _complete_session(
+        client, student_token, level=1, score=500, practice_mode=True
+    )
+    res = _play(client, student_token, activity_id, slot_id, session_id)
+    assert res.status_code == 200
+    assert res.json()["seized"] is True
+    # The slot is now occupied by the practice-mode capture.
+    slot = _slots_for(client, teacher_token, activity_id)[0]
+    assert slot["occupation"] is not None
 
 
 # ── Territory cap ─────────────────────────────────────────────────────────────

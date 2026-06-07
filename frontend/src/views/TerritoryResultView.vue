@@ -10,9 +10,38 @@ const store = useTerritoryStore()
 const activityId = computed(() => route.params.id as string)
 const slotId = computed(() => route.params.slotId as string)
 
+type PlayOutcome = { seized: boolean; score: number | null }
+
 const submitting = ref(true)
-const result = ref<{ seized: boolean; score: number | null } | null>(null)
+const result = ref<PlayOutcome | null>(null)
 const noSession = ref(false)
+
+// A territory play durably consumes its game session, so re-POSTing the same
+// session_id (e.g. on reload or back/forward, which restore history.state)
+// returns "session already used" and would mask the real outcome. Cache the
+// first outcome per session_id and replay it on re-entry instead.
+const RESULT_CACHE_PREFIX = 'mg_territory_result_'
+
+function readCachedOutcome(sessionId: string): PlayOutcome | null {
+  try {
+    const raw = sessionStorage.getItem(RESULT_CACHE_PREFIX + sessionId)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (typeof parsed?.seized !== 'boolean') return null
+    const score = typeof parsed.score === 'number' && Number.isFinite(parsed.score) ? parsed.score : null
+    return { seized: parsed.seized, score }
+  } catch {
+    return null
+  }
+}
+
+function writeCachedOutcome(sessionId: string, outcome: PlayOutcome): void {
+  try {
+    sessionStorage.setItem(RESULT_CACHE_PREFIX + sessionId, JSON.stringify(outcome))
+  } catch {
+    // sessionStorage may be unavailable (private mode / quota); non-critical.
+  }
+}
 
 onMounted(async () => {
   const sessionId = history.state?.sessionId as string | undefined
@@ -22,12 +51,21 @@ onMounted(async () => {
     return
   }
 
+  const cached = readCachedOutcome(sessionId)
+  if (cached) {
+    result.value = cached
+    submitting.value = false
+    return
+  }
+
   try {
     const res = await store.playSlot(activityId.value, slotId.value, sessionId)
     if (res) {
       const rawScore = res.occupation?.score
       const safeScore = typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore : null
-      result.value = { seized: res.seized, score: safeScore }
+      const outcome: PlayOutcome = { seized: res.seized, score: safeScore }
+      result.value = outcome
+      writeCachedOutcome(sessionId, outcome)
     }
   } finally {
     // Always leave the submitting state, even on an unexpected throw, so the

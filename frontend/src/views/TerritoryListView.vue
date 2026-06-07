@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTerritoryStore } from '@/stores/territoryStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -11,6 +11,11 @@ const auth = useAuthStore()
 const PAGE_SIZE = 20
 const page = ref(1)
 
+// Reactive clock so the Expired badge flips when a deadline passes while the
+// list is open, instead of staying frozen at the value captured on first render.
+const nowMs = ref(Date.now())
+let expiryTimer: ReturnType<typeof setInterval> | null = null
+
 const totalPages = computed(() => Math.max(1, Math.ceil(store.activities.length / PAGE_SIZE)))
 
 const pagedActivities = computed(() => {
@@ -19,10 +24,10 @@ const pagedActivities = computed(() => {
 })
 
 const pagedActivitiesWithStatus = computed(() => {
-  const now = new Date()
+  const now = nowMs.value
   return pagedActivities.value.map((a) => ({
     ...a,
-    isExpired: !a.settled && new Date(a.deadline) < now
+    isExpired: !a.settled && new Date(a.deadline).getTime() < now
   }))
 })
 
@@ -35,7 +40,16 @@ function formatDeadline(iso: string): string {
   return new Date(iso).toLocaleString()
 }
 
-onMounted(() => store.loadActivities())
+onMounted(() => {
+  store.loadActivities()
+  expiryTimer = setInterval(() => { nowMs.value = Date.now() }, 30_000)
+})
+onUnmounted(() => {
+  if (expiryTimer !== null) {
+    clearInterval(expiryTimer)
+    expiryTimer = null
+  }
+})
 </script>
 
 <template>
@@ -45,7 +59,7 @@ onMounted(() => store.loadActivities())
         <h2 class="panel-title">Grabbing Territory</h2>
         <div class="header-actions">
           <button
-            v-if="auth.isTeacher || auth.isAdmin"
+            v-if="auth.isTeacher"
             class="btn"
             @click="router.push({ name: 'territory-create' })"
           >

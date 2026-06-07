@@ -26,8 +26,11 @@ const submitting = ref(false)
 const validationError = ref('')
 const classesLoaded = ref(false)
 
-// B-M-13: admins can always create; teachers need at least one class
-const hasNoClasses = computed(() => classesLoaded.value && !auth.isAdmin && classes.value.length === 0)
+// Admins are read-only for territory — the create API rejects them with 403
+// (require_role(TEACHER)), so the form is hidden behind a notice for them.
+const adminBlocked = computed(() => auth.isAdmin)
+// Teachers need at least one class before they can create an activity.
+const hasNoClasses = computed(() => classesLoaded.value && classes.value.length === 0)
 
 const hasDuplicateStars = computed(() => {
   const ratings = slots.value.map(s => s.star_rating)
@@ -108,17 +111,20 @@ onMounted(async () => {
     <div class="setup-panel rune-panel">
       <h2 class="setup-title">Create Territory Activity</h2>
 
-      <div v-if="hasNoClasses" class="error-msg">
+      <div v-if="adminBlocked" class="error-msg">
+        Admins have read-only access and cannot create territory activities.
+      </div>
+      <div v-else-if="hasNoClasses" class="error-msg">
         You don't have any classes yet. Create a class first before setting up a territory activity.
       </div>
       <div v-else-if="validationError" class="error-msg">{{ validationError }}</div>
       <div v-else-if="store.errorCreate" class="error-msg">{{ store.errorCreate }}</div>
 
-      <div v-if="hasNoClasses" class="form-actions">
+      <div v-if="adminBlocked || hasNoClasses" class="form-actions">
         <button class="btn back-btn" type="button" @click="router.push('/territory')">← Back</button>
       </div>
 
-      <form v-if="!hasNoClasses" class="setup-form" @submit.prevent="submit">
+      <form v-if="!adminBlocked && !hasNoClasses" class="setup-form" @submit.prevent="submit">
         <div class="field">
           <label class="field-label">Title</label>
           <input v-model="title" type="text" class="rune-input" placeholder="Activity title" />

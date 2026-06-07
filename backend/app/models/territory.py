@@ -66,6 +66,10 @@ class TerritoryOccupation(Base):
         UniqueConstraint("slot_id", name="uq_territory_occupation_slot"),
         UniqueConstraint("session_id", name="uq_territory_occupation_session"),
         Index("ix_territory_occupations_student_id", "student_id"),
+        # Created by migration x8a9b0c1d2e3f to back per-student/per-slot ranking
+        # aggregation. Declared here too so `alembic revision --autogenerate`
+        # does not emit a spurious DROP INDEX against the live schema.
+        Index("ix_territory_occupations_student_slot", "student_id", "slot_id"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))

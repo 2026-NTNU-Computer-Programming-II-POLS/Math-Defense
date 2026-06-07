@@ -3,12 +3,17 @@ import { computed } from 'vue'
 import type { SlotInfo } from '@/services/territoryService'
 import { getChallengeMode, CHALLENGE_MODE_LABEL } from '@/services/territory/challengeMode'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   slot: SlotInfo
   disabledReason?: string
   userId?: string | null
   highlighted?: boolean
-}>()
+  // Only students can capture territory; non-students get the read-only card
+  // without a Play button (the API would 403 their play anyway).
+  canPlay?: boolean
+}>(), {
+  canPlay: true,
+})
 
 defineEmits<{
   play: [slotId: string]
@@ -36,6 +41,7 @@ const stars = computed(() => '★'.repeat(props.slot.star_rating) + '☆'.repeat
     </div>
     <div v-else class="slot-empty">Unoccupied</div>
     <button
+      v-if="canPlay"
       class="btn slot-play-btn"
       :disabled="!!disabledReason"
       :title="disabledReason"

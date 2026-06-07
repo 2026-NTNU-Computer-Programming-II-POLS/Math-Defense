@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
-from sqlalchemy import func, select, text
+from sqlalchemy import Float, cast, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
@@ -302,8 +302,12 @@ class SqlAlchemyTerritoryRepository:
         )
         # B-H-9 / C-1: LEFT JOIN so non-participating members contribute 0;
         # divide by class_count so multi-class students aren't double-counted.
+        # cast to Float so the division is floating-point on every dialect.
+        # Postgres makes coalesce(int, 0.0) numeric already, but SQLite keeps
+        # integer affinity and would truncate (e.g. 5/2 -> 2) for a student in
+        # multiple classes; the cast keeps test (SQLite) and prod (PG) in sync.
         weighted_val = (
-            func.coalesce(student_val.c.territory_value, 0.0)
+            cast(func.coalesce(student_val.c.territory_value, 0.0), Float)
             / student_class_count.c.class_count
         )
         avg_col = func.avg(weighted_val)

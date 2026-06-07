@@ -216,6 +216,20 @@ class TerritoryApplicationService:
             raise InvalidSessionError("Game session not found")
         if session.status != SessionStatus.COMPLETED:
             raise InvalidSessionError("Game session is not completed")
+        # Preview runs (teacher/admin smoke-tests) must never capture
+        # competitive territory. Practice-mode student runs ARE allowed by
+        # product decision (accessibility/inclusion): unlike the leaderboard
+        # they stay territory-eligible, and the frontend shows an advisory
+        # notice that such a run still won't count toward the leaderboard.
+        # (is_preview is role-derived, so a student's own session is always
+        # is_preview=False — this guard is defense-in-depth.)
+        if session.is_preview:
+            raise InvalidSessionError(
+                "Preview sessions cannot capture territory"
+            )
+        # Score basis mirrors the leaderboard's canonical value
+        # (COALESCE(total_score, score)): V2 runs carry a float total_score,
+        # legacy runs fall back to the raw integer score.
         score = session.total_score if session.total_score is not None else float(session.score)
         if score < 0:
             raise InvalidSessionError("Game session has no valid score")
@@ -333,12 +347,22 @@ class TerritoryApplicationService:
             activity_id, class_id=effective_class_id,
         )
         prior_ranks = self._territory_repo.get_latest_snapshot_ranks(activity_id)
+        # Snapshots are written global-scoped (all participants, class_id=None).
+        # When the caller drills into a single class the live ranks are
+        # class-scoped and are NOT comparable to the global snapshot rank — the
+        # delta would be (global_rank - class_rank) garbage. Only surface
+        # rank_change when the live scope matches the snapshot scope.
+        scope_matches_snapshot = effective_class_id is None
 
         entries: list[dict] = []
         for r in rows:
             prev = prior_ranks.get(r["student_id"])
             # Convention: positive = climbed (rank number decreased).
-            rank_change = (prev - r["rank"]) if prev is not None else None
+            rank_change = (
+                (prev - r["rank"])
+                if (scope_matches_snapshot and prev is not None)
+                else None
+            )
             entries.append({
                 "rank": r["rank"],
                 "student_id": r["student_id"],
@@ -368,9 +392,10 @@ class TerritoryApplicationService:
             self._verify_owner_or_admin(activity, requester_id, requester_role)
             activity.settle(settled_by=requester_id)
             self._territory_repo.save_activity(activity)
-            # Snapshot final rankings so the rank-change column has a baseline
-            # (the codebase has no scheduler today; settle-time is the
-            # earliest reliable trigger we can rely on).
+            # Snapshot final rankings so the rank-change column has a baseline.
+            # The background scheduler (infrastructure/scheduler.py) only runs
+            # settle_expired — there is no periodic snapshot writer — so settle
+            # time is still the earliest reliable snapshot trigger.
             self._territory_repo.write_rankings_snapshot(activity_id)
             self._uow.commit()
             logger.info("GT activity settled: id=%s by=%s", activity_id, requester_id)
