@@ -21,7 +21,11 @@ from app.domain.errors import (
 from app.domain.value_objects import Level, Score, GameResult, SessionStatus
 from app.domain.session.aggregate import GameSession
 from app.domain.session.events import SessionCompleted
-from app.domain.scoring.score_calculator import recompute_total_score
+from app.domain.scoring.score_calculator import (
+    SCORE_SCALE_K,
+    difficulty_multiplier,
+    recompute_total_score,
+)
 from app.infrastructure.wasm_runtime import get_pow_fn, get_total_score_fn, is_wasm_loaded
 if TYPE_CHECKING:
     from app.application.achievement_service import AchievementApplicationService
@@ -332,7 +336,7 @@ class SessionApplicationService:
                     #     waves_survived=0, so such a forgery is at least visible.
                 # F-BUG-6 follow-up: the modern V2 client omits ``score`` in
                 # the end payload because the server is the sole authority on
-                # the final integer score (V2 leaderboard ranks by total_score
+                # the final integer score (the V3 leaderboard ranks by total_score
                 # anyway). Fall back to the latest in-flight value the client
                 # already PATCHed at WAVE_END. Without this substitution the
                 # aggregate's "must not be less than last reported" guard
@@ -688,6 +692,18 @@ class SessionApplicationService:
                 initial_answer=session.initial_answer,
                 pow_fn=get_pow_fn(),
                 total_score_fn=get_total_score_fn(),
+            )
+        # V3: lift the canonical core into the player-facing magnitude (K) and
+        # apply the star-rating difficulty multiplier. Done here — NOT inside
+        # recompute_total_score — so the parity fixtures keep pinning the pure
+        # 7-input core. Server-authoritative: difficulty derives from the
+        # trusted session row, never a client field. 0.0 stays 0.0; None falls
+        # through to the clear-value branch below.
+        if recomputed is not None:
+            recomputed = (
+                recomputed
+                * SCORE_SCALE_K
+                * difficulty_multiplier(int(session.star_rating))
             )
         if recomputed is None:
             if session.total_score is not None:

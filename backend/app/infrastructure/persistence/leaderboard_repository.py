@@ -16,8 +16,8 @@ from app.utils.integrity import extract_constraint_name
 
 
 def _effective_score(model):
-    """COALESCE(total_score, CAST(score AS FLOAT)) — V2 sessions carry a
-    floating-point total_score; V1 rows fall back to the integer score."""
+    """COALESCE(total_score, CAST(score AS FLOAT)) — V3 rows carry a
+    floating-point total_score; pre-V3 / cleared rows fall back to the integer score."""
     return func.coalesce(model.total_score, cast(model.score, Float))
 
 

@@ -119,7 +119,7 @@ class SessionEnd(BaseModel):
     kills: int = Field(ge=KILLS_MIN, le=KILLS_MAX)
     waves_survived: int = Field(ge=WAVES_MIN, le=WAVES_MAX)
 
-    # V2 scoring variables (optional for backward compat)
+    # V3 scoring variables (optional for backward compat)
     kill_value: int | None = Field(default=None, ge=0, le=SCORE_MAX)
     cost_total: int | None = Field(default=None, ge=0, le=GOLD_MAX)
     time_total: float | None = Field(default=None, ge=0, le=7200.0)

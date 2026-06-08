@@ -196,15 +196,18 @@ alpha       = S1 / (S1 + S2)              if S1+S2 > 0 else 0
 K           = alpha·S1 + (1 − alpha)·S2                 (continuous blend)
 
 exponent    = 1 / sqrt(max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer)))
-TotalScore  = max(0, K)^exponent           (killValue=0 → K=0 → score=0)
+TotalScore  = max(0, killValue)^exponent · K · difficulty   (killValue = 0 → score = 0)
+            difficulty = 1 + 0.25·(starRating − 1)          (★1 → ×1.0 … ★5 → ×2.0)
 ```
 
 In English:
 
-- More kills, faster, with cheaper towers → higher S1, S2, K.
-- Less HP lost and a correct IA → smaller exponent denominator → larger exponent → K is raised to a larger power. The `sqrt` softens this curve so HP loss is no longer brutally punished at the top end.
+- **More kills → higher score.** `killValue` is the base, so the sheer volume you defeat is rewarded directly.
+- **Faster and cheaper → higher K**, the speed/efficiency rate blend that scales the score.
+- **Less HP lost and a correct IA → a larger exponent**, so `killValue` is raised to a larger power. The `sqrt` softens this curve so HP loss is no longer brutally punished at the top end.
+- **Higher star rating → a larger difficulty multiplier** (up to ×2 at ★5), so the same play on a harder level scores more.
 - Sitting in Build Phase forever does not pad the timer — only active wave time counts toward S1.
-- Building no towers (`costTotal = 0`) zeroes S2 and the blend collapses to `K = S1` (no penalty: the dominant rate carries the score).
+- Building no towers (`costTotal = 0`) zeroes S2 and the blend collapses to `K = S1` (the dominant rate carries the score).
 - The K blend is continuous (no jump at S1 = S2): runs that flip between efficiency- and cost-dominant no longer see a score discontinuity.
 
 ---

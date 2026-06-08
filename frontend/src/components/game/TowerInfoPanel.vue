@@ -340,7 +340,7 @@ const showTargetingMode = computed(() => {
       </template>
 
       <button
-        v-if="upgradeInfo && upgradeInfo.cost > 0"
+        v-if="upgradeInfo && upgradeInfo.cost > 0 && !confirmingRefund"
         class="btn upgrade-btn"
         :disabled="!upgradeInfo.ok"
         @click="upgrade"

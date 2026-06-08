@@ -97,6 +97,7 @@ class LeaderboardApplicationService:
                 waves_survived=entry.waves_survived,
                 created_at=entry.created_at,
                 is_personal_best=entry.id in pb_ids,
+                total_score=entry.total_score,
             )
             for entry in history
         ]

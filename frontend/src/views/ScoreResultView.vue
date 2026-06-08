@@ -41,6 +41,7 @@ const breakdown = computed(() => {
     healthOrigin: g.healthOrigin,
     healthFinal: g.hp,
     initialAnswer: g.initialAnswer,
+    starRating: g.starRating,
   }
   return calculateScore(input)
 })

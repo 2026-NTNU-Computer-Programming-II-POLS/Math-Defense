@@ -102,7 +102,7 @@ shape, and a determinism-critical FP flag set:
 
 ### Determinism rationale
 
-`replay_version=2` (construction plan §3.5) requires **bit-identical**
+`replay_version=2` requires **bit-identical**
 floating-point output across every WASM engine that runs the binary. Three
 properties hold simultaneously:
 
@@ -114,7 +114,7 @@ properties hold simultaneously:
    ways that would diverge between toolchain versions.
 
 The parity tests under `frontend/src/math/*.wasm.test.ts` pin this contract.
-A future host-clang `parity_test.c` (construction plan §5.3, follow-up)
+A future host-clang `parity_test.c`
 will extend the guarantee to a non-WASM build of the same TUs.
 
 ### Clean
@@ -207,20 +207,28 @@ double compute_total_score(
 );
 ```
 
-**Canonical V2 score formula** — single source of truth for both the
-frontend display (`score-calculator.ts`) and the backend anti-cheat
-verifier (`score_calculator.py` via `app/infrastructure/wasm_runtime.py`,
-which mounts this same `.wasm`). The s1/s2/k/exponent breakdown shown in
-`ScoreResultView` is derived locally, but `totalScore` always comes out
-of this function so server and client agree to the last ULP.
+**Canonical score CORE** — single source of truth for both the frontend
+display (`score-calculator.ts`) and the backend anti-cheat verifier
+(`score_calculator.py` via `app/infrastructure/wasm_runtime.py`, which
+mounts this same `.wasm`). Returns the 7-input core
+`core = max(0, kill_value)^exponent · k`, where the base is `kill_value`
+(volume), `k` is the continuous speed/efficiency blend, and the exponent
+softens with HP retained + a correct initial answer. The s1/s2/k/exponent
+breakdown shown in `ScoreResultView` is derived locally, but the core
+always comes out of this function so server and client agree to the last
+ULP. The magnitude scale `K` (= 1) and the star-difficulty multiplier are
+applied by the **caller** — server-authoritative, from the trusted session
+row — NOT inside this function, so the parity fixtures pin the pure core.
 
 `prep_sum` is pre-summed by the caller so the ABI stays a flat scalar
 list and the parity fixtures in `shared/score_parity_fixtures.json` don't
-need to encode variable-length prep arrays. A v2 session whose submitted
-`total_score` diverges from the server recompute by more than `1e-4` is
-rejected with HTTP 422 + `replay_mismatch`. Any change to this function
-MUST be mirrored in both fallbacks (TS / Python) and the parity fixtures
-regenerated.
+need to encode variable-length prep arrays. The modern v2 client omits
+`total_score` from the end payload (the server is authoritative); when a
+client *does* submit one, a v2 session whose value diverges from the
+server recompute by more than `1e-4` is rejected with HTTP 422 +
+`replay_mismatch`. Any change to this function MUST be mirrored in both
+fallbacks (TS / Python) and the parity fixtures regenerated (see the
+rebuild steps at the top of this file).
 
 ---
 
@@ -443,8 +451,8 @@ The level generator (`generate_level`, `find_pair_intersections`,
 `find_all_curves_common_point`, `count_common_intersections_in_interval`,
 `compute_spawn_points`) is shared infrastructure — not bound to a single
 tower. Score recomputation (`compute_total_score`, with `power_f64` as
-the underlying determinism-pinned primitive) backs the FU-A backend
-recompute path; replay-v2 PRNG (`prng_seed` / `prng_next_u32` /
+the underlying determinism-pinned primitive) backs the backend
+score-recompute path; replay-v2 PRNG (`prng_seed` / `prng_next_u32` /
 `prng_next_f64`) is the gameplay random stream.
 
 > **Historical note**: Earlier V1 versions included Function Cannon, Integral Cannon, Fourier Shield, and Probability Shrine, which carried four extra C exports (`calculate_trajectory`, `fourier_composite`, `fourier_match`, `line_circle_intersect`). The V2 redesign (Phase 5, April 2026) unified them into 7 concept-based towers, and those exports were dropped from the binary in May 2026 once V2 was confirmed not to need them.

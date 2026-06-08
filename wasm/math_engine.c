@@ -162,8 +162,21 @@ double compute_total_score(double kill_value,
     if (exponent_denom < 1.0) exponent_denom = 1.0;
     double exponent = 1.0 / sqrt(exponent_denom);
 
-    double base = (k < 0.0) ? 0.0 : k;
-    return pow(base, exponent);
+    /* V3: killValue is the score base (volume); the survival /
+     * first-answer exponent softens it and the rate-blend k scales it. The old
+     * V2 used base = k, which (a) ignored volume entirely — more kills did not
+     * raise the score — and (b) inverted the HP penalty whenever k < 1, because
+     * raising a sub-1 base to a SMALLER exponent moves it UP toward 1. Anchoring
+     * the base on killValue (always >= 0) fixes both: the score is now monotone
+     * increasing in killValue and monotone increasing in HP retained.
+     * killValue = 0 still yields 0 (0**exponent = 0 for exponent > 0).
+     *
+     * The scale constant K and the star-rating difficulty multiplier are
+     * applied by the caller (server-authoritative, from the trusted session
+     * row), NOT here, so this stays the canonical 7-input core that the parity
+     * fixtures pin. */
+    double base = (kill_value < 0.0) ? 0.0 : kill_value;
+    return pow(base, exponent) * k;
 }
 
 /* ══════════════════════════════════════════

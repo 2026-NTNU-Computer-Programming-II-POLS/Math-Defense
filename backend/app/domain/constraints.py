@@ -20,7 +20,7 @@ SCORE_MIN = 0
 SCORE_MAX = 9_999_999
 SCORE_RANGE = (SCORE_MIN, SCORE_MAX)
 
-# V2 floating-point score cap — matches the `le` bound in SessionEnd.total_score schema.
+# V3 floating-point total_score cap — matches the `le` bound in SessionEnd.total_score schema.
 TOTAL_SCORE_MAX = 1_000_000.0
 
 KILLS_MIN = 0

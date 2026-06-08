@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { challengeService, type Challenge } from '@/services/challengeService'
 import { leaderboardService, type LeaderboardEntry } from '@/services/leaderboardService'
+import { formatScore } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -68,7 +69,7 @@ onMounted(load)
             <tr v-for="e in entries" :key="e.id">
               <td class="rank-col">{{ e.rank }}</td>
               <td>{{ e.player_name }}</td>
-              <td class="score-col">{{ e.score }}</td>
+              <td class="score-col">{{ formatScore(e.total_score ?? e.score) }}</td>
               <td class="meta-col">{{ e.waves_survived }}</td>
               <td class="meta-col">{{ formatDate(e.created_at) }}</td>
             </tr>

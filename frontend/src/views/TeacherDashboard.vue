@@ -8,6 +8,7 @@ import {
   type ClassPosteriors,
 } from '@/services/assessmentService'
 import CompetencyBar from '@/components/teacher/CompetencyBar.vue'
+import { formatScore } from '@/utils/formatters'
 
 const router = useRouter()
 
@@ -171,7 +172,7 @@ onMounted(async () => {
             <li v-for="r in reflections" :key="r.session_id" class="reflection-row">
               <div class="reflection-head">
                 <span class="item-name">{{ r.student_name || r.student_id }}</span>
-                <span class="item-meta">★{{ r.star_rating }} · {{ r.score }} pts · {{ formatDate(r.ended_at) }}</span>
+                <span class="item-meta">★{{ r.star_rating }} · {{ formatScore(r.total_score ?? r.score) }} pts · {{ formatDate(r.ended_at) }}</span>
               </div>
               <p class="reflection-text">{{ r.reflection_text }}</p>
             </li>

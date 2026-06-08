@@ -46,7 +46,7 @@ class LeaderboardEntry:
         self.session_id = session_id
         # Backlog §23 — non-NULL when entry comes from a challenge run.
         self.challenge_id = challenge_id
-        # M-02: V2 floating-point total_score; None for v1 sessions or missing context.
+        # M-02: V3 floating-point total_score; None for legacy/pre-V3 sessions or missing context.
         self.total_score = total_score
         self.created_at = created_at or datetime.now(UTC)
 

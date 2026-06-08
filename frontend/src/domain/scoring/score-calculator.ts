@@ -1,19 +1,47 @@
-// F-ARCH-3 / B-ARCH-6: the canonical V2 score formula lives in
+// F-ARCH-3 / B-ARCH-6: the canonical V3 score CORE lives in
 // wasm/math_engine.c::compute_total_score. This module computes the s1/s2/k/
-// exponent breakdown locally for the ScoreResultView display, but `totalScore`
-// always comes from `computeTotalScoreWasm` so frontend and the server-side
-// wasmtime-py recomputation agree to the last ULP. When the WASM module
-// hasn't been rebuilt with the new export yet, the bridge's JS fallback
-// runs the same algebra and parity is enforced by
-// shared/score_parity_fixtures.json (consumed by both sides).
+// exponent breakdown locally for the ScoreResultView display, but the core
+// value always comes from `computeTotalScoreWasm` so it agrees with the
+// server-side wasmtime-py recomputation to the last ULP. When the WASM module
+// hasn't been rebuilt with the export yet, the bridge's JS fallback runs the
+// same algebra and parity is enforced by shared/score_parity_fixtures.json
+// (consumed by both sides).
+//
+// `totalScore` here is the DISPLAY value = core × SCORE_SCALE_K ×
+// difficultyMultiplier(star). The server applies the identical transform from
+// the trusted session row, so this equals the stored/leaderboard total_score.
+// The modern client does NOT submit total_score — the server is the
+// sole authority — so this scaling is display-only and never gates a session.
 //
 // Design notes:
+//   V3: the score base is killValue (volume), softened by the
+//     survival/first-answer exponent and scaled by the rate-blend k. The old
+//     V2 used base=k, which ignored volume and inverted the HP penalty when
+//     k<1. computeTotalScoreWasm returns this canonical 7-input *core*; this
+//     module then multiplies by SCORE_SCALE_K and difficultyMultiplier(star)
+//     to get the displayed totalScore, mirroring the server
+//     (session_service._verify_score). This is display-only: the modern client
+//     does not submit total_score, so the server stays the sole authority.
 //   killValue=0  → totalScore is always 0 (0**x = 0). Zero-kill runs score nothing by design.
 //   costTotal=0  → s2=0, alpha=1, k=s1 (no penalty; the dominant rate carries
 //                  the blend). The pre-Q3 piecewise weight applied a 30% penalty
 //                  here; the continuous alpha blend removes that cliff.
 //   mUsed is a debug field only; the backend anti-cheat verifier does not track it.
 import { computeTotalScoreWasm } from '@/math/WasmBridge'
+
+// V3 post-core transforms — mirror backend domain/scoring/score_calculator.py
+// (SCORE_SCALE_K + difficulty_multiplier). Keep both in lock-step: the server
+// applies the identical scale so the end-of-game total matches the stored /
+// leaderboard value. 0.25·(star−1) is exact in IEEE-754, so the multiplier is
+// bit-identical across JS and Python.
+//
+// K = 1 (identity): the core already lands in the thousands-to-~100k range at
+// realistic kill_values. K > 1 risks the server's TOTAL_SCORE_MAX (1e6) clamp
+// on high-star runs and would flatten top-end ranking — see the backend note.
+export const SCORE_SCALE_K = 1
+export function difficultyMultiplier(starRating: number): number {
+  return 1 + 0.25 * (starRating - 1)
+}
 
 export interface ScoreInput {
   killValue: number
@@ -23,6 +51,7 @@ export interface ScoreInput {
   healthOrigin: number
   healthFinal: number
   initialAnswer: 0 | 1
+  starRating: number              // 1–5; drives the difficulty multiplier
 }
 
 export interface ScoreBreakdown {
@@ -70,7 +99,7 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
   // above is recomputed locally only because ScoreResultView displays
   // intermediate fields; the value sent to/verified by the server is the
   // WASM-derived totalScore.
-  const totalScore = computeTotalScoreWasm(
+  const core = computeTotalScoreWasm(
     input.killValue,
     input.timeTotal,
     prepTimeSum,
@@ -79,6 +108,10 @@ export function calculateScore(input: ScoreInput): ScoreBreakdown {
     input.healthFinal,
     input.initialAnswer,
   )
+  // V3: lift the core into the player-facing range and apply difficulty. The
+  // server applies the identical transform from the trusted star_rating, so
+  // this displayed value equals the stored/leaderboard total_score.
+  const totalScore = core * SCORE_SCALE_K * difficultyMultiplier(input.starRating)
 
   return {
     s1: round4(s1),

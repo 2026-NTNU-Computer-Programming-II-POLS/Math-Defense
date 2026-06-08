@@ -38,6 +38,9 @@ class SessionHistoryEntry:
     kills: int
     waves_survived: int
     created_at: datetime
+    # V3: the scaled total_score for this run (NULL for pre-V3 / practice rows
+    # whose value was cleared). The self-view displays total_score ?? score.
+    total_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -52,3 +55,5 @@ class PersonalHistoryEntry:
     waves_survived: int
     created_at: datetime
     is_personal_best: bool
+    # V3: scaled total_score for display (total_score ?? score on the client).
+    total_score: float | None = None

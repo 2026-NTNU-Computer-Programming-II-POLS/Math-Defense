@@ -14,7 +14,7 @@ REST API server for Math Defense: authentication (incl. refresh-token rotation, 
 | Auth | PyJWT (HS256) + bcrypt + pyotp (TOTP) |
 | Rate Limiting | slowapi (per-IP) + per-account login throttle |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
-| WASM host | wasmtime-py 45.0.0 (FU-A — recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
+| WASM host | wasmtime-py 45.0.0 (recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
 | Testing | pytest 9 + pytest-asyncio (32 test files) |
 
 ---
@@ -73,7 +73,7 @@ backend/
 │   │   ├── class_service.py               CRUD, student join, reflections feed
 │   │   ├── admin_service.py               Teacher/class/student paginated views + set_user_active + create_teacher
 │   │   ├── territory_service.py           Activity lifecycle + slot occupation + rankings (+ with-meta + external)
-│   │   ├── territory_recommendation_service.py  Per-activity slot recommendation (Backlog §28)
+│   │   ├── territory_recommendation_service.py  Per-activity slot recommendation
 │   │   ├── assessment_service.py          Applies evidence to Beta posteriors; apply_evidence_in_open_uow for atomic chaining
 │   │   ├── recommender_service.py         Adaptive star-rating + talent-tree suggestions from posteriors
 │   │   ├── challenge_service.py           Challenge CRUD; soft-delete via deleted_at; immutability once played
@@ -89,7 +89,7 @@ backend/
 │   │   ├── email_service.py       Thin SMTP wrapper for welcome/account-exists/verification/MFA mail; no-op when SMTP env is unset
 │   │   ├── scheduler.py           Background asyncio task runner (territory settlement loop)
 │   │   ├── spectate_hub.py        In-process pub/sub for live-spectate WebSocket fan-out (bounded queue per subscriber)
-│   │   ├── wasm_runtime.py        FU-A — singleton wasmtime-py runtime hosting the same math_engine.wasm the frontend ships; exposes power_f64 for v2 score recompute. Thread-safe; raises ReplayUnavailableError when WASM cannot load so v2 fails closed.
+│   │   ├── wasm_runtime.py        Singleton wasmtime-py runtime hosting the same math_engine.wasm the frontend ships; exposes power_f64 for v2 score recompute. Thread-safe; raises ReplayUnavailableError when WASM cannot load so v2 fails closed.
 │   │   └── persistence/
 │   │       ├── user_repository.py             SQLAlchemy impl of UserRepository (incl. ia_recent_accuracy)
 │   │       ├── session_repository.py          SQLAlchemy impl + get_cumulative_stats() + compute_ia_recent_accuracy()
@@ -161,9 +161,6 @@ backend/
 │       ├── encryption.py          Fernet encrypt/decrypt for TOTP secrets at rest; verify_key_configured() fail-fast startup check
 │       └── integrity.py           is_constraint_violation() — matches PG constraint name on IntegrityError.orig.diag
 │
-├── data/
-│   └── math_engine.wasm           Shipped WASM blob (mirrors frontend/public/wasm) — backs wasm_runtime singleton
-│
 ├── alembic/                       Alembic migration environment (versions/ + env.py) — 47 revisions through d1a2b3c4e5f6_drop_avatar_url_from_users (current head)
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
@@ -200,7 +197,7 @@ backend/
 │   ├── test_challenge.py                  — challenge CRUD + soft-delete + role guards + immutability
 │   ├── test_study.py                      — enrollment, probe + affect submission, admin CSV export
 │   ├── test_recommender.py                — adaptive recommendation against synthetic posteriors
-│   └── test_wasm_runtime.py               — wasmtime-py singleton load + ReplayUnavailableError + thread-safety (FU-A); v2 strict-rejection lives in test_score_verify.py
+│   └── test_wasm_runtime.py               — wasmtime-py singleton load + ReplayUnavailableError + thread-safety; v2 strict-rejection lives in test_score_verify.py
 │
 ├── requirements.txt               Runtime dependencies (FastAPI 0.136, SQLAlchemy 2.0, psycopg v3, Alembic 1.18, PyJWT, slowapi, bcrypt, pyotp, zxcvbn, wasmtime 45, etc.)
 ├── requirements-dev.txt           Includes runtime + pytest 9 / pytest-asyncio 1.4
@@ -288,7 +285,7 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/auth/register` | 5/min | Submit registration. Enumeration-safe (M-05): always returns a fixed 202 with NO cookies and no user payload. New accounts get a welcome email, existing ones an account-exists notice; the user then signs in via `/login`. Verification is soft (no login gate) |
+| POST | `/api/auth/register` | 5/min | Submit registration. Enumeration-safe: always returns a fixed 202 with NO cookies and no user payload. New accounts get a welcome email, existing ones an account-exists notice; the user then signs in via `/login`. Verification is soft (no login gate) |
 | POST | `/api/auth/login` | 10/min | Authenticate; on success set cookies; if MFA required, return `mfa_required=true` + `mfa_token` |
 | POST | `/api/auth/logout` | 30/min | Revoke access JTI (deny-list) + revoke refresh token; clear cookies |
 | POST | `/api/auth/refresh` | 30/min | Rotate refresh token, mint new access cookie |
@@ -309,9 +306,9 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 |---|---|---|---|
 | POST | `/api/sessions` | 30/min | Create session: `star_rating` (1–5), optional `path_config`, `initial_answer`, `practice_mode`, `challenge_id`, `rng_seed`, `replay_version` (1 or 2). Abandons stale + existing active sessions first. |
 | GET | `/api/sessions/active` | 60/min | Fetch caller's active session (null if none) |
-| PATCH | `/api/sessions/{id}` | 120/min | Update any subset of `current_wave`, `score`, `kill_value`, `cost_total`. `gold` and `hp` are **not** accepted from the client (B-BUG-17) — both must derive from the authoritative replay event log. |
+| PATCH | `/api/sessions/{id}` | 120/min | Update any subset of `current_wave`, `score`, `kill_value`, `cost_total`. `gold` and `hp` are **not** accepted from the client — both must derive from the authoritative replay event log. |
 | POST | `/api/sessions/{id}/abandon` | 30/min | Idempotent abandon |
-| POST | `/api/sessions/{id}/end` | 30/min | Complete with `kills`, `waves_survived`, V2 fields (`kill_value`, `cost_total`, `time_total`, `health_origin/final`, `time_exclude_prepare`, `n_prep_phases`, `total_score`). `score` is accepted for back-compat but ignored — the server recomputes. Triggers `SessionEventBus`. |
+| POST | `/api/sessions/{id}/end` | 30/min | Complete with `kills`, `waves_survived`, V2 fields (`kill_value`, `cost_total`, `time_total`, `health_origin/final`, `time_exclude_prepare`, `n_prep_phases`). `score` and `total_score` are accepted for back-compat but the server recomputes the canonical `total_score` authoritatively (modern v2 clients omit both). Triggers `SessionEventBus`. |
 | POST | `/api/sessions/{id}/reflection` | 10/min | Attach free-text reflection (≤2000 chars); audit-logged when overwriting an existing entry |
 
 **Validation bounds** (enforced at schema + aggregate + DB layers):
@@ -417,7 +414,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | Method | Path | Rate | Description |
 |---|---|---|---|
 | GET | `/api/recommendation/me` | 60/min | Adaptive star-rating + talent-node suggestion from the caller's competency posteriors |
-| GET | `/api/recommendation/territory/{activity_id}` | 60/min | Slot suggestion for a Grabbing Territory activity (Backlog §28) — returns `null` if no recommendation applies |
+| GET | `/api/recommendation/territory/{activity_id}` | 60/min | Slot suggestion for a Grabbing Territory activity — returns `null` if no recommendation applies |
 
 ### Challenges — `/api/challenges`
 
@@ -501,7 +498,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `time_total` | Float | Total active time in seconds |
 | `time_exclude_prepare` | JSON | Array of prepare-phase durations excluded from scoring time |
 | `health_origin`, `health_final` | Integer | HP at level start and end (scoring formula inputs) |
-| `total_score` | Float | Server-recomputed final score (K^(1/exp) formula) |
+| `total_score` | Float | Server-recomputed canonical score: `max(0, killValue)^exponent · k · difficulty(star)` (× `SCALE` = 1). Server-authoritative — the modern client does not submit it |
 | `reflection_text` | String(2000) | Free-text reflection captured after a winning wave |
 | `practice_mode` | Boolean | Excluded from the global leaderboard; achievement/talent awards still fire |
 | `is_preview` | Boolean | Server-derived from caller's role at create — true when a teacher or admin ran the session. Same leaderboard-exclusion semantics as `practice_mode`; client cannot set this |
@@ -521,8 +518,8 @@ Indexes: `ix_game_session_user_id`, `ix_game_sessions_challenge_id`; partial uni
 | `session_id` | String | FK → GameSession (ON DELETE SET NULL), unique |
 | `level` | Integer | CHECK 1–5 (stores star_rating of the completed session) |
 | `score`, `kills`, `waves_survived` | Integer | |
-| `total_score` | Float | Nullable; V2 floating-point score. Rankings prefer it when present, falling back to raw `score` for older entries |
-| `challenge_id` | String (FK) | Nullable; ON DELETE CASCADE — deleting a challenge removes its leaderboard entries (B-BUG-4) so wave-restricted/uncapped challenge scores never leak into global rankings |
+| `total_score` | Float | Nullable; floating-point score. `COALESCE(total_score, score)` drives **both** the ranking and the displayed value, falling back to raw `score` for legacy rows |
+| `challenge_id` | String (FK) | Nullable; ON DELETE CASCADE — deleting a challenge removes its leaderboard entries so wave-restricted/uncapped challenge scores never leak into global rankings |
 | `created_at` | DateTime | |
 
 Unique on `session_id` — guarantees one leaderboard entry per completed session, which is what makes the event-driven auto-create idempotent.
@@ -578,7 +575,7 @@ docker compose up backend        # from project root (older installs: docker-com
 |---|---|---|
 | `SECRET_KEY` | Yes | JWT signing secret — minimum 32 characters; generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `DATABASE_URL` | Yes | SQLAlchemy URL, e.g. `postgresql+psycopg://mathdefense:changeme@postgres:5432/math_defense`. Scheme must be `postgresql+psycopg` (psycopg v3); the bare `postgresql://` alias resolves to unmaintained psycopg2. |
-| `DATABASE_URL_APP` | No | M-13 optional least-privilege runtime URL. When set, the runtime engine (`app/db/database.py`) connects with the DML-only `mathdefense_app` role while Alembic (`alembic/env.py`) keeps migrating as the admin `DATABASE_URL`. Same scheme + `changeme` rejection as `DATABASE_URL`. Unset/blank → runtime falls back to `DATABASE_URL`. |
+| `DATABASE_URL_APP` | No | Optional least-privilege runtime URL. When set, the runtime engine (`app/db/database.py`) connects with the DML-only `mathdefense_app` role while Alembic (`alembic/env.py`) keeps migrating as the admin `DATABASE_URL`. Same scheme + `changeme` rejection as `DATABASE_URL`. Unset/blank → runtime falls back to `DATABASE_URL`. |
 | `POSTGRES_PASSWORD` | Yes (Docker) | Password for the `postgres` service. Must match the password embedded in `DATABASE_URL`. |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins. No default — an absent value raises at startup rather than silently defaulting to localhost in prod. |
 | `ALGORITHM` | No | JWT algorithm (default `HS256`) |
@@ -618,7 +615,7 @@ pytest tests/test_challenge.py -v            # challenge CRUD + soft-delete + im
 pytest tests/test_study.py -v                # validity probe enrollment + export
 pytest tests/test_recommender.py -v          # adaptive star/talent recommendation
 pytest tests/test_refresh_token.py -v        # refresh-token rotation + reuse
-pytest tests/test_wasm_runtime.py -v         # FU-A WASM runtime lifecycle
+pytest tests/test_wasm_runtime.py -v         # WASM runtime lifecycle
 ```
 
 The test suite targets a dedicated PostgreSQL database (the dev DB name with a `_test` suffix; auto-created on first run). Each test truncates all tables before it starts so the suite shares one connection pool without cross-test pollution. Notable coverage includes:

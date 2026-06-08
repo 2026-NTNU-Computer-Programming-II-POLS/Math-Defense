@@ -31,6 +31,8 @@ export interface ClassReflection {
   student_name: string
   star_rating: number
   score: number
+  // V3 canonical score; shown as total_score ?? score to match the leaderboard.
+  total_score: number | null
   reflection_text: string
   ended_at: string | null
 }

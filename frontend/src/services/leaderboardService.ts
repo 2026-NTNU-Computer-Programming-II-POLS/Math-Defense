@@ -6,6 +6,10 @@ export interface LeaderboardEntry {
   player_name: string
   level: number
   score: number
+  // V3 canonical score. Rankings use COALESCE(total_score, score), so the UI
+  // displays `total_score ?? score` to match the rank order and the
+  // end-of-game Total Score. NULL for pre-V3 / fallback rows.
+  total_score: number | null
   kills: number
   waves_survived: number
   created_at: string
@@ -20,6 +24,9 @@ export interface PersonalHistoryEntry {
   id: string
   level: number
   score: number
+  // V3 canonical score; displayed as `total_score ?? score`. NULL for pre-V3
+  // and practice/preview rows whose value was cleared.
+  total_score: number | null
   kills: number
   waves_survived: number
   created_at: string

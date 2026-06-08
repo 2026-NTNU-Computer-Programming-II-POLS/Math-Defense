@@ -13,6 +13,11 @@ interface Props {
 }
 const props = defineProps<Props>()
 
+// V3: show the canonical total_score, falling back to the integer score for
+// pre-V3 / cleared rows. Keeps the chart, axis, and row labels on one metric
+// that matches the global board and the end-of-game Total Score.
+const displayScore = (e: PersonalHistoryEntry): number => e.total_score ?? e.score
+
 const W = 640
 const H = 220
 const PAD_L = 40
@@ -31,7 +36,7 @@ interface Point {
 const chronological = computed<PersonalHistoryEntry[]>(() => [...props.entries].reverse())
 
 const maxScore = computed(() => {
-  const scores = chronological.value.map(e => e.score)
+  const scores = chronological.value.map(displayScore)
   return scores.length ? Math.max(...scores, 1) : 1
 })
 
@@ -43,7 +48,7 @@ const points = computed<Point[]>(() => {
   const denom = list.length === 1 ? 1 : list.length - 1
   return list.map((entry, i) => {
     const x = PAD_L + (innerW * i) / denom
-    const y = PAD_T + innerH - (innerH * entry.score) / maxScore.value
+    const y = PAD_T + innerH - (innerH * displayScore(entry)) / maxScore.value
     return { x, y, entry }
   })
 })
@@ -116,7 +121,7 @@ const personalBestPoints = computed(() => points.value.filter(p => p.entry.is_pe
           <span v-if="e.is_personal_best" class="pt-pb-marker">★</span>
         </span>
         <span class="pt-row-level">Lv.{{ e.level }}</span>
-        <span class="pt-row-score">{{ formatScore(e.score) }}</span>
+        <span class="pt-row-score">{{ formatScore(displayScore(e)) }}</span>
         <span class="pt-row-date">{{ new Date(e.created_at).toLocaleDateString() }}</span>
       </li>
     </ul>

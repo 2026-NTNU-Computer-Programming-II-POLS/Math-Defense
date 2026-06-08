@@ -121,7 +121,7 @@ erDiagram
         int     score
         int     kills
         int     waves_survived
-        float   total_score        "nullable — V2 floating-point score"
+        float   total_score        "nullable — canonical score; COALESCE(total_score, score) basis"
         string  session_id     FK  "→ game_sessions.id SET NULL, UNIQUE"
         string  challenge_id   FK  "→ challenges.id CASCADE, nullable"
         datetime created_at
@@ -373,9 +373,9 @@ Central identity table. Stores authentication credentials, MFA state, and profil
 | `mfa_enabled` | `Boolean` | NO | DEFAULT `false` |
 | `totp_last_used_at` | `DateTime(tz)` | YES | TOTP step-replay guard — set on every accepted code |
 | `ia_recent_accuracy` | `Float` | NO | SERVER DEFAULT `0.0`; `CHECK(0.0 ≤ ia_recent_accuracy ≤ 1.0)` (`ck_user_ia_accuracy_range`). Rolling fraction of last 10 IA-correct sessions; drives Star-1 concrete-fading on the path renderer |
-| `endpoint_marker_style` | `String(16)` | YES | `CHECK(endpoint_marker_style IS NULL OR endpoint_marker_style IN ('star','gorilla','custom'))` (`ck_user_endpoint_marker_style`). Endpoint marker (P\*) display preference, persisted server-side so the choice follows the player across devices. NULL = FE local default. Added in `ff6a7b8c9d0e` |
-| `endpoint_marker_custom_dataurl` | `Text` | YES | Custom endpoint-marker image stored as a data URL; only meaningful when `endpoint_marker_style = 'custom'`. Added in `ff6a7b8c9d0e` |
-| `endpoint_hit_fx` | `String(16)` | YES | `CHECK(endpoint_hit_fx IS NULL OR endpoint_hit_fx IN ('random','fragments','crying','angry'))` (`ck_user_endpoint_hit_fx`). Endpoint hit-effect preference. NULL = FE local default. Added in `ff6a7b8c9d0e` |
+| `endpoint_marker_style` | `String(16)` | YES | `CHECK(endpoint_marker_style IS NULL OR endpoint_marker_style IN ('star','gorilla','custom'))` (`ck_user_endpoint_marker_style`). Endpoint marker (P\*) display preference, persisted server-side so the choice follows the player across devices. NULL = FE local default. |
+| `endpoint_marker_custom_dataurl` | `Text` | YES | Custom endpoint-marker image stored as a data URL; only meaningful when `endpoint_marker_style = 'custom'`. |
+| `endpoint_hit_fx` | `String(16)` | YES | `CHECK(endpoint_hit_fx IS NULL OR endpoint_hit_fx IN ('random','fragments','crying','angry'))` (`ck_user_endpoint_hit_fx`). Endpoint hit-effect preference. NULL = FE local default. |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated on write by a PG `BEFORE UPDATE` trigger (`users_update_timestamp`, created in `b2_fix_h06_h07_h10`) |
 
@@ -516,10 +516,10 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `health_origin` | `Integer` | YES | — |
 | `health_final` | `Integer` | YES | — |
 | `time_exclude_prepare` | `JSON` | YES | list of per-wave time floats |
-| `total_score` | `Float` | YES | — |
+| `total_score` | `Float` | YES | Server-recomputed canonical score: `max(0, kill_value)^exponent · k · SCALE(=1) · difficulty(star)`. NULL when V2 inputs are incomplete or for pre-V3 rows |
 | `reflection_text` | `String(2000)` | YES | Free-text reflection captured after a winning wave (articulation prompt) |
 | `rng_seed` | `BigInteger` | YES | Per-session deterministic RNG seed forwarded by the client at session creation; replayed by `EventPlayer` to rebuild the PRNG stream. `BigInteger` because the client emits a 32-bit unsigned value that does not fit in every dialect's `INTEGER`. NULL on legacy rows / clients that do not opt into replay |
-| `replay_version` | `SmallInteger` | NO | SERVER DEFAULT `1`. `1` = legacy mulberry32 PRNG + JS `Math.*` transcendentals (ε=5e-4 acceptance); `2` = PCG XSL-RR 64/32 in WASM + musl transcendentals compiled into the .wasm (bit-exact across browsers). Tagged at session creation: client tags `2` only when WASM has loaded; backend `_verify_score` rejects v2 mismatches with HTTP 422 `replay_mismatch` (FU-A) |
+| `replay_version` | `SmallInteger` | NO | SERVER DEFAULT `1`. `1` = legacy mulberry32 PRNG + JS `Math.*` transcendentals (ε=5e-4 acceptance); `2` = PCG XSL-RR 64/32 in WASM + musl transcendentals compiled into the .wasm (bit-exact across browsers). Tagged at session creation: client tags `2` only when WASM has loaded; backend `_verify_score` rejects v2 mismatches with HTTP 422 `replay_mismatch` |
 | `started_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `ended_at` | `DateTime(tz)` | YES | set on completion / abandonment |
 
@@ -530,7 +530,7 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 
 ### `leaderboard_entries`
 
-Top scores per user per difficulty level. `user_id` and `session_id` use `SET NULL` so history survives account or session deletion. `challenge_id` uses **CASCADE** (audit B-BUG-4, migration `w7f8a9b0c1d2`): when a challenge is deleted, its leaderboard rows are removed rather than leaking into the global/per-level board, since those rows were scored under challenge-specific wave/score caps.
+Top scores per user per difficulty level. `user_id` and `session_id` use `SET NULL` so history survives account or session deletion. `challenge_id` uses **CASCADE**: when a challenge is deleted, its leaderboard rows are removed rather than leaking into the global/per-level board, since those rows were scored under challenge-specific wave/score caps.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -540,9 +540,9 @@ Top scores per user per difficulty level. `user_id` and `session_id` use `SET NU
 | `score` | `Integer` | NO | — |
 | `kills` | `Integer` | NO | — |
 | `waves_survived` | `Integer` | NO | — |
-| `total_score` | `Float` | YES | M-02 V2 floating-point score (kill_value/time/efficiency/health factors). Rankings prefer this when present and fall back to raw `score` for legacy rows. Added in `b2_fix_h06_h07_h10` |
+| `total_score` | `Float` | YES | Floating-point score. `COALESCE(total_score, score)` is the basis for **both** the ranking and the displayed value (integer `score` is the legacy fallback). V3 formula: `killValue^exponent · k · difficulty(star)` |
 | `session_id` | `String` (FK) | YES | → `game_sessions.id` ON DELETE **SET NULL**; UNIQUE |
-| `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **CASCADE**; non-NULL when the originating session was launched from a challenge. Per-challenge ranks are served by `query_ranked_by_challenge` so global / per-level boards still work. Cascade ensures deleted challenges do not leak score-capped rows back into the global leaderboard (migration `w7f8a9b0c1d2`) |
+| `challenge_id` | `String` (FK) | YES | → `challenges.id` ON DELETE **CASCADE**; non-NULL when the originating session was launched from a challenge. Per-challenge ranks are served by `query_ranked_by_challenge` so global / per-level boards still work. Cascade ensures deleted challenges do not leak score-capped rows back into the global leaderboard |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `CHECK(1 ≤ level ≤ 5)` (`ck_leaderboard_level_range`), `UNIQUE(session_id)` (`uq_leaderboard_session_id`)  
@@ -600,7 +600,7 @@ A teacher-created territory game scoped to a class. After the `deadline`, settle
 | `settled` | `Boolean` | NO | DEFAULT `false` |
 | `settled_at` | `DateTime(tz)` | YES | — |
 | `settled_by` | `String` (FK) | YES | → `users.id` ON DELETE **SET NULL** (`fk_gt_activities_settled_by`) |
-| `student_slot_cap` | `Integer` | NO | DEFAULT `5`; SERVER DEFAULT `5`; `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Per-activity, teacher-configurable cap on how many slots a single student may simultaneously occupy. Default of 5 preserves the legacy hard-coded `TERRITORY_CAP_PER_STUDENT` value. Added in `ee5f6a7b8c9d` |
+| `student_slot_cap` | `Integer` | NO | DEFAULT `5`; SERVER DEFAULT `5`; `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Per-activity, teacher-configurable cap on how many slots a single student may simultaneously occupy. Default of 5 preserves the legacy hard-coded `TERRITORY_CAP_PER_STUDENT` value. |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`)  
@@ -618,7 +618,7 @@ Individual problem slots within a territory activity. Each slot has its own diff
 | `activity_id` | `String` (FK) | NO | → `grabbing_territory_activities.id` ON DELETE **CASCADE** |
 | `star_rating` | `Integer` | NO | `CHECK(1 ≤ star_rating ≤ 5)` |
 | `path_config` | `JSON` | YES | — |
-| `slot_index` | `Integer` | NO | `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`) — tightened from the original `>= 0` in migration `dd4e5f6a7b8c` so the 50-slot cap (set by Pydantic `CreateActivityRequest.max_length=50`) is also enforced at the DB layer |
+| `slot_index` | `Integer` | NO | `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`) — tightened from the original `>= 0` so the 50-slot cap (set by Pydantic `CreateActivityRequest.max_length=50`) is also enforced at the DB layer |
 
 **Constraints:** `UNIQUE(activity_id, slot_index)` (`uq_territory_slot_activity_index`), `CHECK(1 ≤ star_rating ≤ 5)` (`ck_territory_slot_star_range`), `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`)  
 **Indexes:** `ix_territory_slots_activity_id`
@@ -640,7 +640,7 @@ Records which student currently holds each slot, and via which game session. Bot
 
 **Constraints:** `UNIQUE(slot_id)` (`uq_territory_occupation_slot`), `UNIQUE(session_id)` (`uq_territory_occupation_session`)  
 **Indexes:** `ix_territory_occupations_student_id`, `ix_territory_occupations_student_slot (student_id, slot_id)` (created in `x8a9b0c1d2e3f`; present in the DB but **not declared on the ORM model**, so Alembic autogenerate will flag it).  
-The standalone `ix_territory_occupations_slot_id` was dropped in `d4_drop_redundant_constraints` (L-21) — the `uq_territory_occupation_slot` unique constraint already creates a B-tree index that covers single-column `slot_id` lookups.
+No standalone `ix_territory_occupations_slot_id` index exists — the `uq_territory_occupation_slot` unique constraint already creates a B-tree index that covers single-column `slot_id` lookups.
 
 ---
 
@@ -648,7 +648,7 @@ The standalone `ix_territory_occupations_slot_id` was dropped in `d4_drop_redund
 
 **Session replay guard.** A durable record of every `session_id` ever used for a territory capture. Kept separate from `territory_occupations` so displaced occupations (deleted on counter-seize) cannot un-mark a session as used.
 
-The FK was added as **RESTRICT** in `y9b0c1d2e3f4` (BD-8), but was later relaxed to **CASCADE** in `e5_territory_session_use_cascade` (2026-05-21). Rationale: `GameSession.user_id` is `ON DELETE CASCADE`, so deleting a user cascades into `game_sessions`; a RESTRICT here blocked deleting any user who ever captured territory. CASCADE is safe because once the `game_session` row is gone there is no `rng_seed` or `session_events` left to replay, so the use-record has nothing left to protect.
+The FK is **CASCADE** to `game_sessions.id`. Rationale: `GameSession.user_id` is `ON DELETE CASCADE`, so deleting a user cascades into `game_sessions`; a RESTRICT here would block deleting any user who ever captured territory. CASCADE is safe because once the `game_session` row is gone there is no `rng_seed` or `session_events` left to replay, so the use-record has nothing left to protect.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -658,7 +658,7 @@ The FK was added as **RESTRICT** in `y9b0c1d2e3f4` (BD-8), but was later relaxed
 
 ### `territory_rankings_snapshot`
 
-Point-in-time ranking snapshot per `(activity, student)`. Written at settle time so the rankings endpoint can compute rank deltas against the most recent prior snapshot without a periodic worker. Older snapshots are retained for historical queries. Introduced in migration `x8a9b0c1d2e3f`.
+Point-in-time ranking snapshot per `(activity, student)`. Written at settle time so the rankings endpoint can compute rank deltas against the most recent prior snapshot without a periodic worker. Older snapshots are retained for historical queries.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -833,7 +833,7 @@ Empirical Validity Probe enrollment cache. One row per (user, study). `group` is
 | `dosage_seconds` | `Integer` | NO | SERVER DEFAULT `0` |
 | `enrolled_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
-**Constraints:** Composite `PRIMARY KEY(user_id, study_id)`. The redundant explicit `UNIQUE(user_id, study_id)` (`uq_study_enrollment`) was dropped in `d4_drop_redundant_constraints` (L-22) — the PK index already enforces it.
+**Constraints:** Composite `PRIMARY KEY(user_id, study_id)`. There is no separate `UNIQUE(user_id, study_id)` constraint — the composite PK index already enforces uniqueness.
 
 ---
 
@@ -878,8 +878,6 @@ Likert affect surveys (anxiety + intrinsic motivation, IMI subscale). Two phases
 
 Append-only security event log written by `app.infrastructure.audit_logger.record_audit_event` in its own isolated SQLAlchemy session so audit rows commit independently of the surrounding business transaction. `user_id` is a plain string with **no FK constraint** so audit records survive user deletion.
 
-Created by migration `z0c1d2e3f4a5_create_audit_logs_table`.
-
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
 | `id` | `String(36)` | NO | PK |
@@ -898,7 +896,7 @@ Created by migration `z0c1d2e3f4a5_create_audit_logs_table`.
 
 ### `Role`
 Defined in `app/domain/user/value_objects.py`, used as `users.role`.  
-PostgreSQL type name: `user_role` (created by migration `f7a3b8c2d1e6`; ORM model uses `create_type=False`).
+PostgreSQL type name: `user_role` (ORM model uses `create_type=False`).
 
 | Value | Meaning |
 |---|---|
@@ -908,7 +906,7 @@ PostgreSQL type name: `user_role` (created by migration `f7a3b8c2d1e6`; ORM mode
 
 ### `SessionStatus`
 Defined in `app/domain/value_objects.py`, used as `game_sessions.status`.  
-PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec5`).
+PostgreSQL type name: `sessionstatus`.
 
 | Value | Meaning |
 |---|---|
@@ -967,7 +965,7 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 
 | Policy | Used for | Rationale |
 |---|---|---|
-| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id`; `leaderboard_entries.challenge_id`; `territory_rankings_snapshot.activity_id` / `.student_id`; **`territory_session_uses.session_id`** (relaxed from RESTRICT in `e5_territory_session_use_cascade`); the new `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` all CASCADE on `classes.id` / `users.id` | Deleting a parent cleans up all child rows automatically. `leaderboard_entries.challenge_id` was changed from SET NULL to CASCADE in `w7f8a9b0c1d2` (B-BUG-4). `territory_session_uses.session_id` was changed from RESTRICT to CASCADE in `e5_territory_session_use_cascade` because RESTRICT blocked user-deletion cascades; the replay risk is already gone once the parent `game_session` row is deleted |
+| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id`; `leaderboard_entries.challenge_id`; `territory_rankings_snapshot.activity_id` / `.student_id`; **`territory_session_uses.session_id`**; the new `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` all CASCADE on `classes.id` / `users.id` | Deleting a parent cleans up all child rows automatically. `leaderboard_entries.challenge_id` is CASCADE so deleted challenges drop their rows instead of leaking into the board. `territory_session_uses.session_id` is CASCADE because RESTRICT would block user-deletion cascades; the replay risk is already gone once the parent `game_session` row is deleted |
 | **SET NULL** | `leaderboard_entries.user_id`, `leaderboard_entries.session_id`, `game_sessions.challenge_id`, `territory_occupations.session_id`, `grabbing_territory_activities.settled_by` | Preserve history / audit trail when the referenced entity is removed |
 | **RESTRICT** | `classes.teacher_id` | Prevents deleting a teacher who still owns classes — operator must reassign first |
 | *(none / soft)* | `audit_logs.user_id` | Intentionally unlinked — must survive user deletion |
@@ -1035,17 +1033,18 @@ PostgreSQL type name: `sessionstatus` (created by initial migration `aec17830bec
 | `s3b4c5d6e7f8` | `challenges` table + `challenge_id` columns on `game_sessions` and `leaderboard_entries` |
 | `t4c5d6e7f8a9` | Replay foundation — `game_sessions.rng_seed` + append-only `session_events` table |
 | `u5d6e7f8a9b0` | Empirical Validity Probe — `study_enrollments` / `study_probe_attempts` / `study_affect_responses` |
-| `v6e7f8a9b0c1` | Replay protocol versioning — `game_sessions.replay_version SMALLINT NOT NULL DEFAULT 1`. Splits sessions into v1 (mulberry32+JS Math, ε=5e-4) vs v2 (PCG+WASM, bit-exact). Phase 4 of the construction plan; FU-A server-side recompute rejects v2 mismatches with HTTP 422 |
-| `w7f8a9b0c1d2` | Leaderboard challenge-cascade (B-BUG-4) — change `leaderboard_entries.challenge_id` FK from `SET NULL` to `CASCADE` so deleted challenges drop their (capped-scoring) rows instead of leaking them into the global/per-level board |
+| `v6e7f8a9b0c1` | Replay protocol versioning — `game_sessions.replay_version SMALLINT NOT NULL DEFAULT 1`. Splits sessions into v1 (mulberry32+JS Math, ε=5e-4) vs v2 (PCG+WASM, bit-exact). Server-side recompute rejects v2 mismatches with HTTP 422 |
+| `w7f8a9b0c1d2` | Leaderboard challenge-cascade — change `leaderboard_entries.challenge_id` FK from `SET NULL` to `CASCADE` so deleted challenges drop their (capped-scoring) rows instead of leaking them into the global/per-level board |
 | `x8a9b0c1d2e3f` | Territory ranking aggregation support — add composite index `ix_territory_occupations_student_slot (student_id, slot_id)` and new `territory_rankings_snapshot` table (+ `ix_snap_activity_time`, `ix_snap_activity_student_time`) so rankings endpoint computes rank deltas without a periodic worker |
-| `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK (BD-8) — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
-| `z0c1d2e3f4a5` | Create `audit_logs` table (C-01) — the ORM model and `audit_logger` existed since early development but no migration ever created the table; all audit events were silently dropped. Adds composite indexes `(user_id, created_at)` and `(event_type, created_at)` |
+| `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
+| `z0c1d2e3f4a5` | Create `audit_logs` table — the ORM model and `audit_logger` existed since early development but no migration ever created the table; all audit events were silently dropped. Adds composite indexes `(user_id, created_at)` and `(event_type, created_at)` |
 | `aa1d2e3f4a6` | Server-derived preview flag (`game_sessions.is_preview`) — true when a non-student (teacher/admin) created the session. `LeaderboardInsertHandler` skips these so they never reach public ranking tables; mirrors `practice_mode` exclusion semantics. Branches off `z0c1d2e3f4a5` in parallel with the `a1_widen_totp` chain |
-| `a1_widen_totp` | Widen `users.totp_secret` from `String(64)` → `String(255)` to fit Fernet-encrypted ciphertext (H-01). Linear chain on top of `z0c1d2e3f4a5` |
-| `b2_fix_h06_h07_h10` | Fix H-06 / H-07 / H-10 / M-02: adds `ix_game_sessions_challenge_id`; adds Postgres `BEFORE UPDATE` triggers on `users`, `talent_allocations`, `user_competency_state` to keep `updated_at` current; backfills `NOT NULL` on `game_sessions.status / current_wave / gold / hp / score`; adds `leaderboard_entries.total_score Float NULL` |
-| `c3_add_check_constraints` | M-15/M-16/M-17 CHECK constraints — non-negativity on `game_sessions.score / kills / waves_survived / hp / gold`; `alpha > 0`, `beta > 0` on `user_competency_state`; `ia_recent_accuracy BETWEEN 0.0 AND 1.0` on `users` |
-| `d4_drop_redundant_constraints` | L-21/L-22 cleanup — drop `ix_territory_occupations_slot_id` (covered by `uq_territory_occupation_slot`) and `uq_study_enrollment` (covered by composite PK) |
+| `a1_widen_totp` | Widen `users.totp_secret` from `String(64)` → `String(255)` to fit Fernet-encrypted ciphertext. Linear chain on top of `z0c1d2e3f4a5` |
+| `b2_fix_h06_h07_h10` | Schema + trigger fixes: adds `ix_game_sessions_challenge_id`; adds Postgres `BEFORE UPDATE` triggers on `users`, `talent_allocations`, `user_competency_state` to keep `updated_at` current; backfills `NOT NULL` on `game_sessions.status / current_wave / gold / hp / score`; adds `leaderboard_entries.total_score Float NULL` |
+| `c3_add_check_constraints` | CHECK constraints — non-negativity on `game_sessions.score / kills / waves_survived / hp / gold`; `alpha > 0`, `beta > 0` on `user_competency_state`; `ia_recent_accuracy BETWEEN 0.0 AND 1.0` on `users` |
+| `d4_drop_redundant_constraints` | Redundant-index cleanup — drop `ix_territory_occupations_slot_id` (covered by `uq_territory_occupation_slot`) and `uq_study_enrollment` (covered by composite PK) |
 | `e5_territory_session_use_cascade` | Relax `territory_session_uses.session_id` FK from RESTRICT → CASCADE. RESTRICT blocked user-deletion cascades (`GameSession.user_id` is CASCADE), and the replay risk is moot once the parent session row is deleted |
+| `f3d4e5a6b7c8` | V3 score-scale reset (down_revision `e2c3d4f5a6b7`). NULLs legacy `total_score` on `game_sessions` + `leaderboard_entries` so `COALESCE(total_score, score)` falls back to the integer `score` on a comparable scale, and resets territory standings (`DELETE` from `territory_occupations`, `territory_session_uses`, `territory_rankings_snapshot` — their `score`/`territory_value` were old-scale snapshots). Data-only; `downgrade()` is a no-op |
 | `bb2c3d4e5f7a` | **Merge migration** for the two heads `aa1d2e3f4a6` and `e5_territory_session_use_cascade`. Also expands `classes` for Tier-C class management: adds `description / subject / school_year / capacity / color / icon / archived_at` plus `ck_classes_capacity_positive` and `ix_classes_archived_at`; creates `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` |
 | `cc3d4e5f6a8b` | Balance Overhaul Phase 4 (Q10): `DELETE FROM talent_allocations WHERE talent_node_id = 'calculus_pet_hp'`. Node was renamed `calculus_pet_range`; orphaned allocations are removed so spent-TP recovery (`achievement_service.compute_remaining_talent_points`) reflects the rename automatically |
 | `dd4e5f6a7b8c` | Tighten `territory_slots.slot_index` CHECK from `>= 0` to `BETWEEN 0 AND 49`. Combined with the existing `UNIQUE(activity_id, slot_index)` and sequential 0-based assignment, this caps per-activity slot count at 50 at the DB layer (matching `CreateActivityRequest.max_length=50`) so paths that bypass the application service still can't exceed the limit. Renames constraint `ck_territory_slot_index_nonneg` → `ck_territory_slot_index_range` |

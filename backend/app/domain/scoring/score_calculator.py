@@ -1,4 +1,4 @@
-"""Server-side V2 score formula — mirrors the WASM canonical definition.
+"""Server-side V3 score formula — mirrors the WASM canonical definition.
 
 F-ARCH-3 / B-ARCH-6: the canonical implementation lives in
 ``wasm/math_engine.c::compute_total_score``. When the application layer
@@ -20,7 +20,14 @@ Used to verify frontend-submitted scores for anti-cheat logging. Returns
 None when any required input is absent so callers can skip gracefully.
 
 Design notes:
-  kill_value=0  → score is always 0 (0**x = 0). Zero-kill runs score nothing by design.
+  V3: the score base is kill_value (volume), softened by the
+  survival/first-answer exponent and scaled by the rate-blend k:
+      core = kill_value**(1/sqrt(denom)) * k
+  The old V2 used base=k, which ignored volume and inverted the HP penalty
+  when k<1. ``recompute_total_score`` returns this canonical 7-input *core*;
+  the caller multiplies by SCORE_SCALE_K and difficulty_multiplier(star) to
+  get the stored/displayed total_score (see session_service._verify_score).
+  kill_value=0  → core is always 0 (0**x = 0). Zero-kill runs score nothing by design.
   cost_total=0  → s2=0, alpha=1, k=s1 (no penalty; the dominant rate carries
                   the blend). The pre-Q3 piecewise weight applied a 30% penalty
                   here; the continuous alpha blend removes that cliff.
@@ -107,4 +114,37 @@ def recompute_total_score(
     # Q1: sqrt-softened exponent (was 1/denom). Smooths the HP-loss penalty so
     # high-difficulty plays are no longer crushed.
     exponent = 1.0 / math.sqrt(max(1, exponent_denom))
-    return float(pow_fn(max(0.0, k), exponent))
+    # V3: base is kill_value (volume), softened by the exponent and
+    # scaled by k. See wasm/math_engine.c::compute_total_score for the
+    # rationale (old V2 used base=k, ignoring volume and inverting the HP
+    # penalty when k<1). The scale K and difficulty multiplier are applied by
+    # the caller, NOT here — this returns the canonical 7-input core.
+    return float(pow_fn(max(0.0, kill_value), exponent) * k)
+
+
+# ── V3 post-core transforms (applied by the application layer, NOT inside the
+# canonical core above, so the parity fixtures keep testing the pure 7-input
+# formula). Mirrored on the frontend in domain/scoring/score-calculator.ts —
+# keep both in lock-step. ──
+
+# Magnitude constant applied on top of the canonical core. The V3 core
+# (killValue**exponent * k) already spans roughly tens to ~1e5 at realistic
+# kill_values — the same order of magnitude as the legacy integer ``score``
+# (per-level caps 5,000-100,000) — so
+# COALESCE(total_score, score) mixes old and new rows without inversion and no
+# extra inflation is needed (K = 1, identity). Kept as a named, front/back-
+# mirrored knob for future retuning. WARNING: K > 1 risks the TOTAL_SCORE_MAX
+# (1e6) clamp on high-star runs — the L5 realistic-max core is ~135k, so even
+# K=10 would slam L4/L5 into the cap and flatten top-end ranking. Pure scale —
+# does NOT change ranking order.
+SCORE_SCALE_K = 1.0
+
+
+def difficulty_multiplier(star_rating: int) -> float:
+    """Reward higher-difficulty (higher star) runs. 1★→1.0 … 5★→2.0.
+
+    0.25 and the integer (star-1) are exact in IEEE-754, so this multiplier is
+    a bit-exact double on both the frontend and the backend — the server-side
+    application of K * difficulty stays reproducible across languages.
+    """
+    return 1.0 + 0.25 * (star_rating - 1)

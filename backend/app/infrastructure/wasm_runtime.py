@@ -45,7 +45,7 @@ _lock = threading.Lock()
 _pow_fn: Callable[[float, float], float] | None = None
 _load_attempted = False
 
-# F-ARCH-3: cached binding for the canonical V2 score formula export. When
+# F-ARCH-3: cached binding for the canonical V3 score formula export. When
 # present, both client and server route the entire formula through this single
 # C function, removing the algebraic duplication the audit flagged. When the
 # .wasm hasn't been rebuilt with the export yet, get_total_score_fn() returns

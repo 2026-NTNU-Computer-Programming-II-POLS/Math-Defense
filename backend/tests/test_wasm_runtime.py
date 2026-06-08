@@ -89,9 +89,11 @@ class TestWasmRuntimeWhenLoaded:
 
     def test_pow_handles_realistic_score_input(self):
         # Realistic score-formula path: kill_value=500, active_time=55,
-        # cost_total=200, HP delta 0 → exponent_denom=3, k≈4.55.
+        # cost_total=200, HP delta 0 → exponent_denom=3, k≈7.67. V3 core =
+        # killValue**(1/sqrt(3)) * k ≈ 277.3 (the magnitude scale K and the
+        # difficulty multiplier are applied by the caller, not by this core).
         fn = get_pow_fn()
         recomputed = recompute_total_score(pow_fn=fn, **_V2)
         assert recomputed is not None
         # Sanity: positive, within plausible band for these inputs.
-        assert 1.0 < recomputed < 10.0
+        assert 200.0 < recomputed < 350.0

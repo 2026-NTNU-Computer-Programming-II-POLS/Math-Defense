@@ -298,7 +298,12 @@ function _computeTotalScoreJsFallback(
   const k = alpha * s1 + (1 - alpha) * s2
   // Q1: sqrt-softened exponent (was 1/denom).
   const exponentDenom = Math.max(1, 1 + (2 + healthOrigin - healthFinal - initialAnswer))
-  return powerF64(Math.max(0, k), 1 / Math.sqrt(exponentDenom))
+  // V3: base is killValue (volume), softened by the exponent and
+  // scaled by k. See math_engine.c::compute_total_score for the rationale
+  // (the old V2 used base=k, which ignored volume and inverted the HP penalty
+  // when k<1). The scale K and difficulty multiplier are NOT applied here —
+  // this returns the canonical 7-input core.
+  return powerF64(Math.max(0, killValue), 1 / Math.sqrt(exponentDenom)) * k
 }
 
 // ── Bit-deterministic PRNG (PCG XSL-RR 64/32) ──

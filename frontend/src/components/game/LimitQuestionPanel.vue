@@ -178,7 +178,13 @@ function submitTyped(): void {
   border-radius: 0 3px 3px 0;
 }
 .burst-hint--instakill { border-left-color: #ffcb47; color: #ffe9a8; }
-.burst-hint strong { color: var(--gold); font-weight: bold; }
+.burst-hint strong {
+  color: var(--gold-bright);
+  font-weight: bold;
+  background: var(--gold-tint);
+  padding: 0 3px;
+  border-radius: 3px;
+}
 .change-btn { font-size: var(--text-xs); padding: 6px 12px; align-self: flex-start; }
 .typed-entry { display: flex; gap: 6px; }
 .typed-input {

@@ -640,7 +640,7 @@ numericalIntegrate(a, b, c, lo, hi, n?) // trapezoid ∫(ax²+bx+c)dx (Calculus 
 // ── Scoring ──
 powerF64(base, exp)                      // bit-deterministic pow via musl; used by score-calculator.ts
 computeTotalScoreWasm(killValue, timeTotal, prepSum, costTotal,
-                      healthOrigin, healthFinal, initialAnswer)  // V2 score formula (FU-A parity)
+                      healthOrigin, healthFinal, initialAnswer)  // score CORE (parity); score-calculator.ts then ×SCALE(=1)×difficulty(star) for display
 
 // ── PRNG (PCG XSL-RR 64/32, replay v2) ──
 createPrng(seed, stream?)                // allocates a PrngHandle (WasmPrngHandle or JsPrngHandle)

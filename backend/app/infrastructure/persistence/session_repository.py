@@ -278,6 +278,7 @@ class SqlAlchemySessionRepository:
                 kills=int(r.kills),
                 waves_survived=int(r.waves_survived),
                 created_at=_ensure_utc(r.ended_at) or _ensure_utc(r.started_at),
+                total_score=r.total_score,
             )
             for r in rows
         ], int(total)

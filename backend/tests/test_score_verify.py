@@ -11,7 +11,11 @@ from __future__ import annotations
 
 import pytest
 
-from app.domain.scoring.score_calculator import recompute_total_score
+from app.domain.scoring.score_calculator import (
+    SCORE_SCALE_K,
+    difficulty_multiplier,
+    recompute_total_score,
+)
 from app.infrastructure.wasm_runtime import get_pow_fn, is_wasm_loaded
 from app.models.game_session import GameSession as GameSessionModel
 
@@ -24,6 +28,13 @@ _V2 = dict(
     health_origin=20,
     health_final=20,
 )
+
+
+def _scaled(core: float) -> float:
+    """Apply the V3 server-side transform the way _verify_score does. All
+    sessions here are created at star_rating=1, so difficulty is 1.0 and the
+    stored total_score is simply ``core * SCORE_SCALE_K``."""
+    return core * SCORE_SCALE_K * difficulty_multiplier(1)
 
 
 def _register_and_token(client, name: str) -> str:
@@ -90,7 +101,8 @@ class TestVerifyScore:
 
         stored = _db_total_score(session_factory, sid)
         assert stored is not None
-        assert abs(stored - expected) < 1e-3
+        # Server stores the V3-scaled value, not the raw core.
+        assert abs(stored - _scaled(expected)) < 1e-2
 
     def test_matching_total_score_stored_unchanged(self, client, session_factory):
         token = _register_and_token(client, "sv_v2_match")
@@ -99,12 +111,17 @@ class TestVerifyScore:
         expected = recompute_total_score(initial_answer=False, **_V2)
         assert expected is not None
 
-        status = _end(client, token, sid, total_score=round(expected, 6), **_V2)
+        # A legitimate client submits the V3-scaled value (what calculateScore
+        # now displays). This is a v1 session (lenient), so even a mismatch
+        # would not 422 — but with the scaled value submitted there is none.
+        status = _end(
+            client, token, sid, total_score=round(_scaled(expected), 6), **_V2,
+        )
         assert status == 200
 
         stored = _db_total_score(session_factory, sid)
         assert stored is not None
-        assert abs(stored - expected) < 1e-3
+        assert abs(stored - _scaled(expected)) < 1e-2
 
     def test_no_total_score_submitted_and_no_v2_fields_stores_none(self, client, session_factory):
         token = _register_and_token(client, "sv_none_none")
@@ -142,20 +159,25 @@ class TestVerifyScoreReplayV2Strict:
         )
         assert expected is not None
 
-        status = _end(client, token, sid, total_score=round(expected, 4), **_V2)
+        # The strict v2 path compares the submitted value against the
+        # server-recomputed, V3-scaled value, so a legitimate client must
+        # submit the scaled total (what calculateScore displays).
+        status = _end(
+            client, token, sid, total_score=round(_scaled(expected), 4), **_V2,
+        )
         assert status == 200
 
         stored = _db_total_score(session_factory, sid)
         assert stored is not None
-        assert abs(stored - expected) < 1e-3
+        assert abs(stored - _scaled(expected)) < 1e-2
 
     def test_v2_tampered_score_rejected_with_replay_mismatch(self, client, session_factory):
         token = _register_and_token(client, "sv_v2_strict_tamper")
         sid = _new_session(client, token, replay_version=2)
 
         # 999_999 is multiple orders of magnitude beyond the legitimate
-        # recomputed value (~2.0 for these inputs) — well past the 1e-4
-        # rounding tolerance the strict path allows.
+        # recomputed value (~277.3 for these inputs: core × K=1 × difficulty 1.0)
+        # — well past the 1e-4 rounding tolerance the strict path allows.
         res = client.post(
             f"/api/sessions/{sid}/end",
             json={

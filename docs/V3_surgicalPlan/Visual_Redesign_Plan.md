@@ -72,7 +72,7 @@ pet alignment decision in Phase 6.5.
    `npm run lint-determinism` (CI).
 5. **Layered, not coupled.** No renderer mutates entity state. Visual hooks
    read projections (`engine/projections/views.ts`) or listen to events; they
-   never write back. F-ARCH-4 stays clean.
+   never write back, keeping the engine → render boundary clean.
 6. **Reduced-motion respect.** A single `prefers-reduced-motion` gate
    (read once into a `motionPreference` ref) attenuates intensity (particle
    count, shake amplitude, flash brightness) instead of removing effects
@@ -211,7 +211,7 @@ extended via the new `dying` flag.
 `engine/projections/project-enemies.ts` is amended to include dying
 enemies in the view with an added `dyingProgress: number ∈ [0,1]` field
 so the renderer can paint the corpse without reading entity state
-directly (F-ARCH-4 preserved).
+directly (the engine → render boundary is preserved).
 
 A new event `Events.ENEMY_DYING` fires from `killEnemy()` for the
 death-particle renderer to consume. Registry entry added in the same PR.

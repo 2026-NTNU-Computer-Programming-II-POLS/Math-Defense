@@ -60,7 +60,7 @@ Ten enemy types with distinct counter-play. `killValue` (not gold reward) drives
 
 ### Score formula
 
-Computed in WASM (`compute_total_score` in `wasm/math_engine.c`) so the server can re-verify bit-deterministically; the frontend mirrors it for display.
+The 7-input **core** is computed in WASM (`compute_total_score` in `wasm/math_engine.c`) so the server can re-verify it bit-deterministically; the frontend mirrors it for display. The magnitude scale and the star-difficulty multiplier are applied on top — server-authoritative, from the trusted session row.
 
 ```
 activeTime = max(0.001, timeTotal − Σ(time spent in Build Phase))
@@ -69,10 +69,13 @@ S2         = killValue / costTotal       if costTotal > 0 else 0
 alpha      = S1 / (S1 + S2)             if S1 + S2 > 0 else 0
 K          = alpha·S1 + (1 − alpha)·S2               (continuous blend)
 exponent   = 1 / sqrt(max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer)))
-TotalScore = max(0, K)^exponent                      (killValue = 0 → K = 0 → score = 0)
+core       = max(0, killValue)^exponent · K          (killValue = 0 → core = 0)
+TotalScore = core · SCALE · difficulty               (SCALE = 1; difficulty = 1 + 0.25·(starRating − 1) ∈ [1, 2])
 ```
 
-Edge cases: no towers built (`costTotal = 0`) → `S2 = 0`, alpha = 1, `K = S1` (no penalty); sitting in Build forever does not pad the timer.
+The score **base is `killValue`** (volume): more kills → higher score, while `K` (the speed/efficiency rate blend) and the survival/IA `exponent` reward fast, cheap, low-damage runs, and `difficulty` rewards higher star ratings. `SCALE` is an identity knob (= 1) — the core already lands in the thousands at realistic kill counts, so no inflation is needed (a larger SCALE would risk the `total_score ≤ 1,000,000` clamp on high-star runs and flatten top-end ranking).
+
+Edge cases: no towers built (`costTotal = 0`) → `S2 = 0`, alpha = 1, `K = S1` (no formula penalty — though the server separately rejects cost = 0 *with* kills as economically impossible, forcing score 0); sitting in Build forever does not pad the timer.
 
 ### Monty Hall event
 
@@ -302,8 +305,8 @@ Create `.env` at the project root (see `.env.example`):
 | `POSTGRES_PASSWORD` | Yes | Password for the `postgres` service (matches the password embedded in `DATABASE_URL`) |
 | `CORS_ORIGINS` | Yes | Comma-separated browser origins, e.g. `http://localhost:5173,http://localhost:3000` |
 | `FRONTEND_URL` | Yes | Base URL used in outbound emails (verification links), e.g. `http://localhost:5173` |
-| `POSTGRES_APP_PASSWORD` | No | M-13 least-privilege app role password; consumed by `pg_init_roles.sh` on first DB init to create the DML-only `mathdefense_app` role. Required only if you set `DATABASE_URL_APP` for runtime queries. |
-| `DATABASE_URL_APP` | No | M-13 optional least-privilege runtime URL. When set, the runtime engine connects with the `mathdefense_app` role (password = `POSTGRES_APP_PASSWORD`) while Alembic keeps migrating as the admin `DATABASE_URL`. Unset/blank → runtime also uses `DATABASE_URL`. |
+| `POSTGRES_APP_PASSWORD` | No | Least-privilege app role password; consumed by `pg_init_roles.sh` on first DB init to create the DML-only `mathdefense_app` role. Required only if you set `DATABASE_URL_APP` for runtime queries. |
+| `DATABASE_URL_APP` | No | Optional least-privilege runtime URL. When set, the runtime engine connects with the `mathdefense_app` role (password = `POSTGRES_APP_PASSWORD`) while Alembic keeps migrating as the admin `DATABASE_URL`. Unset/blank → runtime also uses `DATABASE_URL`. |
 | `PROXY_MODE` | No | Default `false`. Set `true` when running behind nginx/another proxy so rate limits key on `X-Forwarded-For` instead of the proxy IP. |
 | `TRUSTED_PROXY_IPS` | No | Comma-separated IPs / CIDRs whose `X-Forwarded-For` the backend trusts when `PROXY_MODE=true`. |
 | `TOTP_ENCRYPTION_KEY` | Yes | AES-256 Fernet key used to encrypt TOTP secrets at rest. Required at startup unconditionally (`lifespan` calls `verify_key_configured()` before the first request), so a missing key aborts boot regardless of whether MFA is in use. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |

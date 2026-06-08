@@ -144,7 +144,7 @@ flowchart LR
         Email[Email Service]
         Sched[Scheduler<br/>territory settlement<br/>auth janitor]
         Hub[Spectate Hub<br/>in-process pub/sub]
-        WasmRT[wasm_runtime<br/>wasmtime-py singleton<br/>shared math_engine.wasm<br/>FU-A score recompute]
+        WasmRT[wasm_runtime<br/>wasmtime-py singleton<br/>shared math_engine.wasm<br/>server-side score recompute]
     end
 
     DB[(PostgreSQL 16)]
@@ -504,7 +504,7 @@ C99 sources in `wasm/` (`math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h
 | `find_pair_intersections`, `find_all_curves_common_point`, `count_common_intersections_in_interval` | Level-generator intersection solver |
 | `compute_spawn_points` | Boundary-crossing bisection for the 2-spawn-per-curve rule |
 | `generate_level` | Full rejection-sampling loop (8 batches × 50 attempts) |
-| `power_f64` | musl-backed `pow(base, exp)` shared with backend score recompute (FU-A) |
+| `power_f64` | musl-backed `pow(base, exp)` shared with the backend score recompute |
 | `compute_total_score` | C-side mirror of the canonical scoring formula |
 | `malloc`, `free` | Bridge memory plumbing |
 
@@ -550,33 +550,39 @@ Session-replay flow (`ReplayView.vue`):
 3. If `1`: legacy path — `generateLevel(starRating, mulberry32(seed))`,
    `Game.setSeed(seed)` falls through to mulberry32.
 
-The lint rule `npm run lint-determinism` (Phase 5 of the construction
-plan) bans `Math.sin/cos/tan/asin/acos/atan/atan2/log/log2/log10/exp/pow`
+The lint rule `npm run lint-determinism` bans `Math.sin/cos/tan/asin/acos/atan/atan2/log/log2/log10/exp/pow`
 in the directories that reach the v2 reconstruction code path:
 `src/domain/level/`, `src/domain/scoring/`, `src/math/curve-evaluator.ts`,
 `src/engine/Game.ts`, `src/systems/`. Pre-existing legacy callers carry
 per-line opt-outs with a follow-up reference; new code must route through
-`WasmBridge`. The `domain/scoring/` entry was added with FU-A so the
-frontend score formula uses the same musl `pow` the backend recomputes
-against (see §5.2).
+`WasmBridge`. The `domain/scoring/` entry routes the frontend score
+formula through the same musl `pow` the backend recomputes against
+(see §5.2).
 
-### 5.2 Server-side replay validation (FU-A)
+### 5.2 Server-side replay validation
 
-For `replay_version=2` sessions the backend recomputes `total_score` from
-the asserted `ScoreInput` (kill_value, time_total, cost_total, HP delta,
-prep-phase durations) using the **same** musl `pow` the browser ran.
-`app/infrastructure/wasm_runtime.py` loads the same `math_engine.wasm`
+For `replay_version=2` sessions the backend recomputes the score **core**
+from the asserted `ScoreInput` (kill_value, time_total, cost_total, HP
+delta, prep-phase durations) using the **same** musl `pow` the browser
+ran. `app/infrastructure/wasm_runtime.py` loads the same `math_engine.wasm`
 artifact the frontend ships, instantiates it under wasmtime-py, and
 exposes a singleton `power_f64(base, exp)` callable. The score recompute
 in `app/domain/scoring/score_calculator.py` accepts a `pow_fn`
 parameter; `SessionApplicationService._verify_score` injects the WASM
-callable so the recomputed value is bit-equal to the browser-displayed
-`totalScore`.
+callable so the recomputed core is bit-equal to the browser-displayed one.
+`_verify_score` then applies `SCORE_SCALE_K` (= 1) and the star-difficulty
+multiplier `1 + 0.25·(star−1)` — derived from the **trusted** `session.star_rating`,
+never a client field — to obtain the stored `total_score`. The persisted
+value is the sole authority for the leaderboard and territory (both rank
+by `COALESCE(total_score, score)`).
 
 Acceptance flow:
 
-1. Client submits `total_score` on `POST /api/sessions/{id}/end`.
-2. Server recomputes via wasmtime-py.
+1. The modern v2 client OMITS `total_score` from `POST /api/sessions/{id}/end`
+   — the server is authoritative and simply overrides. The strict
+   comparison below fires only for the legacy/test path where a client *does*
+   submit a value.
+2. Server recomputes via wasmtime-py and applies the scale + difficulty.
 3. **v2 path:** if `|submitted - recomputed| > 1e-4` (rounding tolerance
    only — the formula itself agrees byte-for-byte), raise
    `ReplayMismatchError → HTTP 422 {"detail": "replay_mismatch"}`.
@@ -591,8 +597,7 @@ Acceptance flow:
 Today's coverage stops at score-formula tampering. A richer attack —
 fabricating the entire event stream so the resulting `ScoreInput`
 *itself* is a lie — is out of scope and waits on the full Python port
-of `EventPlayer`'s tick logic (construction plan §8 FU-A "not yet
-landed" note).
+of `EventPlayer`'s tick logic, which is not yet landed.
 
 ---
 

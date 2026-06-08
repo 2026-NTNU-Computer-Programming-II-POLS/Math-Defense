@@ -108,6 +108,7 @@ def get_my_history(
             id=h.id,
             level=h.level,
             score=h.score,
+            total_score=h.total_score,
             kills=h.kills,
             waves_survived=h.waves_survived,
             created_at=h.created_at,

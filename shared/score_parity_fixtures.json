@@ -11,7 +11,7 @@
       "health_final": 10,
       "initial_answer": true
     },
-    "expected": 1.430446758201972
+    "expected": 43.06096379366626
   },
   {
     "input": {
@@ -26,7 +26,7 @@
       "health_final": 8,
       "initial_answer": false
     },
-    "expected": 1.2639209345001978
+    "expected": 18.051135442384915
   },
   {
     "input": {
@@ -38,7 +38,7 @@
       "health_final": 10,
       "initial_answer": true
     },
-    "expected": 0.8790435749836025
+    "expected": 13.248660308157197
   },
   {
     "input": {
@@ -66,6 +66,6 @@
       "health_final": 5,
       "initial_answer": false
     },
-    "expected": 1.1998894949475882
+    "expected": 12.578819342034103
   }
 ]

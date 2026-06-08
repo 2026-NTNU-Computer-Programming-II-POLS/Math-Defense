@@ -330,7 +330,7 @@ class GameSession:
         time_exclude_prepare: list[float] | None = None,
         total_score: float | None = None,
     ) -> None:
-        """Record V2 scoring metadata after completion.
+        """Record V3 scoring metadata after completion.
 
         These analytics fields are write-once supplements to the core
         GameResult; they do not participate in state-transition invariants.

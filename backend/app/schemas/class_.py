@@ -149,6 +149,7 @@ class ClassReflectionOut(BaseModel):
     student_name: str = ""
     star_rating: int
     score: int
+    total_score: float | None = None
     reflection_text: str
     ended_at: datetime | None = None
 

@@ -340,6 +340,7 @@ def list_class_reflections(
             student_name=v.student_name,
             star_rating=v.star_rating,
             score=v.score,
+            total_score=v.total_score,
             reflection_text=v.reflection_text,
             ended_at=v.ended_at,
         )

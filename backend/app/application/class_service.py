@@ -60,6 +60,9 @@ class ClassReflectionView:
     score: int
     reflection_text: str
     ended_at: datetime | None
+    # V3: scaled total_score for the run; displayed as total_score ?? score so
+    # the teacher's "pts" matches the leaderboard. NULL for pre-V3 rows.
+    total_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -406,6 +409,7 @@ class ClassApplicationService:
                 score=s.score,
                 reflection_text=s.reflection_text or "",
                 ended_at=s.ended_at,
+                total_score=s.total_score,
             )
             for s in sessions
         ]

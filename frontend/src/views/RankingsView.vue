@@ -431,7 +431,7 @@ onBeforeUnmount(cancelInflight)
             <td class="rank">{{ e.rank }}</td>
             <td class="player-name">{{ e.player_name }}</td>
             <td>Lv.{{ e.level }}</td>
-            <td class="score">{{ formatScore(e.score) }}</td>
+            <td class="score">{{ formatScore(e.total_score ?? e.score) }}</td>
             <td>{{ e.kills }}</td>
             <td>{{ e.waves_survived }}</td>
           </tr>

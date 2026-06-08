@@ -10,15 +10,16 @@
 //      is the cross-language parity check; it compares the same un-rounded value
 //      the server verifies, so it shares the backend's tight tolerance instead
 //      of a looser bound inflated by round4's ~5e-5 display rounding.
-//   2. calculateScore().totalScore equals round4 of that raw value — verifies
-//      the domain wrapper still wires the inputs through and applies display
-//      rounding.
+//   2. calculateScore().totalScore equals round4 of that raw value scaled by
+//      SCORE_SCALE_K × difficultyMultiplier(star) — verifies the domain wrapper
+//      wires the inputs through and applies the V3 magnitude/difficulty
+//      transform plus display rounding.
 
 import { describe, expect, it } from 'vitest'
 import fixturesRaw from '../../../../shared/score_parity_fixtures.json'
 
 import { computeTotalScoreWasm } from '@/math/WasmBridge'
-import { calculateScore } from './score-calculator'
+import { calculateScore, SCORE_SCALE_K, difficultyMultiplier } from './score-calculator'
 
 interface ParityCase {
   input: {
@@ -71,7 +72,12 @@ describe('score-calculator parity', () => {
       healthOrigin: caseData.input.health_origin,
       healthFinal: caseData.input.health_final,
       initialAnswer: caseData.input.initial_answer ? 1 : 0,
+      starRating: 1,
     })
-    expect(breakdown.totalScore).toBe(round4(actual))
+    // V3: calculateScore lifts the core by SCORE_SCALE_K × difficulty(star).
+    // The fixtures carry no star, so we pin star=1 (multiplier 1.0) here.
+    expect(breakdown.totalScore).toBe(
+      round4(actual * SCORE_SCALE_K * difficultyMultiplier(1)),
+    )
   })
 })
