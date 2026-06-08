@@ -34,6 +34,12 @@ export class EconomySystem implements GameSystem {
           if (game.state.shieldHitsRemaining === 0) {
             game.state.shieldActive = false
             game.state.shieldReductionFactor = 1
+            // BUG-001: the shield's two expiry conditions (3 hits OR 30s) must
+            // reconcile to one source of truth. BuffSystem owns activeBuffs and
+            // only its 30s timer retires the entry; when the hits drain first,
+            // signal BuffSystem to retire it now so the shop stops advertising a
+            // frozen countdown and re-purchase is unblocked.
+            game.getSystem('buff')?.retireActiveBuffByEffectId('SHIELD_ACTIVATE', game)
           }
         }
         if (game.state.hp <= 0) return

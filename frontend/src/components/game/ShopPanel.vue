@@ -75,12 +75,15 @@ const items = computed(() =>
     }),
 )
 
-// Discoverability dot on the collapsed icon. Two triggers:
-//   - any buff is affordable AND not currently active (worth opening), or
-//   - any active buff is about to expire (worth re-buying).
-// Iterates PURCHASABLE_BUFFS directly so it stays cheap (9 items) and avoids
-// resolving the full `items` computed when the panel is hidden.
-const expiringSoonSeconds = 5
+// Discoverability dot on the collapsed icon: any buff is affordable AND not
+// currently active (worth opening the shop for). BUG-002: a second "active buff
+// about to expire" trigger was removed — it advertised a re-buy that the shop's
+// `alreadyActive` guard simultaneously disabled (a buff stays alreadyActive for
+// its entire lifetime, including the final seconds), so the dot pinged the
+// player to act on a button that could never be clicked. The two pieces of
+// logic encoded opposite policies on the same window. Iterates PURCHASABLE_BUFFS
+// directly so it stays cheap (9 items) and avoids resolving the full `items`
+// computed when the panel is hidden.
 const hasNotice = computed(() => {
   for (const b of PURCHASABLE_BUFFS) {
     if (g.gold < b.cost) continue
@@ -89,9 +92,6 @@ const hasNotice = computed(() => {
     // the shop for it (Bug #3).
     if (HEAL_EFFECT_IDS.has(b.effectId) && g.hp >= g.maxHp) continue
     return true
-  }
-  for (const ab of g.activeBuffs) {
-    if (ab.remainingTime <= expiringSoonSeconds) return true
   }
   return false
 })

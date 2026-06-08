@@ -276,3 +276,88 @@ def test_qr_endpoint_returns_join_url(client, db_session):
     body = res.json()
     assert body["code"] == code
     assert code in body["join_url"]
+
+
+def _complete_session(client, token, score, level=1, practice=False):
+    """Create and complete a session, returning its id. practice=True flags it
+    as a practice run (leaderboard-ineligible)."""
+    sid = client.post(
+        "/api/sessions",
+        json={"star_rating": level, "practice_mode": practice},
+        headers=_auth(token),
+    ).json()["id"]
+    client.post(
+        f"/api/sessions/{sid}/end",
+        json={"score": score, "kills": 10, "waves_survived": 3},
+        headers=_auth(token),
+    )
+    return sid
+
+
+# ── BUG-006 / BUG-007 — class report CSV hardening ─────────────────────────────
+
+
+def test_class_report_csv_neutralises_formula_and_has_bom(client, db_session):
+    """BUG-006: a student-controlled player_name beginning with a formula
+    trigger must be neutralised with a leading apostrophe before a teacher opens
+    the report. BUG-007: the body must start with a UTF-8 BOM so Excel detects
+    UTF-8. The student appears in the report via membership even with no runs."""
+    _t, teacher_token = _register_teacher(db_session, "t_csvinj")
+    # Register a student whose player_name is a spreadsheet-formula payload
+    # (email stays valid; player_name has no character allow-list).
+    email = "csvinj_student@test.local"
+    password = "xQ7!aPm2#vKz9"
+    client.post("/api/auth/register", json={
+        "email": email, "password": password, "player_name": "=1+1",
+    })
+    stu = client.post("/api/auth/login", json={"email": email, "password": password})
+    stu_token = stu.cookies.get("access_token")
+
+    res = _create_class(client, teacher_token, "CsvInj")
+    class_id = res.json()["id"]
+    client.post("/api/classes/join", json={"code": res.json()["join_code"]}, headers=_auth(stu_token))
+
+    rep = client.get(f"/api/classes/{class_id}/report.csv", headers=_auth(teacher_token))
+    assert rep.status_code == 200
+    assert rep.content.startswith(b"\xef\xbb\xbf")  # BUG-007: UTF-8 BOM present
+    body = rep.text
+    assert "'=1+1" in body                          # BUG-006: formula neutralised
+    assert ",=1+1," not in body                     # never written as a raw formula cell
+
+
+# ── BUG-008 — QR deep-link targets a real SPA route ────────────────────────────
+
+
+def test_qr_join_url_points_to_consumable_spa_route(client, db_session):
+    """BUG-008: the deep link must hit /classes?code= (which ClassView consumes
+    on mount), not the non-existent /classes/join SPA route that the catch-all
+    redirect would swallow."""
+    _t, teacher_token = _register_teacher(db_session, "t_qrurl")
+    res = _create_class(client, teacher_token, "QRUrl")
+    class_id = res.json()["id"]
+    code = res.json()["join_code"]
+    body = client.get(f"/api/classes/{class_id}/qr", headers=_auth(teacher_token)).json()
+    assert f"/classes?code={code}" in body["join_url"]
+    assert "/classes/join" not in body["join_url"]
+
+
+# ── BUG-011 — class dashboard excludes practice/preview runs ────────────────────
+
+
+def test_class_leaderboard_excludes_practice_runs(client, db_session):
+    """BUG-011: a practice-mode run must not inflate the class-dashboard
+    leaderboard/report. Only the competition-eligible run counts."""
+    _t, teacher_token = _register_teacher(db_session, "t_prac")
+    student_token, _ = _register_student(client, "s_prac")
+    res = _create_class(client, teacher_token, "PracClass")
+    class_id = res.json()["id"]
+    client.post("/api/classes/join", json={"code": res.json()["join_code"]}, headers=_auth(student_token))
+
+    _complete_session(client, student_token, score=300)                 # counts
+    _complete_session(client, student_token, score=500, practice=True)  # excluded
+
+    lb = client.get(f"/api/classes/{class_id}/leaderboard", headers=_auth(teacher_token))
+    assert lb.status_code == 200
+    row = lb.json()[0]
+    assert row["sessions_played"] == 1
+    assert row["total_score"] == 300

@@ -7,6 +7,7 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session as DbSession
 
 from app.domain.session.aggregate import GameSession
+from app.domain.leaderboard.view import SessionHistoryEntry
 from app.domain.session.repository import CumulativeStats
 from app.domain.value_objects import SessionStatus, Level
 from app.models.game_session import GameSession as GameSessionModel
@@ -240,12 +241,57 @@ class SqlAlchemySessionRepository:
             stars_played=stars_played,
         )
 
+    # PB-detection window for the self-view history; mirrors the leaderboard
+    # repo's cap so a pathological history can't load unbounded rows. COUNT(*)
+    # is unaffected, so page metadata stays correct past this bound.
+    _USER_HISTORY_WINDOW = 10000
+
+    def get_user_session_history(
+        self, user_id: str, level: int | None = None
+    ) -> tuple[list[SessionHistoryEntry], int]:
+        # BUG-010: self-view timeline sourced from the user's own completed
+        # game_sessions, INCLUDING preview/practice runs (the public boards stay
+        # leaderboard-table-backed). Newest-first by completion time.
+        completed = SessionStatus.COMPLETED.value
+        q = self._db.query(GameSessionModel).filter(
+            GameSessionModel.user_id == user_id,
+            GameSessionModel.status == completed,
+        )
+        if level is not None:
+            q = q.filter(GameSessionModel.star_rating == level)
+        total = q.with_entities(func.count(GameSessionModel.id)).scalar() or 0
+        rows = (
+            q.order_by(
+                func.coalesce(
+                    GameSessionModel.ended_at, GameSessionModel.started_at
+                ).desc(),
+                GameSessionModel.id.desc(),
+            )
+            .limit(self._USER_HISTORY_WINDOW)
+            .all()
+        )
+        return [
+            SessionHistoryEntry(
+                id=r.id,
+                level=int(r.star_rating),
+                score=int(r.score),
+                kills=int(r.kills),
+                waves_survived=int(r.waves_survived),
+                created_at=_ensure_utc(r.ended_at) or _ensure_utc(r.started_at),
+            )
+            for r in rows
+        ], int(total)
+
     def aggregate_stats_for_users(self, user_ids: list[str]) -> dict[str, dict]:
         if not user_ids:
             return {}
         completed = SessionStatus.COMPLETED.value
 
-        # Per-user aggregate over completed sessions.
+        # Per-user aggregate over competition-eligible completed sessions.
+        # BUG-011: exclude practice_mode and is_preview so this teacher/admin
+        # dashboard ranks the same population as every other leaderboard surface
+        # (spec line 84: practice runs are leaderboard-ineligible). Without this a
+        # student could climb the class ranking via practice/sandbox runs.
         agg_rows = (
             self._db.query(
                 GameSessionModel.user_id,
@@ -257,6 +303,8 @@ class SqlAlchemySessionRepository:
             .filter(
                 GameSessionModel.user_id.in_(user_ids),
                 GameSessionModel.status == completed,
+                GameSessionModel.practice_mode.is_(False),
+                GameSessionModel.is_preview.is_(False),
             )
             .group_by(GameSessionModel.user_id)
             .all()
@@ -273,6 +321,10 @@ class SqlAlchemySessionRepository:
             .filter(
                 GameSessionModel.user_id.in_(user_ids),
                 GameSessionModel.status == completed,
+                # BUG-011: keep the reflections count consistent with the main
+                # aggregate above — practice/preview runs are excluded here too.
+                GameSessionModel.practice_mode.is_(False),
+                GameSessionModel.is_preview.is_(False),
                 GameSessionModel.reflection_text.isnot(None),
                 func.length(GameSessionModel.reflection_text) > 0,
             )

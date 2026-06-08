@@ -13,6 +13,7 @@ from app.domain.user.value_objects import Role
 from app.factories import build_class_service
 from app.limiter import limiter
 from app.middleware.auth import get_current_user, require_role
+from app.utils.csv_export import UTF8_BOM, csv_safe
 from app.schemas.class_ import (
     AddCoTeacherRequest,
     AddStudentRequest,
@@ -373,7 +374,11 @@ def get_join_qr(
     svc = build_class_service(db)
     cls_ = svc.get_class_for_owner(class_id, user.id, user.role)
     base = settings.frontend_url.rstrip("/")
-    return JoinQrOut(code=cls_.join_code, join_url=f"{base}/classes/join?code={cls_.join_code}")
+    # BUG-008: point at the SPA route that actually exists and consumes ?code=
+    # (ClassView reads route.query.code on mount at /classes). The previous
+    # /classes/join path matched no frontend route, so the SPA catch-all
+    # redirected to "/" and dropped the query — the deep-link join silently died.
+    return JoinQrOut(code=cls_.join_code, join_url=f"{base}/classes?code={cls_.join_code}")
 
 
 # ── Co-teachers ───────────────────────────────────────────────────────────────
@@ -642,6 +647,9 @@ def class_report_csv(
 ):
     rows = build_class_service(db).class_report(class_id, user.id, user.role)
     buf = io.StringIO()
+    # BUG-007: prepend a UTF-8 BOM so Excel auto-detects UTF-8 and renders
+    # Chinese player names correctly instead of mojibake on a downloaded file.
+    buf.write(UTF8_BOM)
     writer = csv.writer(buf)
     writer.writerow([
         "student_id", "player_name", "email", "joined_at",
@@ -650,7 +658,10 @@ def class_report_csv(
     ])
     for r in rows:
         writer.writerow([
-            r.student_id, r.player_name, r.email,
+            # BUG-006: player_name / email are user-controlled and unrestricted
+            # in character set, so neutralise spreadsheet-formula triggers before
+            # a teacher/admin opens the report (stored CSV-injection vector).
+            r.student_id, csv_safe(r.player_name or ""), csv_safe(r.email or ""),
             r.joined_at.isoformat() if r.joined_at else "",
             r.sessions_played, f"{r.average_stars:.2f}", r.total_score,
             r.last_played_at.isoformat() if r.last_played_at else "",

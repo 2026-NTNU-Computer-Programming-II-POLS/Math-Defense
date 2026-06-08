@@ -245,6 +245,33 @@ export class BuffSystem implements GameSystem {
     }
   }
 
+  /**
+   * Retire an active buff identified by its effectId before its timer expires.
+   * This is the seam for a buff that has a second, non-timer expiry condition.
+   * BUG-001: a Ward Shield expires on either 3 absorbed hits OR 30s. EconomySystem
+   * owns the hit counter but BuffSystem owns `activeBuffs`, so when the hits drain
+   * first EconomySystem calls this to retire the entry. It applies the buff's
+   * revert (idempotent for SHIELD_DEACTIVATE) and emits the same events as a timer
+   * expiry, so the shop and active-buff HUD see the buff as gone instead of
+   * showing a frozen countdown that gates re-purchase. No-op when no matching
+   * entry exists, so a later 30s timer tick for an already-retired shield is
+   * harmless.
+   */
+  retireActiveBuffByEffectId(effectId: string, game: Game): void {
+    const buffs = game.state.activeBuffs
+    const i = buffs.findIndex((b) => b.effectId === effectId)
+    if (i === -1) return
+    const retired = buffs[i]
+    if (retired.revertId) applyEffect(retired.revertId, game)
+    buffs.splice(i, 1)
+    game.eventBus.emit(Events.BUFF_EXPIRED, {
+      id: retired.id,
+      name: retired.name,
+      effectId: retired.effectId,
+    })
+    game.eventBus.emit(Events.ACTIVE_BUFFS_CHANGED, [...buffs])
+  }
+
   private _purchaseBuff(itemId: string, game: Game): boolean {
     const def = PURCHASABLE_BUFFS.find((b) => b.id === itemId)
     if (!def) return false

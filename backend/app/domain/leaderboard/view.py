@@ -25,6 +25,22 @@ class RankedLeaderboardEntry:
 
 
 @dataclass(frozen=True)
+class SessionHistoryEntry:
+    """Raw personal-history row sourced from the user's own game sessions
+    (BUG-010), before the application service computes the ``is_personal_best``
+    flag. Unlike the leaderboard table, this self-view INCLUDES preview and
+    practice runs — a player's own timeline shows everything they played, while
+    the public ranking boards stay leaderboard-table-backed and exclusion-aware.
+    """
+    id: str
+    level: int
+    score: int
+    kills: int
+    waves_survived: int
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class PersonalHistoryEntry:
     """Personal-best timeline view — like a leaderboard entry without rank,
     but with an ``is_personal_best`` flag computed chronologically by the

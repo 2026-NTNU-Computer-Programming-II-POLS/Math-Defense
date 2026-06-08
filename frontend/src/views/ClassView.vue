@@ -49,6 +49,9 @@ const showLeaderboard = ref(false)
 
 const qrCode = ref<{ code: string; join_url: string } | null>(null)
 const showQr = ref(false)
+// BUG-003: track which class the open QR panel belongs to so a regenerate on
+// that class can refresh the panel instead of leaving a now-invalid code shown.
+const qrClassId = ref<string | null>(null)
 
 const transferTeacherId = ref('')
 const transferringClassId = ref<string | null>(null)
@@ -80,6 +83,19 @@ const selectedIsOwner = computed(() => {
   if (!c || !auth.user) return false
   return c.teacher_id === auth.user.id
 })
+// BUG-004/005: per-row ownership gate for owner-only actions. selectedIsOwner is
+// keyed on the selected class, but the list-row action buttons live in the
+// per-row loop, so ownership must be checked against the row's own class (`c`).
+function isClassOwner(c: ClassInfo): boolean {
+  return !!auth.user && c.teacher_id === auth.user.id
+}
+// BUG-005 follow-up: admin has read-only access to class management — creating a
+// class and every student/group mutation is teacher-only on the backend
+// (require_role(TEACHER) + _verify_teacher_write rejects ADMIN). Gate write
+// controls on this so admins aren't offered actions that always 403, while they
+// keep read access to rosters/reports. Co-teachers are teacher-role, so student
+// management stays available to them (the backend permits it).
+const canManageStudents = computed(() => auth.isTeacher)
 
 async function loadClasses(): Promise<void> {
   loading.value = true
@@ -228,6 +244,9 @@ async function regenerateCode(classId: string): Promise<void> {
     const res = await classService.regenerateCode(classId)
     const idx = classes.value.findIndex((c) => c.id === classId)
     if (idx !== -1) classes.value[idx].join_code = res.join_code
+    // BUG-003: if the QR panel is open for this class it still shows the now-
+    // invalidated code/link. Refresh it so the teacher never shares a stale QR.
+    if (showQr.value && qrClassId.value === classId) await loadQr(classId)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to regenerate code'
   } finally {
@@ -354,6 +373,7 @@ async function transferClass(classId: string): Promise<void> {
 async function loadQr(classId: string): Promise<void> {
   try {
     qrCode.value = await classService.joinQr(classId)
+    qrClassId.value = classId
     showQr.value = true
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load QR'
@@ -500,7 +520,7 @@ onMounted(async () => {
 
       <div v-if="error" class="class-error">{{ error }}</div>
 
-      <div v-if="isTeacherOrAdmin" class="section">
+      <div v-if="auth.isTeacher" class="section">
         <h3 class="section-title">Create Class</h3>
         <form class="inline-form" @submit.prevent="createClass">
           <input v-model="newClassName" class="rune-input" type="text" placeholder="Class name" />
@@ -568,16 +588,23 @@ onMounted(async () => {
                 </span>
               </template>
             </div>
+            <!-- BUG-005: admin has read-only access to class management, so admins
+                 see only the read-only QR action below; every mutating button is
+                 gated to teachers. BUG-004: New Code / Rename are teacher-write
+                 (owner + co-teacher), while Archive / Delete are owner-only and
+                 carry a per-row ownership check so a co-teacher is not offered an
+                 action the backend always rejects with 403. -->
             <div v-if="isTeacherOrAdmin" class="class-actions">
-              <button class="btn-sm" :disabled="!!c.archived_at || regeneratingId === c.id" @click.stop="regenerateCode(c.id)">
+              <button v-if="auth.isTeacher" class="btn-sm" :disabled="!!c.archived_at || regeneratingId === c.id" @click.stop="regenerateCode(c.id)">
                 {{ regeneratingId === c.id ? 'Generating…' : 'New Code' }}
               </button>
               <button class="btn-sm" @click.stop="loadQr(c.id)">QR</button>
-              <button class="btn-sm" @click.stop="startRename(c)">Rename</button>
-              <button class="btn-sm" :disabled="archivingId === c.id" @click.stop="toggleArchive(c)">
+              <button v-if="auth.isTeacher" class="btn-sm" @click.stop="startRename(c)">Rename</button>
+              <button v-if="auth.isTeacher && isClassOwner(c)" class="btn-sm" :disabled="archivingId === c.id" @click.stop="toggleArchive(c)">
                 {{ c.archived_at ? 'Unarchive' : 'Archive' }}
               </button>
               <button
+                v-if="auth.isTeacher && isClassOwner(c)"
                 class="btn-sm danger"
                 :disabled="deletingClassId === c.id"
                 @click.stop="deleteClass(c.id, c.name)"
@@ -601,14 +628,14 @@ onMounted(async () => {
       <div v-if="isTeacherOrAdmin && selectedClassId && selectedClass" class="section">
         <h3 class="section-title">Students — {{ selectedClass.name }}</h3>
 
-        <form class="inline-form" @submit.prevent="addStudent">
+        <form v-if="canManageStudents" class="inline-form" @submit.prevent="addStudent">
           <input v-model="newStudentEmail" class="rune-input" type="email" placeholder="Student email" />
           <button class="btn" type="submit" :disabled="addingStudent">
             {{ addingStudent ? 'Adding…' : 'Add' }}
           </button>
         </form>
 
-        <details class="details-block">
+        <details v-if="canManageStudents" class="details-block">
           <summary>Bulk add by email</summary>
           <textarea
             v-model="bulkEmailsText"
@@ -637,13 +664,13 @@ onMounted(async () => {
             </div>
             <div class="student-actions">
               <button
-                v-if="selectedGroupId"
+                v-if="canManageStudents && selectedGroupId"
                 class="btn-sm"
                 @click="assignToGroup(s.student_id)"
               >
                 → Group
               </button>
-              <button class="btn-sm danger" @click="removeStudent(s.student_id, s.player_name || s.student_id)">Remove</button>
+              <button v-if="canManageStudents" class="btn-sm danger" @click="removeStudent(s.student_id, s.player_name || s.student_id)">Remove</button>
             </div>
           </li>
         </ul>
@@ -655,7 +682,7 @@ onMounted(async () => {
           <ul class="invite-list">
             <li v-for="inv in invites" :key="inv.id" class="invite-item">
               <span>{{ inv.email }}</span>
-              <button class="btn-sm danger" @click="revokeInvite(inv.email)">Revoke</button>
+              <button v-if="canManageStudents" class="btn-sm danger" @click="revokeInvite(inv.email)">Revoke</button>
             </li>
           </ul>
         </div>
@@ -687,7 +714,7 @@ onMounted(async () => {
         <!-- Groups -->
         <div class="subsection">
           <h4 class="subsection-title">Groups</h4>
-          <form class="inline-form" @submit.prevent="createGroup">
+          <form v-if="canManageStudents" class="inline-form" @submit.prevent="createGroup">
             <input v-model="newGroupName" class="rune-input" type="text" placeholder="Group name" />
             <input v-model="newGroupColor" class="rune-input color-input" type="text" placeholder="#color" />
             <button class="btn-sm" type="submit">Create</button>
@@ -701,7 +728,7 @@ onMounted(async () => {
               >
                 {{ g.name }} <small>({{ g.member_count }})</small>
               </span>
-              <button class="btn-sm danger" @click="deleteGroup(g.id)">Delete</button>
+              <button v-if="canManageStudents" class="btn-sm danger" @click="deleteGroup(g.id)">Delete</button>
             </li>
           </ul>
           <div v-if="selectedGroupId">
@@ -709,7 +736,7 @@ onMounted(async () => {
             <ul v-if="groupMembers.length" class="invite-list">
               <li v-for="gm in groupMembers" :key="gm.student_id" class="invite-item">
                 <span>{{ gm.player_name || gm.student_id }}</span>
-                <button class="btn-sm danger" @click="unassignFromGroup(gm.student_id)">Remove</button>
+                <button v-if="canManageStudents" class="btn-sm danger" @click="unassignFromGroup(gm.student_id)">Remove</button>
               </li>
             </ul>
             <div v-else class="empty">No members</div>

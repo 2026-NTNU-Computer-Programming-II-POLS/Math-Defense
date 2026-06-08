@@ -45,19 +45,3 @@ class LeaderboardRepository(Protocol):
     ) -> tuple[list[RankedLeaderboardEntry], int]:
         """Challenge-scoped ranking — entries tagged with challenge_id (Backlog §23)."""
         pass
-
-    def get_user_history(
-        self,
-        user_id: str,
-        level: int | None = None,
-    ) -> tuple[list[LeaderboardEntry], int]:
-        """Personal history — all of a user's entries, newest first, plus a
-        true total count.
-
-        The list is capped by an implementation-defined safety limit so a
-        runaway user cannot OOM the process. The second tuple element is the
-        un-capped ``COUNT(*)`` so the caller can report an accurate ``total``
-        to the client even when the row list itself was truncated.
-        Optional ``level`` filter scopes to a single star-rating.
-        """
-        pass

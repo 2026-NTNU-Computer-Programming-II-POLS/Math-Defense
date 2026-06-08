@@ -38,7 +38,7 @@ Each entry is appended as a `##` section. Do not delete past entries; mark them 
 
 ## [BUG-001] Depleted Ward Shield keeps its active-buff slot, blocking re-purchase and showing a misleading countdown
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — `BuffSystem.retireActiveBuffByEffectId` added (owner of `activeBuffs`); `EconomySystem` calls it when `shieldHitsRemaining` hits 0, emitting `BUFF_EXPIRED` + `ACTIVE_BUFFS_CHANGED`. Regression tests in `BuffSystem.test.ts`.
 - **Severity:** Medium
 - **Feature:** In-game Shop (Ward Shield buff) — `shop_shield` / `SHIELD_ACTIVATE`
 - **Account level:** any in-game player (student / anonymous)
@@ -71,7 +71,7 @@ When `shieldHitsRemaining` reaches 0 in `EconomySystem`, also retire the corresp
 
 ## [BUG-002] "Expiring soon" shop notice invites a re-purchase the shop simultaneously disables
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — took option (a): dropped the "expiring soon" trigger from `hasNotice` in `ShopPanel.vue`, so the notice dot only fires for genuinely actionable items (affordable + not active). The dot no longer contradicts the `alreadyActive` disable.
 - **Severity:** Low
 - **Feature:** In-game Shop (collapsed-trigger notice dot)
 - **Account level:** any in-game player (student / anonymous)
@@ -101,7 +101,7 @@ Reconcile the two policies. Either: (a) drop the "expiring soon" trigger from `h
 
 ## [BUG-003] Open Join-Code QR panel keeps showing the old (now-invalid) code after Regenerate
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — added a `qrClassId` ref so the open QR panel is correlated to its class; `regenerateCode` now re-calls `loadQr(classId)` when the panel is open for the regenerated class, so it shows the live code instead of the invalidated one.
 - **Severity:** Low
 - **Feature:** Teacher class management — regenerate join code / QR (`POST /api/classes/{id}/regenerate-code`, `GET /api/classes/{id}/qr`)
 - **Account level:** teacher
@@ -132,7 +132,7 @@ On a successful regenerate, refresh or invalidate the QR panel: either re-call `
 
 ## [BUG-004] Owner-only Archive/Delete buttons are shown to co-teachers and fail with 403
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — added per-row `isClassOwner(c)` gate in `ClassView.vue`; Archive/Unarchive and Delete now render only for the class owner. New Code / Rename stay available to co-teachers (backend `_verify_teacher_write` permits them). Backend was already correct (owner-only 403); this was the UI surface mismatch.
 - **Severity:** Medium
 - **Feature:** Teacher class management — class actions for co-taught classes (`POST /api/classes/{id}/archive`, `DELETE /api/classes/{id}`)
 - **Account level:** teacher (co-teacher, non-owner)
@@ -165,7 +165,7 @@ Hide or disable owner-only actions (Archive/Unarchive, Delete) for non-owners by
 
 ## [BUG-005] Admin cannot edit classes despite being expected to have edit rights
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed as UI-hardening (2026-06-08). **The filed premise was a false positive:** the spec / `_verify_owner_or_admin` / `AUDIT_REPORT_2026-05-15` all define admin as *deliberately read-only* for class mutations — there is no requirement that admins can edit classes (this also matches BUG-004's own note "Admin (read-only) should likewise not see mutating actions"). So the backend was left unchanged (correctly 403s admin writes); the real defect was the frontend showing admins mutating buttons they can't use. Resolution: in `ClassView.vue`, New Code / Rename / Archive / Delete are now gated to `auth.isTeacher`, so admins see only the read-only **QR** action. (If a future product decision *does* want admin edit rights, that is a spec change touching the router gate + `_verify_teacher_write` + `_verify_owner_only` — out of scope here.)
 - **Severity:** Low
 - **Feature:** Teacher class management — edit/rename class (`PUT /api/classes/{id}`)
 - **Account level:** admin
@@ -195,7 +195,7 @@ Decide the intended admin policy and apply it consistently. If admins should edi
 
 ## [BUG-006] Class report CSV is vulnerable to spreadsheet formula injection via player_name / email
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — extracted `csv_safe`/`CSV_INJECTION_TRIGGERS` from `study.py` into shared `app/utils/csv_export.py`; `class_report_csv` now wraps `player_name` and `email` with `csv_safe`. `study.py` reuses the shared helper. Regression test in `test_class_extensions.py`.
 - **Severity:** High
 - **Feature:** Teacher class management — class report export (`GET /api/classes/{id}/report.csv`)
 - **Account level:** teacher / admin (downloader); attack payload planted by a student
@@ -227,7 +227,7 @@ Apply the same neutralisation that `study.py` already uses. Reuse a shared `_csv
 
 ## [BUG-007] Class report CSV omits the UTF-8 BOM, garbling Chinese names in Excel
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — `class_report_csv` now prepends `UTF8_BOM` (from `app/utils/csv_export.py`) to the buffer so Excel auto-detects UTF-8. Regression test asserts the response body starts with `EF BB BF`.
 - **Severity:** Medium
 - **Feature:** Teacher class management — class report export (`GET /api/classes/{id}/report.csv`)
 - **Account level:** teacher / admin
@@ -258,7 +258,7 @@ Emit the CSV with a UTF-8 BOM so Excel detects the encoding — e.g. write the b
 
 ## [BUG-008] QR / share-link join URL points to a non-existent route (`/classes/join`), so the deep-link join never prefills and the code is lost
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — took option (a) (smallest change): backend `get_join_qr` now builds `join_url` as `{base}/classes?code=...` (the route `ClassView` already consumes on mount) instead of the non-existent `/classes/join`. Regression test asserts the new path and the absence of `/classes/join`.
 - **Severity:** Medium
 - **Feature:** Student class management — join by code via QR / share link (`GET /api/classes/{id}/qr` → `join_url`; `ClassView` deep-link prefill)
 - **Account level:** student (consumer of the link; QR generated by teacher)
@@ -290,7 +290,7 @@ Make the generated URL and the router agree on a single path. Either (a) change 
 
 ## [BUG-009] Leaderboard level filter omits Star 5, so Legendary-difficulty scores can never be filtered
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — both `LeaderboardView.vue` and `RankingsView.vue` now derive the filter from a shared `levelFilters` const built from `STAR_MIN`/`STAR_MAX` (`difficulty-defs`), so the filter always offers exactly the playable levels (1–5) and stays in sync if the range changes.
 - **Severity:** Medium
 - **Feature:** Student leaderboard — level/star filter (`GET /api/leaderboard?level=…`, Personal / Global / Class tabs)
 - **Account level:** student
@@ -322,7 +322,7 @@ Derive the filter buttons from the shared star range instead of a literal — e.
 
 ## [BUG-010] Teacher's Personal History (`/api/leaderboard/me`) is always empty because preview runs are never recorded anywhere a teacher can see them
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08, per product decision: teachers should see their own history). Took the bug's option (a): `get_user_history` (GET `/api/leaderboard/me`) now reads the caller's own completed `game_sessions` via a new `get_user_session_history` repo method — **including preview/practice runs** — instead of the leaderboard table. Public ranking boards remain leaderboard-table-backed, so preview/practice still never reach any shared ranking. Note: this self-view change also means a **student's own practice runs now appear in their personal timeline** (intended — it is their own history). New read-model `SessionHistoryEntry`; regression tests cover the teacher preview-history case and the student practice-history case, both asserting the runs stay off the public board.
 - **Severity:** Medium
 - **Feature:** Leaderboard — personal history (`GET /api/leaderboard/me`) for the teacher role
 - **Account level:** teacher
@@ -358,7 +358,7 @@ Decouple the personal-history source from the public-ranking source so preview e
 
 ## [BUG-011] Class-dashboard leaderboard & report count practice_mode / preview runs, inflating student rankings
 
-- **Status:** 🔴 Open
+- **Status:** 🟢 Fixed (2026-06-08) — `aggregate_stats_for_users` now excludes `practice_mode` and `is_preview` rows in both the main aggregate and the reflections sub-query. Members with only practice runs correctly show 0 (driven by membership, not the aggregate), not removed. Regression test seeds a normal + practice run and asserts only the normal one counts.
 - **Severity:** Medium
 - **Feature:** Class leaderboard & report — `GET /api/classes/{id}/leaderboard` and `GET /api/classes/{id}/report` (ClassView dashboard, viewable by class owner/co-teacher and any admin)
 - **Account level:** teacher (and admin, who can open any class) — surfaced while reviewing the admin leaderboard feature
@@ -387,5 +387,30 @@ Two parallel "class leaderboard" surfaces exist with different data sources. The
 
 **Suggested Fix** (describe only, do not implement)
 Apply the same eligibility filter the other boards use to the class aggregate: in `aggregate_stats_for_users`, exclude rows where `practice_mode` is true or `is_preview` is true (in addition to the existing `status == COMPLETED` filter), and apply it to both the main aggregate query and the reflections-count sub-query so the two stay consistent. Add a regression test that seeds a member with a high-scoring practice-mode session plus a normal session and asserts the class leaderboard/report counts only the normal session. If, instead, the dashboard is intended to show *all* engagement (a product decision), make that explicit — keep practice runs in `sessions_played`/`average_stars` but exclude them from the `total_score` ranking key, and document the divergence from the competitive board — but the spec as written argues for full exclusion.
+
+---
+
+## [BUG-012] Admin is shown class-management write controls the backend always rejects with 403
+
+- **Status:** 🟢 Fixed (2026-06-08) — surfaced while verifying the BUG-005 fix.
+- **Severity:** Low
+- **Feature:** Teacher class management UI — Create Class + student/group management for admins
+- **Account level:** admin
+- **Date found:** 2026-06-08
+
+**Affected Files**
+- `frontend/src/views/ClassView.vue` — Create Class form, Add/Bulk-add student, Remove student, Revoke invite, group Create/Delete, group-member add (→ Group) / remove, all rendered under `isTeacherOrAdmin`.
+- `backend/app/routers/class_.py` — `create_class`, `add_student`, `bulk_add_students`, `remove_student`, `revoke_invite`, group CRUD: all gated `require_role(Role.TEACHER)` (admin absent).
+- `backend/app/application/class_service.py:151` — `_verify_teacher_write` explicitly rejects `Role.ADMIN`.
+
+**Expected vs Actual**
+- Expected: per the documented "admin = read-only for class management" policy (see BUG-005), admins should not be offered class/student/group mutation controls they cannot use; they retain read access to rosters, groups, leaderboard, and the CSV report.
+- Actual: the Create Class form and the entire student/group management surface were gated only by `isTeacherOrAdmin`, so an admin saw ~11 write controls (Create class, Add/Bulk-add, Remove, Revoke, group CRUD, assign/unassign) that each 403 on click.
+
+**Root Cause Analysis**
+Same class of defect as BUG-005, on a wider surface: the UI gated these controls on role-or-admin while the backend enforces teacher-only writes (admin read-only). The read views in the same panel (roster list, invites list, groups list, leaderboard, report) are correctly admin-readable (`require_role(TEACHER, ADMIN)` + `_verify_owner_or_admin(is_read_op=True)`), so only the write affordances were mismatched. Co-teacher / Transfer-ownership subsections were already correctly gated by `selectedIsOwner` (admins are never owners), so they were unaffected.
+
+**Resolution**
+Gated the Create Class section on `auth.isTeacher`, and added a `canManageStudents` computed (`auth.isTeacher`) gating every student/group write control. Reads stay visible to admins; co-teachers (teacher-role) keep full student management since the backend permits them. No backend change — the backend was already correct.
 
 ---

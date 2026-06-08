@@ -1,9 +1,12 @@
-"""GameSessionRepository — 抽象介面（Protocol），不依賴 SQLAlchemy"""
+"""GameSessionRepository — abstract interface (Protocol); no SQLAlchemy dependency."""
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from app.domain.session.aggregate import GameSession
+
+if TYPE_CHECKING:
+    from app.domain.leaderboard.view import SessionHistoryEntry
 
 
 class CumulativeStats:
@@ -88,6 +91,22 @@ class GameSessionRepository(Protocol):
         """Most-recent ``limit`` completed sessions for the given student,
         ordered ended_at DESC. Used by the territory recommender to
         compute per-level average scores."""
+        pass
+
+    def get_user_session_history(
+        self, user_id: str, level: int | None = None
+    ) -> tuple[list["SessionHistoryEntry"], int]:
+        """The caller's own completed-session timeline, newest-first, plus the
+        untruncated total count.
+
+        BUG-010: this is the source for the personal self-view (GET
+        /api/leaderboard/me). Unlike the public ranking boards (which read the
+        leaderboard table and never store preview/practice runs), this INCLUDES
+        preview and practice sessions so a teacher — every one of whose runs is a
+        preview — can still see their own play history, and a student sees their
+        own practice runs in their personal timeline. Authorisation is the
+        caller's verified id; this never returns another user's rows.
+        """
         pass
 
     def aggregate_stats_for_users(self, user_ids: list[str]) -> dict[str, dict]:

@@ -25,9 +25,18 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import PersonalTimeline from '@/components/leaderboard/PersonalTimeline.vue'
 import { formatScore } from '@/utils/formatters'
+import { STAR_MIN, STAR_MAX } from '@/data/difficulty-defs'
 
 const router = useRouter()
 const route = useRoute()
+
+// BUG-009: derive the star-rating filter from the shared range (1..STAR_MAX)
+// instead of a hard-coded [1,2,3,4] that silently omitted Star 5 (Legendary),
+// which the backend (`level` ge=1 le=5) and LevelSelectView both support.
+const levelFilters: (number | undefined)[] = [
+  undefined,
+  ...Array.from({ length: STAR_MAX - STAR_MIN + 1 }, (_, i) => STAR_MIN + i),
+]
 
 // Personal-first ordering per analysis §6.2: self-referential framing is the
 // healthier default than social ranking. Logged-out visitors fall back to Global.
@@ -394,7 +403,7 @@ onBeforeUnmount(cancelInflight)
     >
       <span class="filter-label">Star rating:</span>
       <button
-        v-for="lv in [undefined, 1, 2, 3, 4]"
+        v-for="lv in levelFilters"
         :key="lv ?? 'all'"
         :class="['btn', 'filter-btn', { active: levelFilter === lv }]"
         @click="levelFilter = lv"

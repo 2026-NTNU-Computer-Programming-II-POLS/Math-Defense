@@ -163,6 +163,55 @@ describe('BuffSystem (V2 shop-based)', () => {
     expect(game.state.activeBuffs).toHaveLength(0)
   })
 
+  // BUG-001: a Ward Shield expires on 3 absorbed hits OR 30s. EconomySystem
+  // drains the hit counter and calls retireActiveBuffByEffectId so the entry is
+  // removed before the timer, instead of leaving a frozen countdown that gates
+  // re-purchase in the shop.
+  describe('BUG-001: retireActiveBuffByEffectId (hit-depleted shield)', () => {
+    it('removes the active entry, applies the revert, and emits change events', () => {
+      game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_shield', cost: 40 })
+      expect(game.state.activeBuffs).toHaveLength(1)
+      expect(game.state.shieldReductionFactor).toBe(0.5)
+
+      const expired = vi.fn()
+      const changed = vi.fn()
+      game.eventBus.on(Events.BUFF_EXPIRED, expired)
+      game.eventBus.on(Events.ACTIVE_BUFFS_CHANGED, changed)
+
+      system.retireActiveBuffByEffectId('SHIELD_ACTIVATE', game)
+
+      // Entry gone, and SHIELD_DEACTIVATE revert restored the factor.
+      expect(game.state.activeBuffs).toHaveLength(0)
+      expect(game.state.shieldActive).toBe(false)
+      expect(game.state.shieldReductionFactor).toBe(1)
+      expect(expired).toHaveBeenCalledWith(
+        expect.objectContaining({ effectId: 'SHIELD_ACTIVATE' }),
+      )
+      expect(changed).toHaveBeenCalledWith([])
+    })
+
+    it('is a harmless no-op when no matching entry exists', () => {
+      const changed = vi.fn()
+      game.eventBus.on(Events.ACTIVE_BUFFS_CHANGED, changed)
+
+      system.retireActiveBuffByEffectId('SHIELD_ACTIVATE', game)
+
+      expect(game.state.activeBuffs).toHaveLength(0)
+      expect(changed).not.toHaveBeenCalled()
+    })
+
+    it('does not retire a later 30s timer expiry once already removed', () => {
+      game.eventBus.emit(Events.SHOP_PURCHASE, { itemId: 'test_shield', cost: 40 })
+      system.retireActiveBuffByEffectId('SHIELD_ACTIVATE', game)
+      expect(game.state.activeBuffs).toHaveLength(0)
+
+      // The 30s timer tick must not throw or double-revert.
+      system.update(31, game)
+      expect(game.state.activeBuffs).toHaveLength(0)
+      expect(game.state.shieldReductionFactor).toBe(1)
+    })
+  })
+
   // Q15: gold-multiplier buffs stack additively via goldMultiplierBonus.
   // Each ×2 contributes +1 bonus, each ×3 contributes +2; the displayed
   // multiplier is 1 + bonus. Reverts subtract the same amount but clamp the

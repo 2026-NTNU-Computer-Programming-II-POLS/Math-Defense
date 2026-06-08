@@ -67,25 +67,32 @@ class LeaderboardApplicationService:
         an entry that is a personal best is always marked as such, even if
         it falls on page 3. The repo returns the full list (one user's
         sessions); we paginate in Python after PB detection.
+
+        BUG-010: sourced from the caller's own game sessions (including
+        preview/practice runs) rather than the leaderboard table, so a teacher —
+        whose every run is a preview — and a student's practice runs both appear
+        in their own timeline. The public ranking boards remain leaderboard-table
+        backed (see get_leaderboard), so this does not leak preview/practice runs
+        into any shared ranking.
         """
         # `history` is bounded by the repository's PB window; `total` is the
         # untruncated COUNT(*) so the client's page count stays accurate even
         # for users whose history exceeds the safety cap.
-        history, total = self._leaderboard_repo.get_user_history(user_id, level)
+        history, total = self._session_repo.get_user_session_history(user_id, level)
         # Walk chronologically (ASC) to compute the rolling-max PB set.
         chronological = list(reversed(history))
         running_best = -1
         pb_ids: set[str] = set()
         for entry in chronological:
-            if entry.score.value > running_best:
-                running_best = entry.score.value
+            if entry.score > running_best:
+                running_best = entry.score
                 pb_ids.add(entry.id)
         # Build the full annotated list (DESC order), then slice for the page.
         annotated = [
             PersonalHistoryEntry(
                 id=entry.id,
-                level=int(entry.level),
-                score=entry.score.value,
+                level=entry.level,
+                score=entry.score,
                 kills=entry.kills,
                 waves_survived=entry.waves_survived,
                 created_at=entry.created_at,

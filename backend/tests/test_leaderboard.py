@@ -1,3 +1,6 @@
+from tests.conftest import register_test_user
+
+
 def _register_and_token(client, name="player1"):
     email = f"{name}@test.local"
     password = "xQ7!aPm2#vKz9"
@@ -248,3 +251,54 @@ def test_personal_history_filters_by_level(client):
     assert len(entries) == 1
     assert entries[0]["level"] == 1
     assert entries[0]["score"] == 300
+
+
+def test_teacher_personal_history_includes_preview_runs(client, db_session):
+    """BUG-010: every teacher run is is_preview, so it never reaches the
+    leaderboard table. The self-view must still show it (sourced from the
+    teacher's own game_sessions), while it stays off the public board."""
+    _u, token, _r = register_test_user(
+        db_session,
+        email="t_hist@test.local",
+        password="xQ7!aPm2#vKz9",
+        player_name="t_hist",
+        role="teacher",
+    )
+    _create_completed_session(client, token, score=420)
+
+    res = client.get("/api/leaderboard/me", headers=_auth_headers(token))
+    assert res.status_code == 200
+    entries = res.json()["entries"]
+    assert len(entries) == 1
+    assert entries[0]["score"] == 420
+    assert entries[0]["is_personal_best"] is True
+
+    # The preview run must NOT leak into the public global board.
+    public = client.get("/api/leaderboard").json()["entries"]
+    assert 420 not in [e["score"] for e in public]
+
+
+def test_student_personal_history_includes_practice_runs(client, db_session):
+    """BUG-010 corollary: the self-view is the player's own timeline, so a
+    student's practice run appears in /me even though it is leaderboard-
+    ineligible and absent from the public board."""
+    token = _register_and_token(client, "pb_practice")
+    _create_completed_session(client, token, score=200)
+    # Practice run — leaderboard-ineligible but part of the player's history.
+    sid = client.post(
+        "/api/sessions",
+        json={"star_rating": 1, "practice_mode": True},
+        headers=_auth_headers(token),
+    ).json()["id"]
+    client.post(
+        f"/api/sessions/{sid}/end",
+        json={"score": 800, "kills": 10, "waves_survived": 3},
+        headers=_auth_headers(token),
+    )
+
+    entries = client.get("/api/leaderboard/me", headers=_auth_headers(token)).json()["entries"]
+    scores = sorted(e["score"] for e in entries)
+    assert scores == [200, 800]
+
+    public = client.get("/api/leaderboard").json()["entries"]
+    assert 800 not in [e["score"] for e in public]
