@@ -60,7 +60,7 @@ export const SPELL_DEFS: SpellDef[] = [
   {
     id: 'haste',
     name: 'Acceleration',
-    description: 'Speeds up every tower briefly, like velocity rising at rate dv/dt',
+    description: 'All towers deal 1.5× damage briefly, like output rising at rate dv/dt',
     cost: 120,
     cooldown: 25,
     targetMode: 'self',
