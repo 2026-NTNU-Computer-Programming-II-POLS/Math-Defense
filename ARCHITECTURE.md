@@ -1158,6 +1158,7 @@ emsdk/                           # local Emscripten SDK install (git-ignored; Do
 shared/                          # game-constants.json + enemy-defs.json + score_parity_fixtures.json
 scripts/                         # pg_backup.sh, pg_init_roles.sh, regenerate_score_fixtures.py, audit_score_caps.py
 stress/                          # k6 load-test harness (docker-compose.stress.yml, k6/, RESULTS.md)
+.github/                         # CI workflows (CodeQL, backend/frontend tests, docker-build; emsdk 5.0.7 pin)
 docs/                            # analysis / audit / educational-theory docs
 docker-compose.yml               # dev
 docker-compose.prod.yml          # prod (incl. db-backup sidecar + pg_backups volume)
