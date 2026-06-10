@@ -15,7 +15,7 @@ REST API server for Math Defense: authentication (incl. refresh-token rotation, 
 | Rate Limiting | slowapi (per-IP) + per-account login throttle |
 | Database | PostgreSQL 16 (psycopg v3; Alembic-managed schema) |
 | WASM host | wasmtime-py 45.0.0 (recomputes v2 scores via the same `math_engine.wasm` the frontend ships) |
-| Testing | pytest 9 + pytest-asyncio (32 test files) |
+| Testing | pytest 9 + pytest-asyncio (33 test files) |
 
 ---
 
@@ -43,7 +43,7 @@ backend/
 │   │   │   └── repository.py      Repository Protocol (interface only)
 │   │   ├── leaderboard/
 │   │   │   ├── aggregate.py       LeaderboardEntry aggregate
-│   │   │   ├── view.py            Read-model projection used by query_ranked / personal_timeline
+│   │   │   ├── view.py            Read-model projections: LeaderboardView (query_ranked) + SessionHistoryEntry (self-history timeline)
 │   │   │   └── repository.py      Repository Protocol
 │   │   ├── user/
 │   │   │   ├── aggregate.py       User aggregate (email, player_name, role; password_hash only — plaintext never reaches domain)
@@ -54,7 +54,7 @@ backend/
 │   │   ├── talent/                Talent tree aggregate + definitions + tree-builder (26 nodes: 19 base + 7 tier-2, 7 tower types, prereq chains including `prerequisite_max_levels` for tier-2)
 │   │   ├── class_/                Class aggregate + ClassMembership + join_code + class-scoped errors
 │   │   ├── auth/                  Auth-specific domain helpers (refresh-token repository protocol)
-│   │   ├── scoring/               score_calculator.py — server-side S1/S2/K/TotalScore formula
+│   │   ├── scoring/               score_calculator.py — server-side V3 score formula (killValue-based core × difficulty multiplier; S1/S2/K speed-efficiency blend)
 │   │   ├── territory/             Grabbing Territory aggregate + recommendation policy + optimistic locking
 │   │   ├── season/                Season aggregate — time-bounded achievement multipliers
 │   │   ├── challenge/             Challenge aggregate + constraint DSL + tower-type enum (generative challenge mode)
@@ -66,7 +66,7 @@ backend/
 │   │   ├── auth_service.py                AuthApplicationService — register / login / MFA / refresh + rotate + revoke
 │   │   ├── session_service.py             Session use cases; emits SessionCompleted to SessionEventBus; attaches reflection text post-end
 │   │   ├── session_event_handlers.py      Post-commit handlers (leaderboard insert / achievement check + assessment evidence / IA rolling accuracy) + SessionEventBus dispatcher — each handler runs in its own UoW
-│   │   ├── leaderboard_service.py         Per-level / class-scoped / challenge-scoped queries + personal-best timeline + manual submission
+│   │   ├── leaderboard_service.py         Per-level / class-scoped / challenge-scoped queries + manual submission + personal timeline (sourced from the caller's own game_sessions, incl. practice/preview)
 │   │   ├── achievement_service.py         Evaluate + unlock; awards talent points; applies active season multipliers
 │   │   ├── season_service.py              List + upsert seasonal windows
 │   │   ├── talent_service.py              Allocate + reset + runtime modifiers
@@ -92,7 +92,7 @@ backend/
 │   │   ├── wasm_runtime.py        Singleton wasmtime-py runtime hosting the same math_engine.wasm the frontend ships; exposes power_f64 for v2 score recompute. Thread-safe; raises ReplayUnavailableError when WASM cannot load so v2 fails closed.
 │   │   └── persistence/
 │   │       ├── user_repository.py             SQLAlchemy impl of UserRepository (incl. ia_recent_accuracy)
-│   │       ├── session_repository.py          SQLAlchemy impl + get_cumulative_stats() + compute_ia_recent_accuracy()
+│   │       ├── session_repository.py          SQLAlchemy impl + get_cumulative_stats() + compute_ia_recent_accuracy() + get_user_session_history()
 │   │       ├── leaderboard_repository.py      Per-level DENSE_RANK + per-class + per-challenge queries
 │   │       ├── achievement_repository.py      Achievement persistence
 │   │       ├── talent_repository.py           Talent allocations
@@ -108,7 +108,7 @@ backend/
 │   │       └── refresh_token_repository.py    Rotating refresh-token store (SHA-256 hashed; used + revoked flags)
 │   │
 │   ├── models/                    SQLAlchemy ORM models
-│   │   ├── user.py                User (email, player_name, role, is_active, totp_*, ia_recent_accuracy, password_version, endpoint_marker_style/custom_dataurl/hit_fx)
+│   │   ├── user.py                User (email, player_name, role, is_active, totp_*, ia_recent_accuracy, password_version, endpoint_marker_style/custom_dataurl/hit_fx, profile_initials_letters/color)
 │   │   ├── game_session.py        GameSession (CHECK star_rating 1–5, partial unique index on active, V2 scoring fields, reflection_text, practice_mode, is_preview, rng_seed, replay_version, challenge_id)
 │   │   ├── leaderboard.py         LeaderboardEntry (unique session_id; user_id nullable via SET NULL; challenge_id nullable)
 │   │   ├── login_attempt.py       LoginAttempt (per-username failure count + lockout deadline + lockout_count for backoff)
@@ -137,12 +137,12 @@ backend/
 │   │   ├── replay.py · season.py · study.py · territory.py
 │   │
 │   ├── routers/                   HTTP adapters — thin controllers; error translation lives in main.py
-│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile/{name,endpoint-marker} / mfa/*)
+│   │   ├── auth.py                /api/auth (register / login / logout / refresh / change-password / me / profile/{name,endpoint-marker,initials} / mfa/*)
 │   │   ├── game_session.py        /api/sessions (CRUD + /reflection)
 │   │   ├── leaderboard.py         /api/leaderboard (+ /me for personal timeline)
 │   │   ├── achievement.py         /api/achievements + GET /api/seasons (sibling seasons_router)
 │   │   ├── talent.py              /api/talents
-│   │   ├── class_.py              /api/classes (+ /reflections, /regenerate-code, /students)
+│   │   ├── class_.py              /api/classes (CRUD + archive/transfer + join/claim-invites/QR + students incl. bulk/move + co-teachers + invites + groups + reflections + leaderboard + report{,.csv})
 │   │   ├── admin.py               /api/admin (teachers / provision teacher / students / classes / set-active / seasons CRUD)
 │   │   ├── territory.py           /api/activities (+ /rankings, /rankings/with-meta, /external-rankings)
 │   │   ├── assessment.py          /api/assessment — class-scoped Beta posteriors for the teacher dashboard
@@ -159,12 +159,13 @@ backend/
 │       ├── security.py            hash_password, verify_password, create_access_token, decode_token
 │       ├── totp.py                TOTP secret generation + provisioning-URI / verify helpers
 │       ├── encryption.py          Fernet encrypt/decrypt for TOTP secrets at rest; verify_key_configured() fail-fast startup check
-│       └── integrity.py           is_constraint_violation() — matches PG constraint name on IntegrityError.orig.diag
+│       ├── integrity.py           is_constraint_violation() — matches PG constraint name on IntegrityError.orig.diag
+│       └── csv_export.py          csv_safe() formula-injection guard + UTF8_BOM — shared by the class report CSV and the study export
 │
-├── alembic/                       Alembic migration environment (versions/ + env.py) — 47 revisions through d1a2b3c4e5f6_drop_avatar_url_from_users (current head)
+├── alembic/                       Alembic migration environment (versions/ + env.py) — 49 revisions through f3d4e5a6b7c8_null_legacy_total_score_for_v3 (current head)
 ├── alembic.ini                    Alembic config; DATABASE_URL injected at runtime
 │
-├── tests/                         32 files
+├── tests/                         33 files
 │   ├── conftest.py                Fixtures (PG `math_defense_test` DB, TRUNCATE-per-test isolation, test client)
 │   ├── test_auth.py                       — register / login / me / logout
 │   ├── test_auth_lockout.py               — per-account lockout window + exponential backoff
@@ -191,6 +192,7 @@ backend/
 │   ├── test_class_extensions.py           — co-teachers, groups, pending invites
 │   ├── test_territory.py                  — activity lifecycle, seize/counter-seize, cap, settlement
 │   ├── test_endpoint_marker.py            — endpoint-marker prefs: schema + aggregate (magic-byte / PNG-dimension checks) + route round-trip + FE/BE parity
+│   ├── test_profile_initials.py           — profile-initials avatar (letters + colour): schema + aggregate pairing invariant + route round-trip
 │   ├── test_q_matrix.py                   — Q-matrix lookup + competency mapping
 │   ├── test_competency_estimator.py       — Beta posterior update (Bayesian stealth assessment)
 │   ├── test_assessment_router.py          — /api/assessment posteriors endpoint + RBAC
@@ -225,13 +227,13 @@ Pure Python — no SQLAlchemy, no FastAPI, no Pydantic.
 
 Use-case orchestration. One method per user intent. Services depend on the `UnitOfWork` protocol declared in `application/ports.py`, never directly on SQLAlchemy.
 
-- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_endpoint_marker`.
+- **`AuthApplicationService`** — `register / login / logout_token / refresh_access_token / change_password / authenticate_token / setup_mfa / confirm_mfa / disable_mfa / verify_mfa_challenge / update_player_name / update_endpoint_marker / update_profile_initials`.
 - **`SessionApplicationService`** — `create_session` (abandons stale sessions >2h and any existing active one, with one IntegrityError retry against the partial-unique index), `get_active_for_user`, `update_session`, `abandon_session`, `end_session` (transitions to COMPLETED and dispatches `SessionCompleted` through the event bus), `attach_reflection`, `has_correct_ia_session`.
 - **`SessionEventBus`** (in `session_event_handlers.py`) — dispatches `SessionCompleted` to three independent handlers, each in its own UoW so a downstream failure cannot roll back the durable session row:
   1. `LeaderboardInsertHandler` — idempotent insert (skipped when `practice_mode` or `is_preview` is true); `ConstraintViolationError` on the unique session-id constraint is the expected duplicate-delivery outcome.
   2. `AchievementCheckHandler` — evaluates the achievement registry; when an `AssessmentApplicationService` is wired, Beta-evidence rows for the unlocked achievements are written inside the same UoW via `apply_evidence_in_open_uow()` (H3 atomicity).
   3. `IaAccuracyRefreshHandler` — recomputes the rolling Initial-Answer accuracy on the user aggregate.
-- **`LeaderboardApplicationService`** — per-level / class-scoped / challenge-scoped queries, personal-best timeline, manual `submit_score` fallback.
+- **`LeaderboardApplicationService`** — per-level / class-scoped / challenge-scoped queries, manual `submit_score` fallback, and the personal timeline (`get_user_history`) — sourced from `GameSessionRepository.get_user_session_history()` (the caller's own completed `game_sessions`, **including** practice and teacher-preview runs) rather than the leaderboard table, with `is_personal_best` computed in the service. Public ranking boards remain leaderboard-table-backed.
 - **Other services** — `AchievementApplicationService`, `SeasonApplicationService`, `TalentApplicationService`, `ClassApplicationService`, `AdminApplicationService`, `TerritoryApplicationService`, `TerritoryRecommendationApplicationService`, `AssessmentApplicationService`, `RecommenderApplicationService`, `ChallengeApplicationService`, `ReplayApplicationService`, `StudyApplicationService`. All share one `SqlAlchemyUnitOfWork` per request (see `factories._get_uow`).
 
 Domain errors all inherit from `DomainError`; their HTTP status comes from the `_STATUS_BY_CLASS` table in `http_status_map.py` (MRO-walked, so subclassing keeps you on the most specific mapping). `DomainValueError` dual-inherits from `ValueError` so existing `except ValueError` clauses keep working. `mappers.py` converts aggregates to Pydantic DTOs so routers stay one-liners.
@@ -293,6 +295,7 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 | GET | `/api/auth/me` | 30/min | Current user + IA unlock state + rolling IA accuracy |
 | PUT | `/api/auth/profile/name` | 10/min | Update `player_name` |
 | PUT | `/api/auth/profile/endpoint-marker` | 10/min | Update endpoint-marker prefs (`style` ∈ star/gorilla/custom, optional `custom_dataurl` PNG/JPEG, `hit_fx` ∈ random/fragments/crying/angry); aggregate re-validates magic bytes + PNG dimensions |
+| PUT | `/api/auth/profile/initials` | 10/min | Update the profile-initials avatar (1–2 letters + `#RRGGBB` colour; both-or-neither — the aggregate enforces the pairing invariant) |
 | POST | `/api/auth/mfa/setup` | 5/min | Generate TOTP secret + provisioning URI |
 | POST | `/api/auth/mfa/confirm` | 5/min | Verify first TOTP code, flip `mfa_enabled=true` |
 | POST | `/api/auth/mfa/disable` | 5/min | Require current password + TOTP code, then disable |
@@ -348,7 +351,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | Method | Path | Rate | Description |
 |---|---|---|---|
 | GET | `/api/leaderboard?level=&class_id=&challenge_id=&page=&per_page=` | 30/min | Ranked entries. `level` → per-difficulty dense rank; `class_id` → class-scoped (requires auth + membership); `challenge_id` → challenge-scoped (requires auth). |
-| GET | `/api/leaderboard/me?level=&page=&per_page=` | 30/min | Personal-best timeline for the authenticated caller; `is_personal_best` flag per row |
+| GET | `/api/leaderboard/me?level=&page=&per_page=` | 30/min | Personal timeline for the authenticated caller, sourced from their own completed sessions (includes practice + teacher-preview runs, which public boards exclude); `is_personal_best` flag per row |
 | POST | `/api/leaderboard` | 10/min | Manual score submission (fallback if event-bus auto-create failed) |
 
 ### Achievements — `/api/achievements`
@@ -384,11 +387,33 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | GET | `/api/classes/{id}` | 30/min | Class details (teacher: full view; student: safe view without join_code) |
 | PUT | `/api/classes/{id}` | 10/min | Rename class (teacher, must own) |
 | DELETE | `/api/classes/{id}` | 10/min | Delete class (teacher/admin, must own) |
+| POST | `/api/classes/{id}/archive` | 10/min | Archive a class (hidden from active lists; teacher-owner) |
+| POST | `/api/classes/{id}/unarchive` | 10/min | Restore an archived class (teacher-owner) |
+| POST | `/api/classes/{id}/transfer` | 5/min | Transfer class ownership to another teacher |
 | POST | `/api/classes/join` | 10/min | Student joins by `join_code` |
+| POST | `/api/classes/claim-invites` | 10/min | Student claims pending email invites issued before their account existed |
 | POST | `/api/classes/{id}/regenerate-code` | 5/min | Regenerate join code; old code immediately invalid (teacher) |
+| GET | `/api/classes/{id}/qr` | 30/min | Join-QR payload (deep-link `/classes?code=…`) for the current join code (teacher/admin) |
 | POST | `/api/classes/{id}/students` | 30/min | Add a student by email directly (teacher, must own) |
+| POST | `/api/classes/{id}/students/bulk` | 5/min | Bulk-add students by email list; unknown emails become pending invites (teacher) |
 | GET | `/api/classes/{id}/students` | 30/min | List enrolled students (teacher/admin) |
 | DELETE | `/api/classes/{id}/students/{student_id}` | 30/min | Remove student; cascades territory occupations (teacher) |
+| POST | `/api/classes/{id}/students/{student_id}/move` | 10/min | Move a student to another class owned by the same teacher |
+| GET | `/api/classes/{id}/co-teachers` | 30/min | List co-teacher grants (teacher/admin) |
+| POST | `/api/classes/{id}/co-teachers` | 10/min | Grant co-teacher access by email (owner) |
+| DELETE | `/api/classes/{id}/co-teachers/{teacher_id}` | 10/min | Revoke a co-teacher grant (owner) |
+| GET | `/api/classes/{id}/invites` | 30/min | List pending email invites (teacher/admin) |
+| DELETE | `/api/classes/{id}/invites/{email}` | 10/min | Cancel a pending invite (teacher) |
+| GET | `/api/classes/{id}/groups` | 30/min | List named student sub-groups (teacher/admin) |
+| POST | `/api/classes/{id}/groups` | 20/min | Create a group (teacher) |
+| PUT | `/api/classes/{id}/groups/{group_id}` | 20/min | Rename a group (teacher) |
+| DELETE | `/api/classes/{id}/groups/{group_id}` | 20/min | Delete a group (teacher) |
+| GET | `/api/classes/{id}/groups/{group_id}/members` | 30/min | List group members (teacher/admin) |
+| POST | `/api/classes/{id}/groups/{group_id}/members/{student_id}` | 30/min | Add a student to a group (teacher) |
+| DELETE | `/api/classes/{id}/groups/{group_id}/members/{student_id}` | 30/min | Remove a student from a group (teacher) |
+| GET | `/api/classes/{id}/leaderboard` | 30/min | Class-scoped leaderboard (teacher/admin/member) |
+| GET | `/api/classes/{id}/report` | 10/min | Per-student aggregate report rows (teacher/admin); practice + preview sessions excluded so ranks match the public boards |
+| GET | `/api/classes/{id}/report.csv` | 10/min | Same report as CSV download — UTF-8 BOM for Excel + `csv_safe` formula-injection neutralisation on user-controlled cells |
 | GET | `/api/classes/{id}/reflections` | 30/min | Per-session reflection feed for a class (teacher/admin) |
 
 ### Admin — `/api/admin`
@@ -480,6 +505,8 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `endpoint_marker_style` | String(16) | Nullable; CHECK ∈ `star`/`gorilla`/`custom`; player's P\* endpoint-marker style (NULL = FE default) |
 | `endpoint_marker_custom_dataurl` | Text | Nullable; PNG/JPEG data-URL for a custom endpoint marker (only valid when style = `custom`) |
 | `endpoint_hit_fx` | String(16) | Nullable; CHECK ∈ `random`/`fragments`/`crying`/`angry`; endpoint hit-effect style |
+| `profile_initials_letters` | String(2) | Nullable; profile-initials avatar letters (1–2 chars). Paired CHECK `ck_user_profile_initials_paired` — both initials columns NULL or both set |
+| `profile_initials_color` | String(7) | Nullable; avatar colour as `#RRGGBB` (enforced by the paired CHECK) |
 | `created_at`, `updated_at` | DateTime | Auto-managed |
 
 ### GameSession
@@ -605,7 +632,7 @@ docker compose up backend        # from project root (older installs: docker-com
 ## Testing
 
 ```bash
-pytest                                       # 32 test files
+pytest                                       # 33 test files
 pytest tests/test_session_aggregate.py -v    # pure aggregate unit tests
 pytest tests/test_coverage_gaps.py -v        # audit-driven edge cases
 pytest tests/test_territory.py -v            # territory integration tests
@@ -642,7 +669,7 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter), keyed by client IP.
 | `POST /auth/refresh` | 30/min |
 | `POST /auth/change-password` | 5/min |
 | `GET /auth/me` | 30/min |
-| `PUT /auth/profile/name`, `PUT /auth/profile/endpoint-marker` | 10/min |
+| `PUT /auth/profile/name`, `PUT /auth/profile/endpoint-marker`, `PUT /auth/profile/initials` | 10/min |
 | `POST /auth/mfa/setup`, `/mfa/confirm`, `/mfa/disable` | 5/min |
 | `POST /auth/mfa/challenge` | 10/min |
 | `POST /sessions` | 30/min |
@@ -660,10 +687,13 @@ Implemented via `slowapi` (Starlette port of Flask-Limiter), keyed by client IP.
 | `GET /talents`, `/talents/modifiers` | 60/min |
 | `POST /talents/{node_id}/allocate` | 30/min |
 | `POST /talents/reset` | 10/min |
-| `POST /classes`, `PUT/DELETE /classes/{id}`, `POST /classes/join` | 10/min |
-| `GET /classes`, `/classes/{id}`, `/classes/{id}/students`, `/classes/{id}/reflections` | 30/min |
-| `POST /classes/{id}/regenerate-code` | 5/min |
-| `POST /classes/{id}/students`, `DELETE /classes/{id}/students/{student_id}` | 30/min |
+| `POST /classes`, `PUT/DELETE /classes/{id}`, `POST /classes/join`, `POST /classes/claim-invites`, `POST /classes/{id}/archive` + `/unarchive` | 10/min |
+| `GET /classes`, `/classes/{id}`, `/classes/{id}/students`, `/classes/{id}/reflections`, `/classes/{id}/qr`, `/classes/{id}/leaderboard`, `GET` co-teachers / invites / groups / group-members | 30/min |
+| `POST /classes/{id}/regenerate-code`, `POST /classes/{id}/transfer`, `POST /classes/{id}/students/bulk` | 5/min |
+| `POST /classes/{id}/students`, `DELETE /classes/{id}/students/{student_id}`, `POST/DELETE` group members | 30/min |
+| `POST /classes/{id}/students/{student_id}/move`, `POST/DELETE` co-teachers, `DELETE /classes/{id}/invites/{email}` | 10/min |
+| `POST/PUT/DELETE /classes/{id}/groups…` (group CRUD) | 20/min |
+| `GET /classes/{id}/report`, `/classes/{id}/report.csv` | 10/min |
 | `GET /admin/teachers`, `/admin/classes`, `/admin/students`, `PATCH /admin/users/{id}/active` | 30/min |
 | `POST /admin/teachers` | 5/min |
 | `POST /activities`, `/activities/{id}/settle` | 10/min, 5/min |

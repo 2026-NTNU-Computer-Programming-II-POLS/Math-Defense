@@ -35,7 +35,7 @@ frontend/
 │   │   ├── GameView.vue            Game container (canvas + HUD overlay)
 │   │   ├── ScoreResultView.vue     Post-game score breakdown (S1/S2/K/TotalScore)
 │   │   ├── LeaderboardView.vue     Score table
-│   │   ├── ProfileView.vue         User profile + achievement/talent summary cards + endpoint-marker customization (star/gorilla/custom image upload, hit-FX picker)
+│   │   ├── ProfileView.vue         User profile + initials-avatar editor (letters + tower-palette colour) + achievement/talent summary cards + endpoint-marker customization (star/gorilla/custom image upload, hit-FX picker)
 │   │   ├── AchievementView.vue     Achievement gallery (5 categories, season multipliers)
 │   │   ├── TalentTreeView.vue      Talent tree allocation UI (26 nodes, 7 tower types)
 │   │   ├── ClassView.vue           Student: list/join classes; Teacher: create/manage classes
@@ -119,7 +119,7 @@ frontend/
 │   │   ├── usePolling.ts                 Polling helper with backoff + cleanup
 │   │   ├── useTokenProbe.ts              Probes auth-token freshness on resume / focus
 │   │   ├── useCanvasPlot.ts              Canvas plotting helper for KaTeX-adjacent function previews
-│   │   ├── useProfileInitials.ts        Singleton reactive custom-initials avatar (letters + tower-palette colour), persisted to `localStorage`
+│   │   ├── useProfileInitials.ts        Custom-initials avatar (letters + tower-palette colour) derived from the authenticated user; persisted server-side via `authService.updateProfileInitials` (legacy localStorage key scrubbed on init)
 │   │   ├── useAuth.ts                    Reactive auth helpers (email-based; role checks)
 │   │   ├── useLeaderboard.ts             Leaderboard fetch helpers
 │   │   ├── useManual.ts                  Fetch + reactive state for the in-app Manual viewer
@@ -137,7 +137,7 @@ frontend/
 │   ├── services/                   Backend API clients
 │   │   ├── api.ts                          fetch wrapper; cookie-based session + refresh-and-retry on 401; ApiError
 │   │   ├── imageCache.ts                   dataURL → HTMLImageElement loader/cache for the custom endpoint-marker image
-│   │   ├── authService.ts                  register(email, password, playerName, role) / login / me / logout / updatePlayerName / updateEndpointMarker
+│   │   ├── authService.ts                  register(email, password, playerName, role) / login / mfaChallenge / me / logout / changePassword / updatePlayerName / updateEndpointMarker / updateProfileInitials
 │   │   ├── sessionService.ts               create / update / end / abandon / getActive (V2 fields, rng_seed, practice_mode)
 │   │   ├── sessionLifecycleService.ts      High-level orchestration around session creation + end / score submit
 │   │   ├── gameCommandService.ts           Server-authoritative game commands (when backend governs a run)
@@ -231,7 +231,7 @@ frontend/
 │   │   ├── placement/
 │   │   │   └── legal-positions.ts        Grid intersection point legality computation
 │   │   ├── scoring/
-│   │   │   └── score-calculator.ts       S1/S2/K/TotalScore formula (mirrors backend)
+│   │   │   └── score-calculator.ts       V3 score formula — killValue-based core, S1/S2/K speed-efficiency blend, difficulty multiplier (mirrors backend)
 │   │   ├── study/
 │   │   │   └── probe-items.ts            Item pool for the Empirical Validity Probe forms (pre/post/delay) + affect items
 │   │   └── wave/
@@ -252,7 +252,7 @@ frontend/
 │   │   ├── PetCombatSystem.ts         Pet projectile homing movement, collision damage, expiry pruning
 │   │   ├── MovementSystem.ts          Path movement with arc-length correction
 │   │   ├── WaveSystem.ts              Enemy spawn queue driven by domain/wave/wave-generator
-│   │   ├── BuffSystem.ts              Time-based buff/curse strategy map; applyExternalBuff() public API
+│   │   ├── BuffSystem.ts              Time-based buff/curse strategy map; applyExternalBuff() + retireActiveBuffByEffectId() public API
 │   │   ├── SpellSystem.ts             4 spells (Exponential/Asymptote/Impulse/Acceleration) + cooldown mgmt
 │   │   ├── MontyHallSystem.ts         Kill-value threshold triggers; door reveal + switch logic; reward injection
 │   │   ├── EconomySystem.ts           Gold on kill (×goldMultiplier), HP on origin reach, wave bonuses
@@ -337,7 +337,9 @@ frontend/
 │   └── synth-audio.py                Regenerates `public/audio/*.wav` from a CC0/synth recipe
 │
 ├── dev/                            Dev-only benches (excluded from prod test run)
+│   ├── bench-game-hotpath.bench.ts
 │   ├── bench-level-gen.bench.ts
+│   ├── bench-wasm-engine.bench.ts
 │   └── vitest.bench.config.ts
 │
 ├── package.json
@@ -486,7 +488,7 @@ Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_ST
 | `MontyHallSystem` | Kill-value thresholds per star rating; door reveal logic; injects rewards via `BuffSystem.applyExternalBuff()` |
 | `MovementSystem` | Advances enemies along CurvePath/SegmentedPath via matching strategy; reads `speedBoost` + `enemySpeedMultiplier` |
 | `WaveSystem` | Reads wave schedule; spawns via `EnemyFactory`; detects clear, emits `WAVE_END` |
-| `BuffSystem` | Time-based active buffs; 30+ effect strategies; `applyExternalBuff()` for SpellSystem + MontyHallSystem |
+| `BuffSystem` | Time-based active buffs; 30+ effect strategies; `applyExternalBuff()` for SpellSystem + MontyHallSystem; `retireActiveBuffByEffectId()` retires a buff early on non-timer expiry (e.g. Ward Shield's 3-hit absorption draining before the 30 s countdown) |
 | `EconomySystem` | Gold on `ENEMY_KILLED` (`killValue × goldMultiplier`); HP damage on `ENEMY_REACHED_ORIGIN`; wave completion bonus |
 | `EndpointFXSystem` | On `ENEMY_REACHED_ORIGIN`, spawns a transient burst on the endpoint marker (P*): `fragments` (default) / `crying` / `angry`. Style read from `game.endpointFx` (set from `uiStore.endpointHitFx`); `random` resolves via `game.rng` so replays reproduce the same FX. Suppressed when the marker is hidden (`pathsVisible === false`) |
 
@@ -541,14 +543,14 @@ Authentication is cookie-based (HTTP-only); the store holds **no** token. Login 
 
 | State | Description |
 |---|---|
-| `user` | `{ id, email, player_name, role, ia_unlock_earned, ia_recent_accuracy }` (snake_case, mapped from `/auth/me`) or `null` |
+| `user` | `{ id, email, player_name, role, ia_unlock_earned, ia_recent_accuracy, endpoint_marker_*, endpoint_hit_fx, profile_initials_letters/color, … }` (snake_case, mapped from `/auth/me`) or `null` |
 | `initializing` | `true` while `me()` is in-flight on boot |
 | `initPromise` | Resolves when the boot `init()` completes (awaited by router guards) |
 | `sessionExpired` | Set by the api.ts 401 interceptor once the session is unrecoverable |
 
 Computed: `isLoggedIn`, `userRole`, `isAdmin`, `isTeacher`, `isStudent`.
 
-Actions: `init()`, `setUser()`, `clearAuth()`, `handleSessionExpiry()`, `logout()`, `refreshProfile()`, `updatePlayerName()`, `stopProbe()`.
+Actions: `init()`, `setUser()`, `patchUser()` (in-place partial merge — no token-probe restart), `clearAuth()`, `handleSessionExpiry()`, `logout()`, `refreshProfile()`, `updatePlayerName()`, `stopProbe()`.
 
 ### `gameStore`
 
@@ -596,13 +598,13 @@ Also owns the **endpoint-marker** preferences (persisted to `localStorage` and s
 |---|---|
 | `api.ts` | `get` / `post` / `put` / `del` helpers — fetch wrapper with cookie-based session (`credentials: 'include'`), refresh-and-retry on 401, `ApiError` class (no `Authorization` header / no localStorage token) |
 | `imageCache.ts` | `loadImage(dataUrl)` / `getCached` / `evict` / `clearCache` — caches the player's custom endpoint-marker image as an `HTMLImageElement` |
-| `authService.ts` | `register(email, password, playerName, role='student')`, `login(email, password)`, `me()`, `logout()`, `updatePlayerName`, `updateEndpointMarker(payload)` |
+| `authService.ts` | `register(email, password, playerName, role='student')`, `login(email, password)`, `mfaChallenge(mfaToken, code)`, `me()`, `logout()`, `changePassword`, `updatePlayerName`, `updateEndpointMarker(payload)`, `updateProfileInitials(payload)` |
 | `sessionService.ts` | `create(...)`, `getActive()`, `update(id, patch)`, `end(id, result)`, `abandon(id)`, `submitReflection(id, text)`, `appendReplayEvents(...)`, `getReplay(id)` |
 | `sessionLifecycleService.ts` | High-level orchestration: open a session, attach engine, submit the final score in one flow |
 | `gameCommandService.ts` | Issues server-authoritative game commands (used when the backend governs a run) |
 | `levelGenerationService.ts` | Fetches deterministic level definitions / decoy curves from the backend |
 | `waveService.ts` | Wave-schedule fetch and regeneration helpers |
-| `leaderboardService.ts` | `get(level?, page, perPage)`, `getForChallenge(challengeId, page, perPage)`, `getMyHistory(level?)` (personal-best timeline). Scores are submitted through the session-end flow, not here |
+| `leaderboardService.ts` | `get(level?, page, perPage)`, `getForChallenge(challengeId, page, perPage)`, `getMyHistory(level?)` (personal timeline — served from the caller's own completed sessions, so practice and teacher-preview runs are included). Scores are submitted through the session-end flow, not here |
 | `achievementService.ts` | `list()`, `summary()`, `unlockedIds()` (memoised set), `invalidateUnlockedIds()` |
 | `talentService.ts` | `getTree()`, `getModifiers()`, `allocate(nodeId)`, `reset()` |
 | `classService.ts` | Full class CRUD + roster + organisation: `createClass`, `listClasses`, `getClass`, `renameClass`, `updateClass`, `deleteClass`, `archiveClass` / `unarchiveClass`, `transferOwnership`, `addStudent` / `bulkAddStudents` / `removeStudent` / `moveStudent`, `listStudents`, `joinByCode`, `claimInvites`, `regenerateCode`, `joinQr`, co-teacher + invite + group + reflection + leaderboard/report helpers |
@@ -758,14 +760,14 @@ frontend dev ports are bound to `127.0.0.1` only in compose.
 
 ## Testing
 
-Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships **87 `*.test.ts` files** under `frontend/src/` (plus one `*.bench.ts` under `dev/`, excluded from the prod run) spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
+Vitest is configured with `happy-dom` so systems can be tested without a real browser. The codebase currently ships **90 `*.test.ts` files** under `frontend/src/` (plus three `*.bench.ts` under `dev/`, excluded from the prod run) spanning engine units, system behaviour, projections, renderers, view components, composables, scoring parity, and a CounterEnemy end-to-end scenario. Notable groupings:
 
 - **Engine units** — `EventBus`, `Game`, `PhaseStateMachine`, `Renderer`, `level-context`, `generated-level-context`, `engine/audio/AssetManager`, `engine/projections/{project-path-panel, project-enemies, project-towers}`, `engine/render-helpers/tile-style`, `engine/__tests__/determinism` (replay reproducibility from `rng_seed`).
 - **Domain** — `domain/combat/{SplitPolicy, RadarTargeting}`, `domain/level/{level-generator, level-layout-service, placement-policy, checkpoint}`, `domain/movement/{vertical, x-driven}-movement-strategy`, `domain/path/{path-builder, path-progress-tracker, path-validator, segmented-path}`, `domain/scoring/score-calculator.parity` (frontend ↔ backend formula parity), `domain/wave/wave-generator`.
 - **Systems** (`systems/__tests__/`) — `BuffSystem` + `BuffSystem.duration` + `BuffSystem.effects`, `CalculusTowerSystem`, `CombatSystem`, `CounterEnemy.e2e`, `EconomySystem`, `EnemyAbilitySystem`, `EndpointFXSystem`, `LimitTowerSystem`, `MagicTowerSystem`, `MatrixTowerSystem`, `MontyHallSystem`, `MovementSystem`, `PetCombatSystem`, `RadarTowerSystem`, `TowerInterferenceSystem`, `TowerPlacementSystem`, `TowerUpgradeSystem`, `WaveSystem`.
-- **Components / views / composables** — `views/{GameView, InitialAnswerView, LevelSelectView}`, `components/game/{FunctionPanel, LimitQuestionPanel, RadarConfigPanel, CalculusPanel, PrincipleOverlay, WaveForecast}`, `stores/uiStore`, `composables/{useSessionSync, useKeyboardPlacement, useFirstEncounterCards, principle-defs}`.
-- **Data / lints** — `data/tower-defs`, `data/achievement-defs` (bans trait-praise vocabulary; requires verb-led descriptions), `entities/{EnemyFactory, TowerFactory, tower-stats, PetFactory}`, `math/{rational, monomial, limit-evaluator, curve-evaluator, curve-renderer}`.
-- **WASM parity** — `WasmBridge.test.ts` pins the JS fallback surface; `WasmBridge.curve.test.ts` / `WasmBridge.prng.test.ts` cover JS-only parity for curve and PRNG subsystems; `WasmBridge.wasm.test.ts` and the four `*.wasm.test.ts` siblings (`curve`, `prng`, `intersect`, `spawn`, `levelgen`) load the compiled binary under Node and assert bit-level parity for each subsystem (skipped if the WASM build is absent).
+- **Components / views / composables** — `views/{GameView, InitialAnswerView, LevelSelectView}`, `components/game/{FunctionPanel, LimitQuestionPanel, RadarConfigPanel, CalculusPanel, PrincipleOverlay, WaveForecast}`, `stores/uiStore`, `composables/{useSessionSync, useKeyboardPlacement, useFirstEncounterCards, useProfileInitials, principle-defs}`, `utils/formatters`.
+- **Data / lints** — `data/tower-defs`, `data/achievement-defs` (bans trait-praise vocabulary; requires verb-led descriptions), `entities/{EnemyFactory, TowerFactory, tower-stats, PetFactory}`, `math/{rational, monomial, limit-evaluator, curve-evaluator, curve-renderer, expressionParser}`.
+- **WASM parity** — `WasmBridge.test.ts` pins the JS fallback surface; `WasmBridge.curve.test.ts` / `WasmBridge.prng.test.ts` cover JS-only parity for curve and PRNG subsystems; `WasmBridge.wasm.test.ts` and the five `*.wasm.test.ts` siblings (`curve`, `prng`, `intersect`, `spawn`, `levelgen`) load the compiled binary under Node and assert bit-level parity for each subsystem (skipped if the WASM build is absent).
 - **Renderers** — `renderers/{CombatFeedbackRenderer, LimitBurstRenderer, PetRenderer, SpellEffectRenderer, TowerRenderer, EnemyRenderer, glyph-fallback-safety}` cover floating-number / hit-flash output, burst variants, glyph-body sprites, and font-fallback safety.
 
 ---

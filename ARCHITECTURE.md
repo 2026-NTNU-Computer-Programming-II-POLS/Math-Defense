@@ -1,7 +1,7 @@
 # Math Defense — System Architecture
 
 > Comprehensive architecture reference for the Math Defense educational tower-defense game.
-> Generated 2026-05-08, refreshed 2026-05-28 from a full audit of source, schema, and deployment configuration.
+> Generated 2026-05-08, refreshed 2026-06-10 from a full audit of source, schema, and deployment configuration.
 
 This document describes the system from four complementary angles:
 
@@ -18,19 +18,21 @@ All diagrams use [Mermaid](https://mermaid.js.org/). Render directly in GitHub, 
 
 | Path | Role |
 |---|---|
-| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~87 Vitest files. |
-| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (47 migrations), ~32 pytest files. |
-| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + score recompute). Sources: `math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`, `Makefile`. |
-| `emsdk/` | Vendored Emscripten SDK (no rebuild required unless updating compiler). |
+| `frontend/` | Vue 3 + Vite SPA. Pure-TS game engine, ECS-style systems, Pinia stores, ~90 Vitest files. Static assets (audio, tower/monster sprites, manual pages) live in `frontend/public/`. |
+| `backend/` | FastAPI service with DDD layering, SQLAlchemy ORM, Alembic (49 migrations), ~33 pytest files. |
+| `wasm/` | C99 math kernel compiled to WebAssembly via Emscripten (17 user-facing exports + `malloc`/`free`: tower mechanics + replay-v2 PRNG/curve/level-gen + canonical `compute_total_score`). Sources: `math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`, `Makefile`. |
+| `emsdk/` | Local Emscripten SDK install location — **git-ignored, not committed**; install it yourself before rebuilding the WASM. Reproducible builds pin `emscripten/emsdk:5.0.7` (backend `Dockerfile` wasm-builder stage + CI `setup-emsdk`); see `UBUNTU_SETUP.md` for platform caveats. |
 | `shared/` | `game-constants.json` (canvas/grid/economy single source of truth) + `enemy-defs.json` (enemy stats/abilities, cross-language) + `score_parity_fixtures.json` (cross-language score-formula fixtures). |
-| `assets/` | Sprites, audio, fonts (referenced as `frontend/public/`). |
+| `scripts/` | Operational scripts: `pg_backup.sh` (daily prod dump), `pg_init_roles.sh` (least-privilege DML-only DB role), `regenerate_score_fixtures.py` (score parity fixtures), `audit_score_caps.py`. |
+| `stress/` | k6 load-test harness: `docker-compose.stress.yml`, scenarios in `k6/`, run scripts, `RESULTS.md`. |
 | `docs/` | Project documentation (analysis, audit, educational theory). |
 | `docker-compose.yml` | Dev orchestration: Postgres + backend (hot reload) + Vite dev server. |
-| `docker-compose.prod.yml` | Production: self-contained images, nginx + TLS termination. |
+| `docker-compose.prod.yml` | Production: self-contained images, nginx + TLS termination, db-backup sidecar. |
 | `nginx.conf`, `nginx-tls.conf`, `security-headers.conf` | SPA fallback + `/api` reverse proxy + shared security/CSP header snippet (included by both nginx configs). |
 | `Math_Defense_Spec.md` | V1 design spec (superseded but retained for V2 lineage). |
 | `DATABASE_SCHEMA.md` | Full ERD: 29 tables, constraints, indexes, migration history. |
 | `SECURITY.md` | Auth flow, JWT/bcrypt, lockout, MFA, CSRF, CSP, audit logging. |
+| `UBUNTU_SETUP.md` | Step-by-step Ubuntu 24.04 setup guide (Docker and native paths, WASM/emsdk caveats). |
 
 ---
 
@@ -63,7 +65,7 @@ flowchart TB
         Infra --> Domain
     end
 
-    DB[("PostgreSQL 16<br/>Alembic: 47 migrations<br/>29 tables")]
+    DB[("PostgreSQL 16<br/>Alembic: 49 migrations<br/>29 tables")]
     Shared[/"shared/game-constants.json<br/>(parity-tested)"/]
 
     Client -- HTTPS --> Nginx
@@ -181,7 +183,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph Auth["Auth Context"]
-        U[User Aggregate<br/>password_version · role<br/>endpoint-marker prefs]
+        U[User Aggregate<br/>password_version · role<br/>endpoint-marker · initials prefs]
         LA[LoginAttempt]
         DT[DeniedToken]
         RT[RefreshToken]
@@ -301,7 +303,7 @@ sequenceDiagram
 
 | Router | Mount | Highlights |
 |---|---|---|
-| `auth.py` | `/api/auth` | register, login, logout, me, refresh; profile sub-routes (`PUT /profile/name`, `/profile/endpoint-marker`); CSRF + lockout-aware |
+| `auth.py` | `/api/auth` | register, login, logout, me, refresh; profile sub-routes (`PUT /profile/name`, `/profile/endpoint-marker`, `/profile/initials`); CSRF + lockout-aware |
 | `game_session.py` | `/api/sessions` | create, active, patch, end, abandon |
 | `leaderboard.py` | `/api/leaderboard` | DENSE_RANK per star, manual submit, personal timeline |
 | `achievement.py` | `/api/achievements` | list, summary |
@@ -483,12 +485,13 @@ flowchart TB
 | `challengeService` | `/api/challenges/*` |
 | `studyService` | `/api/study/*` |
 | `imageCache` | client-side decode/cache of endpoint-marker data URLs (no HTTP) |
+| `territory/` (subdir) | pure helpers shared by territory views — `challengeMode.ts`, `rankingSort.ts` (no HTTP) |
 
 ---
 
 ## 5. WebAssembly Math Kernel
 
-C99 sources in `wasm/` (`math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`), compiled by Emscripten (`wasm/Makefile`, invoked as `make -f wasm/Makefile` after activating the vendored `emsdk/`) to `frontend/src/math/wasm/math_engine.{js,wasm}` plus an auto-generated `frontend/src/math/wasm-exports.d.ts`. The bridge layer (`WasmBridge.ts`) provides:
+C99 sources in `wasm/` (`math_engine.c`, `prng.c/h`, `curve.c/h`, `level_gen.c/h`), compiled by Emscripten (`wasm/Makefile`, invoked as `make -f wasm/Makefile` after installing and activating the Emscripten SDK — `emsdk/` is git-ignored; the backend Docker build and CI both pin `emscripten/emsdk:5.0.7`) to `frontend/src/math/wasm/math_engine.{js,wasm}` plus an auto-generated `frontend/src/math/wasm-exports.d.ts`. The bridge layer (`WasmBridge.ts`) provides:
 
 - **RAII float-buffer helpers** that allocate via `malloc`, hand a typed view to the caller, and `free` on disposal.
 - **JS fallbacks** for every export, gated by `setUseWasm(false)` for diagnostics.
@@ -563,14 +566,19 @@ formula through the same musl `pow` the backend recomputes against
 
 For `replay_version=2` sessions the backend recomputes the score **core**
 from the asserted `ScoreInput` (kill_value, time_total, cost_total, HP
-delta, prep-phase durations) using the **same** musl `pow` the browser
-ran. `app/infrastructure/wasm_runtime.py` loads the same `math_engine.wasm`
-artifact the frontend ships, instantiates it under wasmtime-py, and
-exposes a singleton `power_f64(base, exp)` callable. The score recompute
-in `app/domain/scoring/score_calculator.py` accepts a `pow_fn`
-parameter; `SessionApplicationService._verify_score` injects the WASM
-callable so the recomputed core is bit-equal to the browser-displayed one.
-`_verify_score` then applies `SCORE_SCALE_K` (= 1) and the star-difficulty
+delta, prep-phase durations) through the **same** WASM artifact the browser
+ran. `app/infrastructure/wasm_runtime.py` loads the `math_engine.wasm` the
+frontend ships, instantiates it under wasmtime-py, and binds two singleton
+callables: `power_f64(base, exp)` and the **V3 canonical scorer**
+`compute_total_score(...)`. The recompute in
+`app/domain/scoring/score_calculator.py` delegates the entire core to
+`compute_total_score` when available — client and server then literally call
+the same C function, so the recomputed core is bit-equal to the
+browser-displayed one — and falls back to a parity-pinned Python mirror
+(with `power_f64` injected as `pow_fn`) only when that export is missing.
+The V3 core is `killValue^(1/√denom) · k` (k = continuous α-blend of the
+time-rate S1 and cost-rate S2). `SessionApplicationService._verify_score`
+then applies `SCORE_SCALE_K` (= 1) and the star-difficulty
 multiplier `1 + 0.25·(star−1)` — derived from the **trusted** `session.star_rating`,
 never a client field — to obtain the stored `total_score`. The persisted
 value is the sole authority for the leaderboard and territory (both rank
@@ -588,16 +596,25 @@ Acceptance flow:
    `ReplayMismatchError → HTTP 422 {"detail": "replay_mismatch"}`.
 4. **v1 path:** legacy ε=5e-4 tolerance, mismatch logs a warning and
    the canonical server value overwrites the client one.
-5. **WASM unavailable:** if wasmtime-py or `math_engine.wasm` are
-   missing at boot, the singleton falls back to Python `pow` and even
-   v2 sessions widen to v1's ε tolerance — bit-equality cannot be
-   guaranteed without the shared musl. The fallback is logged loudly
-   so a misconfigured deploy is visible.
+5. **WASM unavailable:** v2 submissions **fail closed**. If wasmtime-py or
+   `math_engine.wasm` are missing at boot, `_verify_score` raises
+   `ReplayUnavailableError → HTTP 503` for any v2 session that submits a
+   score, rather than silently weakening the bit-equal contract to v1's ε
+   (the pre-B-BUG-15 behaviour). v1 sessions still verify through the
+   Python fallback at ε tolerance. The missing runtime is logged loudly so
+   a misconfigured deploy is visible.
 
-Today's coverage stops at score-formula tampering. A richer attack —
-fabricating the entire event stream so the resulting `ScoreInput`
-*itself* is a lie — is out of scope and waits on the full Python port
-of `EventPlayer`'s tick logic, which is not yet landed.
+Beyond the formula itself, `_verify_score` cross-checks the asserted inputs
+against the append-only event log: a minimum `time_total` and the per-wave
+prep durations are derived from the recorded `session_events`; an
+under-reported `time_total` is floored to the derived value (which on v2
+surfaces as `replay_mismatch`), an inflated `time_exclude_prepare` sum is
+replaced by the server-derived one, and `cost_total = 0` with kills is
+rejected as economically impossible (recomputed score forced to 0). A full
+re-simulation — fabricating an internally consistent event stream so the
+resulting `ScoreInput` *itself* is a lie — remains out of scope and waits
+on the full Python port of `EventPlayer`'s tick logic, which is not yet
+landed.
 
 ---
 
@@ -668,6 +685,8 @@ erDiagram
         string endpoint_marker_style "nullable, CHECK allowlist"
         text endpoint_marker_custom_dataurl "nullable"
         string endpoint_hit_fx "nullable, CHECK allowlist"
+        string profile_initials_letters "nullable, paired CHECK"
+        string profile_initials_color "nullable, paired CHECK"
     }
     CLASSES {
         uuid id PK
@@ -993,13 +1012,17 @@ flowchart LR
         Nginx["nginx<br/>:80 → 301 :443<br/>:443 TLS<br/>nginx-tls.conf"]
         BE["backend image<br/>uvicorn (no reload)<br/>alembic upgrade head + advisory lock"]
         DB[(postgres:16<br/>port unpublished)]
+        Backup["db-backup sidecar<br/>cron 02:00 pg_dump<br/>scripts/pg_backup.sh"]
         StaticVol[/"frontend dist/<br/>(built via npm run build)"/]
+        BackupVol[/"pg_backups volume"/]
     end
     Internet -- 443 HTTPS --> Nginx
     Internet -- 80 HTTP --> Nginx
     Nginx -- /api → http --> BE
     Nginx --> StaticVol
     BE --> DB
+    Backup --> DB
+    Backup --> BackupVol
 ```
 
 **Production differences vs dev**
@@ -1011,6 +1034,9 @@ flowchart LR
 - `:80 → :443` 301 redirect.
 - CORS allow-list driven by env vars (`CORS_ORIGIN_1`, `CORS_ORIGIN_2`).
 - Alembic upgrade serialised across replicas via a Postgres advisory lock at startup.
+- **Backend image rebuilds the WASM**: a pinned `emscripten/emsdk:5.0.7` builder stage recompiles `math_engine.wasm` from the C source and ships it at `/app/data/math_engine.wasm` (where `wasm_runtime.py` looks first) — so the server-side score recompute can never run a stale committed binary.
+- **db-backup sidecar**: a postgres-image container running cron (`0 2 * * *`) that invokes `scripts/pg_backup.sh` (pg_dump) into the named `pg_backups` volume.
+- **Least-privilege DB roles**: `scripts/pg_init_roles.sh` (mounted into `/docker-entrypoint-initdb.d/`) creates a DML-only `mathdefense_app` role on first init (password from `POSTGRES_APP_PASSWORD`); pointing `DATABASE_URL_APP` at it scopes the runtime engine to DML while Alembic keeps the admin `DATABASE_URL` for DDL.
 
 ### 9.3 Background workers
 
@@ -1024,14 +1050,14 @@ The two poll jobs (territory settlement, auth-store janitor) are started as `asy
 
 ## 10. Testing Strategy
 
-### Backend (pytest, ~32 test files)
+### Backend (pytest, ~33 test files)
 
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
-- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim, audit-driven coverage gaps (negative HP, score regress, over the per-level score-delta cap), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path.
+- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim (V3 fixtures in `shared/score_parity_fixtures.json`), audit-driven coverage gaps (negative HP, score regress, over the per-level score-delta cap), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path and fail-closed 503 when WASM is missing.
 
-### Frontend (Vitest + happy-dom, ~87 test files)
+### Frontend (Vitest + happy-dom, ~90 test files)
 
 - Engine systems, GameState and PhaseStateMachine.
 - Domain policies (split, level-generator, path-validator, placement-policy).
@@ -1061,7 +1087,7 @@ The two poll jobs (territory settlement, auth-store janitor) are started as `asy
 | Practice-mode flag on session | Lets students drill without polluting leaderboards; achievements/talents still award. |
 | Reflection text post-session | Articulation prompt; logged but not scored. |
 | Bayesian competency state | Stealth assessment without explicit probes per session; informs adaptive recommendations. |
-| Scoring duplicated client and server | Server is canonical for anti-cheat; client mirror keeps UX live. |
+| Single canonical score formula compiled to WASM (V3) | `wasm/math_engine.c::compute_total_score` is the one source of truth: the browser calls it through `WasmBridge`, the server through wasmtime-py — bit-equal by construction. Parity-pinned JS/Python mirrors (fixtures in `shared/score_parity_fixtures.json`) serve only as fallbacks. |
 | Visual Redesign (Phases 0–7 + Spell Re-skin 0–2) | Math-instrument tower silhouettes, glyph-body enemies, cyan-fringe pets, gold-fringe spell glyphs; all motion-heavy effects gated behind `useReducedMotion`. |
 | Endpoint-marker customization persisted on `users` | Per-player marker style / custom image / hit-FX preferences (`endpoint_marker_style`, `endpoint_marker_custom_dataurl`, `endpoint_hit_fx`, DB-level CHECK allowlists) saved via `PUT /api/auth/profile/endpoint-marker` and replayed deterministically by `EndpointFXSystem` (`random` resolves through `game.rng`). |
 
@@ -1081,7 +1107,8 @@ backend/
     seed.py                      # demo-user seeding
     db/                          # engine, SessionLocal
     middleware/                  # auth.py, csrf.py
-    utils/                       # security.py (JWT, bcrypt), totp.py, integrity.py, encryption.py
+    utils/                       # security.py (JWT, bcrypt), totp.py, integrity.py, encryption.py,
+                                 # csv_export.py (injection-hardened CSV for class/study exports)
     domain/                      # per-aggregate folders (aggregate root + policy + repository protocol)
       session/   user/   leaderboard/   achievement/   talent/   class_/
       territory/   challenge/   season/   assessment/   study/   scoring/   auth/
@@ -1089,7 +1116,7 @@ backend/
     application/                 # 15 *_service.py + ports.py + mappers.py
                                  # session_event_handlers.py wires SessionCompleted consumers
     infrastructure/
-      persistence/               # SqlAlchemy*Repository (16 files)
+      persistence/               # SqlAlchemy*Repository (15 files)
       unit_of_work.py
       login_guard.py   token_denylist.py   audit_logger.py
       email_service.py   scheduler.py   spectate_hub.py
@@ -1099,8 +1126,8 @@ backend/
                                  # auth, challenge, class_, game_session, leaderboard, recommendation,
                                  # replay, study, talent, territory)
     schemas/                     # Pydantic DTOs
-  alembic/                       # 47 migrations
-  tests/                         # ~32 pytest files
+  alembic/                       # 49 migrations
+  tests/                         # ~33 pytest files
 
 frontend/
   src/
@@ -1108,31 +1135,35 @@ frontend/
     router/                      # RBAC-aware routes
     stores/                      # Pinia: auth, game, talent, territory, ui
     views/                       # 26 page-level .vue files
-    components/                  # common, layout, game (28 .vue), teacher, territory, leaderboard
+    components/                  # common, layout, game (27 .vue), teacher, territory, leaderboard
     composables/                 # 22 use*.ts (lifecycle, auth, UI, data)
     services/                    # api.ts + 19 per-domain clients (incl. imageCache)
+                                 # + territory/ pure helpers (challengeMode, rankingSort)
     engine/                      # Game.ts, GameState, PhaseStateMachine, EventBus,
                                  # Renderer, InputManager, register-systems,
                                  # audio/, event-handlers/, projections/,
                                  # render-helpers/, replay/
     systems/                     # 18 ECS-style systems (sibling of engine/)
-    renderers/                   # 13 canvas renderers + primitives.ts
+    renderers/                   # 13 canvas renderers + primitives.ts + effects/EffectLayer.ts
     domain/                      # pure rules: combat, level, movement, path, placement,
                                  # scoring, study, wave
     math/                        # WasmBridge, MathUtils, evaluators, wasm/
     entities/                    # Tower/Enemy/Projectile/Pet types + factories
     data/                        # tower-defs, enemy-defs, achievement-defs, talent-defs, ...
     lib/   utils/   styles/      # misc helpers, shared utilities, global CSS
-  tests/                         # Vitest suites (~87 files including in-tree *.test.ts)
+  tests/                         # Vitest suites (~90 files including in-tree *.test.ts)
 
 wasm/                            # C99 sources (math_engine.c, prng.c/h, curve.c/h, level_gen.c/h) + Makefile (Emscripten)
-emsdk/                           # vendored toolchain
+emsdk/                           # local Emscripten SDK install (git-ignored; Docker/CI pin 5.0.7)
 shared/                          # game-constants.json + enemy-defs.json + score_parity_fixtures.json
+scripts/                         # pg_backup.sh, pg_init_roles.sh, regenerate_score_fixtures.py, audit_score_caps.py
+stress/                          # k6 load-test harness (docker-compose.stress.yml, k6/, RESULTS.md)
 docs/                            # analysis / audit / educational-theory docs
 docker-compose.yml               # dev
-docker-compose.prod.yml          # prod
+docker-compose.prod.yml          # prod (incl. db-backup sidecar + pg_backups volume)
 nginx.conf  nginx-tls.conf  security-headers.conf  # reverse proxy + TLS + shared headers
-ARCHITECTURE.md  DATABASE_SCHEMA.md  SECURITY.md  Math_Defense_Spec.md  README.md  # repo-root docs
+md_to_docx.py                    # report/markdown → .docx export helper
+ARCHITECTURE.md  DATABASE_SCHEMA.md  SECURITY.md  Math_Defense_Spec.md  README.md  UBUNTU_SETUP.md  # repo-root docs
 ```
 
 ---

@@ -60,20 +60,22 @@ list is caught by `vue-tsc` instead of crashing at runtime.
 
 ### Prerequisites
 
-Install [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) and activate it. The repo vendors `emsdk/` at the project root so you can:
+Install [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) and activate it. The conventional location is `emsdk/` at the project root (the directory is gitignored — the repo does **not** ship it, so provision it yourself):
 
 ```bash
 # From project root
+git clone https://github.com/emscripten-core/emsdk.git
+./emsdk/emsdk install 5.0.7 && ./emsdk/emsdk activate 5.0.7        # Linux/macOS
+emsdk\emsdk.bat install 5.0.7 && emsdk\emsdk.bat activate 5.0.7    # Windows
 source emsdk/emsdk_env.sh     # Linux/macOS
 emsdk\emsdk_env.bat           # Windows
 ```
 
-> **The vendored `emsdk/` is a Windows build.** The `emsdk_env.sh` line above
-> only yields a working `emcc` if `emsdk/` was provisioned for your platform. On
-> macOS/Linux, install a native SDK instead (`git clone emscripten-core/emsdk`,
-> `./emsdk install 5.0.7 && ./emsdk activate 5.0.7`), or skip host setup entirely
-> and let Docker build the binary (`docker compose build backend`). See
-> [../UBUNTU_SETUP.md](../UBUNTU_SETUP.md#about-the-wasm-engine).
+> An `emsdk/` checkout only yields a working `emcc` if it was provisioned for
+> your platform (a Windows-provisioned tree won't work from WSL/macOS). If you
+> don't want a host toolchain at all, let Docker build the binary
+> (`docker compose build backend` — the image pins `emscripten/emsdk:5.0.7`).
+> See [../UBUNTU_SETUP.md](../UBUNTU_SETUP.md#about-the-wasm-engine).
 
 ### Compile
 

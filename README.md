@@ -121,13 +121,13 @@ For the full design rationale, see [`frontend/public/manual/game-mechanics.md`](
 > For the complete database ERD, column constraints, indexes, and migration history, see **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)**.
 
 ```
-Math Game/
+Math-Defense/
 ├── frontend/          Vue 3 + TypeScript + Vite — UI, game engine, ECS systems
 ├── backend/           FastAPI — DDD layers (domain / application / infrastructure)
 ├── wasm/              C + Emscripten — math module compiled to WebAssembly
-├── shared/            Shared constants (canvas size, grid bounds, player defaults)
-├── scripts/           Helper scripts (Postgres role init, backups, etc.)
-├── emsdk/             Vendored Emscripten SDK for WASM builds
+├── shared/            Shared JSON: game constants, enemy stats, score-parity fixtures
+├── scripts/           Helper scripts (Postgres role init, backups, score-fixture tooling)
+├── stress/            Load & stress tests (k6 HTTP scenarios + Vitest compute benches)
 ├── docker-compose.yml        Dev orchestration: Postgres + backend (hot reload) + frontend (Vite)
 ├── docker-compose.prod.yml   Prod orchestration: images are self-contained, nginx terminates /api
 ├── nginx.conf                Production reverse-proxy config (HTTP, SPA + /api)
@@ -178,8 +178,8 @@ Browser
 |---|---|
 | Frontend | Vue 3.5 (Composition API, `<script setup>`), TypeScript 6.0 strict, Pinia 3, Vue Router 5, Vite 8, Vitest 4 |
 | Backend | FastAPI 0.136, Uvicorn, SQLAlchemy 2.0, Pydantic v2, PyJWT (HS256), bcrypt, slowapi |
-| WASM | C99, Emscripten (`-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 17 exported math functions (plus `_malloc`/`_free`) |
-| Database | PostgreSQL 16 (47 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
+| WASM | C99, Emscripten 5.0.7 (pinned in `backend/Dockerfile` and CI; `-O2`, `-sMODULARIZE -sEXPORT_ES6`, deterministic FP flags); 17 exported math functions (plus `_malloc`/`_free`) |
+| Database | PostgreSQL 16 (49 Alembic migrations) — schema reference: [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) |
 | Container | Docker, Docker Compose |
 | Replay | Versioned (`replay_version` 1=mulberry32+JS Math, 2=PCG+WASM bit-exact); server-side score recompute via `wasmtime-py` |
 
@@ -211,7 +211,7 @@ Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirror
 - Node.js 26+
 - Python 3.13+
 - Docker & Docker Compose (optional)
-- Emscripten SDK (only if rebuilding WASM; `emsdk/` is vendored)
+- Emscripten SDK 5.0.7 (only if rebuilding WASM — the compiled artifacts are committed, and Docker/CI rebuild from `emscripten/emsdk:5.0.7`)
 
 > **On Ubuntu 24.04?** See **[UBUNTU_SETUP.md](UBUNTU_SETUP.md)** for a detailed,
 > platform-specific walkthrough — it covers the Node 26 / Python 3.13 upgrades
@@ -286,10 +286,10 @@ make               # writes math_engine.js / .wasm into frontend/src/math/wasm/
 script. You only need this when you change `wasm/*.c` — the compiled artifacts are
 committed, and the game runs (with a JS fallback) without rebuilding.
 
-> **Platform note:** `make` requires `emcc` (Emscripten) on `PATH`. The vendored
-> `emsdk/` is a **Windows** build — on macOS/Linux it will not produce a working
-> `emcc`. Install a native Emscripten SDK (or let Docker build it via
-> `docker compose build backend`). See
+> **Platform note:** `make` requires `emcc` (Emscripten) on `PATH`. The repo does
+> **not** ship an SDK (`emsdk/` is gitignored) — install Emscripten **5.0.7**
+> (the version pinned in `backend/Dockerfile` and CI) for your platform, or let
+> Docker build it via `docker compose build backend`. See
 > [UBUNTU_SETUP.md](UBUNTU_SETUP.md#about-the-wasm-engine) for the Linux steps.
 
 ---
@@ -322,12 +322,12 @@ Create `.env` at the project root (see `.env.example`):
 
 ## Shared Constants
 
-`shared/game-constants.json` is the single source of truth for values referenced by both frontend and backend:
+`shared/` holds the JSON files referenced by both frontend and backend. `shared/game-constants.json` is the single source of truth for engine/economy values:
 
 ```json
 {
   "canvas":      { "width": 1280, "height": 720, "originX": 640, "originY": 374, "unitPx": 20 },
-  "grid":        { "minX": -14, "maxX": 14, "minY": -14, "maxY": 14, "pointSpacing": 1 },
+  "grid":        { "minX": -14, "maxX": 14, "minY": -14, "maxY": 14, "pointSpacing": 1, "pathClearance": 1.0 },
   "player":      { "initialHp": 20, "initialGold": 200 },
   "loop":        { "targetFps": 60 },
   "collision":   { "hitRadius": 0.5 },
@@ -340,13 +340,15 @@ Create `.env` at the project root (see `.env.example`):
 
 `fixedDt` is intentionally derived in code (`1 / targetFps`) rather than stored.
 
+Two more files live alongside it: **`shared/enemy-defs.json`** — the gameplay-stat source of truth for all ten enemy types (HP, speed, reward, damage, killValue, special configs; visual-only fields like name and colour stay in `frontend/src/data/enemy-defs.ts`) — and **`shared/score_parity_fixtures.json`**, the fixture set that pins the WASM / TypeScript / Python score implementations to bit-identical outputs (regenerate with `make regenerate-fixtures` in `wasm/` after changing the formula).
+
 ---
 
 ## Testing
 
 ```bash
-cd backend  && pytest              # ~32 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, CSRF cookie, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute, admin teacher provisioning)
-cd frontend && npm test            # ~87 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
+cd backend  && pytest              # ~33 test files (DDD aggregates, routers, coverage gaps, domain invariants, auth lockout, token deny-list, CSRF cookie, shared-constants parity, achievement/talent/class/territory integration, server-side score verification, score-calculator parity, avatar parity, Q-matrix, Bayesian competency estimator, assessment router, challenge mode, validity-probe study, recommender, session repository, wasmtime-py runtime, replay-v2 score recompute, admin teacher provisioning)
+cd frontend && npm test            # ~90 test files (systems, engine, domain policies, movement strategies, path pipeline, projections, WASM bridge + WASM/JS parity for prng/curve/intersect/spawn/levelgen, audio asset manager, replay determinism, principle defs, achievement-defs lint, checkpoint serialization, keyboard placement, level-select view, score-calculator parity)
 ```
 
 The frontend uses Vitest with `happy-dom`; the backend uses pytest against a real PostgreSQL test DB (`math_defense_test`, auto-created from `DATABASE_URL`).

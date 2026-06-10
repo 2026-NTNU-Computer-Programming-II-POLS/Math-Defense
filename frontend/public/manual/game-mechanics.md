@@ -47,6 +47,7 @@ Between phases the engine may inject special events:
 
 - **Monty Hall** — see §7.
 - **Chain Rule** challenge — Boss Type-B mid-fight modal, see §8.
+- **First-Encounter Card** — the first time you ever meet a counter-enemy (Regenerator, Bulwark, or Swarmling — tracked across sessions), a telegraph card soft-pauses the game and explains its gimmick.
 - **Principle Overlay** — a one-card "what you just exercised" surfacing after a notable wave.
 
 ---
@@ -76,9 +77,9 @@ In Build Phase no enemies are on the board, so you can think without time pressu
 
 - **Place towers.** Click the tower bar (top), then click a legal grid point. Cost is deducted immediately. Towers snap to integer coordinates.
 - **Configure each tower's math.** Click any placed tower to open its panel. Each tower has its own UI — Magic picks a curve and a debuff/buff mode, Radars aim an angular arc (a ×1.5 focus sector, optionally a hard attack restriction), Matrix picks its pair partner, Limit answers a `lim` question, Calculus picks a function then solves a derivative or integral to apply it.
-- **Upgrade or refund.** Each tower can be upgraded twice (Tier 2 / Tier 3) for a fraction of base cost. Refunding pays back a portion of total invested gold.
+- **Upgrade or refund.** Each tower can be upgraded twice — Tier 2 costs 60% of base cost, Tier 3 another 100%. Refunding pays back half of everything invested (base cost plus upgrade spend, floored) — more while a gold-multiplier buff is active, capped at your total spend.
 - **Open the shop.** Buy time-based buffs (extra damage, slow enemies, heal, shield, gold multiplier). See §9.
-- **Set targeting.** Each combat tower has a targeting mode toggle: closest / strongest / first / last.
+- **Set targeting.** The single-target shooters — Radar B and Radar C — have a targeting picker: First (default; closest to the goal) / Last / Closest / Strongest. The other towers pick targets by their own mechanic (sweep, zone, pair lock, pets).
 - **Start the wave.** Press **Start Wave** when you're ready.
 
 Build Phase is intentionally generous: you can experiment freely, refund what didn't work, and only commit when you start the wave.
@@ -161,7 +162,9 @@ Four single-cast abilities on cooldown. Cost gold, fire instantly, no math input
 | Exponential | eˣ | 80 | 12 s | area (r=3) | 60 damage AoE — the value blows up exponentially |
 | Asymptote | →0 | 60 | 15 s | area (r=4) | slow to 40% speed for 5 s — speed driven asymptotically to zero |
 | Impulse | δ | 100 | 18 s | single | 150 damage one enemy — a Dirac-delta spike at a single point |
-| Acceleration | dv/dt | 120 | 25 s | self | +tower attack speed for 8 s — the rate of change of velocity |
+| Acceleration | dv/dt | 120 | 25 s | self | all towers deal ×1.5 damage for 8 s — output rising like dv/dt |
+
+An area spell that catches no enemy refunds its gold and resets its cooldown, so a misjudged click costs nothing but tempo.
 
 Spells are your reactive layer — towers handle the steady pressure, spells handle the surprises (a burst of fast enemies, a boss low on HP, an unfavourable Monty Hall draw).
 
@@ -218,8 +221,8 @@ In English:
 |---|---|---|---|
 | 1 | degrees 1–2, 2–4 curves | 3 | General only |
 | 2 | adds degree 3 and longer multisets | 4 | General, Fast, Bulwark |
-| 3 | denser mix of degrees 1–3 | 5; last wave includes Boss Type-A | Strong, Fast, Split, Regenerator, Bulwark, Helper, Swarmling, Boss-A in wave 5 |
-| 4 | even denser multisets | 5; last wave includes Boss Type-B | Helper-heavy plus Fast, Strong, Split, Regenerator, Bulwark, Swarmling; Boss-B with chain rule in wave 5 |
+| 3 | denser mix of degrees 1–3 | 5; last wave includes Boss Type-A | General, Strong, Fast, Split, Regenerator, Bulwark, Helper, Swarmling, Boss-A in wave 5 |
+| 4 | even denser multisets | 5; last wave includes Boss Type-B | Helper-heavy plus General, Fast, Strong, Split, Regenerator, Bulwark, Swarmling; Boss-B with chain rule in wave 5 |
 | 5 | hardest multisets, longest curves | 5; last wave includes Boss Type-B + Swarmling bursts | Everything but the entry-tier General (Helper, Strong, Fast, Split, Regenerator, Bulwark, Swarmling, Boss-B); only Star-5 grants the checkpoint retry |
 
 The "multiset" is the polynomial-degree multiset used by `level-generator` to draw the run's curves (e.g. `[2,2,3]` = three curves of degrees 2, 2, 3 sharing one common point). Path generation is **polynomial-only**; the trig / log curve evaluator is used by the Magic tower and the curve LaTeX renderer, not by the path. The whole sequence is replay-deterministic from `rng_seed`.
@@ -230,8 +233,8 @@ The "multiset" is the polynomial-degree multiset used by `level-generator` to dr
 
 What carries between runs:
 
-- **Achievements** — 29 entries across 6 categories (`combat / scoring / efficiency / survival / exploration / territory`). Each clear yields talent points (TP); the full pool awards 52 TP, enough to fill any single tower's branch many times over but not the whole tree at once. Some achievements scale with seasonal multipliers.
-- **Talents** — 26-node tree across the 7 tower types (19 base nodes plus 7 advanced "tier-2" nodes — one per tower — that unlock only when their parent base node sits at max level). Prerequisites form linear chains within each tower's branch. Each node has a `maxLevel` of 2 or 3 and grants a per-tower attribute bonus — damage, range, attack/sweep speed, target count, Magic's zone strength / zone width / duration / slow strength, Radar A's AoE width, Radar B/C crit chance / crit damage, Matrix's damage ramp / pair resonance, Limit's burst bonus, and Calculus pet attack speed / damage / range / crit. Per-level magnitudes vary by node (typically +8% to +25%; target-count nodes add whole targets; tier-2 crit nodes add a flat probability). Modifiers are **snapshotted at tower placement**, so re-build to refresh after reallocating. Free reset is supported.
+- **Achievements** — 29 entries across 6 categories (`combat / scoring / efficiency / survival / exploration / territory`). Each clear yields talent points (TP); the full pool awards 52 TP, enough to fill any single tower's branch nearly three times over but not the whole tree at once. Achievements tied to an admin-defined season bank **double TP** when unlocked while that season is active.
+- **Talents** — 26-node tree across the 7 tower types (19 base nodes plus 7 advanced "tier-2" nodes — one per tower — that unlock only when their parent base node sits at max level). Prerequisites form linear chains within each tower's branch. Each node has a `maxLevel` of 2 or 3 and grants a per-tower attribute bonus — damage, range, attack/sweep speed, target count, Magic's zone strength / zone width / duration / slow strength, Radar A's AoE width, Radar B/C crit chance / crit damage, Matrix's damage ramp / pair resonance, Limit's burst bonus, and Calculus pet attack speed / damage / range / crit. Per-level magnitudes vary by node (+8% to +25% for most; target-count nodes add whole targets; tier-2 crit nodes add a flat probability; Radar C's crit-damage node adds +50% per level). Modifiers are **snapshotted at tower placement**, so re-build to refresh after reallocating. Free reset is supported.
 - **Avatar & profile** — picked from the unlocks earned along the way.
 - **Class & territory** — students can join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global. Each activity holds up to **50 slots** total; the teacher sets a per-student cap (1–50, default 5) so no single student can monopolise the board.
 - **Leaderboard** — every completed (non-practice) run posts its TotalScore by star rating.
@@ -247,7 +250,7 @@ Practice runs (Star-5 checkpoint retries, abandoned runs, runs marked `practice_
 | Pan / inspect | Mouse over the canvas |
 | Place tower | Click a legal grid point (after picking a tower in the bar) |
 | Open tower panel | Click the tower |
-| Start wave | "Start Wave" button (bottom right) |
+| Start wave | "Start Wave" button (top right, just below the HUD) |
 | Pause / resume | Space or Escape (during a wave) |
 | Cast spell | Click the spell button in the spell bar |
 | Keyboard placement | Arrow keys + Enter (full pointer-free placement, WCAG 2.2 SC 2.1.1) |
