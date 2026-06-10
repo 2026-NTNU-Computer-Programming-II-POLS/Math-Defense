@@ -65,8 +65,8 @@ def mean(b: Beta) -> float:
 
 
 def ci95(b: Beta) -> tuple[float, float]:
-    """Approximate central 95% credible interval via the Wilson-Hilferty
-    normal approximation to the Beta quantile.
+    """Approximate central 95% credible interval via a normal approximation:
+    ``mean ± z·sd`` computed from the Beta posterior's exact moments.
 
     A closed-form ``betaincinv`` is not in the standard library; the normal
     approximation is good enough for the dashboard (errors ≲ 0.02 for
