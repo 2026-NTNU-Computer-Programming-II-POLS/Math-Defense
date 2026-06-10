@@ -251,7 +251,7 @@ Before each run, the player sees the level's curves displayed inside a disclosur
 |--------|--------|
 | Correct answer | `initialAnswer = 1` (sharpens the score exponent — see §10) |
 | Wrong | Refund 50 g, `initialAnswer = 0` |
-| "Proceed (paths hidden)" | `initialAnswer = 0`; the path overlay is hidden during play |
+| "Proceed (paths hidden)" | `initialAnswer = 0`; the path overlay is hidden during play, along with every placement-legality cue that could betray it — the grid paints no blocked-cell hatch, the hover cursor shows a neutral (colour-free) ring, and the keyboard cursor can visit every lattice point. Blocked cells still reject an actual placement attempt. |
 
 A **rolling IA accuracy** over the last 10 sessions is tracked per user; on 1★ the path overlay opacity fades as accuracy rises, gradually weaning students off the visual aid.
 

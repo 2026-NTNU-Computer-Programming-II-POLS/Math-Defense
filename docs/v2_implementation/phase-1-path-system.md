@@ -218,6 +218,15 @@ Generate plausible wrong answers by:
 - No endpoint marker.
 - Spawn points still visible (enemies still spawn there).
 
+> **Update (2026-06-10).** Hidden Mode now also conceals every placement-legality
+> cue, since the blocked-cell pattern would otherwise reveal the hidden paths and
+> their intersection: the grid paints no blocked-cell hatch (every tile renders as
+> plain buildable), the hover placement cursor is a neutral ring instead of
+> green/red, and the keyboard placement cursor walks the full lattice rather than
+> skipping blocked points. Placement rules are unchanged — blocked cells still
+> reject the attempt. See `isPlacementConcealed()` in
+> `frontend/src/engine/generated-level-context.ts`.
+
 ### Files to Create / Modify
 
 | File | Action |

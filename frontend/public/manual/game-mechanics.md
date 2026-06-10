@@ -176,7 +176,7 @@ Four outcomes:
 - **Submit a correct answer** → IA flag = 1 (boosts the score exponent — see §12). In-game paths are drawn.
 - **Submit a wrong answer** → IA flag = 0. The correct point is revealed. Paths are still drawn.
 - **Pay 50 gold to skip** → IA flag = 0; paths drawn.
-- **Proceed (Paths Hidden)** → IA flag = 0 and **the curve path overlay is hidden during gameplay**. You play against an invisible path.
+- **Proceed (Paths Hidden)** → IA flag = 0 and **the curve path overlay is hidden during gameplay**. You play against an invisible path — and the UI gives you no substitute clues: the board draws no blocked-cell shading, the placement cursor stays a neutral ring instead of turning green/red, and the keyboard cursor moves freely over every grid point. Cells on or near the hidden paths still refuse an actual placement attempt, so you cannot trace the paths by sight — only by trying.
 
 On Star-1, the *recent* IA accuracy on your account also fades the in-canvas path label opacity (`iaAccuracyToLabelOpacity`). New players see fully labelled axes; consistent veterans see a more naked board.
 
