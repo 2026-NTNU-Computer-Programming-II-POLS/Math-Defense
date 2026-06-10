@@ -51,7 +51,7 @@ export const TALENT_NODE_DEFS: Record<string, TalentNodeDef> = {
 
   // Phase 7 (Q14) — advanced "tier-2" nodes. Each requires its parent at
   // max level; sized at 2 lv × 3 TP = 6 TP per tower (42 TP total) so the
-  // 55 TP achievement pool still leaves headroom to specialize.
+  // 52 TP achievement pool still leaves headroom to specialize.
   magic_slow_strength:  { id: 'magic_slow_strength', towerType: TowerType.MAGIC, attribute: 'slow_strength', name: 'Deeper Chill', description: 'Magic debuff slow is stronger', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.10, prerequisites: [], prerequisiteMaxLevels: ['magic_zone_width'] },
   radar_a_aoe_width:    { id: 'radar_a_aoe_width', towerType: TowerType.RADAR_A, attribute: 'aoe_width', name: 'Wider Sweep', description: 'Sweep beam covers a wider arc', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.10, prerequisites: [], prerequisiteMaxLevels: ['radar_a_speed'] },
   radar_b_crit_chance:  { id: 'radar_b_crit_chance', towerType: TowerType.RADAR_B, attribute: 'crit_chance', name: 'Lucky Shots', description: 'Chance to crit for 2× damage', maxLevel: 2, costPerLevel: 3, effectPerLevel: 0.10, prerequisites: [], prerequisiteMaxLevels: ['radar_b_targets'] },

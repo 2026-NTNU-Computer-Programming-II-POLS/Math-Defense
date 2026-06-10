@@ -349,7 +349,7 @@ erDiagram
     territory_slots                 ||--o| territory_occupations           : "occupied_by (slot_id)"
     grabbing_territory_activities   ||--o{ territory_rankings_snapshot     : "snapshots (activity_id)"
     users                           ||--o{ territory_rankings_snapshot     : "ranked (student_id)"
-    game_sessions                   ||--o{ territory_session_uses          : "consumed_by (session_id)"
+    game_sessions                   ||--o| territory_session_uses          : "consumed_by (session_id PK)"
 ```
 
 ---

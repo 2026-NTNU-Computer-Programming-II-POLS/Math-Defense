@@ -67,9 +67,9 @@ activeTime = max(0.001, timeTotal − Σ(time spent in Build Phase))
 S1         = killValue / activeTime                  (kill rate)
 S2         = killValue / costTotal       if costTotal > 0 else 0
 alpha      = S1 / (S1 + S2)             if S1 + S2 > 0 else 0
-K          = alpha·S1 + (1 − alpha)·S2               (continuous blend)
+k          = alpha·S1 + (1 − alpha)·S2               (continuous blend)
 exponent   = 1 / sqrt(max(1, 1 + (2 + healthOrigin − healthFinal − initialAnswer)))
-core       = max(0, killValue)^exponent · K          (killValue = 0 → core = 0)
+core       = max(0, killValue)^exponent · k          (killValue = 0 → core = 0)
 TotalScore = core · SCALE · difficulty               (SCALE = 1; difficulty = 1 + 0.25·(starRating − 1) ∈ [1, 2])
 ```
 
