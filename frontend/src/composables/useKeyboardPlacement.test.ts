@@ -25,10 +25,7 @@ vi.mock('@/domain/placement/legal-positions', () => ({
   })),
 }))
 
-vi.mock('@/engine/generated-level-context', () => ({
-  isGeneratedLevelContext: () => false,
-}))
-
+import { computeLegalPositions } from '@/domain/placement/legal-positions'
 import { useKeyboardPlacement, type GameLike } from './useKeyboardPlacement'
 import { Events, GamePhase, TowerType } from '@/data/constants'
 import { EventBus } from '@/engine/EventBus'
@@ -252,6 +249,49 @@ describe('useKeyboardPlacement — keydown navigation (§19.5)', () => {
     dispatchKey('Enter')
     expect(game.hud.keyboardCursor).toBeNull()
     expect(handler).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+})
+
+describe('useKeyboardPlacement — concealed placement (paths hidden)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    useGameStore().level = 5
+    vi.mocked(computeLegalPositions).mockClear()
+  })
+
+  function makeGeneratedStub(pathsVisible: boolean): GameLike {
+    const game = makeGameStub()
+    game.state.pathsVisible = pathsVisible
+    game.levelContext = {
+      isGenerated: true,
+      paths: [],
+      decoyCells: [[1, 1]],
+      path: {},
+    } as unknown as GameLike['levelContext']
+    return game
+  }
+
+  it('requests the full lattice for cursor movement while paths are hidden', () => {
+    const game = makeGeneratedStub(false)
+    const wrapper = mountComposable(ref<GameLike | null>(game))
+    // No paths and no decoys passed: nothing is excluded, so arrow keys can
+    // visit every lattice point and the cursor's reachable set leaks nothing.
+    expect(vi.mocked(computeLegalPositions)).toHaveBeenLastCalledWith({ paths: [] })
+    wrapper.unmount()
+  })
+
+  it('restricts the cursor to legal positions when paths are visible', () => {
+    const game = makeGeneratedStub(true)
+    const ctx = game.levelContext as unknown as {
+      paths: unknown
+      decoyCells: unknown
+    }
+    const wrapper = mountComposable(ref<GameLike | null>(game))
+    expect(vi.mocked(computeLegalPositions)).toHaveBeenLastCalledWith({
+      paths: ctx.paths,
+      decoyCells: ctx.decoyCells,
+    })
     wrapper.unmount()
   })
 })

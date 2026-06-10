@@ -25,11 +25,12 @@ import type { MontyHallState } from '@/systems/MontyHallSystem'
 import type { ActiveBuffEntry } from './GameState'
 import type { SegmentedPath } from '@/domain/path/segmented-path'
 import type { PathProgressTracker, SegmentChangedPayload } from '@/domain/path/path-progress-tracker'
+import { concealClassification } from '@/domain/level/level-layout-service'
 import type { PlacementRejectionReason } from '@/domain/level/placement-policy'
 import type { ChainRuleQuestion } from '@/math/chain-rule-generator'
 import type { CalcOp } from '@/math/monomial'
 import type { LevelContext } from './level-context'
-import { isGeneratedLevelContext, type GeneratedLevelContext } from './generated-level-context'
+import { isGeneratedLevelContext, isPlacementConcealed, type GeneratedLevelContext } from './generated-level-context'
 import type { GeneratedLevel } from '@/math/curve-types'
 import type { WaveDef } from '@/domain/wave/wave-generator'
 import type { Checkpoint } from '@/domain/level/checkpoint'
@@ -661,7 +662,16 @@ export class Game {
     // TileClass instead of the legacy stone checkerboard. When no level is
     // active (MENU, or flag-off legacy path) drawGrid falls back to the
     // checkerboard itself — we do not branch on phase here.
-    renderer.drawGrid(this.levelContext?.layout ?? null)
+    // While the paths are hidden (player skipped the P* question) the
+    // classification is concealed: every cell paints as plain 'buildable',
+    // so the hatch pattern cannot reveal the hidden paths or their
+    // intersection. Placement rules are enforced elsewhere and unchanged.
+    const baseLayout = this.levelContext?.layout ?? null
+    renderer.drawGrid(
+      baseLayout !== null && isPlacementConcealed(this)
+        ? concealClassification(baseLayout)
+        : baseLayout,
+    )
 
     if (this.levelContext && this.state.phase !== GamePhase.MENU) {
       const genCtx = isGeneratedLevelContext(this.levelContext) ? this.levelContext : null

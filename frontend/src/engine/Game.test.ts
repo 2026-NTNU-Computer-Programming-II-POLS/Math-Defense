@@ -213,3 +213,58 @@ describe('Game perceived speed', () => {
     expect(game.state.perceivedSpeedMultiplier).toBe(0.5)
   })
 })
+
+describe('Game grid concealment (paths hidden)', () => {
+  let game: Game
+
+  beforeEach(() => {
+    const canvas = document.createElement('canvas')
+    game = new Game(canvas)
+  })
+
+  function attachGeneratedContext(): void {
+    const layout = {
+      classify: () => 'path' as const,
+      pathCellCount: 1,
+      buildableCellCount: 0,
+    }
+    game.levelContext = {
+      isGenerated: true,
+      layout,
+      paths: [],
+      path: { segments: [], startX: 0, targetX: 0, evaluateAt: () => 0, findSegmentAt: () => null },
+      tracker: { update: () => {}, dispose: () => {} },
+      endpoint: { x: 0, y: 0 },
+      region: {},
+      spawns: [],
+      decoyCells: [],
+      dispose: () => {},
+    } as unknown as Game['levelContext']
+    game.phase.forceTransition(GamePhase.BUILD)
+    game.state.phase = GamePhase.BUILD
+  }
+
+  function renderOnce(): unknown {
+    const drawGrid = vi.spyOn(game.renderer, 'drawGrid')
+    ;(game as unknown as { _render(): void })._render()
+    expect(drawGrid).toHaveBeenCalledTimes(1)
+    const arg = drawGrid.mock.calls[0][0]
+    drawGrid.mockRestore()
+    return arg
+  }
+
+  it('passes a layout that classifies every cell as buildable when pathsVisible is false', () => {
+    attachGeneratedContext()
+    game.state.pathsVisible = false
+    const layout = renderOnce() as { classify(gx: number, gy: number): string }
+    expect(layout.classify(0, 0)).toBe('buildable')
+    expect(layout.classify(7, 7)).toBe('buildable')
+  })
+
+  it('passes the real layout through when pathsVisible is true', () => {
+    attachGeneratedContext()
+    game.state.pathsVisible = true
+    const layout = renderOnce()
+    expect(layout).toBe(game.levelContext!.layout)
+  })
+})

@@ -46,6 +46,22 @@ export function isGeneratedLevelContext(ctx: unknown): ctx is GeneratedLevelCont
   return typeof ctx === 'object' && ctx !== null && (ctx as GeneratedLevelContext).isGenerated === true
 }
 
+/**
+ * True when placement legality must be visually concealed: the player
+ * skipped the initial intersection question (`pathsVisible === false` on a
+ * generated level), so no UI surface may distinguish blocked cells from
+ * buildable ones — the blocked-cell pattern would reveal the hidden paths
+ * and their common point. Rule enforcement is unaffected; only legality
+ * *display* (tile hatch, hover-cursor colour, keyboard-cursor
+ * reachability) gates on this.
+ */
+export function isPlacementConcealed(game: {
+  readonly state: { readonly pathsVisible: boolean }
+  readonly levelContext: unknown
+}): boolean {
+  return !game.state.pathsVisible && isGeneratedLevelContext(game.levelContext)
+}
+
 export function createGeneratedLevelContext(
   level: GeneratedLevel,
   eventBus: LevelContextEmitter,

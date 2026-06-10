@@ -208,4 +208,12 @@ describe('Renderer.drawPlacementCursor', () => {
     expect(() => renderer.drawPlacementCursor(0, 0, 'path')).not.toThrow()
     vi.unstubAllGlobals()
   })
+
+  it('accepts the legality-free neutral mode (paths hidden)', () => {
+    const ctx = createCtxStub()
+    vi.stubGlobal('devicePixelRatio', 1)
+    const renderer = new Renderer(makeCanvas(ctx))
+    expect(() => renderer.drawPlacementCursor(0, 0, 'neutral')).not.toThrow()
+    vi.unstubAllGlobals()
+  })
 })

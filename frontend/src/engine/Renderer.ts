@@ -345,12 +345,19 @@ export class Renderer {
    * Highlight the grid-line intersection at lattice point (gx, gy). Towers
    * sit on intersections, not inside cells, so the cursor is a ring centered
    * on the point — not a cell-sized rectangle.
+   *
+   * `'neutral'` draws a legality-free slate ring: used while the paths are
+   * hidden (player skipped the P* question), where a green/red cursor swept
+   * across the board would trace the hidden paths cell by cell.
    */
-  drawPlacementCursor(gx: number, gy: number, cls: TileClass): void {
+  drawPlacementCursor(gx: number, gy: number, cls: TileClass | 'neutral'): void {
     const { ctx } = this
     const px = gameToCanvasX(gx)
     const py = gameToCanvasY(gy)
-    const color = cls === 'buildable' ? '#6adf8a' : '#b84040'
+    const color =
+      cls === 'buildable' ? '#6adf8a'
+      : cls === 'neutral' ? '#8d99a6'
+      : '#b84040'
     const radius = UNIT_PX * 0.42
 
     ctx.save()

@@ -31,7 +31,7 @@ import {
   computeLegalPositions,
   type LegalPositionSet,
 } from '@/domain/placement/legal-positions'
-import { isGeneratedLevelContext } from '@/engine/generated-level-context'
+import { isGeneratedLevelContext, isPlacementConcealed } from '@/engine/generated-level-context'
 import type { GameEvents } from '@/engine/Game'
 import type { GameState } from '@/engine/GameState'
 import type { LevelContext } from '@/engine/level-context'
@@ -76,9 +76,18 @@ export function useKeyboardPlacement(
   function recomputeLegal(g: GameLike): void {
     const ctx = g.levelContext
     if (!ctx) { legal = null; return }
-    legal = isGeneratedLevelContext(ctx)
-      ? computeLegalPositions({ paths: ctx.paths, decoyCells: ctx.decoyCells })
-      : computeLegalPositions(ctx.path)
+    if (isGeneratedLevelContext(ctx)) {
+      // While the paths are hidden the arrow-key cursor walks the full
+      // lattice (computeLegalPositions with no paths excludes nothing):
+      // restricting it to legal positions would let a keyboard player trace
+      // the hidden paths by watching which points the cursor skips. Enter on
+      // a blocked point is rejected by TowerPlacementSystem as usual.
+      legal = isPlacementConcealed(g)
+        ? computeLegalPositions({ paths: [] })
+        : computeLegalPositions({ paths: ctx.paths, decoyCells: ctx.decoyCells })
+      return
+    }
+    legal = computeLegalPositions(ctx.path)
   }
 
   function ensureCursor(g: GameLike): void {

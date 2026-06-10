@@ -135,3 +135,22 @@ function deriveBuildableCells(
 function cellKey(gx: number, gy: number): string {
   return `${gx},${gy}`
 }
+
+/**
+ * Wrap a layout so every cell classifies as 'buildable'.
+ *
+ * Used while the paths are hidden (player skipped the initial intersection
+ * question): painting the path/forbidden hatch would let the player
+ * reverse-engineer the hidden paths — and their common point — straight
+ * from the blocked-cell pattern. Placement enforcement is unaffected:
+ * `TowerPlacementSystem` checks its own `LegalPositionSet`, never the
+ * rendered classification. Cell counts pass through unchanged; they carry
+ * no per-cell information.
+ */
+export function concealClassification(layout: LevelLayoutService): LevelLayoutService {
+  return Object.freeze({
+    classify: (): TileClass => 'buildable',
+    pathCellCount: layout.pathCellCount,
+    buildableCellCount: layout.buildableCellCount,
+  })
+}

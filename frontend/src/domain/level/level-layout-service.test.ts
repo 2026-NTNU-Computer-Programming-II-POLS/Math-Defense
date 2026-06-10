@@ -2,7 +2,7 @@
  * Unit tests for LevelLayoutService.
  */
 import { describe, it, expect } from 'vitest'
-import { createLevelLayoutService } from './level-layout-service'
+import { concealClassification, createLevelLayoutService } from './level-layout-service'
 import { buildLevelPath } from '@/domain/path/path-builder'
 import type { PathLayout } from '@/data/path-segment-types'
 
@@ -82,5 +82,26 @@ describe('LevelLayoutService', () => {
     }
     expect(svc.classify(3, 1)).toBe('forbidden')
     expect(svc.classify(3, 7)).toBe('forbidden')
+  })
+})
+
+describe('concealClassification', () => {
+  it('classifies every cell as buildable regardless of the wrapped layout', () => {
+    const path = buildLevelPath({ path: horizontalLevel(5, 0, 10) })
+    const svc = createLevelLayoutService({ buildablePositions: [[2, 2]] }, path)
+    const concealed = concealClassification(svc)
+    expect(svc.classify(4, 5)).toBe('path')
+    expect(concealed.classify(4, 5)).toBe('buildable')
+    expect(svc.classify(7, 7)).toBe('forbidden')
+    expect(concealed.classify(7, 7)).toBe('buildable')
+    expect(concealed.classify(2, 2)).toBe('buildable')
+  })
+
+  it('passes cell counts through unchanged', () => {
+    const path = buildLevelPath({ path: horizontalLevel(5, 0, 10) })
+    const svc = createLevelLayoutService({ buildablePositions: [[2, 2]] }, path)
+    const concealed = concealClassification(svc)
+    expect(concealed.pathCellCount).toBe(svc.pathCellCount)
+    expect(concealed.buildableCellCount).toBe(svc.buildableCellCount)
   })
 })

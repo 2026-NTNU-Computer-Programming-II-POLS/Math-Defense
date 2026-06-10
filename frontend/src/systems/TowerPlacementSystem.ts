@@ -4,7 +4,7 @@ import { createTower } from '@/entities/TowerFactory'
 import type { Game } from '@/engine/Game'
 import type { Tower } from '@/entities/types'
 import { computeLegalPositions, type LegalPositionSet } from '@/domain/placement/legal-positions'
-import { isGeneratedLevelContext } from '@/engine/generated-level-context'
+import { isGeneratedLevelContext, isPlacementConcealed } from '@/engine/generated-level-context'
 
 export class TowerPlacementSystem {
   getSelectedTowerType: () => TowerType | null = () => null
@@ -141,7 +141,15 @@ export class TowerPlacementSystem {
       const isOccupied = game.towers.some(
         (t) => Math.round(t.x) === gx && Math.round(t.y) === gy,
       )
-      const cls = isOccupied ? 'forbidden' as const : isLegal ? 'buildable' as const : 'forbidden' as const
+      // While the paths are hidden the cursor must not disclose legality —
+      // sweeping the mouse across the board would otherwise trace the hidden
+      // paths cell by cell. Occupied cells still read 'forbidden': the
+      // standing tower is visible anyway.
+      const cls = isOccupied
+        ? 'forbidden' as const
+        : isPlacementConcealed(game)
+          ? 'neutral' as const
+          : isLegal ? 'buildable' as const : 'forbidden' as const
       renderer.drawPlacementCursor(gx, gy, cls)
     }
   }
