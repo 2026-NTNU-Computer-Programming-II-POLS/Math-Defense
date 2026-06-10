@@ -6,7 +6,7 @@ Quick-lookup tables for towers, enemies, spells, buffs, and Monty Hall rewards. 
 
 ## Towers
 
-Seven tower types, each tied to a real math concept. Stats below are the **base** tier. Tier 2 adds +25% damage and +10% range at 60% of base cost; Tier 3 adds +50% damage, +20% range, **and a universal +15% attack speed** at 100% of base cost. The +15% speed reduces base cooldown by 15% and so has no effect on Calculus (whose base cooldown is 0). Any other per-tower bonuses (sweep speed, target count, crit, ramp, AoE width, pet stats) are listed in each row.
+Seven tower types, each tied to a real math concept. Stats below are the **base** tier. Tier 2 adds +25% damage and +10% range at 60% of base cost; Tier 3 adds +50% damage, +20% range, **and a universal +15% attack speed** at 100% of base cost. The +15% speed reduces base cooldown by 15% and so has no effect on Calculus (whose base cooldown is 0). Refunding a tower returns half of everything invested — base cost plus upgrade spend, floored; selling while a gold-multiplier buff is active returns proportionally more, capped at your total spend. Any other per-tower bonuses (sweep speed, target count, crit, ramp, AoE width, pet stats) are listed in each row.
 
 ![All towers at a glance](towers/_overview.png)
 
@@ -17,7 +17,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 60 / 8 / 10 / 1.0 s
 - **Math:** function curves (polynomial, trigonometric, log)
 - **Unlocked from:** Star 1
-- **Mechanic:** draws a math curve as a band-shaped zone. Toggle the band between **Debuff** (enemies inside take damage-over-time and are slowed to 60% speed for 2 s — the slow refreshes on re-hit) and **Buff** (towers inside a wider band of the same curve gain damage). Pick a curve that hugs the enemy path for damage; pick a curve that passes through your tower cluster for utility.
+- **Mechanic:** draws a math curve as a band-shaped zone. Toggle the band between **Debuff** (enemies inside take damage-over-time and are slowed to 60% speed for 2 s — the slow refreshes on re-hit) and **Buff** (towers inside a wider band — twice the debuff band's width — gain +25% damage, scaled further by the zone-strength talent). Pick a curve that hugs the enemy path for damage; pick a curve that passes through your tower cluster for utility.
 - **Tip:** the right curve is the one your enemies will walk on. The 2 s slow outlasts the 1 s damage tick, so a single Magic tower keeps enemies slowed continuously between ticks.
 - **Exam tie-in:** GSAT Math A polynomial/trig curves; AP Precalculus.
 
@@ -50,8 +50,8 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 90 / 40 / 12 / 2.5 s
 - **Math:** radian arcs
 - **Unlocked from:** Star 2
-- **Mechanic:** slow, very heavy single-target shots at long range — the longest range and the heaviest base damage in the roster. Shots **lead** moving targets (aim ahead of them). Uses the arc for a ×1.5 focus sector and an optional restriction (see below).
-- **Tier 2/3:** +10% / +20% crit chance, plus +50% crit damage at Tier 3.
+- **Mechanic:** slow, very heavy single-target shots at long range — the longest range and the heaviest base damage in the roster. Shots **lead** moving targets (aim ahead of them). Has an **innate 5% crit chance** (a crit deals 2× damage), so crit upgrades and talents always have something to amplify. Uses the arc for a ×1.5 focus sector and an optional restriction (see below).
+- **Tier 2/3:** +10% / +20% crit chance (stacking on the innate 5%), plus +50% crit damage at Tier 3.
 - **Pick when:** the path has one chokepoint a long way from a placeable cell — and you want every shot to count.
 
 **Radar arc (A / B / C).** Each radar has a configurable angular sector, set in its panel in degrees. Enemies inside it take **×1.5 damage** — a focus-fire bonus that is always on, even on the default 0°–90° sector. The **Restrict attacks to arc** checkbox is optional: off (the default) leaves the tower firing in every direction with the arc as a pure bonus zone; on makes the tower ignore every enemy outside the sector. For full-circle coverage, set Arc Start 0° and Arc End 360°.
@@ -75,7 +75,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 70 / 25 / 8 / 3.0 s
 - **Math:** limits, L'Hôpital's rule
 - **Unlocked from:** Star 3
-- **Mechanic:** charges for **3 s**, then releases an AoE burst that hits every enemy in range at **1.5×** the formula damage. The panel presents a multiple-choice **one-sided** `lim` question of the form `lim[x→a⁺] f(x)/(x − a)`; your answer determines the formula:
+- **Mechanic:** charges for **3 s**, then releases an AoE burst that hits every enemy in range at **1.5×** the formula damage. The panel presents a **one-sided** `lim` question of the form `lim[x→a⁺] f(x)/(x − a)` — multiple-choice through Star 3; from Star 4 you must type the answer yourself. Your answer determines the formula:
 
 | Answer | Effect |
 |---|---|
@@ -93,7 +93,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 - **Cost / Damage / Range / Cooldown:** 100 / 0 base / 10 / — (does not fire directly)
 - **Math:** derivatives, integrals, power rule
 - **Unlocked from:** Star 3
-- **Mechanic:** pick a monomial `f(x)`, then pick an operation — `f'`, `f''`, or `∫f` — and **solve it yourself**: type the resulting monomial. The panel never shows the answer; only a correct answer applies the operation. The result `C·x^n` spawns pets that home onto the nearest enemy and detonate. The exponent **n** picks the **trait** (`n=1` → slow, `n=2` → fast, `n=3` → heavy, `n ≥ 4` → basic), which sets per-pet damage / fire rate / movement speed (a "fast" pet hits softer but more often; a "heavy" pet hits hard but slow). The coefficient **C** is **log-compressed** into pet count — `floor(log₂(C+1))` pets — so a `99·x²` result spawns 6 fast pets, not 99. Talents add to that count; non-integer `|C|` becomes a damage multiplier on each pet. The first operation is free; chaining another costs gold; a wrong answer is rejected at no cost.
+- **Mechanic:** pick a monomial `f(x)`, then pick an operation — `f'`, `f''`, or `∫f` — and **solve it yourself**: type the resulting monomial. The panel never shows the answer; only a correct answer applies the operation. The result `C·x^n` spawns pets that home onto the nearest enemy and detonate. The exponent **n** picks the **trait** (`n=1` → slow, `n=2` → fast, `n=3` → heavy, `n ≥ 4` → basic), which sets per-pet damage / fire rate / movement speed (a "fast" pet hits softer but more often; a "heavy" pet hits hard but slow). The coefficient **C** is **log-compressed** into pet count — `floor(log₂(C+1))` pets — so a `99·x²` result spawns 6 fast pets, not 99. Talents add to that count; non-integer `|C|` becomes a damage multiplier on each pet. The first operation is free; chaining another costs 50 gold; a wrong answer is rejected at no cost.
 - **Tier 2/3:** pet damage +25% / +50%; Tier 3 also +1 pet count and +20% pet speed.
 - **Pick when:** you want autonomous chip damage during waves or extra cleanup that doesn't need direct line-of-sight positioning.
 - **Exam tie-in:** AP Calculus AB Section I differentiation/integration of polynomials.
@@ -105,7 +105,7 @@ Seven tower types, each tied to a real math concept. Stats below are the **base*
 | ![Magic](towers/magic.png) Magic | 60 | 8 | 10 | 1.0 | Curve zone (debuff DoT + 2 s slow, or buff allies) |
 | ![Radar A](towers/radarA.png) Radar A — Sweep | 50 | 5 | 6 | 0.5 | AoE sweep |
 | ![Radar B](towers/radarB.png) Radar B — Rapid | 65 | 8 | 7 | 0.3 | Fast single target |
-| ![Radar C](towers/radarC.png) Radar C — Sniper | 90 | 40 | 12 | 2.5 | Slow heavy single target |
+| ![Radar C](towers/radarC.png) Radar C — Sniper | 90 | 40 | 12 | 2.5 | Slow heavy single target, innate 5% crit |
 | ![Matrix](towers/matrix.png) Matrix | 80 | 1* | 8 | 0.5 | Paired laser, 1 + dot-product damage |
 | ![Limit](towers/limit.png) Limit | 70 | 25 | 8 | 3.0 | Charge-up AoE burst (1.5× damage) from `lim` answer |
 | ![Calculus](towers/calculus.png) Calculus | 100 | 0* | 10 | — | Spawns C·x^n pets |
@@ -159,7 +159,7 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 | Threat | Why standard towers struggle | What to do |
 |---|---|---|
 | Regenerator | constant HP regen | Burst damage (Radar C, Impulse spell). Damage over Time (DoT) alone is unreliable. |
-| Bulwark | takes only 40% tower damage | Only Calculus pets bypass the cut — spells (Exponential/Impulse) and all tower fire are still reduced to 40%. The Matrix laser ramps through it. |
+| Bulwark | takes only 40% tower damage | Only Calculus pets bypass the cut — spells (Exponential/Impulse) and all tower fire are still reduced to 40%, including the Matrix laser. But the Matrix ramp keeps growing, so a locked pair still scales past the cut. |
 | Swarmling | -65% tower damage; bursty | Calculus pets ignore the modifier. Asymptote to slow the cluster. |
 | Helper | buffs nearby allies | Kill the Helper *first*. Radar C or an Impulse spell are reliable openers. |
 | Split | doubles into smaller mobs | Place AoE (Magic curve, Radar A sweep) where the children will spawn. |
@@ -170,14 +170,16 @@ Ten enemy types. `killValue` is what they contribute to the Monty Hall and score
 
 ## Spells
 
-Cast from the spell bar. Cost gold, fire instantly, share no resource pool with Build Phase shop buffs.
+Cast from the spell bar. Cost gold, fire instantly; their cooldowns are independent of the Build Phase shop buffs.
 
 | Spell | Glyph | Cost | Cooldown | Effect |
 |---|---|---|---|---|
 | **Exponential** | eˣ | 80 | 12 s | 60 damage in a r=3 AoE around the click point — the value blows up exponentially |
 | **Asymptote** | →0 | 60 | 15 s | Slow enemies in r=4 to 40% speed for 5 s — their speed is driven asymptotically toward zero |
 | **Impulse** | δ | 100 | 18 s | 150 damage to a single targeted enemy — a Dirac-delta spike, all the energy at one point |
-| **Acceleration** | dv/dt | 120 | 25 s | Boost tower attack speed for 8 s (self-cast) — the rate of change of velocity |
+| **Acceleration** | dv/dt | 120 | 25 s | All towers deal ×1.5 damage for 8 s (self-cast) — output rising like dv/dt |
+
+An area cast (Exponential, Asymptote) that catches no enemy refunds its gold and resets its cooldown.
 
 When to cast:
 
@@ -202,7 +204,7 @@ When to cast:
 | Ward Shield | 120 | 30 s | Halve the next 3 incoming damage hits (rounded up) |
 | Prospector | 50 | 30 s | Double gold from kills |
 
-Stack rules: each buff stacks **independently**. Two damage buffs are multiplicative.
+Stack rules: durations tick independently, but same-category buffs share an **additive** bonus pool — Sharpen Blades (×1.2) plus the Monty Hall Power Surge (×2) gives ×2.2 (1 + 0.2 + 1.0), not ×2.4. Gold multipliers, slows, and vulnerability stack the same way, so no combination snowballs out of control. A Magic tower's buff band is a separate factor and *does* multiply on top.
 
 ---
 
@@ -229,14 +231,14 @@ Gold-multiplier rewards (Gold Rush) stack **additively** with shop buffs: a ×2 
 
 ## Targeting Modes
 
-Each combat tower can be set to one of:
+Only the single-target shooters — **Radar B** and **Radar C** — have a targeting picker. (Radar A sweeps everything in its arc, Magic and Limit are zones, Matrix locks via its pair, and Calculus pets choose their own targets.)
 
-- **Closest** — shortest distance to tower (default; smooth coverage)
+- **First** — furthest along the path, i.e. closest to P\* (default; stop the leaders before they leak)
+- **Last** — furthest from P\* (farm the back of the pack)
+- **Closest** — shortest distance to the tower (smooth coverage)
 - **Strongest** — highest current HP (Bosses, Bulwark)
-- **First** — furthest along the path (kill before they get close)
-- **Last** — nearest to P\* (catch leaks)
 
-Switch via the small targeting toggle on the tower panel.
+Switch via the targeting picker on the tower panel.
 
 ---
 
@@ -244,12 +246,12 @@ Switch via the small targeting toggle on the tower panel.
 
 Twenty-six nodes across the seven tower types: nineteen base nodes (Magic 3, Radar A 2, Radar B 3, Radar C 3, Matrix 3, Limit 2, Calculus 3) plus seven advanced **"tier-2"** nodes — one per tower — that each require their parent base node at max level. Prerequisites within each tower form linear chains. The Talent Tree view renders each tower as its own mini-tree (two-column grid, tower-color theming, dashed border on the tier-2 cap node) so the prerequisite path inside a tower is visible at a glance.
 
-| Tier | Per-tower coverage | Magnitude |
-|---|---|---|
-| Base | `damage`, `range`, `attack_speed` / `sweep_speed`, `target_count`, Magic `zone_strength` / `zone_width` / `duration`, Matrix `damage_ramp`, Calculus `pet_attack_speed` / `pet_damage` / `pet_range` | +8% to +20% per level (target-count nodes add a whole target) |
-| Tier-2 | Magic `slow_strength`, Radar A `aoe_width`, Radar B `crit_chance`, Radar C `crit_damage`, Matrix `resonance` (paired-tower base damage ×(1+resonance)), Limit `burst_bonus` (adds to the 1.5× burst multiplier), Calculus `pet_crit` | +10% to +50% per level depending on the node; crit-chance nodes add a probability |
+| Tier | Per-tower coverage | Magnitude | TP cost |
+|---|---|---|---|
+| Base | `damage`, `range`, `attack_speed` / `sweep_speed`, `target_count`, Magic `zone_strength` / `zone_width` / `duration`, Matrix `damage_ramp`, Calculus `pet_attack_speed` / `pet_damage` / `pet_range` | +8% to +20% per level (target-count nodes add a whole target) | 1 TP per level (target-count nodes and Magic's duration node cost 3) |
+| Tier-2 | Magic `slow_strength`, Radar A `aoe_width`, Radar B `crit_chance`, Radar C `crit_damage`, Matrix `resonance` (paired-tower base damage ×(1+resonance)), Limit `burst_bonus` (adds to the 1.5× burst multiplier), Calculus `pet_crit` | +10% to +50% per level depending on the node; crit-chance nodes add a probability | 3 TP per level |
 
-Each node has a `maxLevel` of 2 or 3. Free reset is available from the Talent Tree view. Effects apply at *tower placement* — re-build a tower to refresh its modifier snapshot after reallocating.
+Each node has a `maxLevel` of 2 or 3. Maxing every node would take 111 TP against the 52-TP achievement pool (doubled for season unlocks), so specialization is forced. Free reset is available from the Talent Tree view. Effects apply at *tower placement* — re-build a tower to refresh its modifier snapshot after reallocating.
 
 ---
 
@@ -263,6 +265,7 @@ Each node has a `maxLevel` of 2 or 3. Free reset is available from the Talent Tr
 | IA | Initial Answer — the pre-game intersection-point question. The score's exponent uses IA = 1 only when you submit a correct `(x, y)`. |
 | Multiset | The polynomial-degree multiset (e.g. `[1,2,2]`) used to generate the path. |
 | Practice mode | A run that won't post to leaderboards (Star-5 checkpoint retry, manual abandon). |
+| Season | An admin-defined window; achievements tied to it bank 2× TP when unlocked while it is active. |
 | Tier | A tower upgrade level (1 base, 2 mid, 3 max). |
 
 ---

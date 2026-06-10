@@ -25,7 +25,7 @@ two independent ways to bring the stack up:
 # ---- Path A: Docker (recommended) ----
 sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker "$USER" && newgrp docker   # run docker without sudo
-git clone <repo-url> "Math Game" && cd "Math Game"
+git clone <repo-url> Math-Defense && cd Math-Defense
 cp .env.example .env
 # edit .env — fill SECRET_KEY, DATABASE_URL, POSTGRES_PASSWORD, TOTP_ENCRYPTION_KEY (see below)
 docker compose up
@@ -81,14 +81,13 @@ docker run --rm hello-world   # sanity check
 ### A.2 Get the code
 
 ```bash
-git clone <repo-url> "Math Game"
-cd "Math Game"
+git clone <repo-url> Math-Defense
+cd Math-Defense
 ```
 
-> The repo vendors a Windows build of `emsdk/` at the root. **Docker ignores it
-> entirely** — `backend/Dockerfile` pulls `emscripten/emsdk:5.0.7` from Docker
-> Hub to rebuild the WASM, and the frontend image uses the committed binary. You
-> can leave `emsdk/` untouched.
+> No Emscripten SDK ships with the repo (`emsdk/` is gitignored) and none is
+> needed here — `backend/Dockerfile` pulls `emscripten/emsdk:5.0.7` from Docker
+> Hub to rebuild the WASM, and the frontend image uses the committed binary.
 
 ### A.3 Create and fill `.env`
 
@@ -316,12 +315,13 @@ almost never need to build it yourself** because:
 - The Docker backend image rebuilds it from `emscripten/emsdk:5.0.7` on Docker
   Hub; the Docker frontend image uses the committed binary.
 
-### ⚠️ The vendored `emsdk/` is a Windows build
+### ⚠️ No Emscripten SDK ships with the repo
 
-The `emsdk/` directory checked into the repo contains a **Windows** toolchain
-(`.bat` launchers, a Win64 Node, a Win64 Python). **It will not run on Ubuntu.**
-The `wasm/README.md` instruction `source emsdk/emsdk_env.sh` therefore won't
-produce a working `emcc` on this checkout.
+`emsdk/` is **gitignored** — a fresh clone contains no Emscripten toolchain at
+all (some Windows dev machines keep a local Windows build at that path; it
+would not run on Ubuntu anyway). To rebuild on Linux, use one of the two
+options below, and install the same **5.0.7** that `backend/Dockerfile` and CI
+pin so the produced binary matches bit-for-bit.
 
 ### Rebuilding WASM on Ubuntu (only if you changed `wasm/*.c`)
 
@@ -345,7 +345,7 @@ cd emsdk
 ./emsdk activate 5.0.7
 source ./emsdk_env.sh                 # puts emcc on PATH for this shell
 
-cd "/path/to/Math Game/wasm"
+cd /path/to/Math-Defense/wasm
 make                                  # writes into frontend/src/math/wasm/
 ```
 
@@ -425,7 +425,7 @@ production checklist.
 | Backend won't start, mentions TOTP / Fernet key | `TOTP_ENCRYPTION_KEY` unset/malformed | Generate a Fernet key (§A.3) |
 | `connection refused` to Postgres (native) | `DATABASE_URL` host is still `postgres` | Change host to `localhost` (§B.4) |
 | `pytest` errors creating the test DB | `mathdefense` role lacks `CREATEDB` | `ALTER ROLE mathdefense CREATEDB;` (§B.3) |
-| `emcc: command not found` during `npm run build` | No Linux Emscripten; vendored emsdk is Windows | Use Docker build or install Linux emsdk (§ WASM) |
+| `emcc: command not found` during `npm run build` | No Emscripten on the host (the repo ships none) | Use Docker build or install Linux emsdk 5.0.7 (§ WASM) |
 | `permission denied` on `docker.sock` | User not in `docker` group | `sudo usermod -aG docker $USER` then re-login |
 | Prod frontend container crash-loops, nginx logs `cannot load certificate` | `./certs/{fullchain,privkey}.pem` missing | Provision certs before `up` (§ Production build) |
 | Login silently fails (cookie never set) when reached via a LAN IP | `Secure` auth cookie dropped over plain HTTP to a non-localhost host | Reach the app as `localhost` via an SSH tunnel (§A.4) |
