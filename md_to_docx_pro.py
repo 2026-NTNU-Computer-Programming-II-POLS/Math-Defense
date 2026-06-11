@@ -193,8 +193,8 @@ def style_document(doc):
     normal = doc.styles["Normal"]
     set_style_east_asia(normal)
     normal.font.size = Pt(10.5)
-    normal.paragraph_format.line_spacing = 1.15
-    normal.paragraph_format.space_after = Pt(6)
+    normal.paragraph_format.line_spacing = 1.08
+    normal.paragraph_format.space_after = Pt(4)
 
     for sname in ("Heading 1", "Heading 2", "Heading 3", "Heading 4",
                   "Title", "List Bullet", "List Number", "Quote"):
@@ -217,8 +217,8 @@ def style_document(doc):
         st.font.size = Pt(size)
         st.font.bold = bold
         st.font.color.rgb = ACCENT
-        st.paragraph_format.space_before = Pt(10)
-        st.paragraph_format.space_after = Pt(4)
+        st.paragraph_format.space_before = Pt(8)
+        st.paragraph_format.space_after = Pt(3)
         st.paragraph_format.keep_with_next = True
 
     try:
@@ -267,10 +267,17 @@ def convert(md_path, docx_path):
             i += 1
             for cl in code_lines:
                 p = doc.add_paragraph()
+                # Diagram height is dominated by per-line paragraph
+                # spacing, so code lines stack with none.
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.line_spacing = 1.0
                 run = p.add_run(cl if cl else " ")
                 run.font.name = CODE_FONT
                 set_run_east_asia(run, CODE_FONT)
                 run.font.size = Pt(9.5)
+            if code_lines:
+                # Restore a gap between the block and the next paragraph.
+                p.paragraph_format.space_after = Pt(6)
             continue
 
         if line.strip() == "":
