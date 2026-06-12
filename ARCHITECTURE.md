@@ -1,7 +1,6 @@
 # Math Defense — System Architecture
 
 > Comprehensive architecture reference for the Math Defense educational tower-defense game.
-> Generated 2026-05-08, refreshed 2026-06-10 from a full audit of source, schema, and deployment configuration.
 
 This document describes the system from four complementary angles:
 
@@ -256,7 +255,7 @@ flowchart TB
 `GameSession` emits `SessionCreated`, `SessionUpdated`, `SessionCompleted`, `SessionAbandoned`. After the session row itself is committed, `SessionApplicationService` dispatches `SessionCompleted` through `SessionEventBus` to a chain of **three independent, post-commit handlers** (`application/session_event_handlers.py`):
 
 1. `LeaderboardInsertHandler` — create a `LeaderboardEntry` (idempotent via `UNIQUE(session_id)`; skipped for practice-mode and teacher/admin preview runs).
-2. `AchievementCheckHandler` — run `AchievementApplicationService.check_and_unlock(...)` (awarding talent points) **and**, when an `AssessmentApplicationService` is wired, write the unlocked achievements' Beta-Bernoulli evidence (`apply_evidence_in_open_uow`) inside the **same** UoW commit (the "H3" fix).
+2. `AchievementCheckHandler` — run `AchievementApplicationService.check_and_unlock(...)` (awarding talent points) **and**, when an `AssessmentApplicationService` is wired, write the unlocked achievements' Beta-Bernoulli evidence (`apply_evidence_in_open_uow`) inside the **same** UoW commit.
 3. `IaAccuracyRefreshHandler` — recompute and persist `User.ia_recent_accuracy` (rolling recent-session fraction).
 
 Each handler runs in **its own Unit of Work** and is isolated by a per-handler `try/except Exception` in `SessionEventBus.dispatch` — a failure in one (or a bug) is logged and does **not** roll back the already-durable session row or suppress the other handlers. Atomicity is guaranteed only *within* `AchievementCheckHandler`: achievement-unlock rows and their Beta-Bernoulli evidence commit together in one UoW. The trade-off is a known durability gap — if the leaderboard insert fails it is logged with **no automatic retry** (a future outbox table would close this); the `UNIQUE(session_id)` constraint keeps any later retry idempotent. (Study `dosage_seconds` is **not** updated by this chain.)
@@ -294,7 +293,7 @@ sequenceDiagram
     App->>Lb: LeaderboardInsertHandler(SessionCompleted)
     Lb->>DB: INSERT leaderboard_entries (idempotent)
     App->>Ach: AchievementCheckHandler(SessionCompleted)
-    Ach->>DB: INSERT user_achievements / UPDATE talent_allocations + Beta-evidence (H3)
+    Ach->>DB: INSERT user_achievements / UPDATE talent_allocations + Beta-evidence
     App-->>R: EndSessionResult (DTO + newly_unlocked)
     R-->>FE: 200 OK + DTO
 ```
@@ -353,7 +352,7 @@ flowchart TB
     end
 
     subgraph Components["Reusable Components (6 subdirs)"]
-        Common[common/<br/>Modal · MathDisplay · markdown helpers]
+        Common[common/<br/>Modal · MathDisplay · ManualModal]
         Layout[layout/<br/>app chrome]
         GameCmp["game/ (27 .vue files)<br/>HUD · TowerBar · BuildPanel · BuildHint · ShopPanel ·<br/>SpellBar · SpellIcon · StartWaveButton · GameSpeedPanel ·<br/>MagicModePanel · RadarConfigPanel · MatrixPairPanel ·<br/>LimitQuestionPanel · CalculusPanel ·<br/>IntegralPanel · FunctionPanel · ChainRulePanel ·<br/>MontyHallPanel · TargetingModePanel · TowerInfoPanel ·<br/>BuffCardPanel · WaveForecast · FirstEncounterCard ·<br/>AchievementToast · PrincipleOverlay ·<br/>PhaseFader · WaveBanner"]
         Teacher[teacher/CompetencyBar]
@@ -382,7 +381,7 @@ flowchart TB
 flowchart TB
     subgraph Core["Engine Core (frontend/src/engine/)<br/>systems/ · renderers/ · domain/ are sibling top-level dirs"]
         Game["Game.ts<br/>fixed-timestep 60 FPS loop<br/>owns GameState"]
-        State["GameState.ts<br/>(phase · level · gold · hp ·<br/>score · kills · waves_survived ·<br/>kill_value · cost_total · time_total)"]
+        State["GameState.ts<br/>(phase · level · wave · gold · hp ·<br/>score · kills · cumulativeKillValue ·<br/>costTotal · timeTotal · timeExcludePrepare)"]
         FSM["PhaseStateMachine<br/>transition table"]
         Bus["EventBus<br/>type-safe pub/sub"]
         Input["InputManager"]
@@ -557,7 +556,7 @@ The lint rule `npm run lint-determinism` bans `Math.sin/cos/tan/asin/acos/atan/a
 in the directories that reach the v2 reconstruction code path:
 `src/domain/level/`, `src/domain/scoring/`, `src/math/curve-evaluator.ts`,
 `src/engine/Game.ts`, `src/systems/`. Pre-existing legacy callers carry
-per-line opt-outs with a follow-up reference; new code must route through
+per-line opt-outs; new code must route through
 `WasmBridge`. The `domain/scoring/` entry routes the frontend score
 formula through the same musl `pow` the backend recomputes against
 (see §5.2).
@@ -600,7 +599,7 @@ Acceptance flow:
    `math_engine.wasm` are missing at boot, `_verify_score` raises
    `ReplayUnavailableError → HTTP 503` for any v2 session that submits a
    score, rather than silently weakening the bit-equal contract to v1's ε
-   (the pre-B-BUG-15 behaviour). v1 sessions still verify through the
+   tolerance. v1 sessions still verify through the
    Python fallback at ε tolerance. The missing runtime is logged loudly so
    a misconfigured deploy is visible.
 
@@ -1055,7 +1054,7 @@ The two poll jobs (territory settlement, auth-store janitor) are started as `asy
 - **Domain unit tests** — pure aggregate logic, value objects, invariants (no DB).
 - **Repository / integration tests** — real Postgres, TRUNCATE-per-test isolation, async-capable via pytest-asyncio.
 - **Router tests** — FastAPI TestClient end-to-end (auth, RBAC, rate-limit headers).
-- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim (V3 fixtures in `shared/score_parity_fixtures.json`), audit-driven coverage gaps (negative HP, score regress, over the per-level score-delta cap), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path and fail-closed 503 when WASM is missing.
+- **Cross-cutting tests** — shared-constants parity, score recomputation vs client claim (V3 fixtures in `shared/score_parity_fixtures.json`), abuse-boundary cases (negative HP, score regress, over the per-level score-delta cap), `wasmtime-py` runtime singleton (load/fallback/threading), v2 strict-rejection 422 path and fail-closed 503 when WASM is missing.
 
 ### Frontend (Vitest + happy-dom, ~90 test files)
 
@@ -1075,7 +1074,7 @@ The two poll jobs (territory settlement, auth-store janitor) are started as `asy
 |---|---|
 | Domain errors are HTTP-free; `app/http_status_map.py` maps each error class → status | Routers stay thin; one global exception handler applies the mapping. |
 | Repository **protocols** (not inheritance) | Domain free of ORM; in-memory test doubles are trivial. |
-| Lite event sourcing for sessions | `SessionCompleted` is dispatched **post-commit** to independent handlers, each in its own UoW and isolated by a per-handler `try/except`; only achievement-unlock + Beta-evidence commit atomically together (H3). Chosen for resilience over cross-handler atomicity — a failed leaderboard insert is logged, not retried (an outbox is future work), and `UNIQUE(session_id)` keeps retries idempotent. |
+| Lite event sourcing for sessions | `SessionCompleted` is dispatched **post-commit** to independent handlers, each in its own UoW and isolated by a per-handler `try/except`; only achievement-unlock + Beta-evidence commit atomically together. Chosen for resilience over cross-handler atomicity — a failed leaderboard insert is logged, not retried (an outbox is future work), and `UNIQUE(session_id)` keeps retries idempotent. |
 | Append-only `session_events` | Replay and live spectate need a deterministic, immutable record. |
 | Partial unique index on active session | "At most one active session per user" without blocking completed rows. |
 | Rotating refresh tokens, hashed | Compromise window bounded; reuse of a `used` token is detectable. |
@@ -1088,7 +1087,7 @@ The two poll jobs (territory settlement, auth-store janitor) are started as `asy
 | Reflection text post-session | Articulation prompt; logged but not scored. |
 | Bayesian competency state | Stealth assessment without explicit probes per session; informs adaptive recommendations. |
 | Single canonical score formula compiled to WASM (V3) | `wasm/math_engine.c::compute_total_score` is the one source of truth: the browser calls it through `WasmBridge`, the server through wasmtime-py — bit-equal by construction. Parity-pinned JS/Python mirrors (fixtures in `shared/score_parity_fixtures.json`) serve only as fallbacks. |
-| Visual Redesign (Phases 0–7 + Spell Re-skin 0–2) | Math-instrument tower silhouettes, glyph-body enemies, cyan-fringe pets, gold-fringe spell glyphs; all motion-heavy effects gated behind `useReducedMotion`. |
+| Math-themed visual language | Math-instrument tower silhouettes, glyph-body enemies, cyan-fringe pets, gold-fringe spell glyphs; all motion-heavy effects gated behind `useReducedMotion`. |
 | Endpoint-marker customization persisted on `users` | Per-player marker style / custom image / hit-FX preferences (`endpoint_marker_style`, `endpoint_marker_custom_dataurl`, `endpoint_hit_fx`, DB-level CHECK allowlists) saved via `PUT /api/auth/profile/endpoint-marker` and replayed deterministically by `EndpointFXSystem` (`random` resolves through `game.rng`). |
 
 ---
@@ -1158,7 +1157,7 @@ emsdk/                           # local Emscripten SDK install (git-ignored; Do
 shared/                          # game-constants.json + enemy-defs.json + score_parity_fixtures.json
 scripts/                         # pg_backup.sh, pg_init_roles.sh, regenerate_score_fixtures.py, audit_score_caps.py
 stress/                          # k6 load-test harness (docker-compose.stress.yml, k6/, RESULTS.md)
-.github/                         # CI workflows (CodeQL, backend/frontend tests, docker-build; emsdk 5.0.7 pin)
+.github/                         # CI workflow (ci.yml: backend + frontend tests, docker-build; emsdk 5.0.7 pin) + dependabot.yml
 docs/                            # analysis / audit / educational-theory docs
 docker-compose.yml               # dev
 docker-compose.prod.yml          # prod (incl. db-backup sidecar + pg_backups volume)

@@ -15,14 +15,14 @@ An educational tower defense where **math is the mechanic, not the gate**. The w
 | Tower | Glyph | Math Concept | How It Works | Unlocked |
 |---|---|---|---|---|
 | Magic | ✦ | Function curves (polynomial / trig / log) | Draws a curve as a band-shaped zone; toggle between **Debuff** (damages enemies in band) and **Buff** (boosts towers in band) | Star 1 |
-| Radar A — Sweep | ◐ | Radian arcs, sector area | Continuous AoE sweep; damage applied to all enemies inside the arc on every tick | Star 1 |
-| Radar B — Rapid | ◑ | Radian arcs | Fast single-target projectiles within a restricted arc; shortest cooldown in the roster | Star 2 |
-| Radar C — Sniper | ◒ | Radian arcs | Slow, heavy single-target shots at long range; highest base damage | Star 2 |
-| Matrix | ⊞ | Vectors & dot product | **Paired** tower system — fires nothing alone; base damage = dot product of the pair's grid-coordinate vectors; laser ramps damage the longer it locks on | Star 2 |
-| Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; answer drives the effect — `+∞` instakills every enemy in range (bypasses defensive caps), `+C` (finite positive) scales damage by `\|C\| × 1.5`, any other answer (`0`, `−C`, `−∞`) deals chip damage (`effectiveDamage × 0.35 × 1.5`) | Star 3 |
-| Calculus | ∫ | Derivatives & integrals (power rule) | Player picks a polynomial and applies `d/dx` or `∫`; the resulting `C·xⁿ` spawns `floor(log2(C+1))` autonomous pets (capped log-curve, not raw C) whose behaviour is determined by `n` (homing, lifetime, AoE) | Star 3 |
+| Radar A — Sweep | ◐ | Radian arcs, sector area | A needle sweeps the circle and pings every enemy the beam passes — one discrete hit per pass, so faster sweep = higher hit rate; pings on enemies inside the focus arc deal 1.5×, and the sweep can optionally be confined to that arc | Star 1 |
+| Radar B — Rapid | ◑ | Radian arcs | Fast single-target projectiles; shortest cooldown in the roster; an optional focus arc boosts in-arc damage (1.5×) | Star 2 |
+| Radar C — Sniper | ◒ | Radian arcs | Slow, heavy single-target shots at long range; highest base damage; innate 5% crit chance; shares the same optional 1.5× focus arc as the other radars | Star 2 |
+| Matrix | ⊞ | Vectors & dot product | **Paired** tower system — fires nothing alone; base damage = `1 +` dot product of the pair's grid-coordinate vectors (laser disabled when that sum ≤ 0); laser ramps damage the longer it locks on | Star 2 |
+| Limit | ∞ | Limits (lim x→a) | Presents a multiple-choice `lim` question; answer drives the effect — `+∞` instakills every enemy in range (bypasses defensive caps), `+C` (finite positive) scales damage by `\|C\| × 1.5`, any other outcome (`0`, constant, `−C`, `−∞`) deals chip damage (`effectiveDamage × 0.35 × 1.5`) | Star 3 |
+| Calculus | ∫ | Derivatives & integrals (power rule) | Player picks a polynomial and applies `d/dx` or `∫`; the resulting `C·xⁿ` spawns `floor(log2(max(1, C) + 1))` autonomous pets (capped log-curve, not raw C) whose behaviour is determined by `n` (homing, lifetime, AoE) | Star 3 |
 
-Each tower has Tier 2 / Tier 3 upgrades (+25%/+50% damage, +10%/+20% range, plus type-specific bonuses).
+Each tower has Tier 2 / Tier 3 upgrades (+25%/+50% damage, +10%/+20% range; Tier 3 also adds +15% attack speed, plus type-specific bonuses).
 
 ---
 
@@ -53,10 +53,10 @@ Ten enemy types with distinct counter-play. `killValue` (not gold reward) drives
 | Split | 40 | 2.0 | 8 | 1 | 5 | On death splits into 2 smaller Generals |
 | Helper | 35 | 2.0 | 23 | 1 | 15 | Aura: +5 HP/s and +20% speed to allies in r=3 — **kill first** |
 | Regenerator | 80 | 1.5 | 30 | 2 | 20 | Regens 18 HP/s — needs burst damage |
-| Bulwark | 220 | 0.9 | 45 | 3 | 30 | Takes only **40%** of tower damage; only Calculus pets bypass the cut (spells are reduced too) |
-| Swarmling | 12 | 3.2 | 6 | 1 | 4 | Takes only **35%** of tower damage; pets bypass the modifier |
+| Bulwark | 220 | 0.9 | 45 | 3 | 30 | Takes only **40%** of tower damage; Calculus pets and one-shot power-up effects bypass the cut (spells are reduced too) |
+| Swarmling | 12 | 3.2 | 6 | 1 | 4 | Takes only **35%** of tower damage; pets and power-up effects bypass the modifier |
 | Boss Type-A | 500 | 0.8 | 150 | 99 | 100 | 200-HP shield; spawns a General every 8 s |
-| Boss Type-B | 600 | 0.7 | 225 | 99 | 150 | 250-HP shield; spawns a Fast every 8 s; triggers **Chain Rule challenge** at ~50% HP — correct answer instakills the boss + 100 gold; wrong answer = no heal, no penalty, boss returns to combat |
+| Boss Type-B | 600 | 0.7 | 225 | 99 | 150 | 250-HP shield; spawns a Fast every 8 s; triggers **Chain Rule challenge** at ~50% HP — correct answer instakills the boss + 100 gold; wrong answer = no heal, no penalty, boss returns to combat. Either way the boss **splits into two scaled-down children** (a Strong and a Fast): immediately on a correct answer, or on its eventual death after a wrong one |
 
 ### Score formula
 
@@ -79,13 +79,13 @@ Edge cases: no towers built (`costTotal = 0`) → `S2 = 0`, alpha = 1, `K = S1` 
 
 ### Monty Hall event
 
-When cumulative kill-value crosses a star-specific threshold, the wave pauses. Pick a door → system reveals a losing door → stay or **switch**. Switching wins `(doors−1)/doors` (2/3 at 3 doors, 4/5 at 5 doors). The game never tells you this — it's the lesson. Rewards include Power Surge (double damage), Eagle Eye (+50% range), Time Warp (-40% enemy speed), Gold Rush (3× gold), Divine Blessing (full HP), Master Builder (next 2 towers free).
+When cumulative kill-value crosses a star-specific threshold, the wave pauses. Pick a door → system reveals a losing door → stay or **switch**. Thresholds use 3–5 doors (more at higher stars), and switching wins `(doors−1)/doors` — 2/3, 3/4, 4/5. The game never tells you this — it's the lesson. Rewards include Power Surge (double damage), Eagle Eye (+50% range), Time Warp (-40% enemy speed), Gold Rush (3× gold), Divine Blessing (full HP), Master Builder (next 2 towers free).
 
 ### Shop buffs & spells
 
 Shop (Build Phase, time-based, stack independently): Sharpen Blades (+20% damage), Overclock (+15% attack speed), Far Sight (+15% range), Quagmire (-15% enemy speed), Corrode Armor (+10% enemy damage taken), Heal 5/10, Ward Shield (halve next 3 damage hits), Prospector (2× gold).
 
-Spells (cast any time, gold-cost, cooldown-gated): **Exponential** `eˣ` (60 AoE r=3, 80g/12s), **Asymptote** `→0` (slow to 40% in r=4 for 5s, 60g/15s), **Impulse** `δ` (150 single-target, 100g/18s), **Acceleration** `dv/dt` (+tower attack speed 8s, 120g/25s).
+Spells (cast any time, gold-cost, cooldown-gated): **Exponential** `eˣ` (60 AoE r=3, 80g/12s), **Asymptote** `→0` (slow to 40% in r=4 for 5s, 60g/15s), **Impulse** `δ` (150 single-target, 100g/18s), **Acceleration** `dv/dt` (all towers deal 1.5× damage for 8s, 120g/25s).
 
 ### Difficulty (star rating)
 
@@ -101,7 +101,7 @@ Path generation is polynomial-only; the trig / log evaluator is used by the Magi
 
 ### Progression (carries between runs)
 
-- **Achievements** — 29 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`); some scale with seasonal multipliers.
+- **Achievements** — 29 entries across 6 categories (`combat / efficiency / exploration / scoring / survival / territory`). An admin-defined season window doubles the talent-point reward of achievements tagged into that season (the mechanism is in place; no achievement ships season-tagged by default).
 - **Talent Tree** — 26 nodes (19 base + 7 tier-2 advanced) across the 7 tower types. Base nodes form linear prerequisite chains; tier-2 nodes additionally require their parent at max level (`prerequisite_max_levels`). Each node has a `maxLevel` (2 or 3) and grants a per-tower attribute multiplier — including damage, range, attack/sweep speed, target count, zone width/strength, Magic zone duration/slow strength, Matrix damage-ramp rate/resonance, Limit burst bonus, and Calculus pet damage/speed/range/crit. Modifiers are snapshotted at tower placement, so re-build to refresh after reallocating. Free reset is supported.
 - **Avatar & profile** — unlocked along the way. Profile customization also covers the **endpoint marker** (the P\* rune you defend): pick a marker style (`star` / `gorilla` / `custom` data-URL upload) and a hit-effect animation (`random` / `fragments` / `crying` / `angry`), validated at the schema, domain-aggregate, and DB-constraint layers.
 - **Class & Territory** — students join classes and compete in time-bounded "Grabbing Territory" events with leaderboards by region / class / global. Each activity has up to 50 slots and a teacher-configurable `student_slot_cap` (1–50, default 5) controlling how many slots a single student may hold.
@@ -138,7 +138,7 @@ Math-Defense/
 ├── DATABASE_SCHEMA.md        Full ERD, column constraints, indexes, and migration history
 ├── SECURITY.md               Security model, threat surface, and hardening notes
 ├── Math_Defense_Spec.md      Full game-design specification
-└── docs/                     Additional design documents and analysis (Audit, V3 planning, educational theory)
+└── docs/                     Additional design documents and analysis (audit notes, educational theory)
 ```
 
 The three runtime layers communicate as follows:
@@ -200,7 +200,7 @@ MENU
                       └─ GAME_OVER (HP reaches 0)
 ```
 
-Phase transitions are enforced by `PhaseStateMachine` on the frontend and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend. The `BUFF_SELECT` phase survives only as a `GamePhase` enum value for V1 compatibility — the `PhaseStateMachine` defines no transitions into it, so the V2 flow never enters it; shop-based purchases during BUILD replaced the end-of-wave buff card draw.
+Phase transitions are enforced by `PhaseStateMachine` on the frontend (the Initial Answer step is a routed pre-run screen rather than an engine `GamePhase`) and mirrored by the `GameSession` aggregate's `SessionStatus` state machine on the backend.
 
 ---
 

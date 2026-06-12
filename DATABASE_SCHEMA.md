@@ -3,7 +3,7 @@
 **Engine**: PostgreSQL (psycopg v3 — `postgresql+psycopg` URL scheme)  
 **ORM**: SQLAlchemy 2.x (declarative `Base`)  
 **Migrations**: Alembic (`backend/alembic/`)  
-**All PKs**: UUID stored as `String`, generated via `str(uuid.uuid4())`  
+**Primary keys**: UUID stored as `String` (generated via `str(uuid.uuid4())`) unless noted otherwise — exceptions are autoincrement integer PKs (`session_events`, `study_probe_attempts`, `study_affect_responses`), natural-key PKs (`login_attempts.username`, `denied_tokens.jti`, `seasons.season_id`, `territory_session_uses.session_id`), and composite PKs (`user_competency_state`, `study_enrollments`, `class_group_members`)  
 **All timestamps**: `DateTime(timezone=True)`, UTC
 
 ---
@@ -371,17 +371,17 @@ Central identity table. Stores authentication credentials, MFA state, and profil
 | `password_hash` | `String(255)` | NO | — |
 | `password_version` | `Integer` | NO | DEFAULT `0` |
 | `is_email_verified` | `Boolean` | NO | DEFAULT `false` |
-| `totp_secret` | `String(255)` | YES | Widened from `String(64)` in `a1_widen_totp` to fit Fernet ciphertext |
+| `totp_secret` | `String(255)` | YES | Fernet-encrypted TOTP secret (ciphertext, not plaintext) |
 | `mfa_enabled` | `Boolean` | NO | DEFAULT `false` |
 | `totp_last_used_at` | `DateTime(tz)` | YES | TOTP step-replay guard — set on every accepted code |
 | `ia_recent_accuracy` | `Float` | NO | SERVER DEFAULT `0.0`; `CHECK(0.0 ≤ ia_recent_accuracy ≤ 1.0)` (`ck_user_ia_accuracy_range`). Rolling fraction of last 10 IA-correct sessions; drives Star-1 concrete-fading on the path renderer |
 | `endpoint_marker_style` | `String(16)` | YES | `CHECK(endpoint_marker_style IS NULL OR endpoint_marker_style IN ('star','gorilla','custom'))` (`ck_user_endpoint_marker_style`). Endpoint marker (P\*) display preference, persisted server-side so the choice follows the player across devices. NULL = FE local default. |
 | `endpoint_marker_custom_dataurl` | `Text` | YES | Custom endpoint-marker image stored as a data URL; only meaningful when `endpoint_marker_style = 'custom'`. |
 | `endpoint_hit_fx` | `String(16)` | YES | `CHECK(endpoint_hit_fx IS NULL OR endpoint_hit_fx IN ('random','fragments','crying','angry'))` (`ck_user_endpoint_hit_fx`). Endpoint hit-effect preference. NULL = FE local default. |
-| `profile_initials_letters` | `String(2)` | YES | "Initials + colour" avatar letters (1–2 chars). Added in `e2c3d4f5a6b7` — moves the avatar from a shared localStorage key to per-user server-side persistence. Paired with `profile_initials_color`: `ck_user_profile_initials_paired` requires both NULL or both set. |
+| `profile_initials_letters` | `String(2)` | YES | "Initials + colour" avatar letters (1–2 chars), persisted server-side so the avatar follows the player across devices. Paired with `profile_initials_color`: `ck_user_profile_initials_paired` requires both NULL or both set. |
 | `profile_initials_color` | `String(7)` | YES | Avatar background colour, `#RRGGBB` (`LIKE '#______'` enforced by the paired CHECK). NULL together with the letters = FE default badge. |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
-| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated on write by a PG `BEFORE UPDATE` trigger (`users_update_timestamp`, created in `b2_fix_h06_h07_h10`) |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; auto-updated on write by a PG `BEFORE UPDATE` trigger (`users_update_timestamp`) |
 
 **Constraints:** `UNIQUE(username)`, `UNIQUE(email)`, `CHECK(ia_recent_accuracy BETWEEN 0.0 AND 1.0)` (`ck_user_ia_accuracy_range`), `CHECK(endpoint_marker_style IS NULL OR endpoint_marker_style IN ('star','gorilla','custom'))` (`ck_user_endpoint_marker_style`), `CHECK(endpoint_hit_fx IS NULL OR endpoint_hit_fx IN ('random','fragments','crying','angry'))` (`ck_user_endpoint_hit_fx`), `CHECK` both-or-neither pairing on `profile_initials_letters`/`profile_initials_color` with `length(letters) BETWEEN 1 AND 2` and `color LIKE '#______'` (`ck_user_profile_initials_paired`)  
 **Indexes:** None beyond PK + unique columns
@@ -398,13 +398,13 @@ A classroom created by a teacher. Students join via an 8-character uppercase `jo
 | `name` | `String(100)` | NO | — |
 | `teacher_id` | `String` (FK) | NO | → `users.id` ON DELETE **RESTRICT** |
 | `join_code` | `String(8)` | NO | UNIQUE; `CHECK (join_code = upper(join_code))` |
-| `description` | `String(500)` | YES | Tier-C metadata (`bb2c3d4e5f7a`) |
-| `subject` | `String(80)` | YES | Tier-C metadata |
-| `school_year` | `String(40)` | YES | Tier-C metadata |
+| `description` | `String(500)` | YES | Optional class metadata |
+| `subject` | `String(80)` | YES | Optional class metadata |
+| `school_year` | `String(40)` | YES | Optional class metadata |
 | `capacity` | `Integer` | YES | `CHECK(capacity IS NULL OR capacity > 0)` (`ck_classes_capacity_positive`) |
-| `color` | `String(16)` | YES | Tier-C metadata |
-| `icon` | `String(40)` | YES | Tier-C metadata |
-| `archived_at` | `DateTime(tz)` | YES | NULL = active; non-NULL = soft-archived (audit B2/M1/O8) |
+| `color` | `String(16)` | YES | Optional class metadata |
+| `icon` | `String(40)` | YES | Optional class metadata |
+| `archived_at` | `DateTime(tz)` | YES | NULL = active; non-NULL = soft-archived |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `UNIQUE(join_code)` (`uq_classes_join_code`), `UNIQUE(teacher_id, name)` (`uq_classes_teacher_name`), `CHECK(join_code = upper(join_code))` (`ck_classes_join_code_upper`), `CHECK(capacity IS NULL OR capacity > 0)` (`ck_classes_capacity_positive`)  
@@ -430,7 +430,7 @@ Enrolment join table — maps students to classes. Soft-deleted students are tra
 
 ### `class_co_teachers`
 
-Many-to-many supplement: secondary teachers attached to a class. Added by `bb2c3d4e5f7a` for Tier-C class management.
+Many-to-many supplement: secondary teachers attached to a class.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -446,7 +446,7 @@ Many-to-many supplement: secondary teachers attached to a class. Added by `bb2c3
 
 ### `class_pending_invites`
 
-Pre-registration invites that auto-attach the user to a class on signup. Added by `bb2c3d4e5f7a`.
+Pre-registration invites that auto-attach the user to a class on signup.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -462,7 +462,7 @@ Pre-registration invites that auto-attach the user to a class on signup. Added b
 
 ### `class_groups`
 
-Within-class student grouping for group-targeted activities. Added by `bb2c3d4e5f7a`.
+Within-class student grouping for group-targeted activities.
 
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
@@ -527,8 +527,8 @@ Active and historical game runs. A **partial unique index** (`WHERE status = 'ac
 | `started_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 | `ended_at` | `DateTime(tz)` | YES | set on completion / abandonment |
 
-**Constraints:** `CHECK(1 ≤ star_rating ≤ 5)` (`ck_game_session_star_range`), `CHECK(score ≥ 0)` (`ck_game_session_score_nonneg`), `CHECK(kills ≥ 0)` (`ck_game_session_kills_nonneg`), `CHECK(waves_survived ≥ 0)` (`ck_game_session_waves_nonneg`), `CHECK(hp ≥ 0)` (`ck_game_session_hp_nonneg`), `CHECK(gold ≥ 0)` (`ck_game_session_gold_nonneg`) — non-negativity checks added in `c3_add_check_constraints`  
-**Indexes:** `ix_game_session_user_id`, `ix_game_sessions_challenge_id` (added in `b2_fix_h06_h07_h10`), `uq_one_active_per_user` (partial UNIQUE on `user_id WHERE status = 'active'`)
+**Constraints:** `CHECK(1 ≤ star_rating ≤ 5)` (`ck_game_session_star_range`), `CHECK(score ≥ 0)` (`ck_game_session_score_nonneg`), `CHECK(kills ≥ 0)` (`ck_game_session_kills_nonneg`), `CHECK(waves_survived ≥ 0)` (`ck_game_session_waves_nonneg`), `CHECK(hp ≥ 0)` (`ck_game_session_hp_nonneg`), `CHECK(gold ≥ 0)` (`ck_game_session_gold_nonneg`)  
+**Indexes:** `ix_game_session_user_id`, `ix_game_sessions_challenge_id`, `uq_one_active_per_user` (partial UNIQUE on `user_id WHERE status = 'active'`)
 
 ---
 
@@ -581,12 +581,10 @@ Stores the invested level for each talent node per user. Points are derived from
 | `user_id` | `String` (FK) | NO | → `users.id` ON DELETE **CASCADE** |
 | `talent_node_id` | `String(100)` | NO | — |
 | `current_level` | `Integer` | NO | DEFAULT `1`; `CHECK(current_level ≥ 1)` |
-| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; PG `BEFORE UPDATE` trigger `talent_allocations_update_timestamp` (`b2_fix_h06_h07_h10`) refreshes on every write |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; PG `BEFORE UPDATE` trigger `talent_allocations_update_timestamp` refreshes on every write |
 
 **Constraints:** `UNIQUE(user_id, talent_node_id)` (`uq_user_talent_node`), `CHECK(current_level ≥ 1)` (`ck_talent_level_min`)  
 **Indexes:** `ix_talent_allocation_user_id`
-
-> **Data note:** Migration `cc3d4e5f6a8b` (Balance Overhaul Phase 4 / Q10) `DELETE`s all rows where `talent_node_id = 'calculus_pet_hp'` — the node was renamed `calculus_pet_range` and `compute_remaining_talent_points` reads the missing allocations as available TP, so no application-level refund is needed.
 
 ---
 
@@ -604,7 +602,7 @@ A teacher-created territory game scoped to a class. After the `deadline`, settle
 | `settled` | `Boolean` | NO | DEFAULT `false` |
 | `settled_at` | `DateTime(tz)` | YES | — |
 | `settled_by` | `String` (FK) | YES | → `users.id` ON DELETE **SET NULL** (`fk_gt_activities_settled_by`) |
-| `student_slot_cap` | `Integer` | NO | DEFAULT `5`; SERVER DEFAULT `5`; `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Per-activity, teacher-configurable cap on how many slots a single student may simultaneously occupy. Default of 5 preserves the legacy hard-coded `TERRITORY_CAP_PER_STUDENT` value. |
+| `student_slot_cap` | `Integer` | NO | DEFAULT `5`; SERVER DEFAULT `5`; `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Per-activity, teacher-configurable cap on how many slots a single student may simultaneously occupy. |
 | `created_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`)  
@@ -622,7 +620,7 @@ Individual problem slots within a territory activity. Each slot has its own diff
 | `activity_id` | `String` (FK) | NO | → `grabbing_territory_activities.id` ON DELETE **CASCADE** |
 | `star_rating` | `Integer` | NO | `CHECK(1 ≤ star_rating ≤ 5)` |
 | `path_config` | `JSON` | YES | — |
-| `slot_index` | `Integer` | NO | `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`) — tightened from the original `>= 0` so the 50-slot cap (set by Pydantic `CreateActivityRequest.max_length=50`) is also enforced at the DB layer |
+| `slot_index` | `Integer` | NO | `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`) — combined with `UNIQUE(activity_id, slot_index)`, caps per-activity slot count at 50 at the DB layer, matching the application-layer limit (`CreateActivityRequest`, max 50 slots) |
 
 **Constraints:** `UNIQUE(activity_id, slot_index)` (`uq_territory_slot_activity_index`), `CHECK(1 ≤ star_rating ≤ 5)` (`ck_territory_slot_star_range`), `CHECK(slot_index BETWEEN 0 AND 49)` (`ck_territory_slot_index_range`)  
 **Indexes:** `ix_territory_slots_activity_id`
@@ -643,7 +641,7 @@ Records which student currently holds each slot, and via which game session. Bot
 | `occupied_at` | `DateTime(tz)` | NO | DEFAULT `now()` |
 
 **Constraints:** `UNIQUE(slot_id)` (`uq_territory_occupation_slot`), `UNIQUE(session_id)` (`uq_territory_occupation_session`)  
-**Indexes:** `ix_territory_occupations_student_id`, `ix_territory_occupations_student_slot (student_id, slot_id)` (created in `x8a9b0c1d2e3f`; present in the DB but **not declared on the ORM model**, so Alembic autogenerate will flag it).  
+**Indexes:** `ix_territory_occupations_student_id`, `ix_territory_occupations_student_slot (student_id, slot_id)` — backs per-student/per-slot ranking aggregation.  
 No standalone `ix_territory_occupations_slot_id` index exists — the `uq_territory_occupation_slot` unique constraint already creates a B-tree index that covers single-column `slot_id` lookups.
 
 ---
@@ -762,12 +760,12 @@ Bayesian stealth-assessment posteriors. One Beta distribution per (user, compete
 | Column | Type | Nullable | Constraints / Default |
 |---|---|---|---|
 | `user_id` | `String` (FK) | NO | PK component; → `users.id` ON DELETE **CASCADE** |
-| `competency` | `String(32)` | NO | PK component — competency code (e.g. `polynomial_curves`, `radar_targeting`) |
+| `competency` | `String(32)` | NO | PK component — competency code from the closed `Competency` enum (`MAGIC`, `RADAR`, `MATRIX`, `LIMIT`, `CALCULUS`, `CHAIN_RULE`, `PROBABILITY`) |
 | `alpha` | `Float` | NO | DEFAULT `1.0` (uniform prior); `CHECK(alpha > 0)` (`ck_competency_alpha_positive`) |
 | `beta` | `Float` | NO | DEFAULT `1.0` (uniform prior); `CHECK(beta > 0)` (`ck_competency_beta_positive`) |
-| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; PG trigger `user_competency_state_update_timestamp` (`b2_fix_h06_h07_h10`) auto-bumps on every UPDATE |
+| `updated_at` | `DateTime(tz)` | NO | DEFAULT `now()`; PG trigger `user_competency_state_update_timestamp` auto-bumps on every UPDATE |
 
-**Constraints:** Composite `PRIMARY KEY(user_id, competency)`, `CHECK(alpha > 0)`, `CHECK(beta > 0)` (both added in `c3_add_check_constraints`)
+**Constraints:** Composite `PRIMARY KEY(user_id, competency)`, `CHECK(alpha > 0)` (`ck_competency_alpha_positive`), `CHECK(beta > 0)` (`ck_competency_beta_positive`)
 
 ---
 
@@ -948,7 +946,7 @@ PostgreSQL type name: `sessionstatus`.
 | `ix_gt_activities_deadline` | `grabbing_territory_activities` | `deadline` | BTREE |
 | `ix_territory_slots_activity_id` | `territory_slots` | `activity_id` | BTREE |
 | `ix_territory_occupations_student_id` | `territory_occupations` | `student_id` | BTREE |
-| `ix_territory_occupations_student_slot` | `territory_occupations` | `(student_id, slot_id)` | BTREE (DB-only, not on ORM) |
+| `ix_territory_occupations_student_slot` | `territory_occupations` | `(student_id, slot_id)` | BTREE |
 | `ix_snap_activity_time` | `territory_rankings_snapshot` | `(activity_id, snapshot_at)` | BTREE |
 | `ix_snap_activity_student_time` | `territory_rankings_snapshot` | `(activity_id, student_id, snapshot_at)` | BTREE |
 | `ix_removed_memberships_student_id` | `removed_class_memberships` | `student_id` | BTREE |
@@ -969,7 +967,7 @@ PostgreSQL type name: `sessionstatus`.
 
 | Policy | Used for | Rationale |
 |---|---|---|
-| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id`; `leaderboard_entries.challenge_id`; `territory_rankings_snapshot.activity_id` / `.student_id`; **`territory_session_uses.session_id`**; the new `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` all CASCADE on `classes.id` / `users.id` | Deleting a parent cleans up all child rows automatically. `leaderboard_entries.challenge_id` is CASCADE so deleted challenges drop their rows instead of leaking into the board. `territory_session_uses.session_id` is CASCADE because RESTRICT would block user-deletion cascades; the replay risk is already gone once the parent `game_session` row is deleted |
+| **CASCADE** | Most student/class/session references; `session_events.session_id`; `user_competency_state.user_id`; `study_*.user_id`; `refresh_tokens.user_id`; `challenges.teacher_id`; `leaderboard_entries.challenge_id`; `territory_rankings_snapshot.activity_id` / `.student_id`; **`territory_session_uses.session_id`**; `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` all CASCADE on `classes.id` / `users.id` | Deleting a parent cleans up all child rows automatically. `leaderboard_entries.challenge_id` is CASCADE so deleted challenges drop their rows instead of leaking into the board. `territory_session_uses.session_id` is CASCADE because RESTRICT would block user-deletion cascades; the replay risk is already gone once the parent `game_session` row is deleted |
 | **SET NULL** | `leaderboard_entries.user_id`, `leaderboard_entries.session_id`, `game_sessions.challenge_id`, `territory_occupations.session_id`, `grabbing_territory_activities.settled_by` | Preserve history / audit trail when the referenced entity is removed |
 | **RESTRICT** | `classes.teacher_id` | Prevents deleting a teacher who still owns classes — operator must reassign first |
 | *(none / soft)* | `audit_logs.user_id` | Intentionally unlinked — must survive user deletion |
@@ -1000,66 +998,3 @@ PostgreSQL type name: `sessionstatus`.
 | 3 | 15 000 | 200 | 5 |
 | 4 | 50 000 | 300 | 5 |
 | 5 | 100 000 | 500 | 6 |
-
----
-
-## Alembic Migration History
-
-| Revision | Summary |
-|---|---|
-| `aec17830bec5` | Initial schema — `users`, `game_sessions`, `leaderboard_entries` |
-| `b1f4e7a2c0d9` | Add `login_attempts`, `denied_tokens` |
-| `c3f9d2e1a8b4` | Add `kills`, `waves_survived` to `game_sessions` |
-| `e5b2c9d4a1f7` | Indexes + leaderboard FK → SET NULL |
-| `f7a3b8c2d1e6` | V2 foundation — roles, classes, email-based auth |
-| `a1b2c3d4e5f6` | V2 level schema — replace level with `star_rating` |
-| `b2c3d4e5f6a7` | Add `kill_value` to `game_sessions` |
-| `c3d4e5f6a7b8` *(removed — see note)* | V2 achievement + talent tables |
-| `d4e5f6a7b8c9` | V2 grabbing territory tables |
-| `e6f7a8b9c0d1` | Session scoring fields (`time_exclude_prepare`, `total_score`) |
-| `f0a1b2c3d4e5` | Add `password_version` to `users` |
-| `g1b2c3d4e5f6` | Add `session_id` to `territory_occupations` |
-| `h2c3d4e5f6a7` | CHECK constraint `join_code = upper(join_code)` |
-| `i3d4e5f6a7b8` | Membership lifecycle — `removed_class_memberships`, teacher FK RESTRICT, `is_active` |
-| `j4e5f6a7b8c9` | `UNIQUE(teacher_id, name)` on `classes` |
-| `k5f6a7b8c9d0` | Add `territory_session_uses` (durable replay prevention) |
-| `l6a7b8c9d0e1` | FK on `territory_occupations.session_id` |
-| `m7b8c9d0e1f2` | Territory data integrity — `settled_at/settled_by`, slot uniqueness |
-| `58cbdc857a81` | Fix dropped tables (recreate `talent_allocations`, `user_achievements`, `removed_class_memberships`) |
-| `d5e6f7a8b9c0` | Email verification + MFA (`totp_secret`, `mfa_enabled`, `email_verification_tokens`) |
-| `e7f8a9b0c1d2` | Refresh tokens table (`refresh_tokens`) — rotating refresh-token store, hashed |
-| `f2a3b4c5d6e7` | TOTP replay guard column (`users.totp_last_used_at`) |
-| `n8c9d0e1f2a3` | Reflection text column (`game_sessions.reflection_text`) |
-| `o9d0e1f2a3b4` | Bayesian competency state table (`user_competency_state`) |
-| `p0e1f2a3b4c5` | Initial-Answer rolling accuracy column (`users.ia_recent_accuracy`) |
-| `q1f2a3b4c5d6` | Practice mode flag (`game_sessions.practice_mode`) |
-| `a3b4c5d6e7f8` | Lockout exponential-backoff counter (`login_attempts.lockout_count`) |
-| `r2a3b4c5d6e7` | **Merge migration** for branched chain (`q1f2a3b4c5d6` + `a3b4c5d6e7f8`) — also adds the `seasons` table |
-| `s3b4c5d6e7f8` | `challenges` table + `challenge_id` columns on `game_sessions` and `leaderboard_entries` |
-| `t4c5d6e7f8a9` | Replay foundation — `game_sessions.rng_seed` + append-only `session_events` table |
-| `u5d6e7f8a9b0` | Empirical Validity Probe — `study_enrollments` / `study_probe_attempts` / `study_affect_responses` |
-| `v6e7f8a9b0c1` | Replay protocol versioning — `game_sessions.replay_version SMALLINT NOT NULL DEFAULT 1`. Splits sessions into v1 (mulberry32+JS Math, ε=5e-4) vs v2 (PCG+WASM, bit-exact). Server-side recompute rejects v2 mismatches with HTTP 422 |
-| `w7f8a9b0c1d2` | Leaderboard challenge-cascade — change `leaderboard_entries.challenge_id` FK from `SET NULL` to `CASCADE` so deleted challenges drop their (capped-scoring) rows instead of leaking them into the global/per-level board |
-| `x8a9b0c1d2e3f` | Territory ranking aggregation support — add composite index `ix_territory_occupations_student_slot (student_id, slot_id)` and new `territory_rankings_snapshot` table (+ `ix_snap_activity_time`, `ix_snap_activity_student_time`) so rankings endpoint computes rank deltas without a periodic worker |
-| `y9b0c1d2e3f4` | `territory_session_uses.session_id` FK — add `RESTRICT` FK to `game_sessions.id` to block orphan inserts and prevent cascading deletes from reopening the replay-prevention window |
-| `z0c1d2e3f4a5` | Create `audit_logs` table — the ORM model and `audit_logger` existed since early development but no migration ever created the table; all audit events were silently dropped. Adds composite indexes `(user_id, created_at)` and `(event_type, created_at)` |
-| `aa1d2e3f4a6` | Server-derived preview flag (`game_sessions.is_preview`) — true when a non-student (teacher/admin) created the session. `LeaderboardInsertHandler` skips these so they never reach public ranking tables; mirrors `practice_mode` exclusion semantics. Branches off `z0c1d2e3f4a5` in parallel with the `a1_widen_totp` chain |
-| `a1_widen_totp` | Widen `users.totp_secret` from `String(64)` → `String(255)` to fit Fernet-encrypted ciphertext. Linear chain on top of `z0c1d2e3f4a5` |
-| `b2_fix_h06_h07_h10` | Schema + trigger fixes: adds `ix_game_sessions_challenge_id`; adds Postgres `BEFORE UPDATE` triggers on `users`, `talent_allocations`, `user_competency_state` to keep `updated_at` current; backfills `NOT NULL` on `game_sessions.status / current_wave / gold / hp / score`; adds `leaderboard_entries.total_score Float NULL` |
-| `c3_add_check_constraints` | CHECK constraints — non-negativity on `game_sessions.score / kills / waves_survived / hp / gold`; `alpha > 0`, `beta > 0` on `user_competency_state`; `ia_recent_accuracy BETWEEN 0.0 AND 1.0` on `users` |
-| `d4_drop_redundant_constraints` | Redundant-index cleanup — drop `ix_territory_occupations_slot_id` (covered by `uq_territory_occupation_slot`) and `uq_study_enrollment` (covered by composite PK) |
-| `e5_territory_session_use_cascade` | Relax `territory_session_uses.session_id` FK from RESTRICT → CASCADE. RESTRICT blocked user-deletion cascades (`GameSession.user_id` is CASCADE), and the replay risk is moot once the parent session row is deleted |
-| `bb2c3d4e5f7a` | **Merge migration** for the two heads `aa1d2e3f4a6` and `e5_territory_session_use_cascade`. Also expands `classes` for Tier-C class management: adds `description / subject / school_year / capacity / color / icon / archived_at` plus `ck_classes_capacity_positive` and `ix_classes_archived_at`; creates `class_co_teachers`, `class_pending_invites`, `class_groups`, `class_group_members` |
-| `cc3d4e5f6a8b` | Balance Overhaul Phase 4 (Q10): `DELETE FROM talent_allocations WHERE talent_node_id = 'calculus_pet_hp'`. Node was renamed `calculus_pet_range`; orphaned allocations are removed so spent-TP recovery (`achievement_service.compute_remaining_talent_points`) reflects the rename automatically |
-| `dd4e5f6a7b8c` | Tighten `territory_slots.slot_index` CHECK from `>= 0` to `BETWEEN 0 AND 49`. Combined with the existing `UNIQUE(activity_id, slot_index)` and sequential 0-based assignment, this caps per-activity slot count at 50 at the DB layer (matching `CreateActivityRequest.max_length=50`) so paths that bypass the application service still can't exceed the limit. Renames constraint `ck_territory_slot_index_nonneg` → `ck_territory_slot_index_range` |
-| `ee5f6a7b8c9d` | Add `grabbing_territory_activities.student_slot_cap INTEGER NOT NULL DEFAULT 5` plus `CHECK(student_slot_cap BETWEEN 1 AND 50)` (`ck_gt_activity_student_slot_cap_range`). Surfaces the previously hard-coded `TERRITORY_CAP_PER_STUDENT = 5` as a per-activity, teacher-configurable column; default of 5 preserves existing behaviour for backfilled rows |
-| `ff6a7b8c9d0e` | Add `users.endpoint_marker_style String(16) NULL`, `users.endpoint_marker_custom_dataurl Text NULL`, `users.endpoint_hit_fx String(16) NULL` plus CHECK allowlists `ck_user_endpoint_marker_style` (NULL or `star`/`gorilla`/`custom`) and `ck_user_endpoint_hit_fx` (NULL or `random`/`fragments`/`crying`/`angry`). Moves the endpoint-marker (P\*) display preferences from localStorage-only to server-side persistence so the player's choice follows them across devices. All columns nullable with no server default — legacy rows stay valid and NULL means the FE uses its local default |
-| `d1a2b3c4e5f6` | Drop `users.avatar_url` (the preset-SVG avatar feature was removed in favour of the "initials + colour" badge). `avatar_url` was originally added as `String(500) NULL` in `f7a3b8c2d1e6`; downgrade re-adds it with that definition. Linear chain on top of `ff6a7b8c9d0e` |
-| `e2c3d4f5a6b7` | Add `users.profile_initials_letters String(2) NULL` + `users.profile_initials_color String(7) NULL` with paired CHECK `ck_user_profile_initials_paired` (both NULL or both set; 1–2 letters; colour `LIKE '#______'`). Moves the "initials + colour" avatar from a single shared localStorage key (`mdf.profileInitials` — two accounts on one browser overwrote each other) to per-user server-side persistence so the choice follows the player across devices |
-| `f3d4e5a6b7c8` | **Current head.** V3 score-scale reset. NULLs legacy `total_score` on `game_sessions` + `leaderboard_entries` so `COALESCE(total_score, score)` falls back to the integer `score` on a comparable scale (the V3 core spans tens to ~1e5 vs the old V2 ~1.x values, which would otherwise sort every pre-V3 row below every new row), and resets territory standings (`DELETE` from `territory_occupations`, `territory_session_uses`, `territory_rankings_snapshot` — their `score`/`territory_value` were old-scale snapshots taken at seize/settle time). Data-only and irreversible; `downgrade()` is a no-op |
-
-> **Branched history**: Two parallel merges exist in the chain.
-> 1. After `q1f2a3b4c5d6` (gameplay — practice mode) and `a3b4c5d6e7f8` (auth — lockout backoff), `r2a3b4c5d6e7` merges them and also creates the `seasons` table.
-> 2. After `z0c1d2e3f4a5` (audit_logs), the chain again forked into the `is_preview` branch (`aa1d2e3f4a6`) and the constraint-tightening chain (`a1_widen_totp` → `b2_fix_h06_h07_h10` → `c3_add_check_constraints` → `d4_drop_redundant_constraints` → `e5_territory_session_use_cascade`). `bb2c3d4e5f7a` merges those two heads while also shipping the class-feature expansion. `f3d4e5a6b7c8` is the current single head (linear chain `bb2c3d4e5f7a` → `cc3d4e5f6a8b` → `dd4e5f6a7b8c` → `ee5f6a7b8c9d` → `ff6a7b8c9d0e` → `d1a2b3c4e5f6` → `e2c3d4f5a6b7` → `f3d4e5a6b7c8`).
-
-> **Earlier history**: `c3d4e5f6a7b8_v2_achievement_talent.py` was removed from the `alembic/versions/` directory. `d4e5f6a7b8c9_v2_territory.py` was edited to point its `down_revision` directly at `b2c3d4e5f6a7`, bypassing `c3d4e5f6a7b8` in the live migration chain. Migration `58cbdc857a81` later recreated the three tables that `c3d4e5f6a7b8` was meant to create.

@@ -1,14 +1,14 @@
 # WASM Math Engine
 
-High-performance math module for Math Defense, written in C99 and compiled to WebAssembly via Emscripten. It implements the numerically intensive operations that back the game's tower mechanics (matrix transforms, sector hit-tests, trapezoid integration, curve evaluation), plus the bit-deterministic replay-v2 primitives (PCG PRNG, level generation, intersection/spawn solvers) and the canonical score formula. Every function also has a pure-TypeScript fallback in `WasmBridge.ts`, so the game remains fully playable even if the WASM module fails to load.
+High-performance math module for Math Defense, written in C99 and compiled to WebAssembly via Emscripten. It implements the game's math primitives — matrix transforms, sector hit-tests, trapezoid integration, curve evaluation — plus the bit-deterministic replay-v2 primitives (PCG PRNG, level generation, intersection/spawn solvers) and the canonical score formula. Most functions have a pure-TypeScript fallback in `WasmBridge.ts`; the two determinism-critical paths are deliberate exceptions — the PRNG falls back to `mulberry32` (replay-v1 semantics, not bit parity) and `generate_level` has no fallback at all (the bridge returns `null` without WASM) — so replay-v2 sessions require a successful `initWasm()`.
 
 ---
 
 ## Why WASM?
 
-The core tower mechanics drive tight numerical loops every frame — point-in-sector checks for every enemy per Radar system tick, sector coverage area calculations, matrix transformations, and integration for Calculus tower damage. A compiled binary runs these noticeably faster than interpreted JS and keeps the math layer decoupled from both the UI and the DOM.
+Two reasons. First, **bit-determinism**: `replay_version=2` requires every client and the server-side verifier to reproduce the exact same floating-point stream. Compiling the PRNG, curve evaluator, intersection/spawn solvers, level generator, and score core to WASM (with musl libm in the bytecode) yields byte-identical results across browser engines and wasmtime — something JS `Math.*` cannot promise. Second, **hot loops**: level generation rejection-samples up to 8 × 50 candidate layouts, each requiring intersection scans and bisection refinement over multiple curves; a compiled binary runs these tight numerical loops faster than interpreted JS and keeps the math layer decoupled from both the UI and the DOM.
 
-The frontend always calls the bridge (`WasmBridge.*`); it never imports `math_engine.js` directly. `WasmBridge.test.ts` asserts that the JS fallback and WASM output agree on boundary cases.
+The frontend always calls the bridge (`WasmBridge.*`); it never imports `math_engine.js` directly. The `*.wasm.test.ts` suites load the real binary under Node and assert that the JS fallback and WASM output agree on boundary cases (`WasmBridge.test.ts` itself runs under happy-dom, where the binary cannot load, so it exercises only the JS fallback).
 
 ---
 
@@ -16,7 +16,7 @@ The frontend always calls the bridge (`WasmBridge.*`); it never imports `math_en
 
 ```
 wasm/
-├── math_engine.c    Tower mechanics — matrix, sector, integrate, score (C99)
+├── math_engine.c    Matrix, sector, integration, pow, score core (C99)
 ├── prng.c / prng.h  PCG XSL-RR 64/32 PRNG used by replay v2
 ├── curve.c / curve.h
 │                    Curve evaluator/derivative/in-domain for the 3 families
@@ -108,16 +108,15 @@ shape, and a determinism-critical FP flag set:
 floating-point output across every WASM engine that runs the binary. Three
 properties hold simultaneously:
 
-1. emcc compiles musl libc into the `.wasm`, so `sinf`, `cosf`, `logf`,
-   `asinf`, `acosf` ship as WASM bytecode — not as host-engine intrinsics.
+1. emcc compiles musl libc into the `.wasm`, so the libm calls these TUs
+   make — `sinf`, `cosf`, `logf`, `atan2f`, `sqrtf`, `fmodf`, `ceilf`,
+   `pow`, `sqrt` — ship as WASM bytecode, not as host-engine intrinsics.
 2. WASM runtimes interpret that bytecode byte-for-byte (no SIMD relaxation
    we use) and never substitute their own transcendentals.
 3. The FP flags above prevent the C compiler from rewriting expressions in
    ways that would diverge between toolchain versions.
 
 The parity tests under `frontend/src/math/*.wasm.test.ts` pin this contract.
-A future host-clang `parity_test.c`
-will extend the guarantee to a non-WASM build of the same TUs.
 
 ### Clean
 
@@ -134,7 +133,7 @@ cd wasm
 make regenerate-fixtures
 ```
 
-This runs `scripts/regenerate_score_fixtures.py`, which loads the Python mirror (`backend/app/domain/scoring/score_calculator.py`) and re-evaluates the canonical input matrix defined in the script. The input matrix is the source of truth for "what cases we care about"; add a new entry there when you introduce a new branch in the formula. The required order of operations during a formula change is documented at the top of that script.
+This runs `scripts/regenerate_score_fixtures.py`, which re-evaluates the canonical input matrix defined in the script. Expected values come from the WASM build (loaded via `wasm_runtime.get_total_score_fn`) when wasmtime and a fresh binary are available, and otherwise from the Python mirror (`backend/app/domain/scoring/score_calculator.py`); the script prints which path it used so a reviewer can sanity-check the fixture diff. The input matrix is the source of truth for "what cases we care about"; add a new entry there when you introduce a new branch in the formula. The required order of operations during a formula change is documented at the top of that script.
 
 ---
 
@@ -150,7 +149,7 @@ All functions are exposed as C symbols prefixed with `_` (Emscripten convention)
 void matrix_multiply(const float *a, const float *b, float *result);
 ```
 
-Standard 2×2 matrix multiplication. `a`, `b`, `result` are flat 4-float arrays `[a00, a01, a10, a11]`. Used by the **Matrix** tower to compose rotation/scaling transformations.
+Standard 2×2 matrix multiplication. `a`, `b`, `result` are flat 4-float arrays `[a00, a01, a10, a11]` (row-major). Reference implementation of the **Matrix** tower's linear-transform math; the live `MatrixTowerSystem.ts` runs in pure JS, so this export is exercised by the parity suites rather than the game loop.
 
 ---
 
@@ -160,7 +159,7 @@ Standard 2×2 matrix multiplication. `a`, `b`, `result` are flat 4-float arrays 
 float sector_coverage(float radius, float angle_width);
 ```
 
-Area of a circular sector: `0.5 · r² · θ`. Used by the **Radar A** tower for damage scaling by coverage.
+Area of a circular sector: `0.5 · r² · θ`, with `angle_width` clamped to `[0, 2π]` so over-stacked arc buffs cannot return an area larger than the full circle. Reference implementation of the **Radar** towers' coverage math; pinned by the parity suites, not called from the game loop.
 
 ---
 
@@ -177,7 +176,7 @@ int point_in_sector(
 // returns: 1 inside, 0 outside
 ```
 
-Point-in-sector hit test. Core per-tick check for the **Radar A**, **Radar B**, and **Radar C** towers.
+Point-in-sector hit test (`angle_width` clamped to `[0, 2π]`, matching `sector_coverage`). Reference implementation of the **Radar** towers' hit-test math; the live per-tick targeting check is the pure-JS `RadarTargeting.ts`, so this export is exercised by the parity suites rather than the game loop.
 
 ---
 
@@ -191,7 +190,7 @@ float numerical_integrate(
 );
 ```
 
-Trapezoid-rule approximation of `∫[lo,hi] |a·x² + b·x + c| dx` with `n` subdivisions (defaulted to 100 if non-positive). Each sample's `|y|` is taken before the sum, so the result is the area between the curve and the x-axis rather than the signed integral. Used by the **Calculus** tower to compute damage from the player's chosen function.
+Trapezoid-rule approximation of `∫[lo,hi] |a·x² + b·x + c| dx` with `n` subdivisions (defaulted to 100 if non-positive). Each sample's `|y|` is taken before the sum, so the result is the area between the curve and the x-axis rather than the signed integral. Used by the **Calculus** tower to compute damage from the player's chosen coefficients (called from `IntegralPanel.vue`).
 
 ---
 
@@ -229,8 +228,8 @@ need to encode variable-length prep arrays. The modern v2 client omits
 client *does* submit one, a v2 session whose value diverges from the
 server recompute by more than `1e-4` is rejected with HTTP 422 +
 `replay_mismatch`. Any change to this function MUST be mirrored in both
-fallbacks (TS / Python) and the parity fixtures regenerated (see the
-rebuild steps at the top of this file).
+fallbacks (TS / Python) and the parity fixtures regenerated (see
+§*Regenerate score parity fixtures* above).
 
 ---
 
@@ -260,9 +259,10 @@ double   prng_next_f64 (prng_t *r);   /* [0, 1), 53-bit mantissa */
 ```
 
 PCG XSL-RR 64/32 (O'Neill, public domain). Pure integer arithmetic — same
-cross-engine determinism guarantee as `mulberry32`, but with 128-bit state
-and a stream-id channel (`inc`) for splitting `level_rng` from
-`gameplay_rng`. `prng_next_f64` builds a `[0, 1)` double from two `u32`
+cross-engine determinism guarantee as `mulberry32`, but with 64-bit state
+(period 2⁶⁴ instead of mulberry32's 2³²) and a 64-bit stream-selector
+(`inc`) for splitting `level_rng` (stream 0) from `gameplay_rng`
+(stream 1). `prng_next_f64` builds a `[0, 1)` double from two `u32`
 draws as `(top26 * 2^27 + bot27) / 2^53`; rounding never enters because each
 intermediate is exactly representable. Used by `Game.setSeed` when WASM is
 loaded.
@@ -398,11 +398,12 @@ the failure rather than silently falling back to a v1 level (see
 `LevelSelectView.startLevel` for why mixing v1 and v2 layouts breaks
 replay).
 
-> **Polynomial-only**: as of the V3 fraction fill-in rework, the level
-> generator emits polynomials exclusively. Trig and log multiset wire codes
-> (the historical 100 / 101 / 200) were removed from `level_gen.h`. The
-> trig/log curve families still exist in `curve.h` for the Magic tower's
-> function-curve overlay — the generator just never selects them.
+> **Polynomial-only**: the level generator emits polynomials exclusively —
+> the multiset wire codes are the polynomial degrees `1 | 2 | 3`
+> (`MultisetEntry` in `frontend/src/data/difficulty-defs.ts`). The trig/log
+> curve families in `curve.h` back the curve evaluator's other consumers
+> (curve rendering and trigonometric enemy-path segments); the generator
+> never selects them.
 
 ---
 
@@ -431,9 +432,14 @@ Callers never see raw pointers; leaks from early `throw` are impossible.
 
 ## JavaScript Fallback
 
-Every WASM function has a pure-TypeScript equivalent in `WasmBridge.ts`. `initWasm()` is awaited once at app startup; on failure (network error, unsupported browser, build not run) the bridge transparently routes every subsequent call to the fallback. Game systems always import from `WasmBridge` — they are oblivious to which backend is active.
+Most WASM functions have a pure-TypeScript equivalent in `WasmBridge.ts`. `initWasm()` is awaited once at app startup; on failure (network error, unsupported browser, build not run) the bridge transparently routes subsequent calls to the fallback. Game systems always import from `WasmBridge` — they are oblivious to which backend is active.
 
-`isUsingWasm()` is exposed for diagnostics. `setUseWasm(false)` forces the fallback path (used by `WasmBridge.test.ts` to verify parity).
+Two deliberate exceptions:
+
+- **PRNG**: the fallback is `mulberry32`, not a JS re-implementation of PCG — it provides "some RNG", not bit parity, and ignores the stream id. Sessions on the fallback stay on the replay-v1 ε-tolerance budget; replay-v2 sessions require `initWasm()` to succeed.
+- **`generate_level`**: no fallback. `generateLevelDeterministic()` returns `null` when WASM is unavailable and the caller surfaces the failure.
+
+`isUsingWasm()` is exposed for diagnostics. `setUseWasm(false)` forces the fallback path (used by the `*.wasm.test.ts` parity suites).
 
 ---
 
@@ -441,20 +447,26 @@ Every WASM function has a pure-TypeScript equivalent in `WasmBridge.ts`. `initWa
 
 | Tower | WASM Function(s) |
 |---|---|
-| Magic | `curve_evaluate`, `curve_derivative`, `curve_in_domain` (function-curve overlay; family-aware) |
-| Radar A (Sweep) | `point_in_sector`, `sector_coverage` |
-| Radar B (Single-target) | `point_in_sector` |
-| Radar C (Slow powerful) | `point_in_sector` |
-| Matrix | `matrix_multiply` |
+| Magic | — (pure JS — `expressionParser.ts` evaluates the player-entered function) |
+| Radar A — Sweep | — (pure JS targeting in `RadarTargeting.ts`; `point_in_sector` / `sector_coverage` mirror this math and are parity-tested) |
+| Radar B — Rapid | — (same pure-JS targeting path) |
+| Radar C — Sniper | — (same pure-JS targeting path) |
+| Matrix | — (pure JS in `MatrixTowerSystem.ts`; `matrix_multiply` mirrors the transform math and is parity-tested) |
 | Limit | — (pure JS — limit question generation and outcome resolution) |
-| Calculus | `numerical_integrate` |
+| Calculus | `numerical_integrate` (called from `IntegralPanel.vue`) |
 
-The level generator (`generate_level`, `find_pair_intersections`,
-`find_all_curves_common_point`, `count_common_intersections_in_interval`,
-`compute_spawn_points`) is shared infrastructure — not bound to a single
-tower. Score recomputation (`compute_total_score`, with `power_f64` as
-the underlying determinism-pinned primitive) backs the backend
-score-recompute path; replay-v2 PRNG (`prng_seed` / `prng_next_u32` /
-`prng_next_f64`) is the gameplay random stream.
+The remaining exports are not bound to a single tower:
 
-> **Historical note**: Earlier V1 versions included Function Cannon, Integral Cannon, Fourier Shield, and Probability Shrine, which carried four extra C exports (`calculate_trajectory`, `fourier_composite`, `fourier_match`, `line_circle_intersect`). The V2 redesign (Phase 5, April 2026) unified them into 7 concept-based towers, and those exports were dropped from the binary in May 2026 once V2 was confirmed not to need them.
+- The curve evaluator (`curve_evaluate` / `curve_derivative` /
+  `curve_in_domain`) backs `curve-evaluator.ts`, whose consumers are the
+  level generator, the enemy-path builder (including trigonometric path
+  segments), the curve renderer, and the initial-answer view.
+- The level generator group (`generate_level`, `find_pair_intersections`,
+  `find_all_curves_common_point`, `count_common_intersections_in_interval`,
+  `compute_spawn_points`) is shared infrastructure behind
+  `level-generator.ts`, `intersection-solver.ts`, and `spawn-calculator.ts`.
+- Score recomputation (`compute_total_score`, with `power_f64` as the
+  underlying determinism-pinned primitive) backs the frontend score display
+  and the backend score-recompute path.
+- The replay-v2 PRNG (`prng_seed` / `prng_next_u32` / `prng_next_f64`) is
+  the gameplay random stream, seeded via `Game.setSeed`.

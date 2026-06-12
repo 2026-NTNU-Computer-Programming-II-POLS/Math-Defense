@@ -247,7 +247,7 @@ The following values must be set via environment variables or an `.env` file and
 | `SEED_DEMO_USER` | Default off. Enables the three fixed-credential development accounts, and only takes effect when `FRONTEND_URL` also looks local (`localhost`, `127.0.0.1`, `0.0.0.0`, `.local`, `.test`). Leave unset in production |
 | `WASM_ENGINE_PATH` | Optional override for the score-engine binary. The path is resolved strictly and must be an existing `.wasm` file, otherwise it is rejected with a warning and the default search paths are used |
 
-The application detects whether `SECRET_KEY` came from the process environment or an `.env` file at startup and logs a one-line confirmation that the key was loaded; missing values are logged at `ERROR` (and Pydantic also raises before the log line is reached). Changing the secret key invalidates all issued JWTs immediately.
+At startup the application logs a one-line confirmation that `SECRET_KEY` was loaded; a missing value is logged at `ERROR` (and Pydantic also raises before the log line is reached). Changing the secret key invalidates all issued JWTs immediately.
 
 **Important for operators**: The `.env` file must not be committed to version control. The repository provides a `.env.example` template with placeholder values. If real credentials have ever been committed to your repository's history, they should be treated as compromised and rotated, and the history should be cleaned with a tool such as `git-filter-repo`.
 
@@ -275,7 +275,7 @@ PostgreSQL constraints provide a last line of defence below the application-laye
 
 - `CHECK` constraints on `game_sessions` require `score`, `kills`, `waves_survived`, `hp`, and `gold` to be non-negative.
 - `CHECK` constraints on `user_competency_state` require `alpha > 0` and `beta > 0` so the spaced-repetition math remains well-defined.
-- `UNIQUE` constraints back the security-critical token tables: `denied_tokens.jti` (deny-list), `refresh_tokens` token-hash columns, and `leaderboard.session_id` (the legacy `email_verification_tokens` table retains its unique token column but is no longer written to).
+- Uniqueness guarantees back the security-critical token tables: `denied_tokens.jti` is the deny-list table's primary key, and `UNIQUE` constraints cover `refresh_tokens.token_hash` and `leaderboard.session_id` (the legacy `email_verification_tokens` table retains its unique token column but is no longer written to).
 
 These constraints mean that a bug that lets a negative score or a duplicate jti through the application layer is rejected at the database boundary rather than persisted.
 
@@ -293,7 +293,7 @@ CI (`.github/workflows/ci.yml`) runs `pip-audit -r requirements.txt` against bac
 - The frontend production container uses `nginxinc/nginx-unprivileged`, which binds to an unprivileged port and does not run as root.
 - In the production Docker Compose configuration, the database port is not exposed to the host; only the nginx container has externally bound ports (80 and 443).
 - Development Docker Compose binds services to `127.0.0.1` only, not `0.0.0.0`.
-- All production services drop every Linux capability (`cap_drop: [ALL]`) and set `security_opt: [no-new-privileges:true]`, so a compromised process cannot regain elevated privileges via setuid binaries.
+- All production services set `cap_drop: [ALL]` and `security_opt: [no-new-privileges:true]`, so a compromised process cannot regain elevated privileges via setuid binaries. The backend, frontend, and backup containers run with no Linux capabilities at all; the postgres container adds back the five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, `SETUID`) its official entrypoint needs to initialise the data directory and drop to the `postgres` user.
 - Backend and frontend containers run with a read-only root filesystem in production; only explicitly declared `tmpfs` and named-volume mounts are writable.
 - The production compose declares a `healthcheck` for `postgres`, `backend`, and `frontend`; the `db-backup` service (a `crond` loop that runs `pg_backup.sh` daily at 02:00 UTC) has no healthcheck. The development compose adds healthchecks for `postgres` and `backend` only — the Vite dev server is left without one because reload-driven restarts make the signal noisy.
 

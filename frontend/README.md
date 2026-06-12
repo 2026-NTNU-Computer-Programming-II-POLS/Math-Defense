@@ -36,7 +36,7 @@ frontend/
 │   │   ├── ScoreResultView.vue     Post-game score breakdown (S1/S2/K/TotalScore)
 │   │   ├── LeaderboardView.vue     Score table
 │   │   ├── ProfileView.vue         User profile + initials-avatar editor (letters + tower-palette colour) + achievement/talent summary cards + endpoint-marker customization (star/gorilla/custom image upload, hit-FX picker)
-│   │   ├── AchievementView.vue     Achievement gallery (5 categories, season multipliers)
+│   │   ├── AchievementView.vue     Achievement gallery (6 categories, season multipliers)
 │   │   ├── TalentTreeView.vue      Talent tree allocation UI (26 nodes, 7 tower types)
 │   │   ├── ClassView.vue           Student: list/join classes; Teacher: create/manage classes
 │   │   ├── AdminView.vue           Admin dashboards for teachers / classes / students / seasons
@@ -91,9 +91,9 @@ frontend/
 │   │   │   ├── TargetingModePanel.vue Per-tower targeting-mode picker (closest / strongest / first / last)
 │   │   │   ├── AchievementToast.vue Toast for newly-unlocked achievements after session end
 │   │   │   ├── PrincipleOverlay.vue Post-wave card surfacing the mathematical principle exercised by the player's last move
-│   │   │   ├── BuffCardPanel.vue   (Legacy V1 — buff card draw overlay; superseded by ShopPanel)
-│   │   │   ├── FunctionPanel.vue   (Legacy V1 — quadratic a/b/c input)
-│   │   │   └── IntegralPanel.vue   (Legacy V1 — [a,b] interval input)
+│   │   │   ├── BuffCardPanel.vue   Buff-card draw overlay (dormant — the current flow never enters BUFF_SELECT; ShopPanel is the active buff UI)
+│   │   │   ├── FunctionPanel.vue   Piecewise-path HUD widget — reads `gameStore.pathPanel`, mounted inside HUD
+│   │   │   └── IntegralPanel.vue   [a,b] interval input panel (currently unreferenced)
 │   │   ├── teacher/
 │   │   │   └── CompetencyBar.vue   Beta-distribution bar for the teacher dashboard (mean ± uncertainty band)
 │   │   ├── territory/
@@ -148,9 +148,9 @@ frontend/
 │   │   ├── seasonService.ts                list, listAdmin, create (admin)
 │   │   ├── talentService.ts                getTree, getModifiers, allocate, reset
 │   │   ├── classService.ts                 Class CRUD + roster/groups/co-teachers/invites/reflections (createClass, listClasses, joinByCode, … many helpers)
-│   │   ├── adminService.ts                 getTeachers, getClasses, getStudents, createTeacher
+│   │   ├── adminService.ts                 getTeachers, getClasses, getStudents, createTeacher, setUserActive
 │   │   ├── rankingService.ts               getGlobal, getByClass, getInternal, getExternal
-│   │   ├── territoryService.ts             createActivity, listActivities, getActivity, playTerritory, getRankings, settleActivity
+│   │   ├── territoryService.ts             createActivity, listActivities, getActivity, playTerritory, getRankings, getRankingsWithMeta, getTerritoryRecommendation, settleActivity
 │   │   ├── territory/
 │   │   │   ├── challengeMode.ts            Per-slot challenge-mode helpers
 │   │   │   └── rankingSort.ts              Ranking sort + tiebreak helpers
@@ -263,7 +263,7 @@ frontend/
 │   │   ├── effects/EffectLayer.ts    Base class for transient-effect render systems (spawn/age/prune); extended by EndpointFXSystem
 │   │   ├── primitives.ts             Shared canvas primitives (text badges, bars, rings)
 │   │   ├── EnemyRenderer.ts          HP bar, shield bar (blue), helper aura circle, glyph-body sprites
-│   │   ├── TowerRenderer.ts          Math-instrument tower sprites (re-skinned in Visual Redesign)
+│   │   ├── TowerRenderer.ts          Math-instrument tower sprites
 │   │   ├── TowerLifecycleRenderer.ts Tower place / upgrade / refund VFX bursts
 │   │   ├── ProjectileRenderer.ts
 │   │   ├── ImpactEffectRenderer.ts   Projectile impact spark/ring VFX
@@ -271,7 +271,7 @@ frontend/
 │   │   ├── MagicZoneRenderer.ts      Function curve zone overlay
 │   │   ├── RadarRangeRenderer.ts     Arc + sweep visualisation
 │   │   ├── MatrixLaserRenderer.ts    Laser beam between matrix pair
-│   │   ├── PetRenderer.ts            Pet projectile sprites (cyan-fringe re-skin)
+│   │   ├── PetRenderer.ts            Pet projectile sprites (cyan-fringe styling)
 │   │   ├── LimitBurstRenderer.ts     Limit tower outcome burst (±∞ / ±C / 0 variants)
 │   │   ├── SpellEffectRenderer.ts    Expanding circle VFX for spells (gold-fringe spell glyphs)
 │   │   └── CombatFeedbackRenderer.ts Floating damage/heal numbers + hit flashes
@@ -312,7 +312,7 @@ frontend/
 │   │   ├── buff-defs.ts            Time-based buff/curse IDs, labels, effect strategies (30+ effects)
 │   │   ├── spell-defs.ts           4 spell definitions (Exponential/Asymptote/Impulse/Acceleration)
 │   │   ├── monty-hall-defs.ts      Kill-value thresholds per star rating; door reward pool
-│   │   ├── achievement-defs.ts     Achievement definitions (5 categories) — lint-tested against trait-praise vocabulary
+│   │   ├── achievement-defs.ts     Achievement definitions (6 categories) — lint-tested against trait-praise vocabulary
 │   │   ├── talent-defs.ts          26 talent node definitions (19 base + 7 tier-2 advanced, prereq chains across 7 tower types)
 │   │   ├── principle-defs.ts       7 mathematical-principle definitions surfaced by `PrincipleOverlay` after the matching gameplay moment
 │   │   ├── path-segment-types.ts   Piecewise path segment type constants
@@ -323,8 +323,10 @@ frontend/
 ├── public/
 │   ├── audio/                      WAV assets — procedurally synthesised by `scripts/synth-audio.py`
 │   ├── manual/                     In-game manual markdown (`game-mechanics.md`, `towers-and-enemies.md`)
+│   ├── monsters/                   Enemy illustration PNGs (one per enemy type + `_overview.png`) embedded by the manual markdown
+│   ├── towers/                     Tower illustration PNGs (one per tower type + `_overview.png`) embedded by the manual markdown
 │   ├── logo.png                    Math Defense brand mark — used as favicon + MenuView/AuthView hero
-│   ├── logo-V1.png                 Legacy V1 brand mark (kept for migration references)
+│   ├── logo-V1.png                 Former brand mark (not referenced by the app)
 │   └── icons.svg
 │
 ├── scripts/                        Repo tooling (run via `npm run …`)
@@ -424,7 +426,7 @@ interface GameState {
   shieldHitsRemaining: number
   shieldReductionFactor: number  // per-hit multiplier while shield absorbs (1 = inactive)
   goldMultiplier: number       // derived = 1 + goldMultiplierBonus (consumers read this)
-  goldMultiplierBonus: number  // additive accumulator owned by BuffSystem (Q15)
+  goldMultiplierBonus: number  // additive accumulator owned by BuffSystem
   freeTowerNext: boolean
   freeTowerCharges: number
   enemySpeedMultiplier: number // derived: max(0.1, 1 + enemySpeedBonus)
@@ -465,7 +467,7 @@ Valid transitions:
 
 Type-safe generic pub/sub. All event names and payload shapes live in the `GameEvents` interface in `Game.ts`. Every subscription returns an `unsubscribe()` function; `useGameLoop` collects these and calls them all on unmount. Every event must be registered in `engine/event-handlers/registry.ts` — `npm run event-registry-check` fails the build otherwise.
 
-Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_START/END`, `WAVE_START/END`, `TOWER_PLACED/SELECTED/PARAMS_SET/UPGRADE/REFUND`, `CAST_SPELL`, `TOWER_ATTACK`, `ENEMY_SPAWNED/KILLED/REACHED_ORIGIN`, `BUFF_PHASE_START/END`, `BUFF_CARD_SELECTED`, `BUFF_RESULT`, `BOSS_SHIELD_START/ATTEMPT/END`, `CHAIN_RULE_START/ANSWER/END`, `MONTY_HALL_TRIGGER/DOOR_SELECTED/SWITCH_DECISION/RESULT`, `GOLD_CHANGED`, `HP_CHANGED`, `SCORE_CHANGED`, `CANVAS_CLICK/HOVER`.
+Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_START/END`, `WAVE_START/END`, `TOWER_PLACED/SELECTED/PARAMS_SET/UPGRADE/REFUND`, `CAST_SPELL`, `TOWER_ATTACK`, `ENEMY_SPAWNED/KILLED/REACHED_ORIGIN`, `BUFF_PHASE_START/END`, `BUFF_CARD_SELECTED`, `BUFF_RESULT`, `BOSS_SPLIT`, `CHAIN_RULE_START/ANSWER/END`, `MONTY_HALL_TRIGGER/DOOR_SELECTED/SWITCH_DECISION/RESULT`, `GOLD_CHANGED`, `HP_CHANGED`, `SCORE_CHANGED`, `CANVAS_CLICK/HOVER`.
 
 ---
 
@@ -492,10 +494,9 @@ Events include: `PHASE_CHANGED`, `LEVEL_START/END`, `GAME_OVER`, `BUILD_PHASE_ST
 | `EconomySystem` | Gold on `ENEMY_KILLED` (`killValue × goldMultiplier`); HP damage on `ENEMY_REACHED_ORIGIN`; wave completion bonus |
 | `EndpointFXSystem` | On `ENEMY_REACHED_ORIGIN`, spawns a transient burst on the endpoint marker (P*): `fragments` (default) / `crying` / `angry`. Style read from `game.endpointFx` (set from `uiStore.endpointHitFx`); `random` resolves via `game.rng` so replays reproduce the same FX. Suppressed when the marker is hidden (`pathsVisible === false`) |
 
-There are **18 update systems** in `src/systems/` (the 17 above plus
-`EndpointFXSystem`); all are constructed and ordered in
-`engine/register-systems.ts`, which also registers the canvas renderers
-alongside them.
+There are **18 update systems** in `src/systems/` — all listed above; all are
+constructed and ordered in `engine/register-systems.ts`, which also registers
+the canvas renderers alongside them.
 
 ---
 
@@ -507,10 +508,10 @@ The engine knows nothing about Vue. `useGameLoop.ts` is the only bridge:
 onMounted:
   await initWasm()
   g = new Game(canvas)
-  registerSystems(g)                                      // engine/register-systems.ts
+  registerSystems(g, uiCallbacks)                         // engine/register-systems.ts
   g.towerModifierProvider = (towerType) => talentStore.getTowerModifiers(towerType)   // Pinia → engine
-  useEngineUiBridges(g)        // TOWER_PLACED → BuildPanel, TOWER_SELECTED, BuildHint, principle overlay
-  useEngineAudio(g)            // engine events → AssetManager (sfx + music bus)
+  bindEngineUiBridges(g)       // TOWER_PLACED → BuildPanel, TOWER_SELECTED, BuildHint, principle overlay
+  bindEngineAudio(g)           // engine events → AssetManager (sfx + music bus)
   useSessionSync().bind(g)     → backend session lifecycle
   gameStore.bindEngine(g)      → reactive state mirror
   g.start()
@@ -596,7 +597,7 @@ Also owns the **endpoint-marker** preferences (persisted to `localStorage` and s
 
 | Service | Methods |
 |---|---|
-| `api.ts` | `get` / `post` / `put` / `del` helpers — fetch wrapper with cookie-based session (`credentials: 'include'`), refresh-and-retry on 401, `ApiError` class (no `Authorization` header / no localStorage token) |
+| `api.ts` | `get` / `post` / `put` / `patch` / `delete` helpers — fetch wrapper with cookie-based session (`credentials: 'include'`), refresh-and-retry on 401, `ApiError` class (no `Authorization` header / no localStorage token) |
 | `imageCache.ts` | `loadImage(dataUrl)` / `getCached` / `evict` / `clearCache` — caches the player's custom endpoint-marker image as an `HTMLImageElement` |
 | `authService.ts` | `register(email, password, playerName, role='student')`, `login(email, password)`, `mfaChallenge(mfaToken, code)`, `me()`, `logout()`, `changePassword`, `updatePlayerName`, `updateEndpointMarker(payload)`, `updateProfileInitials(payload)` |
 | `sessionService.ts` | `create(...)`, `getActive()`, `update(id, patch)`, `end(id, result)`, `abandon(id)`, `submitReflection(id, text)`, `appendReplayEvents(...)`, `getReplay(id)` |
@@ -608,9 +609,9 @@ Also owns the **endpoint-marker** preferences (persisted to `localStorage` and s
 | `achievementService.ts` | `list()`, `summary()`, `unlockedIds()` (memoised set), `invalidateUnlockedIds()` |
 | `talentService.ts` | `getTree()`, `getModifiers()`, `allocate(nodeId)`, `reset()` |
 | `classService.ts` | Full class CRUD + roster + organisation: `createClass`, `listClasses`, `getClass`, `renameClass`, `updateClass`, `deleteClass`, `archiveClass` / `unarchiveClass`, `transferOwnership`, `addStudent` / `bulkAddStudents` / `removeStudent` / `moveStudent`, `listStudents`, `joinByCode`, `claimInvites`, `regenerateCode`, `joinQr`, co-teacher + invite + group + reflection + leaderboard/report helpers |
-| `adminService.ts` | `getTeachers()`, `getClasses()`, `getStudents()`, `createTeacher(payload)` |
+| `adminService.ts` | `getTeachers()`, `getClasses()`, `getStudents()`, `createTeacher(payload)`, `setUserActive(userId, isActive)` |
 | `rankingService.ts` | `getGlobal(level?, page, perPage)`, `getByClass(classId, level?, …)`, `getInternal(activityId)`, `getExternal(activityId)` |
-| `territoryService.ts` | `createActivity(payload)`, `listActivities(classId?)`, `getActivity(id)`, `playTerritory(activityId, slotId, sessionId)`, `getRankings(activityId)`, `settleActivity(activityId)` |
+| `territoryService.ts` | `createActivity(payload)`, `listActivities(classId?)`, `getActivity(id)`, `playTerritory(activityId, slotId, sessionId)`, `getRankings(activityId)`, `getRankingsWithMeta(activityId)`, `getTerritoryRecommendation(activityId)`, `settleActivity(activityId)` |
 | `territory/challengeMode.ts` | Per-slot challenge-mode constraint helpers |
 | `territory/rankingSort.ts` | Ranking sort + tiebreak helpers |
 | `assessmentService.ts` | `classPosteriors(classId)` — Beta posteriors per student/competency for the teacher dashboard |
@@ -644,7 +645,7 @@ powerF64(base, exp)                      // bit-deterministic pow via musl; used
 computeTotalScoreWasm(killValue, timeTotal, prepSum, costTotal,
                       healthOrigin, healthFinal, initialAnswer)  // score CORE (parity); score-calculator.ts then ×SCALE(=1)×difficulty(star) for display
 
-// ── PRNG (PCG XSL-RR 64/32, replay v2) ──
+// ── PRNG (WASM: PCG XSL-RR 64/32, replay_version=2; JS fallback: mulberry32, replay_version=1) ──
 createPrng(seed, stream?)                // allocates a PrngHandle (WasmPrngHandle or JsPrngHandle)
 prngNextU32(handle)                      // next uint32
 prngNextF64(handle)                      // next [0,1) double (53-bit mantissa)
@@ -696,8 +697,8 @@ generateLevelDeterministic(starRating, prngHandle, multiset)  // full rejection-
 | `/admin/classes` | `AdminView` | Requires admin |
 | `/admin/students` | `AdminView` | Requires admin |
 | `/admin/seasons` | `AdminView` | Requires admin — manage achievement-multiplier windows |
-| `/about` | `AboutView` | — — accessibility statement and project info |
-| `/teacher/challenges` | `ChallengeBuilder` | Requires teacher |
+| `/about` | `AboutView` | — |
+| `/teacher/challenges` | `ChallengeBuilder` | Requires teacher or admin |
 | `/challenge/:id` | `ChallengeView` | Requires auth |
 | `/challenge/:id/leaderboard` | `ChallengeLeaderboardView` | Requires auth |
 | `/replay/:sessionId` | `ReplayView` | Requires auth |
