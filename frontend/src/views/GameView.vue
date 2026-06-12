@@ -425,6 +425,9 @@ onBeforeUnmount(() => {
              drives the loop during WAVE, so it is wave-only too. -->
         <ShopPanel v-if="gameStore.isBuilding" />
         <GameSpeedPanel v-if="gameStore.isWave" />
+        <p v-if="gameStore.isWave" class="pause-hint-rail">
+          <kbd>Space</kbd> / <kbd>Esc</kbd> — Pause
+        </p>
 
         <!-- ACTIVE BUFFS label always shows; the token cards appear as buffs
              are acquired. -->
@@ -883,6 +886,25 @@ onBeforeUnmount(() => {
 }
 .btn-checkpoint.primary:hover {
   background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold) 100%);
+}
+
+/* Wave-phase pause keyboard hint in the left utility rail */
+.pause-hint-rail {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--charcoal-soft);
+  letter-spacing: 0.5px;
+}
+.pause-hint-rail kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--charcoal);
 }
 
 /* Backlog §20 — practice-mode badge */
