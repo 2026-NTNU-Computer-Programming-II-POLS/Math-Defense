@@ -1,6 +1,6 @@
 # Backend — FastAPI (DDD)
 
-REST API server for Math Defense: authentication (incl. refresh-token rotation, email verification, TOTP MFA), game-session lifecycle, leaderboard, classroom management, achievements/talents, grabbing-territory activities, generative challenges, deterministic replay + live spectate, Bayesian stealth assessment, adaptive recommendations, and the empirical-validity-probe study harness. The code is organised into **Domain / Application / Infrastructure** layers — routers are thin HTTP adapters, business rules live in aggregates, and SQLAlchemy is kept behind repository protocols. Domain code is HTTP-free; a dedicated `http_status_map.py` is the single translation point between a `DomainError` subclass and an HTTP status code.
+REST API server for Math Defense: authentication (incl. refresh-token rotation, TOTP MFA), game-session lifecycle, leaderboard, classroom management, achievements/talents, grabbing-territory activities, generative challenges, deterministic replay + live spectate, Bayesian stealth assessment, adaptive recommendations, and the empirical-validity-probe study harness. The code is organised into **Domain / Application / Infrastructure** layers — routers are thin HTTP adapters, business rules live in aggregates, and SQLAlchemy is kept behind repository protocols. Domain code is HTTP-free; a dedicated `http_status_map.py` is the single translation point between a `DomainError` subclass and an HTTP status code.
 
 ## Tech Stack
 
@@ -86,7 +86,7 @@ backend/
 │   │   ├── login_guard.py         Per-account login-attempt tracker — DB-backed; 5 failures/5-min window triggers exponential-backoff lockout (5m → 15m → 60m cap; tracked via `login_attempts.lockout_count`); `purge_stale()` used by the janitor
 │   │   ├── token_denylist.py      DB-backed JWT deny-list for server-side logout (jti → expiry); `purge_expired()` used by the janitor
 │   │   ├── audit_logger.py        record_audit_event() — writes to its own SQLAlchemy session so audit rows commit independently of the surrounding business txn
-│   │   ├── email_service.py       Thin SMTP wrapper for welcome/account-exists/verification/MFA mail; no-op when SMTP env is unset
+│   │   ├── email_service.py       Thin SMTP wrapper for welcome / account-exists mail; no-op when SMTP env is unset
 │   │   ├── scheduler.py           Background asyncio task runner (territory settlement loop)
 │   │   ├── spectate_hub.py        In-process pub/sub for live-spectate WebSocket fan-out (bounded queue per subscriber)
 │   │   ├── wasm_runtime.py        Singleton wasmtime-py runtime hosting the same math_engine.wasm the frontend ships; exposes power_f64 for v2 score recompute. Thread-safe; raises ReplayUnavailableError when WASM cannot load so v2 fails closed.
@@ -122,14 +122,14 @@ backend/
 │   │   ├── class_group.py         Named student sub-groups within a class
 │   │   ├── class_pending_invite.py  Pending email invites awaiting acceptance
 │   │   ├── removed_class_membership.py  Re-join blocklist
-│   │   ├── email_verification_token.py  One-use email tokens (retained passive table; verification subsystem removed — soft verification)
+│   │   ├── email_verification_token.py  One-use email tokens — unused legacy table; no email-verification flow exists
 │   │   ├── territory.py           GrabbingTerritoryActivity (incl. teacher-configurable `student_slot_cap` 1–50, default 5) + TerritorySlot (CHECK slot_index 0..49) + TerritoryOccupation
 │   │   ├── season.py              Season (windowed achievement multipliers; CHECK ends_at > starts_at)
 │   │   ├── challenge.py           Challenge (constraints JSONB; soft-delete via deleted_at)
 │   │   ├── competency_state.py    UserCompetencyState (composite PK user_id + competency; Beta α/β)
 │   │   ├── session_event.py       SessionEvent (append-only event log; UNIQUE(session_id, seq))
 │   │   ├── study.py               StudyEnrollment + StudyProbeAttempt + StudyAffectResponse
-│   │   └── audit_log.py           AuditLog (no FK on user_id — survives user deletion). See DATABASE_SCHEMA.md for the open schema-gap note.
+│   │   └── audit_log.py           AuditLog (no FK on user_id — survives user deletion)
 │   │
 │   ├── schemas/                   Pydantic request/response DTOs
 │   │   ├── auth.py · game_session.py · leaderboard.py · achievement.py · admin.py
@@ -180,7 +180,7 @@ backend/
 │   ├── test_leaderboard.py
 │   ├── test_session_aggregate.py          — pure aggregate unit tests
 │   ├── test_value_objects.py              — VO invariants
-│   ├── test_coverage_gaps.py              — audit-driven edge cases
+│   ├── test_coverage_gaps.py              — cross-cutting edge cases
 │   ├── test_domain_invariants.py          — cross-aggregate invariant tests
 │   ├── test_shared_constants_parity.py    — Python ↔ shared/game-constants.json parity
 │   ├── test_score_verify.py               — server-side score recomputation vs client claim
@@ -203,7 +203,7 @@ backend/
 │
 ├── requirements.txt               Runtime dependencies (FastAPI 0.136, SQLAlchemy 2.0, psycopg v3, Alembic 1.18, PyJWT, slowapi, bcrypt, pyotp, zxcvbn, wasmtime 45, etc.)
 ├── requirements-dev.txt           Includes runtime + pytest 9 / pytest-asyncio 1.4
-├── postgres/                      Helper scripts for the postgres service (init / role bootstrap)
+├── data/                          Bundled math_engine.wasm (copied to /app/data in the Docker image; wasm_runtime falls back to the frontend checkout path in dev)
 └── Dockerfile                     Two-stage build (emsdk wasm-builder → python:3.13-slim runtime)
 ```
 
@@ -231,7 +231,7 @@ Use-case orchestration. One method per user intent. Services depend on the `Unit
 - **`SessionApplicationService`** — `create_session` (abandons stale sessions >2h and any existing active one, with one IntegrityError retry against the partial-unique index), `get_active_for_user`, `update_session`, `abandon_session`, `end_session` (transitions to COMPLETED and dispatches `SessionCompleted` through the event bus), `attach_reflection`, `has_correct_ia_session`.
 - **`SessionEventBus`** (in `session_event_handlers.py`) — dispatches `SessionCompleted` to three independent handlers, each in its own UoW so a downstream failure cannot roll back the durable session row:
   1. `LeaderboardInsertHandler` — idempotent insert (skipped when `practice_mode` or `is_preview` is true); `ConstraintViolationError` on the unique session-id constraint is the expected duplicate-delivery outcome.
-  2. `AchievementCheckHandler` — evaluates the achievement registry; when an `AssessmentApplicationService` is wired, Beta-evidence rows for the unlocked achievements are written inside the same UoW via `apply_evidence_in_open_uow()` (H3 atomicity).
+  2. `AchievementCheckHandler` — evaluates the achievement registry; when an `AssessmentApplicationService` is wired, Beta-evidence rows for the unlocked achievements are written inside the same UoW via `apply_evidence_in_open_uow()`, so the unlock and its assessment evidence commit atomically.
   3. `IaAccuracyRefreshHandler` — recomputes the rolling Initial-Answer accuracy on the user aggregate.
 - **`LeaderboardApplicationService`** — per-level / class-scoped / challenge-scoped queries, manual `submit_score` fallback, and the personal timeline (`get_user_history`) — sourced from `GameSessionRepository.get_user_session_history()` (the caller's own completed `game_sessions`, **including** practice and teacher-preview runs) rather than the leaderboard table, with `is_personal_best` computed in the service. Public ranking boards remain leaderboard-table-backed.
 - **Other services** — `AchievementApplicationService`, `SeasonApplicationService`, `TalentApplicationService`, `ClassApplicationService`, `AdminApplicationService`, `TerritoryApplicationService`, `TerritoryRecommendationApplicationService`, `AssessmentApplicationService`, `RecommenderApplicationService`, `ChallengeApplicationService`, `ReplayApplicationService`, `StudyApplicationService`. All share one `SqlAlchemyUnitOfWork` per request (see `factories._get_uow`).
@@ -287,7 +287,7 @@ Base path: `/api`. Authenticated endpoints accept the JWT via either an HTTP-onl
 
 | Method | Path | Rate | Description |
 |---|---|---|---|
-| POST | `/api/auth/register` | 5/min | Submit registration. Enumeration-safe: always returns a fixed 202 with NO cookies and no user payload. New accounts get a welcome email, existing ones an account-exists notice; the user then signs in via `/login`. Verification is soft (no login gate) |
+| POST | `/api/auth/register` | 5/min | Submit registration. Enumeration-safe: always returns a fixed 202 with NO cookies and no user payload. New accounts get a welcome email, existing ones an account-exists notice; the user then signs in via `/login` (no email-verification gate) |
 | POST | `/api/auth/login` | 10/min | Authenticate; on success set cookies; if MFA required, return `mfa_required=true` + `mfa_token` |
 | POST | `/api/auth/logout` | 30/min | Revoke access JTI (deny-list) + revoke refresh token; clear cookies |
 | POST | `/api/auth/refresh` | 30/min | Rotate refresh token, mint new access cookie |
@@ -458,7 +458,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 |---|---|---|---|
 | POST | `/api/sessions/{session_id}/events` | 60/min | Recorder flushes a batch of session events (returns 202; idempotent via `(session_id, seq)`); fans out to live spectators via the in-process spectate hub |
 | GET | `/api/sessions/{session_id}/replay` | 30/min | Returns `rng_seed` + `replay_version` + `star_rating` + ordered event stream so `EventPlayer` can reconstruct the run |
-| WS | `/api/sessions/{session_id}/spectate` | — | WebSocket: sends a `snapshot` frame (history) then live `event` frames. Owner-only in v1. Periodic auth re-validation every 60 s closes long-lived idle sockets after a ban / password-rotate. |
+| WS | `/api/sessions/{session_id}/spectate` | — | WebSocket: sends a `snapshot` frame (history) then live `event` frames. Owner-only. Periodic auth re-validation every 60 s closes long-lived idle sockets after a ban / password-rotate. |
 
 ### Study — `/api/study` (Empirical Validity Probe)
 
@@ -500,7 +500,7 @@ Token: HS256 JWT, 15-minute expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTE
 | `is_active` | Boolean | Soft-ban flag; admin-controllable via `PATCH /api/admin/users/{id}/active` |
 | `password_hash` | String(255) | bcrypt hash |
 | `password_version` | Integer | Bumped on password change to invalidate older JWTs |
-| `is_email_verified`, `mfa_enabled`, `totp_secret`, `totp_last_used_at` | — | Verification + TOTP MFA (step-replay guard) |
+| `is_email_verified`, `mfa_enabled`, `totp_secret`, `totp_last_used_at` | — | `is_email_verified` is a legacy flag (no verification flow); the rest back TOTP MFA (`totp_last_used_at` = step-replay guard) |
 | `ia_recent_accuracy` | Float | Rolling fraction of last 10 IA-correct sessions; drives Star-1 concrete-fading |
 | `endpoint_marker_style` | String(16) | Nullable; CHECK ∈ `star`/`gorilla`/`custom`; player's P\* endpoint-marker style (NULL = FE default) |
 | `endpoint_marker_custom_dataurl` | Text | Nullable; PNG/JPEG data-URL for a custom endpoint marker (only valid when style = `custom`) |
@@ -608,7 +608,7 @@ docker compose up backend        # from project root (older installs: docker-com
 | `ALGORITHM` | No | JWT algorithm (default `HS256`) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Default `15` |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | No | Default `30` (sets refresh cookie `max-age`) |
-| `FRONTEND_URL` | Yes | Base URL used in outbound emails (verification links). Required — no default so production cannot silently emit links pointing at localhost. |
+| `FRONTEND_URL` | Yes | Base URL used in outbound emails (sign-in links in the welcome / account-exists mail). Required — no default so production cannot silently emit links pointing at localhost. |
 | `JWT_ISSUER` | No | Default `math-defense-api`. Bound into every JWT `iss` and required at decode time. |
 | `JWT_AUDIENCE` | No | Default `math-defense-clients`. Bound into every JWT `aud` and required at decode time. |
 | `PROXY_MODE` | No | Default `false`. When `true`, per-IP rate limiting reads the real client from `X-Forwarded-For`. |
@@ -625,7 +625,7 @@ docker compose up backend        # from project root (older installs: docker-com
 | `CSRF_ENABLED` | No | Default `true` outside the pytest/CI harness. `CsrfMiddleware` enforces a double-submit cookie on unsafe methods whenever the auth cookie is present. |
 | `DEBUG` | No | Default `false`. When `true`, mounts `/docs`, `/redoc`, `/openapi.json`. |
 
-> Schema is managed exclusively by Alembic — `lifespan` runs `alembic upgrade head` on boot. There is no `AUTO_CREATE_TABLES` toggle (removed during the PostgreSQL-only migration).
+> Schema is managed exclusively by Alembic — `lifespan` runs `alembic upgrade head` on boot.
 
 ---
 
@@ -634,7 +634,7 @@ docker compose up backend        # from project root (older installs: docker-com
 ```bash
 pytest                                       # 33 test files
 pytest tests/test_session_aggregate.py -v    # pure aggregate unit tests
-pytest tests/test_coverage_gaps.py -v        # audit-driven edge cases
+pytest tests/test_coverage_gaps.py -v        # cross-cutting edge cases
 pytest tests/test_territory.py -v            # territory integration tests
 pytest tests/test_competency_estimator.py -v # Beta posterior update rule
 pytest tests/test_assessment_router.py -v    # /api/assessment posteriors + RBAC
@@ -647,7 +647,7 @@ pytest tests/test_wasm_runtime.py -v         # WASM runtime lifecycle
 
 The test suite targets a dedicated PostgreSQL database (the dev DB name with a `_test` suffix; auto-created on first run). Each test truncates all tables before it starts so the suite shares one connection pool without cross-test pollution. Notable coverage includes:
 
-- Aggregate state-transition matrix (`SessionStatus × {update, complete, abandon}` — 12 cases)
+- Aggregate state-transition matrix (illegal `update / complete / abandon` calls across every `SessionStatus`)
 - Stale-session auto-abandon side-effect ordering (must commit *before* raising)
 - Per-level / per-class / per-challenge `dense_rank` partitioning
 - Real rate-limiter enablement (session create → 429 at 30/min)
